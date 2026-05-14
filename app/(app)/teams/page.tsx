@@ -20,7 +20,7 @@ export default async function TeamsPage() {
     .eq('user_id', user.id)
 
   const teamIds = (memberships ?? []).flatMap((m) => {
-    const t = m.teams as { id: string } | null
+    const t = m.teams as unknown as { id: string } | null
     return t?.id ? [t.id] : []
   })
 

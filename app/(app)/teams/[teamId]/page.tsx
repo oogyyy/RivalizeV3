@@ -130,11 +130,11 @@ export default async function TeamPage({
     return 'destructive' as const
   }
 
-  const roleIcon = { owner: Crown, admin: Shield, member: User }
-  const roleVariant = {
-    owner: 'neon' as const,
-    admin: 'warning' as const,
-    member: 'secondary' as const,
+  const roleIcon: Record<string, typeof Crown> = { owner: Crown, admin: Shield, member: User }
+  const roleVariant: Record<string, 'neon' | 'warning' | 'secondary'> = {
+    owner: 'neon',
+    admin: 'warning',
+    member: 'secondary',
   }
 
   return (
@@ -501,7 +501,7 @@ export default async function TeamPage({
             <Card className="bg-card border-border overflow-hidden">
               <div className="divide-y divide-border">
                 {(members ?? []).map((member) => {
-                  const profile = member.profiles as {
+                  const profile = member.profiles as unknown as {
                     id: string
                     username: string
                     display_name: string | null

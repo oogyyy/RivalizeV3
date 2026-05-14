@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
 
   const teams = (memberships ?? []).map((m) => ({
-    ...(m.teams as Record<string, unknown>),
+    ...(m.teams as unknown as Record<string, unknown>),
     userRole: m.role,
   })) as Array<{ id: string; name: string; slug: string; logo_url: string | null; userRole: string }>
 
