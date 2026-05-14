@@ -157,7 +157,7 @@ export default function AICoachPage() {
         .eq('user_id', user.id)
 
       const teamList = (memberships ?? [])
-        .map(m => m.teams as Team | null)
+        .map(m => (m.teams as unknown) as Team | null)
         .filter(Boolean) as Team[]
 
       setTeams(teamList)
