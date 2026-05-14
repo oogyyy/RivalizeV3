@@ -57,7 +57,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<'steam' | 'discord' | null>(null)
+  const [oauthLoading, setOauthLoading] = useState<'discord' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [usernameError, setUsernameError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -132,13 +132,13 @@ export default function SignupPage() {
     }
   }
 
-  async function handleOAuth(provider: 'steam' | 'discord') {
+  async function handleOAuth(provider: 'discord') {
     setError(null)
     setOauthLoading(provider)
 
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: provider === 'steam' ? 'steam' : 'discord',
+        provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
         },
@@ -189,18 +189,6 @@ export default function SignupPage() {
 
       {/* OAuth Buttons */}
       <div className="space-y-3 mb-6">
-        <button
-          onClick={() => handleOAuth('steam')}
-          disabled={loading || oauthLoading !== null}
-          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg border border-white/10 bg-[#1b2838] hover:bg-[#1b2838]/80 text-white font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {oauthLoading === 'steam' ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <SteamIcon />
-          )}
-          Continue with Steam
-        </button>
         <button
           onClick={() => handleOAuth('discord')}
           disabled={loading || oauthLoading !== null}

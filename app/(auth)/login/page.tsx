@@ -65,13 +65,13 @@ export default function LoginPage() {
     }
   }
 
-  async function handleOAuth(provider: 'steam' | 'discord') {
+  async function handleOAuth(provider: 'discord') {
     setError(null)
     setOauthLoading(provider)
 
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: provider === 'steam' ? 'steam' : 'discord',
+        provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
         },
@@ -96,18 +96,6 @@ export default function LoginPage() {
 
       {/* OAuth Buttons */}
       <div className="space-y-3 mb-6">
-        <button
-          onClick={() => handleOAuth('steam')}
-          disabled={loading || oauthLoading !== null}
-          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg border border-white/10 bg-[#1b2838] hover:bg-[#1b2838]/80 text-white font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {oauthLoading === 'steam' ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <SteamIcon />
-          )}
-          Continue with Steam
-        </button>
         <button
           onClick={() => handleOAuth('discord')}
           disabled={loading || oauthLoading !== null}
