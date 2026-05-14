@@ -75,7 +75,7 @@ export default async function TeamsPage() {
   }
 
   const teams: TeamEntry[] = (memberships ?? []).flatMap((m) => {
-    const team = m.teams as {
+    const team = m.teams as unknown as {
       id: string
       name: string
       slug: string
