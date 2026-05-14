@@ -107,6 +107,54 @@ ALTER TABLE demos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_folders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_sessions ENABLE ROW LEVEL SECURITY;
 
+-- Helper functions used by policies that need to inspect team_members.
+-- SECURITY DEFINER lets these checks avoid recursive RLS evaluation on team_members.
+CREATE OR REPLACE FUNCTION is_team_member(target_team_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM team_members
+    WHERE team_id = target_team_id
+      AND user_id = auth.uid()
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION is_team_admin(target_team_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM team_members
+    WHERE team_id = target_team_id
+      AND user_id = auth.uid()
+      AND role IN ('owner', 'admin')
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION is_team_creator(target_team_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM teams
+    WHERE id = target_team_id
+      AND created_by = auth.uid()
+  );
+$$;
+
 -- profiles
 CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
@@ -117,42 +165,38 @@ CREATE POLICY "Users can view their own settings" ON user_settings FOR SELECT US
 CREATE POLICY "Users can insert their own settings" ON user_settings FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update their own settings" ON user_settings FOR UPDATE USING (auth.uid() = user_id);
 
--- teams (safe to reference team_members now that it exists)
-CREATE POLICY "Team members can view teams" ON teams FOR SELECT USING (
-  auth.uid() IN (SELECT user_id FROM team_members WHERE team_id = teams.id)
-);
+-- teams
+CREATE POLICY "Team members can view teams" ON teams FOR SELECT USING (is_team_member(id));
 CREATE POLICY "Authenticated users can create teams" ON teams FOR INSERT WITH CHECK (auth.uid() = created_by);
-CREATE POLICY "Team owners and admins can update teams" ON teams FOR UPDATE USING (
-  auth.uid() IN (SELECT user_id FROM team_members WHERE team_id = teams.id AND role IN ('owner', 'admin'))
-);
+CREATE POLICY "Team owners and admins can update teams" ON teams FOR UPDATE USING (is_team_admin(id)) WITH CHECK (is_team_admin(id));
 
 -- team_members
 CREATE POLICY "Team members can view membership" ON team_members FOR SELECT USING (
-  auth.uid() IN (SELECT user_id FROM team_members tm WHERE tm.team_id = team_members.team_id)
+  auth.uid() = user_id OR is_team_member(team_id)
 );
-CREATE POLICY "Owners and admins can manage members" ON team_members FOR ALL USING (
-  auth.uid() IN (SELECT user_id FROM team_members tm WHERE tm.team_id = team_members.team_id AND tm.role IN ('owner', 'admin'))
+CREATE POLICY "Team creators can add themselves as owner" ON team_members FOR INSERT WITH CHECK (
+  auth.uid() = user_id AND role = 'owner' AND is_team_creator(team_id)
 );
-CREATE POLICY "Users can join teams (insert themselves)" ON team_members FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Owners and admins can add members" ON team_members FOR INSERT WITH CHECK (
+  is_team_admin(team_id) AND role IN ('admin', 'member')
+);
+CREATE POLICY "Owners and admins can update members" ON team_members FOR UPDATE USING (
+  is_team_admin(team_id)
+) WITH CHECK (
+  is_team_admin(team_id)
+);
+CREATE POLICY "Owners and admins can remove members" ON team_members FOR DELETE USING (
+  is_team_admin(team_id)
+);
 
 -- demos
-CREATE POLICY "Team members can view demos" ON demos FOR SELECT USING (
-  auth.uid() IN (SELECT user_id FROM team_members WHERE team_id = demos.team_id)
-);
-CREATE POLICY "Team members can upload demos" ON demos FOR INSERT WITH CHECK (
-  auth.uid() IN (SELECT user_id FROM team_members WHERE team_id = demos.team_id)
-);
-CREATE POLICY "Team members can update demos" ON demos FOR UPDATE USING (
-  auth.uid() IN (SELECT user_id FROM team_members WHERE team_id = demos.team_id)
-);
+CREATE POLICY "Team members can view demos" ON demos FOR SELECT USING (is_team_member(team_id));
+CREATE POLICY "Team members can upload demos" ON demos FOR INSERT WITH CHECK (is_team_member(team_id));
+CREATE POLICY "Team members can update demos" ON demos FOR UPDATE USING (is_team_member(team_id)) WITH CHECK (is_team_member(team_id));
 
 -- team_folders
-CREATE POLICY "Team members can view folders" ON team_folders FOR SELECT USING (
-  auth.uid() IN (SELECT user_id FROM team_members WHERE team_id = team_folders.user_team_id)
-);
-CREATE POLICY "Team members can manage folders" ON team_folders FOR ALL USING (
-  auth.uid() IN (SELECT user_id FROM team_members WHERE team_id = team_folders.user_team_id)
-);
+CREATE POLICY "Team members can view folders" ON team_folders FOR SELECT USING (is_team_member(user_team_id));
+CREATE POLICY "Team members can manage folders" ON team_folders FOR ALL USING (is_team_member(user_team_id)) WITH CHECK (is_team_member(user_team_id));
 
 -- ai_sessions
 CREATE POLICY "Users can manage their own AI sessions" ON ai_sessions FOR ALL USING (auth.uid() = user_id);

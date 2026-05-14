@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -27,9 +28,10 @@ export async function POST(request: Request) {
   }
 
   const { name, slug } = parsed.data
+  const admin = createAdminClient()
 
   // Check slug uniqueness
-  const { data: existing } = await supabase
+  const { data: existing } = await admin
     .from('teams')
     .select('id')
     .eq('slug', slug)
@@ -42,7 +44,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data: team, error } = await supabase
+  const { data: team, error } = await admin
     .from('teams')
     .insert({ name, slug, created_by: user.id })
     .select()
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
   // Add creator as owner
-  const { error: memberError } = await supabase.from('team_members').insert({
+  const { error: memberError } = await admin.from('team_members').insert({
     team_id: team.id,
     user_id: user.id,
     role: 'owner',
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
 
   if (memberError) {
     // Clean up team if member insert fails
-    await supabase.from('teams').delete().eq('id', team.id)
+    await admin.from('teams').delete().eq('id', team.id)
     return NextResponse.json({ error: memberError.message }, { status: 400 })
   }
 
