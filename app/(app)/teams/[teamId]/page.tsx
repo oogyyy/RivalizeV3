@@ -28,20 +28,22 @@ export default async function TeamPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch team
+  // Fetch team by id or slug (for robust routing)
   const { data: team } = await supabase
     .from('teams')
     .select('*')
-    .eq('id', teamId)
-    .single()
+    .or(`id.eq.${teamId},slug.eq.${teamId}`)
+    .maybeSingle()
 
   if (!team) notFound()
+
+  const resolvedTeamId = team.id
 
   // Check membership
   const { data: myMembership } = await supabase
     .from('team_members')
     .select('role')
-    .eq('team_id', teamId)
+    .eq('team_id', resolvedTeamId)
     .eq('user_id', user.id)
     .single()
 
@@ -53,20 +55,20 @@ export default async function TeamPage({
   const { data: members } = await supabase
     .from('team_members')
     .select('role, user_id, profiles(id, username, display_name, avatar_url)')
-    .eq('team_id', teamId)
+    .eq('team_id', resolvedTeamId)
 
   // Fetch all demos
   const { data: demos } = await supabase
     .from('demos')
     .select('*')
-    .eq('team_id', teamId)
+    .eq('team_id', resolvedTeamId)
     .order('created_at', { ascending: false })
 
   // Fetch folders
   const { data: folders } = await supabase
     .from('team_folders')
     .select('*')
-    .eq('user_team_id', teamId)
+    .eq('user_team_id', resolvedTeamId)
 
   // Build folder -> demos count map
   const demosByOpponent: Record<string, typeof demos> = {}
@@ -196,20 +198,20 @@ export default async function TeamPage({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <Link href={`/ai-coach?team=${teamId}`}>
+              <Link href={`/ai-coach?team=${resolvedTeamId}`}>
                 <Button variant="outline" className="gap-2">
                   <Brain size={16} />
                   AI Coach
                 </Button>
               </Link>
               {isOwnerOrAdmin && (
-                <DemoUploadButton teamId={teamId} />
+                <DemoUploadButton teamId={resolvedTeamId} />
               )}
             </div>
           </div>
 
           {/* Tab navigation */}
-          <TeamTabNav teamId={teamId} activeTab={tab} />
+          <TeamTabNav teamId={resolvedTeamId} activeTab={tab} />
         </div>
       </div>
 
@@ -361,7 +363,7 @@ export default async function TeamPage({
                 <p className="text-xs text-muted-foreground mb-4">
                   Folders are created automatically when demos are analysed
                 </p>
-                {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
+                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -400,7 +402,7 @@ export default async function TeamPage({
                   {(demos ?? []).length} total
                 </p>
               </div>
-              {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
+              {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
             </div>
 
             {(demos ?? []).length === 0 ? (
@@ -412,7 +414,7 @@ export default async function TeamPage({
                 <p className="text-xs text-muted-foreground mb-4">
                   Upload your first CS2 demo to start analysing
                 </p>
-                {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
+                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
               </div>
             ) : (
               <Card className="bg-card border-border overflow-hidden">
@@ -458,7 +460,7 @@ export default async function TeamPage({
                           </td>
                           <td className="px-4 py-3">
                             {demo.status === 'completed' && (
-                              <Link href={`/ai-coach?demo=${demo.id}&team=${teamId}`}>
+                              <Link href={`/ai-coach?demo=${demo.id}&team=${resolvedTeamId}`}>
                                 <Button
                                   variant="ghost"
                                   size="sm"
