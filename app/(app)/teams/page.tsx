@@ -19,9 +19,10 @@ export default async function TeamsPage() {
     .select('role, teams(*)')
     .eq('user_id', user.id)
 
-  const teamIds = (memberships ?? []).map(
-    (m) => (m.teams as { id: string } | null)?.id
-  ).filter(Boolean) as string[]
+  const teamIds = (memberships ?? []).flatMap((m) => {
+    const t = m.teams as { id: string } | null
+    return t?.id ? [t.id] : []
+  })
 
   // Member counts per team
   const { data: allMembers } = teamIds.length
@@ -62,16 +63,27 @@ export default async function TeamsPage() {
     }
   }
 
-  const teams = (memberships ?? []).map((m) => {
+  type TeamEntry = {
+    id: string
+    name: string
+    slug: string
+    logo_url: string | null
+    memberCount: number
+    demoCount: number
+    userRole: string
+    winRate?: number
+  }
+
+  const teams: TeamEntry[] = (memberships ?? []).flatMap((m) => {
     const team = m.teams as {
       id: string
       name: string
       slug: string
       logo_url: string | null
     } | null
-    if (!team) return null
+    if (!team) return []
     const wr = winMap[team.id]
-    return {
+    return [{
       id: team.id,
       name: team.name,
       slug: team.slug,
@@ -80,8 +92,8 @@ export default async function TeamsPage() {
       demoCount: demoCountMap[team.id] ?? 0,
       userRole: m.role,
       winRate: wr ? Math.round((wr.wins / wr.total) * 100) : undefined,
-    }
-  }).filter(Boolean) as NonNullable<ReturnType<typeof teams.find>>[]
+    }]
+  })
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
