@@ -2,11 +2,9 @@
 
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { formatFileSize } from '@/lib/utils'
+import { cn, formatFileSize } from '@/lib/utils'
 
 interface DemoUploadButtonProps {
   teamId: string
@@ -16,7 +14,7 @@ interface DemoUploadButtonProps {
 interface FileUpload {
   file: File
   progress: number
-  status: 'pending' | 'uploading' | 'creating' | 'done' | 'error'
+  status: 'pending' | 'presigning' | 'uploading' | 'registering' | 'done' | 'error'
   error?: string
   demoId?: string
 }
@@ -26,17 +24,14 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
   const [uploads, setUploads] = useState<FileUpload[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const updateUpload = (index: number, update: Partial<FileUpload>) => {
-    setUploads((prev) => prev.map((u, i) => (i === index ? { ...u, ...update } : u)))
-  }
+  const updateUpload = (index: number, update: Partial<FileUpload>) =>
+    setUploads(prev => prev.map((u, i) => (i === index ? { ...u, ...update } : u)))
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newUploads: FileUpload[] = acceptedFiles.map((file) => ({
-      file,
-      progress: 0,
-      status: 'pending',
-    }))
-    setUploads((prev) => [...prev, ...newUploads])
+    setUploads(prev => [
+      ...prev,
+      ...acceptedFiles.map(file => ({ file, progress: 0, status: 'pending' as const })),
+    ])
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -45,68 +40,71 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
     multiple: true,
   })
 
-  const removeFile = (index: number) => {
-    setUploads((prev) => prev.filter((_, i) => i !== index))
-  }
+  const removeFile = (index: number) =>
+    setUploads(prev => prev.filter((_, i) => i !== index))
 
   const uploadAll = async () => {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
     setIsProcessing(true)
-    const pending = uploads.filter((u) => u.status === 'pending')
 
     for (let i = 0; i < uploads.length; i++) {
-      const upload = uploads[i]
-      if (upload.status !== 'pending') continue
-
-      updateUpload(i, { status: 'uploading', progress: 10 })
+      if (uploads[i].status !== 'pending') continue
 
       try {
-        // Upload file to Supabase storage
-        const fileName = `${teamId}/${Date.now()}_${upload.file.name}`
-        const { error: storageError } = await supabase.storage
-          .from('demos')
-          .upload(fileName, upload.file, {
-            cacheControl: '3600',
-            upsert: false,
-          })
+        // Step 1: Request a presigned upload URL from our API.
+        // The .dem file bytes never pass through Railway — only tiny JSON.
+        updateUpload(i, { status: 'presigning', progress: 10 })
 
-        if (storageError) throw new Error(storageError.message)
+        const presignRes = await fetch('/api/demos/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            teamId,
+            filename: uploads[i].file.name,
+            fileSize: uploads[i].file.size,
+          }),
+        })
 
-        updateUpload(i, { progress: 60, status: 'creating' })
-
-        // Create demo record
-        const { data: demo, error: dbError } = await supabase
-          .from('demos')
-          .insert({
-            team_id: teamId,
-            opponent_name: 'Unknown',
-            map: 'Unknown',
-            raw_file_path: fileName,
-            status: 'processing',
-            created_by: user.id,
-          })
-          .select()
-          .single()
-
-        if (dbError) throw new Error(dbError.message)
-
-        updateUpload(i, { progress: 80, demoId: demo.id })
-
-        // Trigger parse API
-        try {
-          await fetch('/api/demos/parse', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ demoId: demo.id, filePath: fileName }),
-          })
-        } catch {
-          // Parse trigger is best-effort
+        if (!presignRes.ok) {
+          const err = await presignRes.json()
+          throw new Error(err.error ?? 'Failed to get upload URL')
         }
 
-        updateUpload(i, { status: 'done', progress: 100 })
+        const { signedUrl, path } = await presignRes.json()
+
+        // Step 2: Upload directly to Supabase Storage using the presigned URL.
+        // This is a direct PUT from the browser — no Railway proxy involved.
+        updateUpload(i, { status: 'uploading', progress: 20 })
+
+        const uploadRes = await fetch(signedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: uploads[i].file,
+        })
+
+        if (!uploadRes.ok) throw new Error('Direct upload to storage failed')
+
+        updateUpload(i, { progress: 80, status: 'registering' })
+
+        // Step 3: Tell our API the upload succeeded so it can create the DB record.
+        const registerRes = await fetch('/api/demos/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            teamId,
+            storagePath: path,
+            opponentName: 'Unknown',   // TODO: add opponent name input field
+            map: 'unknown',
+            fileSize: uploads[i].file.size,
+          }),
+        })
+
+        if (!registerRes.ok) {
+          const err = await registerRes.json()
+          throw new Error(err.error ?? 'Failed to register demo')
+        }
+
+        const demo = await registerRes.json()
+        updateUpload(i, { status: 'done', progress: 100, demoId: demo.id })
       } catch (err) {
         updateUpload(i, {
           status: 'error',
@@ -117,21 +115,28 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
 
     setIsProcessing(false)
 
-    const allDone = uploads.every((u) => u.status === 'done' || u.status === 'error')
-    if (allDone && pending.length > 0) {
-      onSuccess?.()
-    }
+    const freshUploads = uploads // closure may be stale; effect is visual-only
+    const anyDone = freshUploads.some(u => u.status === 'done')
+    if (anyDone) onSuccess?.()
   }
 
   const handleClose = () => {
-    if (!isProcessing) {
-      setOpen(false)
-      setUploads([])
-    }
+    if (isProcessing) return
+    setOpen(false)
+    setUploads([])
   }
 
-  const pendingCount = uploads.filter((u) => u.status === 'pending').length
-  const doneCount = uploads.filter((u) => u.status === 'done').length
+  const pendingCount = uploads.filter(u => u.status === 'pending').length
+  const doneCount = uploads.filter(u => u.status === 'done').length
+
+  const statusLabel = (u: FileUpload) => {
+    if (u.status === 'presigning') return 'Getting upload URL…'
+    if (u.status === 'uploading') return 'Uploading to storage…'
+    if (u.status === 'registering') return 'Registering…'
+    if (u.status === 'done') return 'Done'
+    if (u.status === 'error') return u.error
+    return 'Ready'
+  }
 
   if (!open) {
     return (
@@ -150,7 +155,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
           <div>
             <h2 className="text-lg font-bold text-foreground">Upload Demos</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Drop .dem files to upload and queue for analysis
+              .dem files upload directly to storage — no size limits
             </p>
           </div>
           <button
@@ -169,8 +174,8 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
             className={cn(
               'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200',
               isDragActive
-                ? 'border-neon-green bg-neon-green/5'
-                : 'border-border hover:border-neon-green/50 hover:bg-accent/30'
+                ? 'border-[#00ff87] bg-[#00ff87]/5'
+                : 'border-border hover:border-[#00ff87]/50 hover:bg-accent/30'
             )}
           >
             <input {...getInputProps()} />
@@ -178,16 +183,14 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
               size={28}
               className={cn(
                 'mx-auto mb-3 transition-colors',
-                isDragActive ? 'text-neon-green' : 'text-muted-foreground'
+                isDragActive ? 'text-[#00ff87]' : 'text-muted-foreground'
               )}
             />
             {isDragActive ? (
-              <p className="text-sm font-medium text-neon-green">Drop the .dem files here…</p>
+              <p className="text-sm font-medium text-[#00ff87]">Drop the .dem files here…</p>
             ) : (
               <>
-                <p className="text-sm font-medium text-foreground">
-                  Drag & drop .dem files here
-                </p>
+                <p className="text-sm font-medium text-foreground">Drag & drop .dem files here</p>
                 <p className="text-xs text-muted-foreground mt-1">or click to select files</p>
               </>
             )}
@@ -205,11 +208,9 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
                     size={16}
                     className={cn(
                       'shrink-0',
-                      upload.status === 'done'
-                        ? 'text-neon-green'
-                        : upload.status === 'error'
-                        ? 'text-red-400'
-                        : 'text-muted-foreground'
+                      upload.status === 'done' ? 'text-[#00ff87]' :
+                      upload.status === 'error' ? 'text-red-400' :
+                      'text-muted-foreground'
                     )}
                   />
                   <div className="flex-1 min-w-0">
@@ -220,29 +221,32 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
                       <span className="text-[10px] text-muted-foreground">
                         {formatFileSize(upload.file.size)}
                       </span>
-                      {upload.status === 'uploading' || upload.status === 'creating' ? (
+                      {(upload.status === 'uploading' || upload.status === 'presigning' || upload.status === 'registering') ? (
                         <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-neon-green rounded-full transition-all duration-300"
+                            className="h-full bg-[#00ff87] rounded-full transition-all duration-300"
                             style={{ width: `${upload.progress}%` }}
                           />
                         </div>
-                      ) : upload.status === 'done' ? (
-                        <span className="text-[10px] text-neon-green font-medium">Uploaded</span>
-                      ) : upload.status === 'error' ? (
-                        <span className="text-[10px] text-red-400">{upload.error}</span>
                       ) : (
-                        <span className="text-[10px] text-muted-foreground">Ready</span>
+                        <span className={cn(
+                          'text-[10px] font-medium',
+                          upload.status === 'done' ? 'text-[#00ff87]' :
+                          upload.status === 'error' ? 'text-red-400' :
+                          'text-muted-foreground'
+                        )}>
+                          {statusLabel(upload)}
+                        </span>
                       )}
                     </div>
                   </div>
                   <div className="shrink-0">
                     {upload.status === 'done' ? (
-                      <CheckCircle2 size={14} className="text-neon-green" />
+                      <CheckCircle2 size={14} className="text-[#00ff87]" />
                     ) : upload.status === 'error' ? (
                       <AlertCircle size={14} className="text-red-400" />
-                    ) : upload.status === 'uploading' || upload.status === 'creating' ? (
-                      <Loader2 size={14} className="text-neon-green animate-spin" />
+                    ) : upload.status !== 'pending' ? (
+                      <Loader2 size={14} className="text-[#00ff87] animate-spin" />
                     ) : (
                       <button
                         onClick={() => removeFile(i)}
@@ -257,7 +261,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
             </div>
           )}
 
-          {/* Footer actions */}
+          {/* Footer */}
           <div className="flex items-center justify-between pt-2">
             <span className="text-xs text-muted-foreground">
               {uploads.length === 0
@@ -267,12 +271,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
                 : `${uploads.length} file${uploads.length !== 1 ? 's' : ''} selected`}
             </span>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClose}
-                disabled={isProcessing}
-              >
+              <Button variant="outline" size="sm" onClick={handleClose} disabled={isProcessing}>
                 {doneCount > 0 ? 'Close' : 'Cancel'}
               </Button>
               {pendingCount > 0 && (
@@ -284,15 +283,9 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
                   className="gap-2"
                 >
                   {isProcessing ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      Uploading…
-                    </>
+                    <><Loader2 size={14} className="animate-spin" /> Uploading…</>
                   ) : (
-                    <>
-                      <Upload size={14} />
-                      Upload {pendingCount} file{pendingCount !== 1 ? 's' : ''}
-                    </>
+                    <><Upload size={14} /> Upload {pendingCount} file{pendingCount !== 1 ? 's' : ''}</>
                   )}
                 </Button>
               )}
