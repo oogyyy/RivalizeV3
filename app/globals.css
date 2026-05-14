@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --background: 220 13% 5%;
+  --foreground: 0 0% 95%;
+  --card: 220 13% 8%;
+  --card-foreground: 0 0% 95%;
+  --popover: 220 13% 8%;
+  --popover-foreground: 0 0% 95%;
+  --primary: 151 100% 50%;
+  --primary-foreground: 220 13% 5%;
+  --secondary: 220 13% 12%;
+  --secondary-foreground: 0 0% 85%;
+  --muted: 220 13% 12%;
+  --muted-foreground: 0 0% 55%;
+  --accent: 220 13% 15%;
+  --accent-foreground: 0 0% 95%;
+  --destructive: 348 100% 61%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 220 13% 15%;
+  --input: 220 13% 12%;
+  --ring: 151 100% 50%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: hsl(var(--background)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+/* Neon glow utility */
+.neon-glow { box-shadow: 0 0 10px rgba(0, 255, 135, 0.3), 0 0 20px rgba(0, 255, 135, 0.1); }
+.neon-text { text-shadow: 0 0 10px rgba(0, 255, 135, 0.5); }
+.neon-border { border-color: rgba(0, 255, 135, 0.5); }
+
+/* Glass card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
