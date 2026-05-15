@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound, redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,7 +36,8 @@ export default async function TeamPage({
     .or(`id.eq.${teamId},slug.eq.${teamId}`)
     .maybeSingle()
 
-  if (!team) notFound()
+  // If team is null it means RLS filtered it out (no membership) or it doesn't exist — go back to list
+  if (!team) redirect('/teams')
 
   const resolvedTeamId = team.id
 
