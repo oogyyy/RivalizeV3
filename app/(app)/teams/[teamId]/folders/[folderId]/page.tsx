@@ -82,8 +82,9 @@ export default async function FolderPage({
     if (d.map) mapCounts[d.map] = (mapCounts[d.map] ?? 0) + 1
   }
   const primaryMap = Object.entries(mapCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
+  // HF dataset viewer supports ?q= as a full-text row search across all columns
   const proRefUrl = primaryMap
-    ? `https://huggingface.co/datasets/blanchon/opencs2_dataset/viewer?q=${encodeURIComponent(primaryMap)}`
+    ? `https://huggingface.co/datasets/blanchon/opencs2_dataset/viewer/default/train?q=${encodeURIComponent(primaryMap)}`
     : 'https://huggingface.co/datasets/blanchon/opencs2_dataset/viewer'
 
   return (
@@ -130,9 +131,9 @@ export default async function FolderPage({
             <div className="flex items-center gap-2 shrink-0">
               {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
               <a href={proRefUrl} target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" className="gap-2 text-muted-foreground hover:text-foreground">
+                <Button variant="secondary" className="gap-2">
                   <ExternalLink size={14} />
-                  Pro References
+                  {primaryMap ? `View Pro Plays on ${primaryMap}` : 'View Pro Plays'}
                 </Button>
               </a>
               <Link href={`/ai-coach?team=${teamId}&folder=${folderId}`}>

@@ -429,7 +429,7 @@ export default function AICoachPage() {
                   </div>
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
-                  Reference OpenCS2 pro match patterns in AI analysis
+                  Enhances answers with general pro meta from public dataset.
                 </p>
               </div>
             </button>

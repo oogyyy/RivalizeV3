@@ -160,13 +160,18 @@ ${playerName && focusArea === 'player' ? `Opponent player to analyze: ${playerNa
 ${mapName && focusArea === 'strategy' ? `Map focus: ${mapName}` : ''}
 ${includeProDataset ? `
 PRO DATASET CONTEXT (OpenCS2 — https://huggingface.co/datasets/blanchon/opencs2_dataset):
-The user has enabled professional match insights. Supplement your analysis with pro-level context:
+The user has enabled professional match insights. Supplement your analysis with pro-level context drawn from general professional CS2 knowledge:
 - Reference how professional teams typically execute and default on this map
 - Note common professional CT anchor positions, rotations, and retake patterns
 - Highlight pro-level T-side timings, utility choreography, and fake sequences
 - Point out where this opponent's tendencies align with or deviate from professional meta
-- Flag any exploits or counters that are well-established in the professional scene
-Label all pro-meta observations clearly with "[Pro Meta]" so the user can distinguish them from opponent-specific findings derived from their uploaded demos.` : ''}`
+- Flag exploits or counters that are well-established in the professional scene
+
+CRITICAL RULES for pro dataset references:
+- Only reference well-established, widely-known professional tendencies — NEVER invent specific plays, round outcomes, or player actions that you cannot verify
+- If you are uncertain whether something is a confirmed professional standard, omit it rather than speculate
+- Always label every pro-meta observation with [Pro Meta] so the user can clearly distinguish it from opponent-specific findings derived from their uploaded demos
+- Frame [Pro Meta] insights as "professional teams generally..." or "the established meta on this map is..." — never as hard facts about a specific match` : ''}`
 
   try {
     const result = streamText({
