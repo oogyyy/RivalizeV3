@@ -21,18 +21,26 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single()
 
-  // Fetch team memberships with team details
+  // Fetch memberships (simple user_id filter — always visible via RLS)
   const { data: memberships } = await supabase
     .from('team_members')
-    .select('role, teams(*)')
+    .select('role, team_id')
     .eq('user_id', user.id)
 
-  const teams = (memberships ?? []).map((m) => ({
-    ...(m.teams as unknown as Record<string, unknown>),
-    userRole: m.role,
-  })) as Array<{ id: string; name: string; slug: string; logo_url: string | null; userRole: string }>
+  const teamIds = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
 
-  const teamIds = teams.map((t) => t.id)
+  // Fetch team details separately to avoid nested RLS circular dependency
+  const { data: teamsData } = teamIds.length
+    ? await supabase
+        .from('teams')
+        .select('id, name, slug, logo_url')
+        .in('id', teamIds)
+    : { data: [] }
+
+  const teams = (teamsData ?? []).map((t) => {
+    const membership = (memberships ?? []).find((m) => m.team_id === t.id)
+    return { ...t, userRole: membership?.role ?? 'member' }
+  }) as Array<{ id: string; name: string; slug: string; logo_url: string | null; userRole: string }>
 
   // Fetch recent demos across all teams
   const { data: recentDemos } = teamIds.length

@@ -153,13 +153,16 @@ export default function AICoachPage() {
 
       const { data: memberships } = await supabase
         .from('team_members')
-        .select('teams(*)')
+        .select('team_id')
         .eq('user_id', user.id)
 
-      const teamList = (memberships ?? [])
-        .map(m => (m.teams as unknown) as Team | null)
-        .filter(Boolean) as Team[]
+      const teamIds = (memberships ?? []).map(m => m.team_id).filter(Boolean)
 
+      const { data: teamsData } = teamIds.length
+        ? await supabase.from('teams').select('*').in('id', teamIds)
+        : { data: [] }
+
+      const teamList = (teamsData ?? []) as Team[]
       setTeams(teamList)
       if (teamList[0]) setSelectedTeamId(teamList[0].id)
       setLoadingTeams(false)

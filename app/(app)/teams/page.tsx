@@ -13,16 +13,23 @@ export default async function TeamsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch teams with member role
+  // Fetch memberships first (simple filter by user_id — always visible via RLS)
   const { data: memberships } = await supabase
     .from('team_members')
-    .select('role, teams(*)')
+    .select('role, team_id')
     .eq('user_id', user.id)
 
-  const teamIds = (memberships ?? []).flatMap((m) => {
-    const t = m.teams as unknown as { id: string } | null
-    return t?.id ? [t.id] : []
-  })
+  const teamIds = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
+
+  // Fetch team details separately to avoid nested RLS circular dependency
+  const { data: teamsData } = teamIds.length
+    ? await supabase
+        .from('teams')
+        .select('id, name, slug, logo_url')
+        .in('id', teamIds)
+    : { data: [] }
+
+  const teamById = Object.fromEntries((teamsData ?? []).map((t) => [t.id, t]))
 
   // Member counts per team
   const { data: allMembers } = teamIds.length
@@ -75,12 +82,7 @@ export default async function TeamsPage() {
   }
 
   const teams: TeamEntry[] = (memberships ?? []).flatMap((m) => {
-    const team = m.teams as unknown as {
-      id: string
-      name: string
-      slug: string
-      logo_url: string | null
-    } | null
+    const team = teamById[m.team_id]
     if (!team) return []
     const wr = winMap[team.id]
     return [{
