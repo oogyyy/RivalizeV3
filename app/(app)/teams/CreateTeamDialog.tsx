@@ -98,7 +98,7 @@ export default function CreateTeamDialog({ asCard }: CreateTeamDialogProps) {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-foreground">Create Team</h2>
-                  <p className="text-xs text-muted-foreground">Set up a new CS2 team</p>
+                  <p className="text-xs text-muted-foreground">Set up your team to start scouting opponents</p>
                 </div>
               </div>
               <button

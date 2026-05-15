@@ -113,7 +113,7 @@ export default async function FolderPage({
                   <span className="text-neon-green">{folder.opponent_display_name}</span>
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  {totalDemos} {totalDemos === 1 ? 'demo' : 'demos'} · All matchups
+                  {totalDemos} {totalDemos === 1 ? 'demo' : 'demos'} · Scouting history
                 </p>
               </div>
             </div>
@@ -122,7 +122,7 @@ export default async function FolderPage({
               <Link href={`/ai-coach?team=${teamId}&folder=${folderId}`}>
                 <Button variant="neon" className="gap-2">
                   <Brain size={16} />
-                  AI Analysis
+                  Generate Anti-Strat
                 </Button>
               </Link>
             </div>
@@ -187,7 +187,7 @@ export default async function FolderPage({
           <div className="lg:col-span-2 space-y-4">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
               <Crosshair size={15} className="text-neon-green" />
-              Demos in this folder
+              Opponent demos in this folder
             </h2>
 
             {totalDemos === 0 ? (
@@ -196,9 +196,9 @@ export default async function FolderPage({
                   <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
                     <Upload size={22} className="text-muted-foreground" />
                   </div>
-                  <p className="text-sm font-medium text-foreground mb-1">No demos yet</p>
+                  <p className="text-sm font-medium text-foreground mb-1">No opponent demos yet</p>
                   <p className="text-xs text-muted-foreground mb-4">
-                    Upload demos from this matchup to analyse them
+                    Upload demos of this opponent to start scouting them
                   </p>
                   {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
                 </CardContent>
@@ -269,7 +269,7 @@ export default async function FolderPage({
                                     className="text-xs gap-1 h-7 text-neon-green hover:bg-neon-green/10"
                                   >
                                     <Brain size={12} />
-                                    Analyse
+                                    Scout
                                   </Button>
                                 </Link>
                               )}
@@ -288,7 +288,7 @@ export default async function FolderPage({
           <div className="space-y-4">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
               <Target size={15} className="text-neon-green" />
-              Top Players
+              Opponent Key Players
             </h2>
 
             <Card className="bg-card border-border">
@@ -296,7 +296,7 @@ export default async function FolderPage({
                 {topPlayers.length === 0 ? (
                   <div className="py-10 text-center">
                     <p className="text-xs text-muted-foreground px-4">
-                      Player stats available after demos are analysed
+                      Opponent player stats available after demos are analysed
                     </p>
                   </div>
                 ) : (
@@ -385,15 +385,15 @@ export default async function FolderPage({
               <CardContent className="p-4 text-center">
                 <Brain size={24} className="text-neon-green mx-auto mb-2" />
                 <p className="text-sm font-semibold text-foreground mb-1">
-                  AI Coach Ready
+                  Generate Anti-Strat
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Get tactical insights for all demos vs {folder.opponent_display_name}
+                  Get AI-powered anti-strats and scouting report vs {folder.opponent_display_name}
                 </p>
                 <Link href={`/ai-coach?team=${teamId}&folder=${folderId}`} className="block">
                   <Button variant="neon" size="sm" className="w-full gap-2">
                     <Brain size={14} />
-                    Start AI Session
+                    Generate Anti-Strat
                   </Button>
                 </Link>
               </CardContent>

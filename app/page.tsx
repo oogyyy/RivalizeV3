@@ -8,38 +8,38 @@ import {
 const features = [
   {
     icon: Upload,
-    title: 'Demo Upload',
-    description: 'Drag and drop your CS2 .dem files. We parse and index every round, player action, and economy state in seconds.',
+    title: 'Opponent Demo Upload',
+    description: 'Drag and drop your upcoming opponent\'s .dem files. We parse every round, player action, and economy state to build a scouting profile.',
     badge: 'Core',
   },
   {
     icon: Brain,
-    title: 'AI Coach',
-    description: 'Get real-time feedback on positioning, utility usage, decision making, and economy management from our trained AI model.',
+    title: 'AI Anti-Strat Generator',
+    description: 'Get AI-generated anti-strats, opponent tendency reports, and recommended counters tailored to your next match.',
     badge: 'AI',
   },
   {
     icon: Users,
     title: 'Team Management',
-    description: 'Invite teammates, assign roles, track individual and team-wide performance trends across multiple sessions.',
+    description: 'Create your team, add upcoming opponents, and keep all your scouting data organised before match day.',
     badge: 'Teams',
   },
   {
     icon: Map,
-    title: 'Heatmaps',
-    description: 'Visualize player positioning, death locations, and utility throw points on interactive map overlays.',
+    title: 'Opponent Heatmaps',
+    description: 'Visualize where the opponent positions, holds angles, and dies — so you know exactly what to expect.',
     badge: 'Visual',
   },
   {
     icon: Target,
-    title: 'Anti-Strat Builder',
-    description: 'Identify opponent tendencies, common setups, and predictable patterns to build effective counter-strategies.',
+    title: 'Weak Spot Detection',
+    description: 'Automatically identify predictable opponent patterns, slow rotations, and exploitable setups across all their demos.',
     badge: 'Strategy',
   },
   {
     icon: BarChart3,
-    title: 'Round Analysis',
-    description: 'Deep-dive into every round with timeline playback, economic breakdowns, and key moment highlights.',
+    title: 'Round Breakdown',
+    description: 'Review opponent round-by-round with timeline playback, economy tracking, and key moment highlights.',
     badge: 'Analytics',
   },
 ]
@@ -48,28 +48,28 @@ const steps = [
   {
     number: '01',
     icon: Upload,
-    title: 'Upload Your Demo',
-    description: 'Drop your CS2 .dem file into Rivalize. Our ingestion pipeline parses every tick, player position, and game event automatically.',
+    title: 'Upload Opponent Demos',
+    description: 'Get your upcoming opponent\'s .dem files and drop them into Rivalize. We parse every tick, position, and round automatically.',
   },
   {
     number: '02',
     icon: Brain,
-    title: 'AI Analyzes Everything',
-    description: 'Our models process movement patterns, utility efficiency, economy decisions, and team coordination to generate actionable insights.',
+    title: 'AI Scouts the Opponent',
+    description: 'Our AI builds a full scouting report — tendencies, weak spots, predictable executes, key players — ready before match day.',
   },
   {
     number: '03',
     icon: Trophy,
-    title: 'Dominate Your Opponents',
-    description: 'Apply targeted coaching tips, study your opponents\' tendencies, and track measurable improvement across every session.',
+    title: 'Show Up Prepared',
+    description: 'Walk into your match with AI-generated anti-strats, player breakdowns, and map-specific counter-plays already in hand.',
   },
 ]
 
 const stats = [
-  { value: '10K+', label: 'Demos Analyzed' },
+  { value: '10K+', label: 'Opponents Scouted' },
   { value: '500+', label: 'Active Teams' },
   { value: '99.9%', label: 'Parse Accuracy' },
-  { value: '24/7', label: 'AI Coach Online' },
+  { value: '24/7', label: 'AI Scout Online' },
 ]
 
 export default function LandingPage() {
@@ -128,27 +128,27 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#00ff87]/20 bg-[#00ff87]/5 text-[#00ff87] text-xs font-semibold mb-8 tracking-wide uppercase">
             <Activity className="w-3 h-3" />
-            AI-Powered CS2 Analysis Platform
+            AI-Powered CS2 Pre-Match Preparation
           </div>
 
           {/* Headline */}
           <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 leading-[1.05]">
-            Your AI CS2{' '}
+            Scout your opponents.{' '}
             <span
               className="text-[#00ff87] neon-text"
               style={{ textShadow: '0 0 40px rgba(0,255,135,0.4), 0 0 80px rgba(0,255,135,0.2)' }}
             >
-              Coach
+              Anti-strat
             </span>
-            {' '}&amp;{' '}
+            {' '}with{' '}
             <br className="hidden md:block" />
-            <span className="text-white/90">Analyst</span>
+            <span className="text-white/90">AI.</span>
           </h1>
 
           {/* Subheadline */}
           <p className="text-lg md:text-xl text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Upload your CS2 demos and get instant AI-powered feedback on positioning,
-            utility, economy, and team coordination. Stop guessing. Start dominating.
+            Upload your upcoming opponent&apos;s demos and get instant AI-generated anti-strats,
+            scouting reports, and weak-spot breakdowns. Stop guessing. Show up prepared.
           </p>
 
           {/* CTA Buttons */}
@@ -261,10 +261,10 @@ export default function LandingPage() {
               Platform Features
             </div>
             <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
-              Everything your team needs
+              Everything you need to prepare
             </h2>
             <p className="text-white/50 text-lg max-w-xl mx-auto">
-              From raw demo files to professional-grade insights. Every tool you need to outperform the competition.
+              From raw opponent demo files to match-ready anti-strats. Every tool a coachless team needs to outplay the competition.
             </p>
           </div>
 
@@ -311,10 +311,10 @@ export default function LandingPage() {
               How It Works
             </div>
             <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
-              Three steps to victory
+              Three steps to match-day edge
             </h2>
             <p className="text-white/50 text-lg max-w-xl mx-auto">
-              Getting started takes minutes. Seeing results takes even less.
+              Upload, scout, and show up prepared — in minutes.
             </p>
           </div>
 
@@ -352,21 +352,21 @@ export default function LandingPage() {
                 AI Coach
               </div>
               <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-6 leading-tight">
-                Your personal{' '}
-                <span className="text-[#00ff87] neon-text">CS2 analyst</span>,
-                {' '}available 24/7
+                Your{' '}
+                <span className="text-[#00ff87] neon-text">AI scout</span>,
+                {' '}ready before every match
               </h2>
               <p className="text-white/50 text-lg leading-relaxed mb-8">
-                Rivalize's AI analyzes hundreds of data points per round — from crosshair placement
-                to economy decisions — and gives you specific, actionable coaching tips that actually move the needle.
+                Rivalize's AI digs through opponent demos — analysing tendencies, flagging weak spots,
+                and generating anti-strats — so your team walks in with a real game plan.
               </p>
               <ul className="space-y-3 mb-8">
                 {[
-                  'Positioning mistakes with specific round timestamps',
-                  'Utility efficiency score and throw-point optimization',
-                  'Economy decision grading per round',
-                  'Team coordination gap analysis',
-                  'Opponent pattern recognition and anti-strat generation',
+                  "Opponent T-side and CT-side tendencies by map",
+                  'Predictable execute patterns and timing tells',
+                  'Key player profiles — habits, angles, and how to counter them',
+                  'Recommended map bans based on opponent performance',
+                  'AI-generated anti-strats and counter-setups',
                 ].map((item, i) => (
                   <li key={i} className="flex items-start gap-3 text-sm text-white/70">
                     <div className="w-5 h-5 rounded-full bg-[#00ff87]/15 border border-[#00ff87]/30 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -380,7 +380,7 @@ export default function LandingPage() {
                 href="/signup"
                 className="inline-flex items-center gap-2 bg-[#00ff87] text-black font-bold px-6 py-3 rounded-md hover:bg-[#00ff87]/90 transition-all neon-glow"
               >
-                Try AI Coach Free
+                Start Scouting Free
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -505,19 +505,18 @@ export default function LandingPage() {
                 Team Management
               </div>
               <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-6 leading-tight">
-                Elevate your{' '}
-                <span className="text-[#00ff87] neon-text">entire roster</span>
+                One dashboard for all your{' '}
+                <span className="text-[#00ff87] neon-text">upcoming opponents</span>
               </h2>
               <p className="text-white/50 text-lg leading-relaxed mb-8">
-                Track every player's performance over time. Identify who's improving, who needs coaching,
-                and where your team's collective weaknesses lie — all from a single dashboard.
+                Organise opponent scouting by team and match. Every opponent gets their own folder — demos, stats, and AI reports — ready whenever you need them.
               </p>
               <div className="grid grid-cols-2 gap-4 mb-8">
                 {[
-                  { icon: TrendingUp, label: 'Performance Trends', desc: 'Track improvement over time' },
-                  { icon: Target, label: 'Role Analytics', desc: 'IGL, AWP, Entry breakdowns' },
-                  { icon: Shield, label: 'Team Reports', desc: 'Shareable PDF exports' },
-                  { icon: Activity, label: 'Session Tracking', desc: 'Per-match history & stats' },
+                  { icon: TrendingUp, label: 'Opponent Folders', desc: 'Demos grouped per opponent' },
+                  { icon: Target, label: 'Role Breakdowns', desc: 'AWP, entry, IGL profiling' },
+                  { icon: Shield, label: 'Scouting Reports', desc: 'AI summaries before each match' },
+                  { icon: Activity, label: 'Match History', desc: 'All opponents in one place' },
                 ].map((item, i) => {
                   const Icon = item.icon
                   return (
@@ -558,7 +557,7 @@ export default function LandingPage() {
                 <span className="text-[#00ff87] neon-text">dominate</span>?
               </h2>
               <p className="text-white/50 text-xl mb-10 max-w-xl mx-auto leading-relaxed">
-                Join thousands of players and teams using Rivalize to get a competitive edge.
+                Join teams using Rivalize to scout opponents and show up prepared every match.
                 No credit card required.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -578,7 +577,7 @@ export default function LandingPage() {
                 </Link>
               </div>
               <p className="mt-6 text-white/30 text-sm">
-                Free plan includes 5 demo uploads/month. No credit card required.
+                Free plan includes 5 opponent demo uploads/month. No credit card required.
               </p>
             </div>
           </div>
@@ -594,7 +593,7 @@ export default function LandingPage() {
                 <span className="text-black font-black text-xs">R</span>
               </div>
               <span className="font-black tracking-tight text-white">RIVALIZE</span>
-              <span className="text-white/20 text-sm ml-2">AI-Powered CS2 Analysis</span>
+              <span className="text-white/20 text-sm ml-2">AI-Powered CS2 Pre-Match Prep</span>
             </div>
             <div className="flex items-center gap-8 text-sm text-white/30">
               <Link href="/login" className="hover:text-white/60 transition-colors">Sign In</Link>

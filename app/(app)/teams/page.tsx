@@ -102,7 +102,7 @@ export default async function TeamsPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">My Teams</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your CS2 teams and demo libraries
+            Manage your teams and scout upcoming opponents
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -136,7 +136,7 @@ export default async function TeamsPage() {
           </div>
           <div className="w-px h-8 bg-border" />
           <div>
-            <p className="text-xs text-muted-foreground">Total Demos</p>
+            <p className="text-xs text-muted-foreground">Opponent Demos</p>
             <p className="text-lg font-bold text-foreground">
               {Object.values(demoCountMap).reduce((a, b) => a + b, 0)}
             </p>
@@ -152,7 +152,7 @@ export default async function TeamsPage() {
           </div>
           <h2 className="text-xl font-bold text-foreground mb-2">No teams yet</h2>
           <p className="text-muted-foreground max-w-sm mb-6">
-            Create your first team to start uploading demos and analysing your CS2 matches.
+            Create your team and start adding upcoming opponents to prepare for matches.
           </p>
           <CreateTeamDialog />
         </div>

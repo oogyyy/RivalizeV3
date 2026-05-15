@@ -142,7 +142,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
     return (
       <Button variant="neon" onClick={() => setOpen(true)} className="gap-2">
         <Upload size={16} />
-        Upload Demo
+        Upload Opponent Demo
       </Button>
     )
   }
@@ -153,9 +153,9 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Upload Demos</h2>
+            <h2 className="text-lg font-bold text-foreground">Upload Opponent Demos</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              .dem files upload directly to storage — no size limits
+              Upload .dem files of upcoming opponents to scout them
             </p>
           </div>
           <button
@@ -187,10 +187,10 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
               )}
             />
             {isDragActive ? (
-              <p className="text-sm font-medium text-[#00ff87]">Drop the .dem files here…</p>
+              <p className="text-sm font-medium text-[#00ff87]">Drop opponent .dem files here…</p>
             ) : (
               <>
-                <p className="text-sm font-medium text-foreground">Drag & drop .dem files here</p>
+                <p className="text-sm font-medium text-foreground">Drag & drop opponent .dem files here</p>
                 <p className="text-xs text-muted-foreground mt-1">or click to select files</p>
               </>
             )}

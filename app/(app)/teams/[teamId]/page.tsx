@@ -183,7 +183,7 @@ export default async function TeamPage({
                   <span className="text-border">·</span>
                   <span className="flex items-center gap-1">
                     <BarChart3 size={13} />
-                    {(demos ?? []).length} demos
+                    {(demos ?? []).length} opponent demos
                   </span>
                   {totalMatches > 0 && (
                     <>
@@ -202,7 +202,7 @@ export default async function TeamPage({
               <Link href={`/ai-coach?team=${resolvedTeamId}`}>
                 <Button variant="outline" className="gap-2">
                   <Brain size={16} />
-                  AI Coach
+                  AI Scout
                 </Button>
               </Link>
               {isOwnerOrAdmin && (
@@ -224,10 +224,10 @@ export default async function TeamPage({
             {/* Stats row */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {[
-                { label: 'Total Demos', value: (demos ?? []).length, color: 'text-foreground' },
-                { label: 'Wins', value: wins, color: 'text-neon-green' },
-                { label: 'Losses', value: losses, color: 'text-red-400' },
-                { label: 'Win Rate', value: `${winRate}%`, color: winRate >= 50 ? 'text-neon-green' : 'text-red-400' },
+                { label: 'Opponent Demos', value: (demos ?? []).length, color: 'text-foreground' },
+                { label: 'Opponents Scouted', value: (folders ?? []).length, color: 'text-neon-green' },
+                { label: 'Analysed', value: completedDemos.length, color: 'text-green-400' },
+                { label: 'Pending', value: (demos ?? []).filter(d => d.status !== 'completed').length, color: 'text-yellow-400' },
               ].map(({ label, value, color }) => (
                 <Card key={label} className="bg-card border-border">
                   <CardContent className="p-5 text-center">
@@ -244,14 +244,14 @@ export default async function TeamPage({
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Target size={16} className="text-neon-green" />
-                    Top Players
+                    Opponent Key Players
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="px-0">
                   {topPlayers.length === 0 ? (
                     <div className="px-6 py-8 text-center">
                       <p className="text-sm text-muted-foreground">
-                        Upload and analyse demos to see player stats
+                        Upload and analyse opponent demos to reveal their key players
                       </p>
                     </div>
                   ) : (
@@ -350,7 +350,7 @@ export default async function TeamPage({
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Opponent Folders</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Demos grouped by opponent team
+                  Opponent demos organised for pre-match preparation
                 </p>
               </div>
             </div>
@@ -362,7 +362,7 @@ export default async function TeamPage({
                 </div>
                 <p className="text-sm font-medium text-foreground mb-1">No folders yet</p>
                 <p className="text-xs text-muted-foreground mb-4">
-                  Folders are created automatically when demos are analysed
+                  Upload opponent demos to auto-create scouting folders per opponent
                 </p>
                 {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
               </div>
@@ -411,9 +411,9 @@ export default async function TeamPage({
                 <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
                   <Upload size={24} className="text-muted-foreground" />
                 </div>
-                <p className="text-sm font-medium text-foreground mb-1">No demos uploaded</p>
+                <p className="text-sm font-medium text-foreground mb-1">No opponent demos yet</p>
                 <p className="text-xs text-muted-foreground mb-4">
-                  Upload your first CS2 demo to start analysing
+                  Upload demos of upcoming opponents to start scouting
                 </p>
                 {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
               </div>
@@ -468,7 +468,7 @@ export default async function TeamPage({
                                   className="text-xs gap-1 h-7 text-neon-green hover:bg-neon-green/10"
                                 >
                                   <Brain size={12} />
-                                  Analyse
+                                  Scout
                                 </Button>
                               </Link>
                             )}

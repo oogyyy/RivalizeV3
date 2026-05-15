@@ -18,7 +18,7 @@ interface SidebarProps {
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/teams', label: 'Teams', icon: Users },
-  { href: '/ai-coach', label: 'AI Coach', icon: Brain },
+  { href: '/ai-coach', label: 'AI Scout', icon: Brain },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]

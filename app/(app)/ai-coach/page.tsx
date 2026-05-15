@@ -22,20 +22,20 @@ interface Message {
 }
 
 const FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
-  { id: 'general', label: 'General', icon: <Brain size={14} />, description: 'Overall match analysis' },
-  { id: 'weakness', label: 'Weaknesses', icon: <Target size={14} />, description: 'Find exploitable patterns' },
-  { id: 'antistrat', label: 'Anti-Strat', icon: <Shield size={14} />, description: 'Counter opponent strategies' },
-  { id: 'strategy', label: 'Strategy', icon: <Crosshair size={14} />, description: 'Build custom strats' },
-  { id: 'player', label: 'Player Focus', icon: <Users size={14} />, description: 'Individual player analysis' },
+  { id: 'general', label: 'Scouting Report', icon: <Brain size={14} />, description: 'Full opponent overview' },
+  { id: 'weakness', label: 'Weak Spots', icon: <Target size={14} />, description: 'Exploitable opponent patterns' },
+  { id: 'antistrat', label: 'Anti-Strat', icon: <Shield size={14} />, description: 'Counter their strategies' },
+  { id: 'strategy', label: 'Match Prep', icon: <Crosshair size={14} />, description: 'Map-specific counter-plays' },
+  { id: 'player', label: 'Player Focus', icon: <Users size={14} />, description: 'Opponent player deep-dive' },
 ]
 
 const CS2_MAPS = ['de_dust2', 'de_mirage', 'de_inferno', 'de_nuke', 'de_overpass', 'de_vertigo', 'de_ancient', 'de_anubis']
 
 const SUGGESTED_QUESTIONS = [
-  { label: 'Biggest weaknesses', prompt: 'What are our biggest weaknesses based on our recent demos?' },
-  { label: 'Anti-strat opponent', prompt: 'Create a detailed anti-strat for our upcoming match against this opponent.' },
-  { label: 'Mirage CT side', prompt: 'How should we play Mirage CT side? Give me specific setups and utility.' },
-  { label: 'Player positioning', prompt: "Analyze the team's overall positioning — where are we making mistakes?" },
+  { label: 'Opponent weaknesses', prompt: "What are this opponent's biggest weaknesses we can exploit in our upcoming match?" },
+  { label: 'Full anti-strat', prompt: 'Create a detailed anti-strat against this opponent — their tendencies, executes, and how we counter them.' },
+  { label: 'Opponent T-side tendencies', prompt: "What are this opponent's most common T-side executes and how should we set up our CT rotations?" },
+  { label: 'Key threat players', prompt: "Who are the most dangerous players on this opponent's roster and how do we neutralise them?" },
 ]
 
 function MarkdownContent({ content }: { content: string }) {
@@ -295,13 +295,13 @@ export default function AICoachPage() {
             <h1 className="text-lg font-bold text-foreground">AI Coach</h1>
             <Badge variant="neon" className="text-xs ml-auto">GPT-4o</Badge>
           </div>
-          <p className="text-xs text-muted-foreground">Elite CS2 analysis & coaching</p>
+          <p className="text-xs text-muted-foreground">Scout opponents & build anti-strats</p>
         </div>
 
         <div className="p-4 space-y-5 flex-1">
           {/* Team selector */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Team</label>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Your Team</label>
             {loadingTeams ? (
               <div className="h-9 bg-muted/30 rounded-md animate-pulse" />
             ) : (
@@ -321,7 +321,7 @@ export default function AICoachPage() {
           {/* Opponent folder selector */}
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
-              Opponent Folder
+              Upcoming Opponent
             </label>
             <select
               value={selectedFolderId}
@@ -452,9 +452,9 @@ export default function AICoachPage() {
               <div className="w-20 h-20 rounded-full bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mb-5">
                 <Brain size={36} className="text-neon-green" />
               </div>
-              <h2 className="text-xl font-bold text-foreground mb-2">AI Coach Ready</h2>
+              <h2 className="text-xl font-bold text-foreground mb-2">AI Scout Ready</h2>
               <p className="text-muted-foreground text-sm max-w-sm mb-8">
-                Select your team and focus area, then ask anything about your CS2 performance.
+                Select your team and opponent, then get AI-powered anti-strats and scouting reports.
               </p>
 
               {/* Suggested questions */}
@@ -568,7 +568,7 @@ export default function AICoachPage() {
                 e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
               }}
               onKeyDown={handleKeyDown}
-              placeholder={selectedTeamId ? 'Ask your AI Coach anything... (Enter to send, Shift+Enter for new line)' : 'Select a team first...'}
+              placeholder={selectedTeamId ? 'Ask about opponent tendencies, anti-strats, weak spots... (Enter to send)' : 'Select a team first...'}
               disabled={!selectedTeamId || streaming}
               rows={1}
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none min-h-[36px] max-h-40 py-2 px-2 disabled:cursor-not-allowed"
@@ -589,7 +589,7 @@ export default function AICoachPage() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground text-center mt-2">
-            AI Coach uses your demo data to provide tactical analysis. Results may vary.
+            AI Scout uses uploaded opponent demos to generate anti-strats and scouting reports.
           </p>
         </div>
       </div>

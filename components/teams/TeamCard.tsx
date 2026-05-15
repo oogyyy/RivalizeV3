@@ -74,7 +74,7 @@ export default function TeamCard({ team }: TeamCardProps) {
             <div className="flex flex-col items-center p-2 rounded-md bg-background/50 border border-border/50">
               <FileVideo size={12} className="text-muted-foreground mb-1" />
               <span className="text-sm font-bold text-foreground">{team.demoCount}</span>
-              <span className="text-[10px] text-muted-foreground">demos</span>
+              <span className="text-[10px] text-muted-foreground">opp. demos</span>
             </div>
             <div className="flex flex-col items-center p-2 rounded-md bg-background/50 border border-border/50">
               <TrendingUp size={12} className="text-muted-foreground mb-1" />

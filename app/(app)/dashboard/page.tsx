@@ -71,14 +71,14 @@ export default async function DashboardPage() {
       bg: 'bg-neon-green/10',
     },
     {
-      label: 'Total Demos',
+      label: 'Opponent Demos',
       value: totalDemos,
       icon: BarChart3,
       color: 'text-neon-blue',
       bg: 'bg-neon-blue/10',
     },
     {
-      label: 'Demos Analysed',
+      label: 'Opponents Scouted',
       value: completedDemos,
       icon: TrendingUp,
       color: 'text-neon-green',
@@ -109,7 +109,7 @@ export default async function DashboardPage() {
             <span className="text-neon-green neon-text">{displayName}</span>
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Here&apos;s what&apos;s happening with your teams today.
+            Your war room for upcoming match preparation.
           </p>
         </div>
         <div className="flex gap-3">
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
           <Link href="/ai-coach">
             <Button variant="neon" className="gap-2">
               <Brain size={16} />
-              AI Coach
+              AI Scout
             </Button>
           </Link>
         </div>
@@ -170,14 +170,14 @@ export default async function DashboardPage() {
                   <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
                     <Upload size={24} className="text-muted-foreground" />
                   </div>
-                  <p className="text-sm font-medium text-foreground">No demos yet</p>
+                  <p className="text-sm font-medium text-foreground">No scouting data yet</p>
                   <p className="text-xs text-muted-foreground mt-1 mb-4">
-                    Upload your first CS2 demo to get started with analysis.
+                    Upload opponent demos to start scouting your upcoming matches.
                   </p>
                   <Link href="/teams">
                     <Button variant="neon" size="sm" className="gap-2">
                       <Plus size={14} />
-                      Upload Demo
+                      Scout Opponent
                     </Button>
                   </Link>
                 </div>
@@ -231,7 +231,7 @@ export default async function DashboardPage() {
                   className="w-full justify-start gap-3 h-11 hover:border-neon-green/50 hover:text-neon-green"
                 >
                   <Upload size={16} />
-                  Upload Demo
+                  Upload Opponent Demo
                 </Button>
               </Link>
               <Link href="/teams" className="block">
@@ -249,7 +249,7 @@ export default async function DashboardPage() {
                   className="w-full justify-start gap-3 h-11 hover:border-neon-green/50 hover:text-neon-green"
                 >
                   <Brain size={16} />
-                  Start AI Session
+                  Generate Anti-Strat
                 </Button>
               </Link>
             </CardContent>
@@ -281,7 +281,7 @@ export default async function DashboardPage() {
                         {team.name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {demoCountMap[team.id] ?? 0} demos
+                        {demoCountMap[team.id] ?? 0} opponent demos
                       </p>
                     </div>
                     <ArrowRight size={14} className="text-muted-foreground group-hover:text-neon-green transition-colors shrink-0" />
@@ -338,7 +338,7 @@ export default async function DashboardPage() {
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {demoCountMap[team.id] ?? 0} demos
+                        {demoCountMap[team.id] ?? 0} opponent demos
                       </span>
                       <ArrowRight size={14} className="text-muted-foreground group-hover:text-neon-green transition-colors" />
                     </div>
