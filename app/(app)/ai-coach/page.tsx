@@ -587,7 +587,7 @@ export default function AICoachPage() {
                   {/* Bubble */}
                   <div
                     className={cn(
-                      'max-w-[75%] rounded-2xl px-4 py-3',
+                      'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
                       msg.role === 'user'
                         ? 'bg-neon-green/10 border border-neon-green/20 rounded-br-sm'
                         : 'bg-card border border-border rounded-bl-sm'
@@ -612,7 +612,7 @@ export default function AICoachPage() {
                     <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center shrink-0 mb-0.5">
                       <Brain size={14} className="text-neon-green" />
                     </div>
-                    <div className="max-w-[75%] bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3">
+                    <div className="max-w-[85%] sm:max-w-[75%] bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3">
                       <MarkdownContent content={streamingContent} />
                       <span className="inline-block w-2 h-4 bg-neon-green ml-0.5 animate-pulse rounded-sm" />
                     </div>
@@ -626,8 +626,8 @@ export default function AICoachPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area */}
-        <div className="border-t border-border bg-card p-4 shrink-0">
+        {/* Input area — shrink-0 keeps it pinned at the bottom of the flex column */}
+        <div className="border-t border-border bg-card p-3 md:p-4 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
           {!selectedTeamId && (
             <p className="text-xs text-muted-foreground text-center mb-3">
               Select a team in the left panel to start chatting
@@ -646,7 +646,7 @@ export default function AICoachPage() {
                 e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
               }}
               onKeyDown={handleKeyDown}
-              placeholder={selectedTeamId ? 'Ask about opponent tendencies, anti-strats, weak spots... (Enter to send)' : 'Select a team first...'}
+              placeholder={selectedTeamId ? 'Ask about opponent tendencies, anti-strats...' : 'Select a team first...'}
               disabled={!selectedTeamId || streaming}
               rows={1}
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none min-h-[36px] max-h-40 py-2 px-2 disabled:cursor-not-allowed"
@@ -657,7 +657,7 @@ export default function AICoachPage() {
               disabled={!input.trim() || !selectedTeamId || streaming}
               size="sm"
               variant="neon"
-              className="shrink-0 h-9 w-9 p-0 rounded-lg"
+              className="shrink-0 h-10 w-10 p-0 rounded-lg"
             >
               {streaming ? (
                 <Loader2 size={15} className="animate-spin" />

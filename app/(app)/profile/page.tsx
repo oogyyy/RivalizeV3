@@ -57,7 +57,7 @@ function AvatarDropzone({
   const src = preview || currentUrl
 
   return (
-    <div className="flex items-center gap-5">
+    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
       {/* Avatar display */}
       <div className="relative shrink-0">
         {src ? (
@@ -122,7 +122,7 @@ function ChipSelect({
             type="button"
             onClick={() => toggle(opt)}
             className={cn(
-              'px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150',
+              'px-3 py-2 rounded-full text-xs font-medium border transition-all duration-150 min-h-[36px]',
               active
                 ? color === 'neon'
                   ? 'bg-neon-green/20 text-neon-green border-neon-green/40'
@@ -259,11 +259,11 @@ export default function ProfilePage() {
   const nameToDisplay = displayName || profile.username
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-5 md:space-y-6">
       {/* Profile Header */}
-      <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6">
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4 md:p-6">
         <div className="absolute inset-0 bg-gradient-to-r from-neon-green/5 via-transparent to-transparent pointer-events-none" />
-        <div className="relative flex items-start gap-5">
+        <div className="relative flex items-start gap-4 md:gap-5">
           {/* Avatar */}
           <div className="relative shrink-0">
             {avatarUrl ? (
@@ -306,9 +306,22 @@ export default function ProfilePage() {
                 ))}
               </div>
             )}
+
+            {/* Mobile-only quick stats */}
+            <div className="md:hidden flex items-center gap-4 mt-3 pt-3 border-t border-border">
+              <div>
+                <p className="text-lg font-bold text-neon-green">{stats.demos}</p>
+                <p className="text-xs text-muted-foreground">Demos</p>
+              </div>
+              <div className="w-px h-6 bg-border" />
+              <div>
+                <p className="text-lg font-bold text-foreground">{stats.teams}</p>
+                <p className="text-xs text-muted-foreground">Teams</p>
+              </div>
+            </div>
           </div>
 
-          {/* Quick stats */}
+          {/* Quick stats — desktop inline, mobile shown below avatar row */}
           <div className="hidden md:flex gap-4 text-center shrink-0">
             <div>
               <p className="text-2xl font-bold text-neon-green">{stats.demos}</p>

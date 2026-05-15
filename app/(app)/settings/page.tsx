@@ -252,7 +252,7 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5 md:space-y-6">
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
@@ -286,7 +286,7 @@ export default function SettingsPage() {
               <Mail size={14} className="text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">Change Email</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <Input
                 type="email"
                 value={newEmail}
@@ -298,7 +298,7 @@ export default function SettingsPage() {
                 variant="outline"
                 onClick={handleEmailChange}
                 disabled={!newEmail || emailSaving}
-                className="gap-2 shrink-0"
+                className="gap-2 shrink-0 h-11 sm:h-10"
               >
                 {emailSaving ? <Loader2 size={13} className="animate-spin" /> : emailSaved ? <Check size={13} className="text-neon-green" /> : <Mail size={13} />}
                 {emailSaved ? 'Sent!' : 'Update'}
@@ -531,7 +531,7 @@ export default function SettingsPage() {
           <CardDescription>Irreversible account actions</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 rounded-lg border border-red-400/20 bg-red-400/5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg border border-red-400/20 bg-red-400/5">
             <div>
               <p className="text-sm font-medium text-foreground">Delete Account</p>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -541,7 +541,7 @@ export default function SettingsPage() {
             <Button
               variant="destructive"
               size="sm"
-              className="gap-2 shrink-0"
+              className="gap-2 shrink-0 h-11 sm:h-9 w-full sm:w-auto"
               onClick={() => setShowDeleteDialog(true)}
             >
               <Trash2 size={13} />

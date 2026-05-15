@@ -100,24 +100,24 @@ export default async function TeamsPage() {
   })
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6 md:space-y-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">My Teams</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">My Teams</h1>
+          <p className="text-muted-foreground text-sm mt-1">
             Manage your teams and scout upcoming opponents
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <CreateTeamDialog />
         </div>
       </div>
 
       {/* Stats bar */}
       {teams.length > 0 && (
-        <div className="flex items-center gap-6 p-4 rounded-lg bg-card border border-border">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4 md:gap-6 p-4 rounded-lg bg-card border border-border overflow-x-auto">
+          <div className="flex items-center gap-2 shrink-0">
             <div className="w-8 h-8 rounded bg-neon-green/10 flex items-center justify-center">
               <Users size={16} className="text-neon-green" />
             </div>
@@ -126,8 +126,8 @@ export default async function TeamsPage() {
               <p className="text-lg font-bold text-foreground">{teams.length}</p>
             </div>
           </div>
-          <div className="w-px h-8 bg-border" />
-          <div className="flex items-center gap-2">
+          <div className="w-px h-8 bg-border shrink-0" />
+          <div className="flex items-center gap-2 shrink-0">
             <div className="w-8 h-8 rounded bg-neon-green/10 flex items-center justify-center">
               <Shield size={16} className="text-neon-green" />
             </div>
@@ -138,8 +138,8 @@ export default async function TeamsPage() {
               </p>
             </div>
           </div>
-          <div className="w-px h-8 bg-border" />
-          <div>
+          <div className="w-px h-8 bg-border shrink-0" />
+          <div className="shrink-0">
             <p className="text-xs text-muted-foreground">Opponent Demos</p>
             <p className="text-lg font-bold text-foreground">
               {Object.values(demoCountMap).reduce((a, b) => a + b, 0)}

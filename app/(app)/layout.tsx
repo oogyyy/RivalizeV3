@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .single()
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-[100dvh] bg-background overflow-hidden">
       {/* Desktop sidebar — hidden on mobile */}
       <Sidebar profile={profile} />
 

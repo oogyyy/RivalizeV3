@@ -13,6 +13,7 @@ import type { Profile } from '@/types/database'
 
 interface SidebarProps {
   profile: Profile | null
+  onLinkClick?: () => void
 }
 
 const navLinks = [
@@ -23,7 +24,7 @@ const navLinks = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-export default function Sidebar({ profile }: SidebarProps) {
+export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
@@ -90,6 +91,7 @@ export default function Sidebar({ profile }: SidebarProps) {
             <Link
               key={href}
               href={href}
+              onClick={onLinkClick}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-150',
                 collapsed ? 'justify-center px-0 py-3' : '',
