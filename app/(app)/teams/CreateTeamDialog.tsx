@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Plus, Loader2, X, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +14,6 @@ interface CreateTeamDialogProps {
 }
 
 export default function CreateTeamDialog({ asCard }: CreateTeamDialogProps) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -54,8 +52,7 @@ export default function CreateTeamDialog({ asCard }: CreateTeamDialogProps) {
       setName('')
       setSlug('')
       setSlugManuallyEdited(false)
-      router.push(`/teams/${data.id}`)
-      router.refresh()
+      window.location.href = `/teams/${data.id}`
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
