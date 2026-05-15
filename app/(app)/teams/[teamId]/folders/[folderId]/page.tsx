@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
-  Crosshair, Calendar, MapPin, TrendingUp, Upload,
+  Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink,
 } from 'lucide-react'
 import type { AggregatedStats, DemoHeader, PlayerStats } from '@/types/database'
 
@@ -76,6 +76,16 @@ export default async function FolderPage({
   // Top players from aggregated stats
   const topPlayers: PlayerStats[] = stats?.top_players ?? []
 
+  // Most common map for the pro reference link
+  const mapCounts: Record<string, number> = {}
+  for (const d of demos ?? []) {
+    if (d.map) mapCounts[d.map] = (mapCounts[d.map] ?? 0) + 1
+  }
+  const primaryMap = Object.entries(mapCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
+  const proRefUrl = primaryMap
+    ? `https://huggingface.co/datasets/blanchon/opencs2_dataset/viewer?q=${encodeURIComponent(primaryMap)}`
+    : 'https://huggingface.co/datasets/blanchon/opencs2_dataset/viewer'
+
   return (
     <div className="min-h-full">
       {/* Header */}
@@ -119,6 +129,12 @@ export default async function FolderPage({
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
+              <a href={proRefUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" className="gap-2 text-muted-foreground hover:text-foreground">
+                  <ExternalLink size={14} />
+                  Pro References
+                </Button>
+              </a>
               <Link href={`/ai-coach?team=${teamId}&folder=${folderId}`}>
                 <Button variant="neon" className="gap-2">
                   <Brain size={16} />
@@ -396,6 +412,49 @@ export default async function FolderPage({
                     Generate Anti-Strat
                   </Button>
                 </Link>
+              </CardContent>
+            </Card>
+
+            {/* OpenCS2 Pro References */}
+            <Card className="bg-card border-border">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-2.5 mb-3">
+                  <div className="w-7 h-7 rounded bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <ExternalLink size={13} className="text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">OpenCS2 Pro Dataset</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
+                      200k+ professional matches. Browse pro plays for additional context.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  {primaryMap ? (
+                    <a
+                      href={proRefUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-2 rounded-md bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-colors group"
+                    >
+                      <div>
+                        <p className="text-xs font-medium text-foreground">{primaryMap}</p>
+                        <p className="text-[10px] text-muted-foreground">View pro matches on this map</p>
+                      </div>
+                      <ExternalLink size={11} className="text-muted-foreground group-hover:text-blue-400 transition-colors shrink-0" />
+                    </a>
+                  ) : null}
+                  <a
+                    href="https://huggingface.co/datasets/blanchon/opencs2_dataset"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2 rounded-md hover:bg-accent transition-colors group"
+                  >
+                    <p className="text-[10px] text-muted-foreground group-hover:text-foreground">Browse full dataset →</p>
+                    <ExternalLink size={10} className="text-muted-foreground shrink-0" />
+                  </a>
+                </div>
               </CardContent>
             </Card>
           </div>

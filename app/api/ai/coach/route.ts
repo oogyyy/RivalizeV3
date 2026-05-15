@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     focusArea?: string
     playerName?: string
     mapName?: string
+    includeProDataset?: boolean
   }
 
   try {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { teamId, folderId, messages = [], focusArea, playerName, mapName } = body
+  const { teamId, folderId, messages = [], focusArea, playerName, mapName, includeProDataset } = body
 
   // Build context from team/folder data
   let contextText = ''
@@ -156,7 +157,16 @@ Your analysis style:
 ${contextText ? `Opponent Scout Context:\n${contextText}` : ''}
 ${focusArea ? `Analysis focus: ${focusInstructions[focusArea] || focusInstructions.general}` : ''}
 ${playerName && focusArea === 'player' ? `Opponent player to analyze: ${playerName}` : ''}
-${mapName && focusArea === 'strategy' ? `Map focus: ${mapName}` : ''}`
+${mapName && focusArea === 'strategy' ? `Map focus: ${mapName}` : ''}
+${includeProDataset ? `
+PRO DATASET CONTEXT (OpenCS2 — https://huggingface.co/datasets/blanchon/opencs2_dataset):
+The user has enabled professional match insights. Supplement your analysis with pro-level context:
+- Reference how professional teams typically execute and default on this map
+- Note common professional CT anchor positions, rotations, and retake patterns
+- Highlight pro-level T-side timings, utility choreography, and fake sequences
+- Point out where this opponent's tendencies align with or deviate from professional meta
+- Flag any exploits or counters that are well-established in the professional scene
+Label all pro-meta observations clearly with "[Pro Meta]" so the user can distinguish them from opponent-specific findings derived from their uploaded demos.` : ''}`
 
   try {
     const result = streamText({

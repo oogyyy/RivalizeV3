@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import {
   Brain, Send, RotateCcw, ChevronDown, Loader2,
   Target, Crosshair, Shield, Users, Map as MapIcon,
-  Sparkles, MessageSquare, ChevronRight
+  Sparkles, MessageSquare, ChevronRight, ExternalLink, Database,
 } from 'lucide-react'
 import type { Team, TeamFolder } from '@/types/database'
 
@@ -140,6 +140,7 @@ export default function AICoachPage() {
   const [streaming, setStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
   const [loadingTeams, setLoadingTeams] = useState(true)
+  const [includeProDataset, setIncludeProDataset] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -196,6 +197,7 @@ export default function AICoachPage() {
           focusArea,
           playerName: focusArea === 'player' ? selectedPlayer : undefined,
           mapName: focusArea === 'strategy' ? selectedMap : undefined,
+          includeProDataset,
           messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
         }),
       })
@@ -247,7 +249,7 @@ export default function AICoachPage() {
       setStreaming(false)
       setStreamingContent('')
     }
-  }, [messages, streaming, selectedTeamId, selectedFolderId, focusArea, selectedPlayer, selectedMap])
+  }, [messages, streaming, selectedTeamId, selectedFolderId, focusArea, selectedPlayer, selectedMap, includeProDataset])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -393,6 +395,62 @@ export default function AICoachPage() {
               </select>
             </div>
           )}
+
+          {/* Pro dataset toggle */}
+          <div className="border-t border-border pt-4">
+            <button
+              onClick={() => setIncludeProDataset(v => !v)}
+              className={cn(
+                'w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-all',
+                includeProDataset
+                  ? 'bg-blue-500/10 border-blue-500/30'
+                  : 'bg-background border-border hover:border-border/80 hover:bg-accent/40'
+              )}
+            >
+              <div className={cn(
+                'w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5',
+                includeProDataset ? 'bg-blue-500/20' : 'bg-muted'
+              )}>
+                <Database size={13} className={includeProDataset ? 'text-blue-400' : 'text-muted-foreground'} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className={cn('text-xs font-semibold', includeProDataset ? 'text-blue-300' : 'text-foreground')}>
+                    Pro Dataset Insights
+                  </p>
+                  <div className={cn(
+                    'w-7 h-4 rounded-full transition-colors shrink-0',
+                    includeProDataset ? 'bg-blue-500' : 'bg-muted-foreground/30'
+                  )}>
+                    <div className={cn(
+                      'w-3 h-3 rounded-full bg-white shadow transition-transform mt-0.5',
+                      includeProDataset ? 'translate-x-3.5 ml-0' : 'translate-x-0.5 ml-0'
+                    )} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
+                  Reference OpenCS2 pro match patterns in AI analysis
+                </p>
+              </div>
+            </button>
+            {includeProDataset && (
+              <div className="mt-2 px-3 py-2 rounded-md bg-blue-500/5 border border-blue-500/15">
+                <p className="text-[10px] text-blue-400/80 leading-relaxed">
+                  AI will cross-reference pro-level meta and tendencies from the{' '}
+                  <a
+                    href="https://huggingface.co/datasets/blanchon/opencs2_dataset"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-blue-300 inline-flex items-center gap-0.5"
+                  >
+                    OpenCS2 dataset
+                    <ExternalLink size={9} />
+                  </a>
+                  {' '}(200k+ pro matches).
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Context summary */}
@@ -403,6 +461,9 @@ export default function AICoachPage() {
               {selectedTeam && <Badge variant="outline" className="text-xs">{selectedTeam.name}</Badge>}
               {selectedFolder && <Badge variant="neon" className="text-xs">vs {selectedFolder.opponent_display_name}</Badge>}
               <Badge variant="secondary" className="text-xs capitalize">{focusArea}</Badge>
+              {includeProDataset && (
+                <Badge className="text-xs bg-blue-500/20 text-blue-300 border-blue-500/30">Pro data</Badge>
+              )}
             </div>
           </div>
         )}
