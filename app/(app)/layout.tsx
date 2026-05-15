@@ -19,13 +19,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Desktop sidebar — hidden on mobile */}
       <Sidebar profile={profile} />
 
-      {/* Content column: mobile top bar + scrollable page */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <MobileMenu profile={profile} />
-        <main className="flex-1 overflow-auto min-w-0">
-          {children}
-        </main>
-      </div>
+      {/* Main content with top clearance for floating hamburger on mobile */}
+      <main className="flex-1 overflow-auto min-w-0 pt-16 md:pt-0">
+        {children}
+      </main>
+
+      {/* Mobile floating hamburger + drawer — all fixed, no layout impact */}
+      <MobileMenu profile={profile} />
     </div>
   )
 }

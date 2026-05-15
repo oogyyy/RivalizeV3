@@ -16,13 +16,46 @@ interface SidebarProps {
   onLinkClick?: () => void
 }
 
-const navLinks = [
+export const navLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/teams', label: 'Teams', icon: Users },
   { href: '/ai-coach', label: 'AI Scout', icon: Brain },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
+
+/** Shared nav list used by both Sidebar (desktop) and MobileMenu (mobile drawer). */
+export function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
+  const pathname = usePathname()
+  return (
+    <div className="space-y-1">
+      {navLinks.map(({ href, label, icon: Icon }) => {
+        const isActive = pathname === href || pathname.startsWith(href + '/')
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={onLinkClick}
+            className={cn(
+              'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-150',
+              isActive
+                ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            )}
+          >
+            <Icon
+              size={18}
+              className={cn('shrink-0', isActive ? 'text-neon-green' : 'text-muted-foreground')}
+            />
+            <span>{label}</span>
+            {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-neon-green" />}
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
 
 export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
   const pathname = usePathname()
@@ -49,7 +82,7 @@ export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'hidden md:flex flex-col h-full bg-card border-r border-border transition-all duration-300 ease-in-out shrink-0',
+        'hidden md:flex flex-col h-full bg-card border-r border-border transition-all duration-300 ease-in-out shrink-0 relative',
         collapsed ? 'w-16' : 'w-60'
       )}
     >
@@ -74,12 +107,10 @@ export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
         )}
       >
         <div className="flex items-center justify-center w-8 h-8 rounded bg-neon-green shrink-0">
-          <Crosshair size={18} className="text-black font-bold" />
+          <Crosshair size={18} className="text-black" />
         </div>
         {!collapsed && (
-          <span className="text-lg font-bold tracking-widest text-foreground">
-            RIVALIZE
-          </span>
+          <span className="text-lg font-bold tracking-widest text-foreground">RIVALIZE</span>
         )}
       </div>
 
@@ -105,7 +136,7 @@ export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
                 size={18}
                 className={cn(
                   'shrink-0',
-                  isActive ? 'text-neon-green' : 'text-muted-foreground group-hover:text-foreground'
+                  isActive ? 'text-neon-green' : 'text-muted-foreground'
                 )}
               />
               {!collapsed && <span>{label}</span>}
@@ -125,7 +156,6 @@ export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
             collapsed && 'justify-center px-0'
           )}
         >
-          {/* Avatar */}
           <div className="relative shrink-0">
             {profile?.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
