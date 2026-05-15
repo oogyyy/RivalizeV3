@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import FolderCard from '@/components/teams/FolderCard'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import TeamTabNav from './TeamTabNav'
+import InviteCodeSection from './InviteCodeSection'
 import {
   Users, Upload, Brain, Trophy, Crosshair, ArrowLeft,
   Crown, Shield, User, Plus, BarChart3, Target, MapPin,
@@ -493,14 +494,16 @@ export default async function TeamPage({
                 </p>
               </div>
               {isOwnerOrAdmin && (
-                <Button variant="outline" className="gap-2">
-                  <Plus size={16} />
-                  Invite Member
-                </Button>
+                <a href="#invite" className="scroll-smooth">
+                  <Button variant="outline" className="gap-2">
+                    <Plus size={16} />
+                    Invite Member
+                  </Button>
+                </a>
               )}
             </div>
 
-            <Card className="bg-card border-border overflow-hidden">
+            <Card className="bg-card border-border overflow-hidden" id="members-list">
               <div className="divide-y divide-border">
                 {(members ?? []).map((member) => {
                   const profile = member.profiles as unknown as {
@@ -548,6 +551,15 @@ export default async function TeamPage({
                 })}
               </div>
             </Card>
+
+            {isOwnerOrAdmin && team.invite_code && (
+              <div id="invite">
+                <InviteCodeSection
+                  inviteCode={team.invite_code}
+                  teamId={resolvedTeamId}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
