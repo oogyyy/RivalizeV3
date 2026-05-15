@@ -9,6 +9,7 @@ import {
   Brain, Send, RotateCcw, ChevronDown, Loader2,
   Target, Crosshair, Shield, Users, Map as MapIcon,
   Sparkles, MessageSquare, ChevronRight, ExternalLink, Database,
+  SlidersHorizontal, X,
 } from 'lucide-react'
 import type { Team, TeamFolder } from '@/types/database'
 
@@ -141,6 +142,7 @@ export default function AICoachPage() {
   const [streamingContent, setStreamingContent] = useState('')
   const [loadingTeams, setLoadingTeams] = useState(true)
   const [includeProDataset, setIncludeProDataset] = useState(false)
+  const [isContextOpen, setIsContextOpen] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -186,6 +188,7 @@ export default function AICoachPage() {
     setInput('')
     setStreaming(true)
     setStreamingContent('')
+    setIsContextOpen(false)
 
     try {
       const res = await fetch('/api/ai/coach', {
@@ -274,8 +277,27 @@ export default function AICoachPage() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Left panel — Context selector */}
-      <div className="w-72 shrink-0 border-r border-border bg-card flex flex-col h-full overflow-y-auto">
+      {/* Left panel — Context selector: sidebar on desktop, full-screen overlay on mobile */}
+      <div
+        className={cn(
+          'shrink-0 border-r border-border bg-card flex flex-col h-full overflow-y-auto',
+          'md:w-72 md:flex',
+          isContextOpen
+            ? 'fixed inset-0 z-40 w-full flex flex-col md:relative md:inset-auto md:w-72'
+            : 'hidden md:flex'
+        )}
+      >
+        {/* Mobile close button */}
+        <div className="md:hidden flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
+          <span className="text-sm font-semibold text-foreground">Context Settings</span>
+          <button
+            onClick={() => setIsContextOpen(false)}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Close context"
+          >
+            <X size={18} />
+          </button>
+        </div>
         <div className="p-5 border-b border-border">
           <div className="flex items-center gap-2 mb-1">
             <Brain size={18} className="text-neon-green" />
@@ -470,11 +492,21 @@ export default function AICoachPage() {
       </div>
 
       {/* Right panel — Chat */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <div className="flex-1 flex flex-col overflow-hidden bg-background min-w-0">
         {/* Chat header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-card shrink-0">
+        <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-2">
-            <MessageSquare size={16} className="text-neon-green" />
+            {/* Mobile context toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsContextOpen(true)}
+              className="md:hidden gap-1.5 text-xs text-muted-foreground hover:text-foreground -ml-2 mr-1"
+            >
+              <SlidersHorizontal size={14} />
+              Context
+            </Button>
+            <MessageSquare size={16} className="text-neon-green hidden md:block" />
             <span className="text-sm font-medium text-foreground">
               {messages.length === 0 ? 'New Session' : `${messages.length} messages`}
             </span>
@@ -486,7 +518,7 @@ export default function AICoachPage() {
             className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
             <RotateCcw size={13} />
-            New Session
+            <span className="hidden sm:inline">New Session</span>
           </Button>
         </div>
 

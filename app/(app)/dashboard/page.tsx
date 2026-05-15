@@ -110,19 +110,19 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6 md:space-y-8 max-w-7xl mx-auto">
       {/* Welcome header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Welcome back,{' '}
             <span className="text-neon-green neon-text">{displayName}</span>
           </h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="mt-1 text-muted-foreground text-sm">
             Your war room for upcoming match preparation.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3 shrink-0">
           <Link href="/teams">
             <Button variant="outline" className="gap-2">
               <Plus size={16} />

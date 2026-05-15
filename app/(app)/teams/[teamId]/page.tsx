@@ -148,9 +148,9 @@ export default async function TeamPage({
     <div className="min-h-full">
       {/* Team header */}
       <div className="border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 py-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-center gap-3 md:gap-4">
               <Link
                 href="/teams"
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -158,7 +158,7 @@ export default async function TeamPage({
                 <ArrowLeft size={18} />
               </Link>
               {/* Team logo */}
-              <div className="w-14 h-14 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center shrink-0">
                 {team.logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -167,34 +167,34 @@ export default async function TeamPage({
                     className="w-full h-full object-cover rounded-xl"
                   />
                 ) : (
-                  <span className="text-2xl font-bold text-neon-green">
+                  <span className="text-xl md:text-2xl font-bold text-neon-green">
                     {team.name.charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-foreground">{team.name}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl md:text-2xl font-bold text-foreground">{team.name}</h1>
                   <Badge variant={roleVariant[myMembership.role]}>
                     {myMembership.role}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-1 text-xs md:text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <Users size={13} />
+                    <Users size={12} />
                     {(members ?? []).length} members
                   </span>
-                  <span className="text-border">·</span>
+                  <span className="text-border hidden sm:inline">·</span>
                   <span className="flex items-center gap-1">
-                    <BarChart3 size={13} />
-                    {(demos ?? []).length} opponent demos
+                    <BarChart3 size={12} />
+                    {(demos ?? []).length} demos
                   </span>
                   {totalMatches > 0 && (
                     <>
-                      <span className="text-border">·</span>
+                      <span className="text-border hidden sm:inline">·</span>
                       <span className="flex items-center gap-1 text-neon-green font-medium">
-                        <Trophy size={13} />
-                        {winRate}% win rate
+                        <Trophy size={12} />
+                        {winRate}% win
                       </span>
                     </>
                   )}
@@ -202,11 +202,11 @@ export default async function TeamPage({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2">
               <Link href={`/ai-coach?team=${resolvedTeamId}`}>
                 <Button variant="outline" className="gap-2">
                   <Brain size={16} />
-                  AI Scout
+                  <span className="hidden sm:inline">AI Scout</span>
                 </Button>
               </Link>
               {isOwnerOrAdmin && (
@@ -221,7 +221,7 @@ export default async function TeamPage({
       </div>
 
       {/* Tab content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6">
         {/* ── OVERVIEW TAB ── */}
         {tab === 'overview' && (
           <div className="space-y-6">

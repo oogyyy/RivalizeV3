@@ -48,7 +48,7 @@ export default function Sidebar({ profile }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'relative flex flex-col h-full bg-card border-r border-border transition-all duration-300 ease-in-out shrink-0',
+        'hidden md:flex flex-col h-full bg-card border-r border-border transition-all duration-300 ease-in-out shrink-0',
         collapsed ? 'w-16' : 'w-60'
       )}
     >

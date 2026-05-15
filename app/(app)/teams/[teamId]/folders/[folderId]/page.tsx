@@ -91,9 +91,9 @@ export default async function FolderPage({
     <div className="min-h-full">
       {/* Header */}
       <div className="border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 py-5">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-5">
           {/* Breadcrumb */}
-          <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+          <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-4 flex-wrap">
             <Link href="/teams" className="hover:text-foreground transition-colors">Teams</Link>
             <span>/</span>
             <Link href={`/teams/${teamId}`} className="hover:text-foreground transition-colors">
@@ -110,7 +110,7 @@ export default async function FolderPage({
             <span className="text-foreground font-medium">{folder.opponent_display_name}</span>
           </nav>
 
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <Link
                 href={`/teams/${teamId}?tab=folders`}
@@ -128,18 +128,22 @@ export default async function FolderPage({
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
               {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
               <a href={proRefUrl} target="_blank" rel="noopener noreferrer">
-                <Button variant="secondary" className="gap-2">
+                <Button variant="secondary" className="gap-2 text-sm">
                   <ExternalLink size={14} />
-                  {primaryMap ? `View Pro Plays on ${primaryMap}` : 'View Pro Plays'}
+                  <span className="hidden sm:inline">
+                    {primaryMap ? `View Pro Plays on ${primaryMap}` : 'View Pro Plays'}
+                  </span>
+                  <span className="sm:hidden">Pro Plays</span>
                 </Button>
               </a>
               <Link href={`/ai-coach?team=${teamId}&folder=${folderId}`}>
                 <Button variant="neon" className="gap-2">
                   <Brain size={16} />
-                  Generate Anti-Strat
+                  <span className="hidden sm:inline">Generate Anti-Strat</span>
+                  <span className="sm:hidden">Anti-Strat</span>
                 </Button>
               </Link>
             </div>
@@ -198,7 +202,7 @@ export default async function FolderPage({
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 space-y-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Demos table */}
           <div className="lg:col-span-2 space-y-4">
