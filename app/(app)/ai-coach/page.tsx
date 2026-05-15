@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -147,22 +146,9 @@ export default function AICoachPage() {
 
   useEffect(() => {
     const fetchTeams = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: memberships } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', user.id)
-
-      const teamIds = (memberships ?? []).map(m => m.team_id).filter(Boolean)
-
-      const { data: teamsData } = teamIds.length
-        ? await supabase.from('teams').select('*').in('id', teamIds)
-        : { data: [] }
-
-      const teamList = (teamsData ?? []) as Team[]
+      const res = await fetch('/api/teams')
+      if (!res.ok) { setLoadingTeams(false); return }
+      const teamList = (await res.json()) as Team[]
       setTeams(teamList)
       if (teamList[0]) setSelectedTeamId(teamList[0].id)
       setLoadingTeams(false)
@@ -173,13 +159,9 @@ export default function AICoachPage() {
   useEffect(() => {
     if (!selectedTeamId) return
     const fetchFolders = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('team_folders')
-        .select('*')
-        .eq('user_team_id', selectedTeamId)
-        .order('opponent_display_name')
-      setFolders((data as TeamFolder[]) || [])
+      const res = await fetch(`/api/teams/${selectedTeamId}/folders`)
+      if (!res.ok) { setFolders([]); setSelectedFolderId(''); return }
+      setFolders((await res.json()) as TeamFolder[])
       setSelectedFolderId('')
     }
     fetchFolders()

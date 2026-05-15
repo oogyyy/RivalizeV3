@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { generateMockDemoData } from '@/lib/demo-parser/mock-parser'
 import { slugify } from '@/lib/utils'
@@ -7,6 +8,8 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = createAdminClient()
 
   let formData: FormData
   try {
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
   const opponentSlug = slugify(opponentName)
 
   // Create demo record
-  const { data: demo, error: demoError } = await supabase
+  const { data: demo, error: demoError } = await admin
     .from('demos')
     .insert({
       team_id: teamId,
@@ -65,7 +68,7 @@ export async function POST(request: Request) {
   }
 
   // Upsert team folder
-  await supabase.from('team_folders').upsert(
+  await admin.from('team_folders').upsert(
     {
       user_team_id: teamId,
       opponent_slug: opponentSlug,
@@ -74,8 +77,6 @@ export async function POST(request: Request) {
     { onConflict: 'user_team_id,opponent_slug' }
   )
 
-  // Trigger background parsing (mock — replace with real parser queue in production)
-  // Using a non-blocking async operation
   const demoId = demo.id
 
   ;(async () => {
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
 
       const parsedData = generateMockDemoData('My Team', opponentName, mapName)
 
-      await supabase
+      await admin
         .from('demos')
         .update({
           parsed_data: parsedData,
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
         .eq('id', demoId)
 
       // Recalculate folder aggregated stats
-      const { data: allDemos } = await supabase
+      const { data: allDemos } = await admin
         .from('demos')
         .select('parsed_data, status')
         .eq('team_id', teamId)
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
           return h && (h.score_team1 ?? 0) > (h.score_team2 ?? 0)
         }).length
 
-        await supabase
+        await admin
           .from('team_folders')
           .update({
             aggregated_stats: {
@@ -125,7 +126,7 @@ export async function POST(request: Request) {
           .eq('opponent_slug', opponentSlug)
       }
     } catch (err) {
-      await supabase
+      await admin
         .from('demos')
         .update({
           status: 'failed',

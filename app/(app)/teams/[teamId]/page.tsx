@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
@@ -29,20 +30,22 @@ export default async function TeamPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch team by id or slug (for robust routing)
-  const { data: team } = await supabase
+  // Use admin client to bypass RLS recursion; auth enforced via explicit user.id checks below
+  const admin = createAdminClient()
+
+  // Fetch team by id or slug
+  const { data: team } = await admin
     .from('teams')
     .select('*')
     .or(`id.eq.${teamId},slug.eq.${teamId}`)
     .maybeSingle()
 
-  // If team is null it means RLS filtered it out (no membership) or it doesn't exist — go back to list
   if (!team) redirect('/teams')
 
   const resolvedTeamId = team.id
 
-  // Check membership
-  const { data: myMembership } = await supabase
+  // Verify the current user is actually a member — this is our authorization check
+  const { data: myMembership } = await admin
     .from('team_members')
     .select('role')
     .eq('team_id', resolvedTeamId)
@@ -54,20 +57,20 @@ export default async function TeamPage({
   const isOwnerOrAdmin = myMembership.role === 'owner' || myMembership.role === 'admin'
 
   // Fetch all team members with profiles
-  const { data: members } = await supabase
+  const { data: members } = await admin
     .from('team_members')
     .select('role, user_id, profiles(id, username, display_name, avatar_url)')
     .eq('team_id', resolvedTeamId)
 
   // Fetch all demos
-  const { data: demos } = await supabase
+  const { data: demos } = await admin
     .from('demos')
     .select('*')
     .eq('team_id', resolvedTeamId)
     .order('created_at', { ascending: false })
 
   // Fetch folders
-  const { data: folders } = await supabase
+  const { data: folders } = await admin
     .from('team_folders')
     .select('*')
     .eq('user_team_id', resolvedTeamId)

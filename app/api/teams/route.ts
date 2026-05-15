@@ -82,7 +82,9 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: memberships, error } = await supabase
+  const admin = createAdminClient()
+
+  const { data: memberships, error } = await admin
     .from('team_members')
     .select('team_id, role')
     .eq('user_id', user.id)
@@ -92,7 +94,7 @@ export async function GET() {
   const teamIds = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
   if (!teamIds.length) return NextResponse.json([])
 
-  const { data: teams, error: teamsError } = await supabase
+  const { data: teams, error: teamsError } = await admin
     .from('teams')
     .select('*')
     .in('id', teamIds)

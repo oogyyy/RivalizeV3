@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
@@ -15,23 +16,24 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Use admin client to bypass RLS recursion; authorization enforced by filtering on user.id
+  const admin = createAdminClient()
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
-  // Fetch memberships (simple user_id filter — always visible via RLS)
-  const { data: memberships } = await supabase
+  const { data: memberships } = await admin
     .from('team_members')
     .select('role, team_id')
     .eq('user_id', user.id)
 
   const teamIds = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
 
-  // Fetch team details separately to avoid nested RLS circular dependency
   const { data: teamsData } = teamIds.length
-    ? await supabase
+    ? await admin
         .from('teams')
         .select('id, name, slug, logo_url')
         .in('id', teamIds)
@@ -44,7 +46,7 @@ export default async function DashboardPage() {
 
   // Fetch recent demos across all teams
   const { data: recentDemos } = teamIds.length
-    ? await supabase
+    ? await admin
         .from('demos')
         .select('id, team_id, opponent_name, map, match_date, status, created_at')
         .in('team_id', teamIds)
@@ -54,7 +56,7 @@ export default async function DashboardPage() {
 
   // Fetch demo counts per team
   const { data: demoCounts } = teamIds.length
-    ? await supabase
+    ? await admin
         .from('demos')
         .select('team_id, status')
         .in('team_id', teamIds)

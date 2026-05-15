@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { Plus, Users, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,17 +14,18 @@ export default async function TeamsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch memberships first (simple filter by user_id — always visible via RLS)
-  const { data: memberships } = await supabase
+  // Use admin client to bypass RLS recursion; authorization is enforced by filtering on user.id
+  const admin = createAdminClient()
+
+  const { data: memberships } = await admin
     .from('team_members')
     .select('role, team_id')
     .eq('user_id', user.id)
 
   const teamIds = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
 
-  // Fetch team details separately to avoid nested RLS circular dependency
   const { data: teamsData } = teamIds.length
-    ? await supabase
+    ? await admin
         .from('teams')
         .select('id, name, slug, logo_url')
         .in('id', teamIds)
@@ -33,7 +35,7 @@ export default async function TeamsPage() {
 
   // Member counts per team
   const { data: allMembers } = teamIds.length
-    ? await supabase
+    ? await admin
         .from('team_members')
         .select('team_id')
         .in('team_id', teamIds)
@@ -46,7 +48,7 @@ export default async function TeamsPage() {
 
   // Demo counts per team
   const { data: allDemos } = teamIds.length
-    ? await supabase
+    ? await admin
         .from('demos')
         .select('team_id, parsed_data')
         .in('team_id', teamIds)

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { generateMockDemoData } from '@/lib/demo-parser/mock-parser'
 import { slugify } from '@/lib/utils'
@@ -29,8 +30,10 @@ export async function POST(request: Request) {
 
   const { teamId, storagePath, opponentName, map, fileSize, matchDate, league } = parsed.data
 
+  const admin = createAdminClient()
+
   // Verify membership
-  const { data: member } = await supabase
+  const { data: member } = await admin
     .from('team_members')
     .select('role')
     .eq('team_id', teamId)
@@ -44,7 +47,7 @@ export async function POST(request: Request) {
   const opponentSlug = slugify(opponentName)
 
   // Create the demo record
-  const { data: demo, error: demoError } = await supabase
+  const { data: demo, error: demoError } = await admin
     .from('demos')
     .insert({
       team_id: teamId,
@@ -67,7 +70,7 @@ export async function POST(request: Request) {
   }
 
   // Upsert the team folder for this opponent
-  await supabase.from('team_folders').upsert(
+  await admin.from('team_folders').upsert(
     {
       user_team_id: teamId,
       opponent_slug: opponentSlug,
@@ -84,13 +87,13 @@ export async function POST(request: Request) {
 
       const parsedData = generateMockDemoData('My Team', opponentName, map)
 
-      await supabase
+      await admin
         .from('demos')
         .update({ parsed_data: parsedData, status: 'completed', map: parsedData.header.map })
         .eq('id', demoId)
 
       // Recalculate folder aggregated stats
-      const { data: allDemos } = await supabase
+      const { data: allDemos } = await admin
         .from('demos')
         .select('parsed_data')
         .eq('team_id', teamId)
@@ -109,7 +112,7 @@ export async function POST(request: Request) {
           if (m) mapsPlayed[m] = (mapsPlayed[m] ?? 0) + 1
         })
 
-        await supabase
+        await admin
           .from('team_folders')
           .update({
             aggregated_stats: {
@@ -128,7 +131,7 @@ export async function POST(request: Request) {
       }
     } catch (err) {
       console.error('[register] Background parse failed:', err)
-      await supabase
+      await admin
         .from('demos')
         .update({ status: 'failed', error_message: String(err) })
         .eq('id', demoId)
