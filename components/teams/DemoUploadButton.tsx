@@ -5,9 +5,9 @@ import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import { Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info, RefreshCw } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
 
 const LARGE_FILE_THRESHOLD = 300 * 1024 * 1024 // 300 MB
+const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
 
 interface DemoUploadButtonProps {
   teamId: string
@@ -29,6 +29,34 @@ function isValidDemoFile(name: string) {
   return name.toLowerCase().endsWith('.dem')
 }
 
+/** Upload a file directly to R2 via a presigned PUT URL with progress reporting. */
+function uploadToR2(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', url)
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve()
+      } else {
+        reject(new Error(`R2 upload failed: HTTP ${xhr.status}`))
+      }
+    })
+
+    xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
+    xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
+
+    xhr.send(file)
+  })
+}
+
 export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUploadButtonProps) {
   const [open, setOpen] = useState(false)
   const [uploads, setUploads] = useState<FileUpload[]>([])
@@ -39,10 +67,17 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
     setUploads(prev => prev.map((u, i) => (i === index ? { ...u, ...update } : u))), [])
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const valid = acceptedFiles.filter(f => isValidDemoFile(f.name))
+    const valid = acceptedFiles.filter(f => isValidDemoFile(f.name) && f.size <= MAX_FILE_SIZE)
+    const oversized = acceptedFiles.filter(f => f.size > MAX_FILE_SIZE)
     setUploads(prev => [
       ...prev,
       ...valid.map(file => ({ file, progress: 0, status: 'pending' as const })),
+      ...oversized.map(file => ({
+        file,
+        progress: 0,
+        status: 'error' as const,
+        error: `File exceeds 500 MB limit (${formatFileSize(file.size)})`,
+      })),
     ])
   }, [])
 
@@ -63,17 +98,13 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
   /** Upload a single file. Returns true on success. */
   const uploadOne = async (i: number, file: File): Promise<boolean> => {
     try {
-      // Step 1 — get path + token from our API
-      updateUpload(i, { status: 'presigning', progress: 5 })
+      // Step 1 — get a presigned R2 PUT URL from our API
+      updateUpload(i, { status: 'presigning', progress: 2 })
 
       const presignRes = await fetch('/api/demos/presign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teamId,
-          filename: file.name,
-          fileSize: file.size,
-        }),
+        body: JSON.stringify({ teamId, filename: file.name, fileSize: file.size }),
       })
 
       if (!presignRes.ok) {
@@ -81,33 +112,25 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
         throw new Error(err.error ?? `Presign failed (${presignRes.status})`)
       }
 
-      const { path, token, contentType } = await presignRes.json()
+      const { key, uploadUrl } = await presignRes.json()
 
-      // Step 2 — upload directly to Supabase Storage using the SDK method.
-      updateUpload(i, { status: 'uploading', progress: 10 })
+      // Step 2 — stream file directly to R2 (never touches Vercel's body limit)
+      updateUpload(i, { status: 'uploading', progress: 5 })
 
-      const supabase = createClient()
-      const { error: storageError } = await supabase.storage
-        .from('demos')
-        .uploadToSignedUrl(path, token, file, { contentType })
+      await uploadToR2(uploadUrl, file, pct => {
+        // Map raw upload progress (0–100) into the 5–88 display range
+        updateUpload(i, { progress: 5 + Math.round(pct * 0.83) })
+      })
 
-      if (storageError) {
-        const msg = storageError.message ?? ''
-        if (msg.toLowerCase().includes('mime') || msg.toLowerCase().includes('not supported')) {
-          throw new Error('Storage rejected this file type. Check bucket MIME settings in Supabase Dashboard.')
-        }
-        throw new Error(msg)
-      }
+      updateUpload(i, { progress: 90, status: 'registering' })
 
-      updateUpload(i, { progress: 88, status: 'registering' })
-
-      // Step 3 — register the demo in the database; opponent folder is auto-created
+      // Step 3 — register the demo record in Supabase; opponent folder is auto-created
       const registerRes = await fetch('/api/demos/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teamId,
-          storagePath: path,
+          r2Key: key,
           opponentName: opponentName.trim(),
           map: 'unknown',
           fileSize: file.size,
@@ -136,7 +159,6 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
     if (!opponentName.trim()) return
     setIsProcessing(true)
 
-    // Read the pending files synchronously before any await so indices are stable
     const pending = uploads
       .map((u, i) => ({ file: u.file, index: i, status: u.status }))
       .filter(u => u.status === 'pending')
@@ -169,7 +191,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
   const statusLabel = (u: FileUpload) => {
     switch (u.status) {
       case 'presigning': return 'Preparing…'
-      case 'uploading': return `Uploading… ${u.progress > 10 ? `${u.progress - 10}%` : ''}`
+      case 'uploading': return `Uploading… ${u.progress > 5 ? `${u.progress - 5}%` : ''}`
       case 'registering': return 'Saving…'
       case 'done': return 'Done'
       case 'error': return u.error ?? 'Failed'
@@ -196,7 +218,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
               Upload Opponent Demo{teamName ? ` for ${teamName}` : ''}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Accepts .dem files — up to 512 MB per file
+              Accepts .dem files — up to 500 MB per file
             </p>
           </div>
           <button
@@ -233,7 +255,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
             <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
               <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
               <p className="text-[11px] text-yellow-300">
-                CS2 demos are typically 200–500 MB. Large files may take 1–3 minutes to upload — keep this tab open.
+                CS2 demos are typically 200–500 MB. Large files upload directly to cloud storage — keep this tab open while uploading.
               </p>
             </div>
           )}
@@ -258,7 +280,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
             ) : (
               <>
                 <p className="text-sm font-medium text-foreground">Drag & drop opponent demo files here</p>
-                <p className="text-xs text-muted-foreground mt-1">.dem files only · click to browse</p>
+                <p className="text-xs text-muted-foreground mt-1">.dem files only · up to 500 MB · click to browse</p>
               </>
             )}
           </div>
@@ -292,7 +314,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
                       {upload.status === 'uploading' || upload.status === 'presigning' || upload.status === 'registering' ? (
                         <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-[#00ff87] rounded-full transition-all duration-500"
+                            className="h-full bg-[#00ff87] rounded-full transition-all duration-300"
                             style={{ width: `${upload.progress}%` }}
                           />
                         </div>
@@ -307,6 +329,9 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
                         </span>
                       )}
                     </div>
+                    {(upload.status === 'uploading' || upload.status === 'presigning') && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{statusLabel(upload)}</p>
+                    )}
                   </div>
                   <div className="shrink-0">
                     {upload.status === 'done' ? (

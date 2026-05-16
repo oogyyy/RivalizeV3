@@ -2,11 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { createPresignedPutUrl, getPublicUrl } from '@/lib/r2'
+
+const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
 
 const schema = z.object({
   teamId: z.string().uuid(),
   filename: z.string().min(1).max(255),
-  fileSize: z.number().positive().max(536_870_912), // 512 MB max
+  fileSize: z.number().positive().max(MAX_FILE_SIZE),
 })
 
 export async function POST(request: Request) {
@@ -23,10 +26,7 @@ export async function POST(request: Request) {
   const { teamId, filename, fileSize } = parsed.data
 
   if (!filename.toLowerCase().endsWith('.dem')) {
-    return NextResponse.json(
-      { error: 'Only .dem files are accepted' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Only .dem files are accepted' }, { status: 400 })
   }
 
   // Admin client bypasses RLS — identity is verified via auth.getUser() above
@@ -44,25 +44,18 @@ export async function POST(request: Request) {
   }
 
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const storagePath = `${teamId}/${Date.now()}-${safeFilename}`
+  const key = `${teamId}/${Date.now()}-${safeFilename}`
 
-  const { data, error } = await admin.storage
-    .from('demos')
-    .createSignedUploadUrl(storagePath)
-
-  if (error || !data) {
-    console.error('[presign] storage error:', error)
-    return NextResponse.json(
-      { error: error?.message ?? 'Failed to generate upload URL' },
-      { status: 500 }
-    )
+  try {
+    const uploadUrl = await createPresignedPutUrl(key)
+    return NextResponse.json({
+      key,
+      uploadUrl,
+      fileUrl: getPublicUrl(key),
+      expiresIn: 3600,
+    })
+  } catch (err) {
+    console.error('[presign] R2 error:', err)
+    return NextResponse.json({ error: 'Failed to generate upload URL' }, { status: 500 })
   }
-
-  return NextResponse.json({
-    path: storagePath,
-    token: data.token,
-    contentType: 'application/octet-stream',
-    signedUrl: data.signedUrl,
-    expiresIn: 3600,
-  })
 }

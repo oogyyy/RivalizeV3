@@ -3,11 +3,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { generateMockDemoData } from '@/lib/demo-parser/mock-parser'
 import { slugify } from '@/lib/utils'
+import { getPublicUrl } from '@/lib/r2'
 import { z } from 'zod'
 
 const schema = z.object({
   teamId: z.string().uuid(),
-  storagePath: z.string().min(1),
+  r2Key: z.string().min(1),
   opponentName: z.string().min(1).max(100),
   map: z.string().default('unknown'),
   fileSize: z.number().positive().optional(),
@@ -15,7 +16,7 @@ const schema = z.object({
   league: z.string().optional(),
 })
 
-// Called by the client after a successful direct upload to Supabase Storage.
+// Called by the client after a successful direct upload to R2.
 // Creates the demo DB record and kicks off background parsing.
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -28,12 +29,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { teamId, storagePath, opponentName, map, fileSize, matchDate, league } = parsed.data
+  const { teamId, r2Key, opponentName, map, fileSize, matchDate, league } = parsed.data
 
   const admin = createAdminClient()
 
-  // Verify the caller belongs to their own team (teamId is always the uploader's team, never the opponent's).
-  // Admin client is used to bypass RLS so the check is authoritative.
+  // Verify the caller belongs to their own team. Admin client bypasses RLS.
   const { data: member } = await admin
     .from('team_members')
     .select('role')
@@ -42,13 +42,11 @@ export async function POST(request: Request) {
     .single()
 
   if (!member) {
-    return NextResponse.json(
-      { error: 'You are not a member of this team' },
-      { status: 403 }
-    )
+    return NextResponse.json({ error: 'You are not a member of this team' }, { status: 403 })
   }
 
   const opponentSlug = slugify(opponentName)
+  const fileUrl = getPublicUrl(r2Key)
 
   // Create the demo record
   const { data: demo, error: demoError } = await admin
@@ -60,7 +58,8 @@ export async function POST(request: Request) {
       map,
       match_date: matchDate ?? null,
       league: league ?? null,
-      raw_file_path: storagePath,
+      raw_file_path: r2Key,
+      file_url: fileUrl,
       status: 'processing',
       file_size_bytes: fileSize ?? null,
       created_by: user.id,
