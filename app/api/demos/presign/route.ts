@@ -11,8 +11,6 @@ const schema = z.object({
   fileSize: z.number().positive().max(1_073_741_824), // 1 GB max
 })
 
-// Returns a presigned Supabase Storage URL so the client can upload
-// the .dem / .dem.zst file directly — the file bytes never pass through the server.
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -28,16 +26,14 @@ export async function POST(request: Request) {
 
   // Validate file extension
   const lowerName = filename.toLowerCase()
-  const validExt = VALID_EXTENSIONS.some(ext => lowerName.endsWith(ext))
-  if (!validExt) {
+  if (!VALID_EXTENSIONS.some(ext => lowerName.endsWith(ext))) {
     return NextResponse.json(
       { error: 'Only .dem and .dem.zst files are accepted' },
       { status: 400 }
     )
   }
 
-  // Use admin client to bypass RLS — we verify the user's own identity via auth.getUser()
-  // above, then confirm they belong to their team directly in the database.
+  // Admin client bypasses RLS — identity is verified via auth.getUser() above
   const admin = createAdminClient()
 
   const { data: member } = await admin
@@ -48,14 +44,11 @@ export async function POST(request: Request) {
     .single()
 
   if (!member) {
-    return NextResponse.json(
-      { error: 'You are not a member of this team' },
-      { status: 403 }
-    )
+    return NextResponse.json({ error: 'You are not a member of this team' }, { status: 403 })
   }
 
-  // Build a unique storage path
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+  // storagePath is relative to the bucket root — no bucket prefix
   const storagePath = `${teamId}/${Date.now()}-${safeFilename}`
 
   const { data, error } = await admin.storage
@@ -63,14 +56,21 @@ export async function POST(request: Request) {
     .createSignedUploadUrl(storagePath)
 
   if (error || !data) {
-    console.error('[presign] Supabase storage error:', error)
-    return NextResponse.json({ error: 'Failed to generate upload URL' }, { status: 500 })
+    console.error('[presign] storage error:', error)
+    // Surface the real error so the client can display it
+    return NextResponse.json(
+      { error: error?.message ?? 'Failed to generate upload URL' },
+      { status: 500 }
+    )
   }
 
+  // Return path + token so the browser can call uploadToSignedUrl() directly,
+  // which uses the correct /object/upload/sign/ endpoint (not the raw signedUrl).
   return NextResponse.json({
-    signedUrl: data.signedUrl,
     path: storagePath,
     token: data.token,
+    // signedUrl is also included for reference / debugging
+    signedUrl: data.signedUrl,
     expiresIn: 3600,
   })
 }
