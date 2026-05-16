@@ -95,13 +95,6 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
         .from('demos')
         .uploadToSignedUrl(path, token, file, {
           contentType: 'application/octet-stream',
-          onUploadProgress: ({ loaded, total }) => {
-            if (total) {
-              // Map 10–85 % of the progress bar to the actual upload
-              const pct = Math.round(10 + (loaded / total) * 75)
-              updateUpload(i, { progress: pct })
-            }
-          },
         })
 
       if (storageError) throw new Error(storageError.message)
