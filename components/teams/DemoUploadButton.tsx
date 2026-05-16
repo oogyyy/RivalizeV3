@@ -8,6 +8,7 @@ import { cn, formatFileSize } from '@/lib/utils'
 
 interface DemoUploadButtonProps {
   teamId: string
+  teamName?: string
   onSuccess?: () => void
 }
 
@@ -19,10 +20,11 @@ interface FileUpload {
   demoId?: string
 }
 
-export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButtonProps) {
+export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUploadButtonProps) {
   const [open, setOpen] = useState(false)
   const [uploads, setUploads] = useState<FileUpload[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [opponentName, setOpponentName] = useState('')
 
   const updateUpload = (index: number, update: Partial<FileUpload>) =>
     setUploads(prev => prev.map((u, i) => (i === index ? { ...u, ...update } : u)))
@@ -44,14 +46,16 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
     setUploads(prev => prev.filter((_, i) => i !== index))
 
   const uploadAll = async () => {
+    if (!opponentName.trim()) return
     setIsProcessing(true)
+    let successCount = 0
 
     for (let i = 0; i < uploads.length; i++) {
       if (uploads[i].status !== 'pending') continue
 
       try {
         // Step 1: Request a presigned upload URL from our API.
-        // The .dem file bytes never pass through Railway — only tiny JSON.
+        // teamId is always the user's own team — the demo belongs to MY team's scouting folder.
         updateUpload(i, { status: 'presigning', progress: 10 })
 
         const presignRes = await fetch('/api/demos/presign', {
@@ -72,7 +76,6 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
         const { signedUrl, path } = await presignRes.json()
 
         // Step 2: Upload directly to Supabase Storage using the presigned URL.
-        // This is a direct PUT from the browser — no Railway proxy involved.
         updateUpload(i, { status: 'uploading', progress: 20 })
 
         const uploadRes = await fetch(signedUrl, {
@@ -92,7 +95,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
           body: JSON.stringify({
             teamId,
             storagePath: path,
-            opponentName: 'Unknown',   // TODO: add opponent name input field
+            opponentName: opponentName.trim(),
             map: 'unknown',
             fileSize: uploads[i].file.size,
           }),
@@ -105,6 +108,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
 
         const demo = await registerRes.json()
         updateUpload(i, { status: 'done', progress: 100, demoId: demo.id })
+        successCount++
       } catch (err) {
         updateUpload(i, {
           status: 'error',
@@ -114,20 +118,19 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
     }
 
     setIsProcessing(false)
-
-    const freshUploads = uploads // closure may be stale; effect is visual-only
-    const anyDone = freshUploads.some(u => u.status === 'done')
-    if (anyDone) onSuccess?.()
+    if (successCount > 0) onSuccess?.()
   }
 
   const handleClose = () => {
     if (isProcessing) return
     setOpen(false)
     setUploads([])
+    setOpponentName('')
   }
 
   const pendingCount = uploads.filter(u => u.status === 'pending').length
   const doneCount = uploads.filter(u => u.status === 'done').length
+  const canUpload = pendingCount > 0 && opponentName.trim().length > 0
 
   const statusLabel = (u: FileUpload) => {
     if (u.status === 'presigning') return 'Getting upload URL…'
@@ -153,9 +156,11 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Upload Opponent Demos</h2>
+            <h2 className="text-lg font-bold text-foreground">
+              Upload Opponent Demo{teamName ? ` for ${teamName}` : ''}
+            </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Upload .dem files of upcoming opponents to scout them
+              Scout upcoming opponents — .dem files up to 512 MB supported
             </p>
           </div>
           <button
@@ -168,6 +173,24 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Opponent name input */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-foreground">
+              Opponent Team Name <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={opponentName}
+              onChange={e => setOpponentName(e.target.value)}
+              placeholder="e.g. NAVI, Astralis, Team Liquid…"
+              disabled={isProcessing}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00ff87] disabled:opacity-50"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              The opponent doesn&apos;t need to exist in Rivalize — a scouting folder will be created automatically.
+            </p>
+          </div>
+
           {/* Dropzone */}
           <div
             {...getRootProps()}
@@ -279,7 +302,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
                   variant="neon"
                   size="sm"
                   onClick={uploadAll}
-                  disabled={isProcessing}
+                  disabled={isProcessing || !canUpload}
                   className="gap-2"
                 >
                   {isProcessing ? (

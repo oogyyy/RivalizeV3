@@ -129,7 +129,7 @@ export default async function FolderPage({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
+              {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} teamName={team.name} />}
               <a href={proRefUrl} target="_blank" rel="noopener noreferrer">
                 <Button variant="secondary" className="gap-2 text-sm">
                   <ExternalLink size={14} />
@@ -221,7 +221,7 @@ export default async function FolderPage({
                   <p className="text-xs text-muted-foreground mb-4">
                     Upload demos of this opponent to start scouting them
                   </p>
-                  {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
+                  {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} teamName={team.name} />}
                 </CardContent>
               </Card>
             ) : (

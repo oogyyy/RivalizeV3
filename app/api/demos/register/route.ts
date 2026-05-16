@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // Verify membership
+  // Verify the caller is a member/owner of their own team (teamId is always the uploader's team, not the opponent's)
   const { data: member } = await admin
     .from('team_members')
     .select('role')
@@ -41,7 +41,10 @@ export async function POST(request: Request) {
     .single()
 
   if (!member) {
-    return NextResponse.json({ error: 'Not a member of this team' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'You must be a member of this team to upload opponent demos' },
+      { status: 403 }
+    )
   }
 
   const opponentSlug = slugify(opponentName)

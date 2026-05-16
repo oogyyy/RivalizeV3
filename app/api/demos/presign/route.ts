@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
   const { teamId, filename, fileSize } = parsed.data
 
-  // Verify the caller is a member of this team
+  // Verify the caller is a member/owner of their own team (teamId is always the uploader's team)
   const { data: member } = await supabase
     .from('team_members')
     .select('role')
@@ -33,7 +33,10 @@ export async function POST(request: Request) {
     .single()
 
   if (!member) {
-    return NextResponse.json({ error: 'Not a member of this team' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'You must be a member of this team to upload opponent demos' },
+      { status: 403 }
+    )
   }
 
   // Build a unique storage path
