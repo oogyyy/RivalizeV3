@@ -3,20 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
-const VALID_EXTENSIONS = ['.dem', '.dem.zst']
-
-function getMimeType(_filename: string): string {
-  // Always use the generic binary type — it's universally accepted by storage
-  // buckets and correctly describes .dem and .dem.zst files. application/zstd
-  // is often not whitelisted even when added via dashboard due to storage
-  // layer caching.
-  return 'application/octet-stream'
-}
-
 const schema = z.object({
   teamId: z.string().uuid(),
   filename: z.string().min(1).max(255),
-  fileSize: z.number().positive().max(1_073_741_824), // 1 GB max
+  fileSize: z.number().positive().max(536_870_912), // 512 MB max
 })
 
 export async function POST(request: Request) {
@@ -32,11 +22,9 @@ export async function POST(request: Request) {
 
   const { teamId, filename, fileSize } = parsed.data
 
-  // Validate file extension
-  const lowerName = filename.toLowerCase()
-  if (!VALID_EXTENSIONS.some(ext => lowerName.endsWith(ext))) {
+  if (!filename.toLowerCase().endsWith('.dem')) {
     return NextResponse.json(
-      { error: 'Only .dem and .dem.zst files are accepted' },
+      { error: 'Only .dem files are accepted' },
       { status: 400 }
     )
   }
@@ -56,7 +44,6 @@ export async function POST(request: Request) {
   }
 
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
-  // storagePath is relative to the bucket root — no bucket prefix
   const storagePath = `${teamId}/${Date.now()}-${safeFilename}`
 
   const { data, error } = await admin.storage
@@ -65,7 +52,6 @@ export async function POST(request: Request) {
 
   if (error || !data) {
     console.error('[presign] storage error:', error)
-    // Surface the real error so the client can display it
     return NextResponse.json(
       { error: error?.message ?? 'Failed to generate upload URL' },
       { status: 500 }
@@ -75,7 +61,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     path: storagePath,
     token: data.token,
-    contentType: getMimeType(filename),
+    contentType: 'application/octet-stream',
     signedUrl: data.signedUrl,
     expiresIn: 3600,
   })

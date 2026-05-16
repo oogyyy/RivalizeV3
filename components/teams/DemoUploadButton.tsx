@@ -8,7 +8,6 @@ import { cn, formatFileSize } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
 const LARGE_FILE_THRESHOLD = 300 * 1024 * 1024 // 300 MB
-const VALID_EXTENSIONS = ['.dem', '.dem.zst']
 
 interface DemoUploadButtonProps {
   teamId: string
@@ -27,8 +26,7 @@ interface FileUpload {
 }
 
 function isValidDemoFile(name: string) {
-  const lower = name.toLowerCase()
-  return VALID_EXTENSIONS.some(ext => lower.endsWith(ext))
+  return name.toLowerCase().endsWith('.dem')
 }
 
 export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUploadButtonProps) {
@@ -50,7 +48,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'application/octet-stream': ['.dem', '.zst'], 'application/zstd': ['.zst'] },
+    accept: { 'application/octet-stream': ['.dem'] },
     multiple: true,
   })
 
@@ -198,7 +196,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
               Upload Opponent Demo{teamName ? ` for ${teamName}` : ''}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Accepts .dem and .dem.zst — up to 1 GB per file
+              Accepts .dem files — up to 512 MB per file
             </p>
           </div>
           <button
@@ -235,7 +233,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
             <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
               <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
               <p className="text-[11px] text-yellow-300">
-                CS2 demos are typically 200–500 MB — this is normal. Large files may take 1–3 minutes to upload. Keep this tab open.
+                CS2 demos are typically 200–500 MB. Large files may take 1–3 minutes to upload — keep this tab open.
               </p>
             </div>
           )}
@@ -256,11 +254,11 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
               className={cn('mx-auto mb-3 transition-colors', isDragActive ? 'text-[#00ff87]' : 'text-muted-foreground')}
             />
             {isDragActive ? (
-              <p className="text-sm font-medium text-[#00ff87]">Drop .dem or .dem.zst files here…</p>
+              <p className="text-sm font-medium text-[#00ff87]">Drop .dem files here…</p>
             ) : (
               <>
                 <p className="text-sm font-medium text-foreground">Drag & drop opponent demo files here</p>
-                <p className="text-xs text-muted-foreground mt-1">.dem or .dem.zst · click to browse</p>
+                <p className="text-xs text-muted-foreground mt-1">.dem files only · click to browse</p>
               </>
             )}
           </div>
