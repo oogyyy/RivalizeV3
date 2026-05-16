@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic'
 
+import React from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatFileSize } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,9 @@ import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
   Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink, BarChart2,
+  HardDrive, ChevronRight,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { AggregatedStats, DemoHeader, PlayerStats } from '@/types/database'
 
 export default async function OpponentPage({
@@ -48,13 +51,13 @@ export default async function OpponentPage({
 
   const stats = folder.aggregated_stats as AggregatedStats | null
 
-  // Fetch demos for this opponent
-  const { data: demos } = await supabase
+  // Use admin client to bypass RLS — membership already verified above
+  const { data: demos } = await admin
     .from('demos')
     .select('*')
     .eq('team_id', teamId)
     .eq('opponent_slug', folder.opponent_slug)
-    .order('match_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
 
   const totalDemos = (demos ?? []).length
   const wins = stats?.wins ?? 0
@@ -67,6 +70,11 @@ export default async function OpponentPage({
     if (status === 'completed') return 'neon' as const
     if (status === 'processing') return 'processing' as const
     return 'destructive' as const
+  }
+  const statusLabel = (status: string) => {
+    if (status === 'completed') return 'Analyzed'
+    if (status === 'processing') return 'Processing'
+    return 'Failed'
   }
 
   const isOwnerOrAdmin = membership.role === 'owner' || membership.role === 'admin'
@@ -235,96 +243,112 @@ export default async function OpponentPage({
                 </CardContent>
               </Card>
             ) : (
-              <Card className="bg-card border-border overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-accent/30">
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Map</th>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Score</th>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {(demos ?? []).map((demo) => {
-                        const pd = demo.parsed_data as { header?: DemoHeader } | null
-                        const header = pd?.header
-                        const scoreStr = header
-                          ? `${header.score_team1} - ${header.score_team2}`
-                          : '—'
-                        const isWin = header && (header.score_team1 ?? 0) > (header.score_team2 ?? 0)
+              <div className="space-y-2">
+                {(demos ?? []).map((demo) => {
+                  const pd = demo.parsed_data as { header?: DemoHeader } | null
+                  const header = pd?.header
+                  const isWin = header
+                    ? (header.score_team1 ?? 0) > (header.score_team2 ?? 0)
+                    : null
+                  const isDraw = header
+                    ? (header.score_team1 ?? 0) === (header.score_team2 ?? 0)
+                    : false
+                  const href = demo.status === 'completed'
+                    ? `/demos/${demo.id}?folder=${folderId}`
+                    : null
 
-                        return (
-                          <tr key={demo.id} className="hover:bg-accent/20 transition-colors group">
-                            <td className="px-4 py-3">
-                              <Link
-                                href={demo.status === 'completed' ? `/demos/${demo.id}?folder=${folderId}` : '#'}
-                                className="font-mono text-xs text-foreground group-hover:text-neon-green transition-colors"
-                              >
-                                {demo.map}
-                              </Link>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Calendar size={11} />
-                                {demo.match_date
-                                  ? formatDate(demo.match_date)
-                                  : formatDate(demo.created_at)}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              {header ? (
-                                <span
-                                  className={`text-xs font-bold font-mono ${
-                                    isWin ? 'text-neon-green' : 'text-red-400'
-                                  }`}
-                                >
-                                  {scoreStr}
+                  const cardBody = (
+                    <Card className={cn(
+                      'bg-card border-border transition-all duration-150',
+                      href && 'cursor-pointer hover:border-neon-green/40 hover:shadow-[0_0_16px_rgba(0,255,135,0.06)] group'
+                    )}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-4">
+                          {/* Map icon */}
+                          <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0 border border-border group-hover:border-neon-green/30 transition-colors">
+                            <MapPin size={15} className="text-muted-foreground group-hover:text-neon-green transition-colors" />
+                          </div>
+
+                          {/* Main info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-sm font-semibold text-foreground group-hover:text-neon-green transition-colors">
+                                {demo.map && demo.map !== 'unknown' ? demo.map : 'Unknown map'}
+                              </span>
+                              {header && (
+                                <span className={cn(
+                                  'text-xs font-bold font-mono',
+                                  isWin ? 'text-neon-green' : isDraw ? 'text-yellow-400' : 'text-red-400'
+                                )}>
+                                  {header.score_team1}–{header.score_team2}
                                 </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
                               )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <Badge variant={statusVariant(demo.status)} className="text-xs">
-                                {demo.status}
+                              <Badge variant={statusVariant(demo.status)} className="text-[10px] h-4 px-1.5">
+                                {statusLabel(demo.status)}
                               </Badge>
-                            </td>
-                            <td className="px-4 py-3">
-                              {demo.status === 'completed' && (
-                                <div className="flex items-center gap-1">
-                                  <Link href={`/demos/${demo.id}?folder=${folderId}`}>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-xs gap-1 h-7 text-muted-foreground hover:text-foreground"
-                                    >
-                                      <BarChart2 size={12} />
-                                      Stats
-                                    </Button>
-                                  </Link>
-                                  <Link href={`/ai-coach?folder=${folderId}`}>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-xs gap-1 h-7 text-neon-green hover:bg-neon-green/10"
-                                    >
-                                      <Brain size={12} />
-                                      Scout
-                                    </Button>
-                                  </Link>
-                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <Calendar size={10} />
+                                {demo.match_date ? formatDate(demo.match_date) : formatDate(demo.created_at)}
+                              </span>
+                              {demo.file_size_bytes && (
+                                <span className="flex items-center gap-1">
+                                  <HardDrive size={10} />
+                                  {formatFileSize(demo.file_size_bytes)}
+                                </span>
                               )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
+                              {header && (
+                                <span className="flex items-center gap-1">
+                                  <BarChart3 size={10} />
+                                  {header.total_rounds} rounds
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right actions */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {demo.status === 'completed' && (
+                              <>
+                                <Link
+                                  href={`/ai-coach?folder=${folderId}`}
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs gap-1 h-7 text-neon-green hover:bg-neon-green/10"
+                                  >
+                                    <Brain size={11} />
+                                    Scout
+                                  </Button>
+                                </Link>
+                                <ChevronRight
+                                  size={14}
+                                  className="text-muted-foreground/40 group-hover:text-neon-green transition-colors"
+                                />
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+
+                  return href ? (
+                    <Link key={demo.id} href={href}>{cardBody}</Link>
+                  ) : (
+                    <div key={demo.id}>{cardBody}</div>
+                  )
+                })}
+
+                {isOwnerOrAdmin && (
+                  <div className="flex justify-end pt-1">
+                    <DemoUploadButton teamId={teamId} />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
