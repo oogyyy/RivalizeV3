@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
-  Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink,
+  Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink, BarChart2,
 } from 'lucide-react'
 import type { AggregatedStats, DemoHeader, PlayerStats } from '@/types/database'
 
@@ -257,9 +257,14 @@ export default async function OpponentPage({
                         const isWin = header && (header.score_team1 ?? 0) > (header.score_team2 ?? 0)
 
                         return (
-                          <tr key={demo.id} className="hover:bg-accent/20 transition-colors">
-                            <td className="px-4 py-3 font-mono text-xs text-foreground">
-                              {demo.map}
+                          <tr key={demo.id} className="hover:bg-accent/20 transition-colors group">
+                            <td className="px-4 py-3">
+                              <Link
+                                href={demo.status === 'completed' ? `/demos/${demo.id}?folder=${folderId}` : '#'}
+                                className="font-mono text-xs text-foreground group-hover:text-neon-green transition-colors"
+                              >
+                                {demo.map}
+                              </Link>
                             </td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">
                               <div className="flex items-center gap-1">
@@ -289,16 +294,28 @@ export default async function OpponentPage({
                             </td>
                             <td className="px-4 py-3">
                               {demo.status === 'completed' && (
-                                <Link href={`/ai-coach?demo=${demo.id}&team=${teamId}`}>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs gap-1 h-7 text-neon-green hover:bg-neon-green/10"
-                                  >
-                                    <Brain size={12} />
-                                    Scout
-                                  </Button>
-                                </Link>
+                                <div className="flex items-center gap-1">
+                                  <Link href={`/demos/${demo.id}?folder=${folderId}`}>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-xs gap-1 h-7 text-muted-foreground hover:text-foreground"
+                                    >
+                                      <BarChart2 size={12} />
+                                      Stats
+                                    </Button>
+                                  </Link>
+                                  <Link href={`/ai-coach?folder=${folderId}`}>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-xs gap-1 h-7 text-neon-green hover:bg-neon-green/10"
+                                    >
+                                      <Brain size={12} />
+                                      Scout
+                                    </Button>
+                                  </Link>
+                                </div>
                               )}
                             </td>
                           </tr>

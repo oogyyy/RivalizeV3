@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, notFound } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, formatDuration, formatPercent, getRatingColor } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -369,7 +369,9 @@ function EconomyTab({ parsed }: { parsed: ParsedDemoData }) {
 
 export default function DemoPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const demoId = params?.demoId as string
+  const folderId = searchParams?.get('folder')
 
   const [demo, setDemo] = useState<Demo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -423,10 +425,10 @@ export default function DemoPage() {
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
         <AlertCircle size={40} className="text-red-400" />
         <p className="text-foreground font-medium">Demo not found</p>
-        <Link href="/teams">
+        <Link href={folderId ? `/opponents/${folderId}` : '/opponents'}>
           <Button variant="outline" size="sm" className="gap-2">
             <ArrowLeft size={14} />
-            Back to Teams
+            Back to Opponents
           </Button>
         </Link>
       </div>
@@ -434,15 +436,17 @@ export default function DemoPage() {
   }
 
   const parsed = demo.parsed_data as ParsedDemoData | null
+  const backHref = folderId ? `/opponents/${folderId}` : '/opponents'
+  const aiScoutHref = folderId ? `/ai-coach?folder=${folderId}` : '/ai-coach'
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Back nav */}
       <div className="flex items-center justify-between">
-        <Link href="/teams">
+        <Link href={backHref}>
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
             <ArrowLeft size={14} />
-            Back to Teams
+            {folderId ? `Back to ${demo.opponent_name}` : 'Back to Opponents'}
           </Button>
         </Link>
         <div className="flex items-center gap-2">
@@ -467,10 +471,10 @@ export default function DemoPage() {
               {parsing ? 'Parsing...' : 'Parse Now'}
             </Button>
           )}
-          <Link href="/ai-coach">
+          <Link href={aiScoutHref}>
             <Button variant="neon" size="sm" className="gap-2">
               <Brain size={14} />
-              AI Coach
+              AI Scout
             </Button>
           </Link>
         </div>
@@ -479,7 +483,7 @@ export default function DemoPage() {
       {/* Demo header info */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">
-          vs <span className="text-neon-green">{demo.opponent_name}</span>
+          <span className="text-neon-green">{demo.opponent_name}</span>
         </h1>
         <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
           <span className="font-mono">{demo.map}</span>
