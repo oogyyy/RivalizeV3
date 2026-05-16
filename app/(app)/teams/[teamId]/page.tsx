@@ -215,7 +215,7 @@ export default async function TeamPage({
                 </Button>
               </Link>
               {isOwnerOrAdmin && (
-                <DemoUploadButton teamId={resolvedTeamId} teamName={team.name} />
+                <DemoUploadButton teamId={resolvedTeamId} />
               )}
             </div>
           </div>
@@ -394,7 +394,7 @@ export default async function TeamPage({
                 <p className="text-xs text-muted-foreground mb-4">
                   Upload opponent demos to auto-create scouting folders per opponent
                 </p>
-                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} teamName={team.name} />}
+                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -433,7 +433,7 @@ export default async function TeamPage({
                   {(demos ?? []).length} total
                 </p>
               </div>
-              {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} teamName={team.name} />}
+              {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
             </div>
 
             {(demos ?? []).length === 0 ? (
@@ -445,7 +445,7 @@ export default async function TeamPage({
                 <p className="text-xs text-muted-foreground mb-4">
                   Upload demos of upcoming opponents to start scouting
                 </p>
-                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} teamName={team.name} />}
+                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
               </div>
             ) : (
               <Card className="bg-card border-border overflow-hidden">
