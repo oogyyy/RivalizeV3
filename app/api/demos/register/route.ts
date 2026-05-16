@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server'
 import { generateMockDemoData } from '@/lib/demo-parser/mock-parser'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import { slugify } from '@/lib/utils'
-import { getPublicUrl } from '@/lib/r2'
+import { getPublicUrl, getFirstBytes } from '@/lib/r2'
+import { parseDemoHeader } from '@/lib/demo-parser/header-parser'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -50,14 +51,15 @@ export async function POST(request: Request) {
   const opponentSlug = slugify(opponentName)
   const fileUrl = getPublicUrl(r2Key)
 
-  // Create the demo record
+  // Create the demo record — store 'processing' instead of 'unknown' for map
+  const initialMap = map !== 'unknown' ? map : 'processing'
   const { data: demo, error: demoError } = await admin
     .from('demos')
     .insert({
       team_id: teamId,
       opponent_name: opponentName,
       opponent_slug: opponentSlug,
-      map,
+      map: initialMap,
       match_date: matchDate ?? null,
       league: league ?? null,
       raw_file_path: r2Key,
@@ -90,11 +92,23 @@ export async function POST(request: Request) {
     try {
       await new Promise(resolve => setTimeout(resolve, 1500))
 
-      // opponentSide tells us which team slot the opponent occupies in the original demo.
-      // Internally we always store: team1 = user's side, team2 = scouted opponent.
-      // With a real parser this would reorder the teams based on opponentSide.
+      // Try to extract real map name from the demo binary header
+      let realMapName: string | null = null
+      try {
+        const fileBytes = await getFirstBytes(r2Key, 8192)
+        const header = parseDemoHeader(fileBytes)
+        if (header?.mapName) {
+          realMapName = header.mapName
+        }
+      } catch (headerErr) {
+        console.warn('[register] Could not read demo header from R2:', String(headerErr))
+      }
+
+      // Use real map name if found, otherwise fall back to what was submitted (if not 'unknown')
+      const effectiveMap = realMapName ?? (map !== 'unknown' ? map : undefined)
+
       const parsedData = {
-        ...generateMockDemoData('My Team', opponentName, map),
+        ...generateMockDemoData('My Team', opponentName, effectiveMap),
         opponentSide,
       }
 

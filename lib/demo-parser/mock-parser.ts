@@ -1,20 +1,68 @@
-import type { ParsedDemoData, PlayerStats, Round, GameEvent } from '@/types/database'
+import type { ParsedDemoData, PlayerStats, Round } from '@/types/database'
 
-const CS2_WEAPONS = ['ak47', 'rifle_m4a1_s', 'awp', 'pistol_glock', 'sg556', 'aug', 'famas', 'galil']
-const MAPS = ['de_dust2', 'de_mirage', 'de_inferno', 'de_nuke', 'de_overpass', 'de_vertigo', 'de_ancient', 'de_anubis']
+// ─── Map pool ────────────────────────────────────────────────────────────────
+const MAPS = [
+  'de_dust2', 'de_mirage', 'de_inferno', 'de_nuke',
+  'de_overpass', 'de_vertigo', 'de_ancient', 'de_anubis',
+  'de_cache', 'de_train', 'de_cobblestone',
+]
+
+// ─── Large name pool (60+ real CS2 pro handles) ──────────────────────────────
+const NAME_POOL = [
+  's1mple', 'NiKo', 'ZywOo', 'device', 'sh1ro', 'electronic', 'Magisk',
+  'broky', 'YEKINDAR', 'Blamef', 'ropz', 'Twistzz', 'NAF', 'EliGE', 'Stewie2K',
+  'Perfecto', 'b1t', 'Jame', 'Axile', 'Hobbit', 'xantares', 'woxic', 'Calyx',
+  'tabseN', 'syrsoN', 'frozen', 'STYKO', 'cerq', 'Brehze', 'Ethan', 'autimatic',
+  'dephh', 'CeRq', 'ShahZaM', 'FugLy', 'RUSH', 'Xyp9x', 'dupreeh', 'gla1ve',
+  'karrigan', 'rain', 'GuardiaN', 'KjaerBye', 'nexa', 'JaCkz', 'apEX',
+  'kennyS', 'AmaNEk', 'shox', 'RpK', 'misutaaa', 'KRIMZ', 'JW', 'flusha',
+  'olofmeister', 'twist', 'Lekr0', 'REZ', 'f0rest', 'GeT_RiGhT', 'flamie',
+  'Boombl4', 'k0nfig', 'snappi', 'Bubzkji', 'es3tag', 'stavn', 'TeSeS', 'refrezh',
+]
+
+// ─── Simple deterministic hash ────────────────────────────────────────────────
+function hashStr(str: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h
+}
+
+/** Pick `count` unique names from the pool seeded by `seed`. */
+function pickNames(seed: string, count: number): string[] {
+  const result: string[] = []
+  const used = new Set<number>()
+  let idx = hashStr(seed) % NAME_POOL.length
+  while (result.length < count) {
+    if (!used.has(idx)) {
+      used.add(idx)
+      result.push(NAME_POOL[idx])
+    }
+    idx = (idx + 7) % NAME_POOL.length // step by prime for spread
+  }
+  return result
+}
+
+function rng(seed: number, min: number, max: number): number {
+  const v = ((seed * 1664525 + 1013904223) >>> 0) % (max - min + 1)
+  return min + v
+}
 
 function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
 function generatePlayer(name: string, team: string): PlayerStats {
-  const kills = randomBetween(5, 28)
-  const deaths = randomBetween(8, 25)
-  const assists = randomBetween(1, 8)
-  const headshots = Math.floor(kills * (randomBetween(30, 70) / 100))
+  const seed = hashStr(name + team)
+  const kills   = rng(seed,     8,  28)
+  const deaths  = rng(seed + 1, 8,  24)
+  const assists = rng(seed + 2, 1,  8)
+  const headshots = Math.floor(kills * (rng(seed + 3, 25, 65) / 100))
 
   return {
-    steam_id: `7656119${randomBetween(10000000, 99999999)}`,
+    steam_id: `7656119${((hashStr(name) >>> 0) % 90000000 + 10000000)}`,
     name,
     team,
     kills,
@@ -22,24 +70,23 @@ function generatePlayer(name: string, team: string): PlayerStats {
     assists,
     headshots,
     headshot_percentage: headshots / Math.max(kills, 1) * 100,
-    adr: randomBetween(55, 115),
-    kast: randomBetween(55, 85),
-    rating: parseFloat((randomBetween(70, 150) / 100).toFixed(2)),
-    utility_damage: randomBetween(10, 80),
-    flash_assists: randomBetween(0, 8),
-    mvps: randomBetween(0, 6),
-    rounds_played: randomBetween(20, 30),
+    adr:            rng(seed + 4, 52, 115),
+    kast:           rng(seed + 5, 54, 84),
+    rating:         parseFloat((rng(seed + 6, 70, 148) / 100).toFixed(2)),
+    utility_damage: rng(seed + 7, 8,  80),
+    flash_assists:  rng(seed + 8, 0,  8),
+    mvps:           rng(seed + 9, 0,  6),
+    rounds_played:  rng(seed + 10, 20, 30),
   }
 }
 
 function generateRound(roundNum: number, team1: string, team2: string): Round {
   const winner = Math.random() > 0.5 ? team1 : team2
-  const winReasons = ['elimination', 'bomb_defused', 'bomb_exploded', 'time_expired']
-
+  const reasons = ['elimination', 'bomb_defused', 'bomb_exploded', 'time_expired'] as const
   return {
     number: roundNum,
     winner,
-    win_reason: winReasons[randomBetween(0, winReasons.length - 1)],
+    win_reason: reasons[randomBetween(0, reasons.length - 1)],
     duration: randomBetween(30, 115),
     team1_economy: randomBetween(1000, 20000),
     team2_economy: randomBetween(1000, 20000),
@@ -54,16 +101,21 @@ export function generateMockDemoData(
   team2Name: string,
   mapName?: string
 ): ParsedDemoData {
-  const map = mapName || MAPS[randomBetween(0, MAPS.length - 1)]
+  // Never use 'unknown' — pick a real CS2 map deterministically from the opponent name
+  const resolvedMap = (mapName && mapName !== 'unknown')
+    ? mapName
+    : MAPS[hashStr(team2Name) % MAPS.length]
+
   const totalRounds = randomBetween(16, 30)
   const score1 = randomBetween(7, Math.min(16, totalRounds))
   const score2 = totalRounds - score1
 
-  const TEAM1_NAMES = ['s1mple', 'NiKo', 'ZywOo', 'device', 'sh1ro']
-  const TEAM2_NAMES = ['electronic', 'Magisk', 'broky', 'YEKINDAR', 'Blamef']
+  // Deterministic player names: same opponent always gets the same 5 players
+  const team1Names = pickNames(`${team1Name}:t1:${resolvedMap}`, 5)
+  const team2Names = pickNames(`${team2Name}:t2:${resolvedMap}`, 5)
 
-  const team1Players = TEAM1_NAMES.map(p => generatePlayer(p, team1Name))
-  const team2Players = TEAM2_NAMES.map(p => generatePlayer(p, team2Name))
+  const team1Players = team1Names.map(n => generatePlayer(n, team1Name))
+  const team2Players = team2Names.map(n => generatePlayer(n, team2Name))
 
   const rounds = Array.from({ length: totalRounds }, (_, i) =>
     generateRound(i + 1, team1Name, team2Name)
@@ -71,7 +123,7 @@ export function generateMockDemoData(
 
   return {
     header: {
-      map,
+      map: resolvedMap,
       team1: team1Name,
       team2: team2Name,
       score_team1: score1,
