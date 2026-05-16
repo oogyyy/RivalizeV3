@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
+import DeleteDemoButton from '@/components/teams/DeleteDemoButton'
+import DeleteFolderButton from '@/components/teams/DeleteFolderButton'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
   Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink, BarChart2,
@@ -150,6 +152,9 @@ export default async function OpponentPage({
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
+              {isOwnerOrAdmin && (
+                <DeleteFolderButton folderId={folderId} opponentName={folder.opponent_display_name} />
+              )}
               <a href={proRefUrl} target="_blank" rel="noopener noreferrer">
                 <Button variant="secondary" className="gap-2 text-sm">
                   <ExternalLink size={14} />
@@ -329,6 +334,7 @@ export default async function OpponentPage({
                                 </Link>
                               </>
                             )}
+                            {isOwnerOrAdmin && <DeleteDemoButton demoId={demo.id} />}
                           </div>
                         </div>
                       </CardContent>

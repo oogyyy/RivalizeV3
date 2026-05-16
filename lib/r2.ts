@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 function getR2Client() {
@@ -35,6 +35,15 @@ export async function createPresignedPutUrl(key: string, expiresIn = 3600): Prom
 export function getPublicUrl(key: string): string {
   const base = process.env.R2_PUBLIC_URL!.replace(/\/$/, '')
   return `${base}/${key}`
+}
+
+/** Delete an object from R2 storage. No-ops if the key doesn't exist. */
+export async function deleteObject(key: string): Promise<void> {
+  const client = getR2Client()
+  await client.send(new DeleteObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME!,
+    Key: key,
+  }))
 }
 
 /**
