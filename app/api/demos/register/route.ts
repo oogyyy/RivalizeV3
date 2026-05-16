@@ -32,7 +32,8 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // Verify the caller is a member/owner of their own team (teamId is always the uploader's team, not the opponent's)
+  // Verify the caller belongs to their own team (teamId is always the uploader's team, never the opponent's).
+  // Admin client is used to bypass RLS so the check is authoritative.
   const { data: member } = await admin
     .from('team_members')
     .select('role')
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
 
   if (!member) {
     return NextResponse.json(
-      { error: 'You must be a member of this team to upload opponent demos' },
+      { error: 'You are not a member of this team' },
       { status: 403 }
     )
   }

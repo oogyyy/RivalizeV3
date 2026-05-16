@@ -3,8 +3,10 @@
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
-import { Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
+
+const LARGE_FILE_THRESHOLD = 300 * 1024 * 1024 // 300 MB
 
 interface DemoUploadButtonProps {
   teamId: string
@@ -20,6 +22,11 @@ interface FileUpload {
   demoId?: string
 }
 
+function isValidDemoFile(name: string) {
+  const lower = name.toLowerCase()
+  return lower.endsWith('.dem') || lower.endsWith('.dem.zst')
+}
+
 export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUploadButtonProps) {
   const [open, setOpen] = useState(false)
   const [uploads, setUploads] = useState<FileUpload[]>([])
@@ -30,15 +37,17 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
     setUploads(prev => prev.map((u, i) => (i === index ? { ...u, ...update } : u)))
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
+    const valid = acceptedFiles.filter(f => isValidDemoFile(f.name))
     setUploads(prev => [
       ...prev,
-      ...acceptedFiles.map(file => ({ file, progress: 0, status: 'pending' as const })),
+      ...valid.map(file => ({ file, progress: 0, status: 'pending' as const })),
     ])
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'application/octet-stream': ['.dem'] },
+    // Accept .dem and .dem.zst — both are raw binary blobs
+    accept: { 'application/octet-stream': ['.dem', '.zst'] },
     multiple: true,
   })
 
@@ -54,8 +63,8 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
       if (uploads[i].status !== 'pending') continue
 
       try {
-        // Step 1: Request a presigned upload URL from our API.
-        // teamId is always the user's own team — the demo belongs to MY team's scouting folder.
+        // Step 1: Get a presigned upload URL.
+        // teamId is the user's OWN team — never the opponent's.
         updateUpload(i, { status: 'presigning', progress: 10 })
 
         const presignRes = await fetch('/api/demos/presign', {
@@ -75,7 +84,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
 
         const { signedUrl, path } = await presignRes.json()
 
-        // Step 2: Upload directly to Supabase Storage using the presigned URL.
+        // Step 2: Upload directly to Supabase Storage (browser → storage, no server proxy).
         updateUpload(i, { status: 'uploading', progress: 20 })
 
         const uploadRes = await fetch(signedUrl, {
@@ -84,11 +93,11 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
           body: uploads[i].file,
         })
 
-        if (!uploadRes.ok) throw new Error('Direct upload to storage failed')
+        if (!uploadRes.ok) throw new Error('Upload to storage failed')
 
         updateUpload(i, { progress: 80, status: 'registering' })
 
-        // Step 3: Tell our API the upload succeeded so it can create the DB record.
+        // Step 3: Register the demo in the database and auto-create the opponent folder.
         const registerRes = await fetch('/api/demos/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -131,10 +140,11 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
   const pendingCount = uploads.filter(u => u.status === 'pending').length
   const doneCount = uploads.filter(u => u.status === 'done').length
   const canUpload = pendingCount > 0 && opponentName.trim().length > 0
+  const hasLargeFile = uploads.some(u => u.file.size > LARGE_FILE_THRESHOLD && u.status === 'pending')
 
   const statusLabel = (u: FileUpload) => {
     if (u.status === 'presigning') return 'Getting upload URL…'
-    if (u.status === 'uploading') return 'Uploading to storage…'
+    if (u.status === 'uploading') return 'Uploading…'
     if (u.status === 'registering') return 'Registering…'
     if (u.status === 'done') return 'Done'
     if (u.status === 'error') return u.error
@@ -160,7 +170,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
               Upload Opponent Demo{teamName ? ` for ${teamName}` : ''}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Scout upcoming opponents — .dem files up to 512 MB supported
+              Accepts .dem and .dem.zst — up to 512 MB per file
             </p>
           </div>
           <button
@@ -173,7 +183,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Opponent name input */}
+          {/* Opponent name */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-foreground">
               Opponent Team Name <span className="text-red-400">*</span>
@@ -186,10 +196,21 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
               disabled={isProcessing}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00ff87] disabled:opacity-50"
             />
-            <p className="text-[10px] text-muted-foreground">
-              The opponent doesn&apos;t need to exist in Rivalize — a scouting folder will be created automatically.
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Info size={10} className="shrink-0" />
+              Opponent does not need to exist in Rivalize — a scouting folder is created automatically.
             </p>
           </div>
+
+          {/* Large file notice */}
+          {hasLargeFile && (
+            <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
+              <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-yellow-300">
+                Large file detected. CS2 demos typically range from 200–500 MB — this is normal. Upload may take a few minutes.
+              </p>
+            </div>
+          )}
 
           {/* Dropzone */}
           <div
@@ -210,11 +231,13 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
               )}
             />
             {isDragActive ? (
-              <p className="text-sm font-medium text-[#00ff87]">Drop opponent .dem files here…</p>
+              <p className="text-sm font-medium text-[#00ff87]">Drop .dem or .dem.zst files here…</p>
             ) : (
               <>
-                <p className="text-sm font-medium text-foreground">Drag & drop opponent .dem files here</p>
-                <p className="text-xs text-muted-foreground mt-1">or click to select files</p>
+                <p className="text-sm font-medium text-foreground">Drag & drop opponent demo files here</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  .dem or .dem.zst · click to browse
+                </p>
               </>
             )}
           </div>
@@ -304,6 +327,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
                   onClick={uploadAll}
                   disabled={isProcessing || !canUpload}
                   className="gap-2"
+                  title={!opponentName.trim() ? 'Enter opponent team name first' : undefined}
                 >
                   {isProcessing ? (
                     <><Loader2 size={14} className="animate-spin" /> Uploading…</>

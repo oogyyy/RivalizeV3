@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
+const VALID_EXTENSIONS = ['.dem', '.dem.zst']
+
 const schema = z.object({
   teamId: z.string().uuid(),
   filename: z.string().min(1).max(255),
@@ -10,7 +12,7 @@ const schema = z.object({
 })
 
 // Returns a presigned Supabase Storage URL so the client can upload
-// the .dem file directly — the file bytes never pass through Railway.
+// the .dem / .dem.zst file directly — the file bytes never pass through the server.
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -24,8 +26,21 @@ export async function POST(request: Request) {
 
   const { teamId, filename, fileSize } = parsed.data
 
-  // Verify the caller is a member/owner of their own team (teamId is always the uploader's team)
-  const { data: member } = await supabase
+  // Validate file extension
+  const lowerName = filename.toLowerCase()
+  const validExt = VALID_EXTENSIONS.some(ext => lowerName.endsWith(ext))
+  if (!validExt) {
+    return NextResponse.json(
+      { error: 'Only .dem and .dem.zst files are accepted' },
+      { status: 400 }
+    )
+  }
+
+  // Use admin client to bypass RLS — we verify the user's own identity via auth.getUser()
+  // above, then confirm they belong to their team directly in the database.
+  const admin = createAdminClient()
+
+  const { data: member } = await admin
     .from('team_members')
     .select('role')
     .eq('team_id', teamId)
@@ -34,7 +49,7 @@ export async function POST(request: Request) {
 
   if (!member) {
     return NextResponse.json(
-      { error: 'You must be a member of this team to upload opponent demos' },
+      { error: 'You are not a member of this team' },
       { status: 403 }
     )
   }
@@ -43,8 +58,6 @@ export async function POST(request: Request) {
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
   const storagePath = `${teamId}/${Date.now()}-${safeFilename}`
 
-  // Use the admin client to generate a signed upload URL
-  const admin = createAdminClient()
   const { data, error } = await admin.storage
     .from('demos')
     .createSignedUploadUrl(storagePath)
