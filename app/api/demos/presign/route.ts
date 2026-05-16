@@ -5,10 +5,12 @@ import { z } from 'zod'
 
 const VALID_EXTENSIONS = ['.dem', '.dem.zst']
 
-function getMimeType(filename: string): string {
-  return filename.toLowerCase().endsWith('.zst')
-    ? 'application/zstd'
-    : 'application/octet-stream'
+function getMimeType(_filename: string): string {
+  // Always use the generic binary type — it's universally accepted by storage
+  // buckets and correctly describes .dem and .dem.zst files. application/zstd
+  // is often not whitelisted even when added via dashboard due to storage
+  // layer caching.
+  return 'application/octet-stream'
 }
 
 const schema = z.object({

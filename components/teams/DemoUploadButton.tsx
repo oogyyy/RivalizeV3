@@ -96,7 +96,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
       if (storageError) {
         const msg = storageError.message ?? ''
         if (msg.toLowerCase().includes('mime') || msg.toLowerCase().includes('not supported')) {
-          throw new Error(`File type not allowed by storage (${contentType}). Contact support if this persists.`)
+          throw new Error('Storage rejected this file type. Check bucket MIME settings in Supabase Dashboard.')
         }
         throw new Error(msg)
       }
