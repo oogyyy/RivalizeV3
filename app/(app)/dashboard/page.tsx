@@ -5,12 +5,13 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Target, Upload, Brain, BarChart3, TrendingUp,
-  Crosshair, Clock, ArrowRight, Trophy,
+  Crosshair, Clock, ArrowRight, Trophy, Map, ChevronRight,
 } from 'lucide-react'
 import type { AggregatedStats } from '@/types/database'
 
@@ -27,6 +28,7 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single()
 
+  // joined_at is the correct column on team_members
   const { data: memberships } = await admin
     .from('team_members')
     .select('role, team_id')
@@ -35,50 +37,72 @@ export default async function DashboardPage() {
   const teamIds = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
   const primaryTeamId = teamIds[0] ?? null
 
-  // Fetch all opponent folders
+  // Fetch opponent folders (for right sidebar + total count)
   const { data: folders } = teamIds.length
     ? await admin
         .from('team_folders')
-        .select('*')
+        .select('id, opponent_display_name, opponent_slug, aggregated_stats, user_team_id')
         .in('user_team_id', teamIds)
-        .order('updated_at', { ascending: false, nullsFirst: false })
+        .order('updated_at', { ascending: false })
         .limit(6)
     : { data: [] }
 
-  // Fetch recent demos across all teams
+  // Build a slug→folderId map so demo rows can link to the right folder
+  type FolderRow = {
+    id: string
+    opponent_display_name: string
+    opponent_slug: string
+    aggregated_stats: AggregatedStats | null
+    user_team_id: string
+  }
+  const folderByKey: Record<string, string> = {}
+  for (const f of (folders ?? []) as FolderRow[]) {
+    folderByKey[`${f.user_team_id}:${f.opponent_slug}`] = f.id
+  }
+
+  // If the folder for a demo isn't in the top-6 we still need its id — fetch all
+  const { data: allFolders } = teamIds.length
+    ? await admin
+        .from('team_folders')
+        .select('id, opponent_slug, user_team_id')
+        .in('user_team_id', teamIds)
+    : { data: [] }
+  type SlimFolder = { id: string; opponent_slug: string; user_team_id: string }
+  for (const f of (allFolders ?? []) as SlimFolder[]) {
+    const key = `${f.user_team_id}:${f.opponent_slug}`
+    if (!folderByKey[key]) folderByKey[key] = f.id
+  }
+
+  // Fetch recent demos with map column
   const { data: recentDemos } = teamIds.length
     ? await admin
         .from('demos')
-        .select('id, team_id, opponent_name, map, match_date, status, created_at')
+        .select('id, team_id, opponent_name, opponent_slug, map, match_date, status, created_at')
         .in('team_id', teamIds)
         .order('created_at', { ascending: false })
         .limit(6)
     : { data: [] }
 
-  // Fetch demo counts
-  const { data: allDemos } = teamIds.length
+  // Total counts
+  const { data: allDemosMeta } = teamIds.length
     ? await admin
         .from('demos')
         .select('team_id, status')
         .in('team_id', teamIds)
     : { data: [] }
 
-  const totalDemos = (allDemos ?? []).length
-  const analyzedDemos = (allDemos ?? []).filter((d) => d.status === 'completed').length
-
-  // Total opponents scouted
-  const { data: allFolders } = teamIds.length
-    ? await admin
-        .from('team_folders')
-        .select('id')
-        .in('user_team_id', teamIds)
-    : { data: [] }
-
+  const totalDemos = (allDemosMeta ?? []).length
+  const analyzedDemos = (allDemosMeta ?? []).filter((d) => d.status === 'completed').length
   const totalOpponents = (allFolders ?? []).length
 
   const displayName = profile?.display_name || profile?.username || 'Player'
 
-  const statusVariant = (status: string) => {
+  function statusLabel(status: string) {
+    if (status === 'completed') return 'Analyzed'
+    if (status === 'processing') return 'Processing'
+    return 'Failed'
+  }
+  function statusVariant(status: string) {
     if (status === 'completed') return 'neon' as const
     if (status === 'processing') return 'processing' as const
     return 'destructive' as const
@@ -131,7 +155,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Recent Activity */}
+        {/* Recent Demos */}
         <div className="lg:col-span-2">
           <Card className="bg-card border-border h-full">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -141,13 +165,13 @@ export default async function DashboardPage() {
               </CardTitle>
               {totalDemos > 0 && (
                 <Link href="/opponents">
-                  <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                  <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
                     View all <ArrowRight size={12} />
                   </Button>
                 </Link>
               )}
             </CardHeader>
-            <CardContent className="px-0">
+            <CardContent className="px-0 pb-2">
               {(recentDemos ?? []).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center px-6">
                   <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
@@ -165,33 +189,71 @@ export default async function DashboardPage() {
                   </Link>
                 </div>
               ) : (
-                <div className="divide-y divide-border">
-                  {(recentDemos ?? []).map((demo) => (
-                    <div
-                      key={demo.id}
-                      className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors"
-                    >
-                      <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0">
-                        <Crosshair size={14} className="text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {demo.opponent_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {demo.map}
-                          {demo.match_date
-                            ? ` · ${formatDate(demo.match_date)}`
-                            : demo.created_at
-                            ? ` · ${formatDate(demo.created_at)}`
-                            : ''}
-                        </p>
-                      </div>
-                      <Badge variant={statusVariant(demo.status)} className="text-xs shrink-0">
-                        {demo.status}
-                      </Badge>
-                    </div>
-                  ))}
+                <div className="divide-y divide-border/60">
+                  {(recentDemos ?? []).map((demo) => {
+                    type DemoRow = {
+                      id: string; team_id: string; opponent_name: string
+                      opponent_slug: string | null; map: string
+                      match_date: string | null; status: string; created_at: string
+                    }
+                    const d = demo as DemoRow
+                    const folderId = d.opponent_slug
+                      ? folderByKey[`${d.team_id}:${d.opponent_slug}`]
+                      : undefined
+                    const href = d.status === 'completed' && folderId
+                      ? `/demos/${d.id}?folder=${folderId}`
+                      : folderId
+                      ? `/opponents/${folderId}`
+                      : '/opponents'
+
+                    return (
+                      <Link
+                        key={d.id}
+                        href={href}
+                        className="flex items-center gap-4 px-6 py-3.5 hover:bg-accent/30 transition-colors group"
+                      >
+                        {/* Avatar */}
+                        <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center shrink-0 group-hover:bg-neon-green/10 transition-colors border border-transparent group-hover:border-neon-green/20">
+                          <span className="text-xs font-bold text-foreground group-hover:text-neon-green transition-colors">
+                            {d.opponent_name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate group-hover:text-neon-green transition-colors">
+                            {d.opponent_name}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                            {d.map && d.map !== 'unknown' && (
+                              <>
+                                <Map size={10} className="shrink-0" />
+                                <span className="font-mono">{d.map}</span>
+                                <span className="text-muted-foreground/40">·</span>
+                              </>
+                            )}
+                            <Clock size={10} className="shrink-0" />
+                            <span>
+                              {d.match_date ? formatDate(d.match_date) : formatDate(d.created_at)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Status + arrow */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant={statusVariant(d.status)} className="text-[10px]">
+                            {statusLabel(d.status)}
+                          </Badge>
+                          {d.status === 'completed' && (
+                            <ChevronRight
+                              size={14}
+                              className="text-muted-foreground/40 group-hover:text-neon-green transition-colors"
+                            />
+                          )}
+                        </div>
+                      </Link>
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
@@ -245,40 +307,47 @@ export default async function DashboardPage() {
                   Opponents
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-1 p-2">
+              <CardContent className="space-y-0.5 p-2">
                 {(folders ?? []).slice(0, 5).map((folder) => {
-                  const stats = folder.aggregated_stats as AggregatedStats | null
+                  const f = folder as FolderRow
+                  const stats = f.aggregated_stats as AggregatedStats | null
                   const wins = stats?.wins ?? 0
                   const losses = stats?.losses ?? 0
+                  const total = wins + losses + (stats?.draws ?? 0)
+                  const winRate = total > 0 ? Math.round((wins / total) * 100) : null
                   return (
                     <Link
-                      key={folder.id}
-                      href={`/opponents/${folder.id}`}
+                      key={f.id}
+                      href={`/opponents/${f.id}`}
                       className="flex items-center gap-3 rounded-md p-2 hover:bg-accent/50 transition-colors group"
                     >
-                      <div className="w-7 h-7 rounded bg-accent flex items-center justify-center shrink-0">
-                        <span className="text-xs font-bold text-foreground">
-                          {folder.opponent_display_name.charAt(0).toUpperCase()}
+                      <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-foreground group-hover:text-neon-green transition-colors">
+                          {f.opponent_display_name.charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate group-hover:text-neon-green transition-colors">
-                          {folder.opponent_display_name}
+                          {f.opponent_display_name}
                         </p>
-                        {(wins + losses) > 0 && (
-                          <p className="text-[10px] text-muted-foreground font-mono">
+                        {total > 0 && (
+                          <p className={cn(
+                            'text-[10px] font-mono',
+                            wins > losses ? 'text-neon-green' : losses > wins ? 'text-red-400' : 'text-muted-foreground'
+                          )}>
                             {wins}W–{losses}L
+                            {winRate !== null && <span className="text-muted-foreground ml-1">· {winRate}%</span>}
                           </p>
                         )}
                       </div>
-                      <ArrowRight size={13} className="text-muted-foreground group-hover:text-neon-green shrink-0" />
+                      <ArrowRight size={13} className="text-muted-foreground/40 group-hover:text-neon-green shrink-0 transition-colors" />
                     </Link>
                   )
                 })}
-                {(allFolders ?? []).length > 5 && (
-                  <Link href="/opponents">
-                    <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground mt-1">
-                      +{(allFolders ?? []).length - 5} more opponents
+                {totalOpponents > 5 && (
+                  <Link href="/opponents" className="block mt-1">
+                    <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground hover:text-foreground">
+                      +{totalOpponents - 5} more opponents
                     </Button>
                   </Link>
                 )}

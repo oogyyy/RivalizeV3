@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import {
-  Target, Brain, ChevronRight, FileVideo, Trophy, Upload,
+  Target, Brain, ChevronRight, FileVideo, Trophy, Upload, Calendar,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { AggregatedStats } from '@/types/database'
 
 export default async function OpponentsPage() {
@@ -27,12 +28,12 @@ export default async function OpponentsPage() {
     .eq('id', user.id)
     .single()
 
-  // Resolve the user's primary team (first one they joined/own)
+  // joined_at is the correct column name on team_members (not created_at)
   const { data: memberships } = await admin
     .from('team_members')
-    .select('team_id, role, created_at')
+    .select('team_id, role, joined_at')
     .eq('user_id', user.id)
-    .order('created_at', { ascending: true })
+    .order('joined_at', { ascending: true })
 
   let primaryTeamId: string | null = (memberships ?? [])[0]?.team_id ?? null
 
@@ -63,10 +64,10 @@ export default async function OpponentsPage() {
         .from('team_folders')
         .select('*')
         .eq('user_team_id', primaryTeamId)
-        .order('updated_at', { ascending: false, nullsFirst: false })
+        .order('updated_at', { ascending: false })
     : { data: [] }
 
-  // Fetch all demos for this team to compute per-opponent counts & last-seen dates
+  // Fetch all demos for this team to compute per-opponent counts & dates
   const { data: allDemos } = primaryTeamId
     ? await admin
         .from('demos')
@@ -74,7 +75,14 @@ export default async function OpponentsPage() {
         .eq('team_id', primaryTeamId)
     : { data: [] }
 
-  type DemoRow = { id: string; opponent_slug: string | null; status: string; created_at: string; match_date: string | null }
+  type DemoRow = {
+    id: string
+    opponent_slug: string | null
+    status: string
+    created_at: string
+    match_date: string | null
+  }
+
   const demosBySlug: Record<string, DemoRow[]> = {}
   for (const d of (allDemos ?? []) as DemoRow[]) {
     if (!d.opponent_slug) continue
@@ -120,7 +128,7 @@ export default async function OpponentsPage() {
           <p className="text-xs text-muted-foreground mt-0.5">Demos Uploaded</p>
         </div>
         <div className="rounded-lg bg-card border border-border p-4 text-center">
-          <p className="text-2xl font-bold text-foreground">{analyzedDemos}</p>
+          <p className="text-2xl font-bold text-neon-green">{analyzedDemos}</p>
           <p className="text-xs text-muted-foreground mt-0.5">Analyzed</p>
         </div>
       </div>
@@ -155,32 +163,35 @@ export default async function OpponentsPage() {
             const winRate = total > 0 ? Math.round((wins / total) * 100) : null
             const isPositive = wins > losses
             const isNegative = losses > wins
+            const demoCount = demos.length
 
             return (
               <Link key={folder.id} href={`/opponents/${folder.id}`}>
-                <Card className="bg-card border-border hover:border-neon-green/40 transition-all duration-200 cursor-pointer group h-full">
-                  <CardContent className="p-4 flex flex-col h-full">
+                <Card className="bg-card border-border hover:border-neon-green/40 hover:shadow-[0_0_20px_rgba(0,255,135,0.06)] transition-all duration-200 cursor-pointer group h-full">
+                  <CardContent className="p-5 flex flex-col h-full gap-4">
+                    {/* Top: avatar + name + chevron */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0">
-                          <span className="text-sm font-bold text-foreground">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-neon-green/20 to-accent flex items-center justify-center shrink-0 border border-neon-green/20">
+                          <span className="text-base font-bold text-neon-green">
                             {folder.opponent_display_name.charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-foreground truncate group-hover:text-neon-green transition-colors">
+                          <p className="font-semibold text-foreground truncate group-hover:text-neon-green transition-colors leading-tight">
                             {folder.opponent_display_name}
                           </p>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <FileVideo size={10} className="text-muted-foreground shrink-0" />
-                            <span className="text-xs text-muted-foreground">
-                              {demos.length} {demos.length === 1 ? 'demo' : 'demos'}
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <FileVideo size={10} />
+                              {demoCount} {demoCount === 1 ? 'demo' : 'demos'}
                             </span>
                             {lastActivity && (
                               <>
-                                <span className="text-muted-foreground/40">·</span>
-                                <span className="text-xs text-muted-foreground">
-                                  Last: {formatDate(lastActivity)}
+                                <span className="text-muted-foreground/30">·</span>
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Calendar size={10} />
+                                  {formatDate(lastActivity)}
                                 </span>
                               </>
                             )}
@@ -188,31 +199,50 @@ export default async function OpponentsPage() {
                         </div>
                       </div>
                       <ChevronRight
-                        size={16}
-                        className="text-muted-foreground group-hover:text-neon-green transition-colors shrink-0 mt-0.5"
+                        size={15}
+                        className="text-muted-foreground/50 group-hover:text-neon-green transition-colors shrink-0 mt-1"
                       />
                     </div>
 
-                    {total > 0 && (
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                        <span
-                          className={`text-sm font-bold font-mono ${
-                            isPositive ? 'text-neon-green' : isNegative ? 'text-red-400' : 'text-muted-foreground'
-                          }`}
-                        >
-                          {wins}W–{losses}L{draws > 0 ? `–${draws}D` : ''}
-                        </span>
-                        {winRate !== null && (
-                          <Badge
-                            variant={isPositive ? 'neon' : isNegative ? 'destructive' : 'secondary'}
-                            className="text-[10px]"
-                          >
-                            <Trophy size={9} className="mr-0.5" />
-                            {winRate}%
-                          </Badge>
-                        )}
-                      </div>
-                    )}
+                    {/* Bottom: record + win rate */}
+                    <div className="flex items-center justify-between border-t border-border pt-3 mt-auto">
+                      {total > 0 ? (
+                        <>
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(
+                              'text-base font-bold font-mono',
+                              isPositive ? 'text-neon-green' : isNegative ? 'text-red-400' : 'text-muted-foreground'
+                            )}>
+                              {wins}W
+                            </span>
+                            <span className="text-muted-foreground text-xs">–</span>
+                            <span className={cn(
+                              'text-base font-bold font-mono',
+                              isNegative ? 'text-red-400' : 'text-muted-foreground'
+                            )}>
+                              {losses}L
+                            </span>
+                            {draws > 0 && (
+                              <>
+                                <span className="text-muted-foreground text-xs">–</span>
+                                <span className="text-base font-bold font-mono text-yellow-400">{draws}D</span>
+                              </>
+                            )}
+                          </div>
+                          {winRate !== null && (
+                            <Badge
+                              variant={isPositive ? 'neon' : isNegative ? 'destructive' : 'secondary'}
+                              className="text-[10px] gap-1"
+                            >
+                              <Trophy size={9} />
+                              {winRate}%
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">No completed matches</span>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </Link>
@@ -221,19 +251,19 @@ export default async function OpponentsPage() {
 
           {/* Add opponent CTA card */}
           {primaryTeamId && (
-            <Card className="bg-card border-border border-dashed hover:border-neon-green/40 transition-all duration-200 cursor-pointer group">
-              <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-[100px] text-center gap-2">
-                <div className="w-9 h-9 rounded-lg bg-neon-green/10 flex items-center justify-center group-hover:bg-neon-green/20 transition-colors">
-                  <Upload size={16} className="text-neon-green" />
-                </div>
-                <p className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                  Scout another opponent
-                </p>
-                <div onClick={e => e.preventDefault()}>
-                  <DemoUploadButton teamId={primaryTeamId!} />
-                </div>
-              </CardContent>
-            </Card>
+            <div className="h-full">
+              <Card className="bg-card border-dashed border-border hover:border-neon-green/40 transition-all duration-200 group h-full">
+                <CardContent className="p-5 flex flex-col items-center justify-center h-full min-h-[140px] text-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-neon-green/10 flex items-center justify-center group-hover:bg-neon-green/20 transition-colors border border-neon-green/20">
+                    <Upload size={16} className="text-neon-green" />
+                  </div>
+                  <p className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                    Scout another opponent
+                  </p>
+                  <DemoUploadButton teamId={primaryTeamId} />
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       )}
