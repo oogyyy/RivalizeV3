@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateMockDemoData } from '@/lib/demo-parser/mock-parser'
+import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 
 export async function POST(
   _request: Request,
@@ -82,6 +83,8 @@ export async function POST(
           if (map) mapsPlayed[map] = (mapsPlayed[map] || 0) + 1
         }
 
+        const topPlayers = computeTopPlayers(allDemos)
+
         await supabase
           .from('team_folders')
           .update({
@@ -91,9 +94,9 @@ export async function POST(
               losses: allDemos.length - wins,
               draws: 0,
               win_rate: allDemos.length > 0 ? wins / allDemos.length : 0,
-              avg_rating: 1.05,
+              avg_rating: topPlayers.length > 0 ? topPlayers.reduce((s, p) => s + p.rating, 0) / topPlayers.length : 1.0,
               maps_played: mapsPlayed,
-              top_players: [],
+              top_players: topPlayers,
             },
           })
           .eq('user_team_id', demo.team_id)

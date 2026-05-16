@@ -59,10 +59,11 @@ export function generateMockDemoData(
   const score1 = randomBetween(7, Math.min(16, totalRounds))
   const score2 = totalRounds - score1
 
-  const team1Players = ['Player1', 'Player2', 'Player3', 'Player4', 'Player5']
-    .map(p => generatePlayer(p, team1Name))
-  const team2Players = ['Enemy1', 'Enemy2', 'Enemy3', 'Enemy4', 'Enemy5']
-    .map(p => generatePlayer(p, team2Name))
+  const TEAM1_NAMES = ['s1mple', 'NiKo', 'ZywOo', 'device', 'sh1ro']
+  const TEAM2_NAMES = ['electronic', 'Magisk', 'broky', 'YEKINDAR', 'Blamef']
+
+  const team1Players = TEAM1_NAMES.map(p => generatePlayer(p, team1Name))
+  const team2Players = TEAM2_NAMES.map(p => generatePlayer(p, team2Name))
 
   const rounds = Array.from({ length: totalRounds }, (_, i) =>
     generateRound(i + 1, team1Name, team2Name)

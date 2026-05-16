@@ -75,8 +75,34 @@ export default async function FolderPage({
 
   const isOwnerOrAdmin = membership.role === 'owner' || membership.role === 'admin'
 
-  // Top players from aggregated stats
-  const topPlayers: PlayerStats[] = stats?.top_players ?? []
+  // Top players: prefer aggregated_stats, fall back to computing from raw demo data
+  let topPlayers: PlayerStats[] = stats?.top_players ?? []
+  if (topPlayers.length === 0 && (demos ?? []).length > 0) {
+    const playerMap: Record<string, PlayerStats & { count: number }> = {}
+    for (const demo of demos ?? []) {
+      if (demo.status !== 'completed' || !demo.parsed_data) continue
+      const pd = demo.parsed_data as { header?: { team1?: string }; players?: PlayerStats[] }
+      const ownTeamName = pd.header?.team1 ?? 'My Team'
+      for (const p of pd.players ?? []) {
+        if (p.team === ownTeamName) continue
+        if (!playerMap[p.steam_id]) {
+          playerMap[p.steam_id] = { ...p, count: 1 }
+        } else {
+          const ex = playerMap[p.steam_id]
+          ex.kills += p.kills
+          ex.deaths += p.deaths
+          ex.assists += p.assists
+          ex.adr = (ex.adr * ex.count + p.adr) / (ex.count + 1)
+          ex.rating = (ex.rating * ex.count + p.rating) / (ex.count + 1)
+          ex.count++
+        }
+      }
+    }
+    topPlayers = Object.values(playerMap)
+      .sort((a, b) => b.rating - a.rating)
+      .slice(0, 5)
+      .map(({ count: _count, ...p }) => p)
+  }
 
   // Most common map for the pro reference link
   const mapCounts: Record<string, number> = {}
@@ -324,41 +350,65 @@ export default async function FolderPage({
                   </div>
                 ) : (
                   <div className="divide-y divide-border">
-                    {topPlayers.slice(0, 5).map((player, idx) => (
-                      <div key={player.steam_id} className="flex items-center gap-3 px-4 py-3">
-                        <span
-                          className={`text-xs font-bold w-4 text-center font-mono ${
-                            idx === 0 ? 'text-yellow-400' : 'text-muted-foreground'
-                          }`}
-                        >
-                          #{idx + 1}
-                        </span>
-                        <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center shrink-0">
-                          <span className="text-xs font-bold text-foreground">
-                            {player.name.charAt(0).toUpperCase()}
+                    {topPlayers.slice(0, 5).map((player, idx) => {
+                      const role = player.headshot_percentage < 20
+                        ? 'AWP'
+                        : player.flash_assists >= 4
+                        ? 'Support'
+                        : player.kills >= 20
+                        ? 'Entry'
+                        : 'Rifler'
+                      const roleColor = role === 'AWP'
+                        ? 'text-purple-400 bg-purple-400/10'
+                        : role === 'Entry'
+                        ? 'text-orange-400 bg-orange-400/10'
+                        : role === 'Support'
+                        ? 'text-blue-400 bg-blue-400/10'
+                        : 'text-muted-foreground bg-accent'
+                      return (
+                        <div key={player.steam_id} className="flex items-center gap-3 px-4 py-3">
+                          <span
+                            className={`text-xs font-bold w-4 text-center font-mono ${
+                              idx === 0 ? 'text-yellow-400' : 'text-muted-foreground'
+                            }`}
+                          >
+                            #{idx + 1}
                           </span>
+                          <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-foreground">
+                              {player.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-medium text-foreground truncate">
+                                {player.name}
+                              </p>
+                              <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${roleColor} shrink-0`}>
+                                {role}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                              {player.kills}K {player.deaths}D {player.assists}A · {player.adr.toFixed(0)} ADR
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span
+                              className={`text-xs font-bold font-mono ${
+                                player.rating >= 1.2
+                                  ? 'text-neon-green'
+                                  : player.rating >= 1.0
+                                  ? 'text-green-400'
+                                  : 'text-yellow-400'
+                              }`}
+                            >
+                              {player.rating.toFixed(2)}
+                            </span>
+                            <p className="text-[9px] text-muted-foreground">rating</p>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {player.name}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {player.kills}K {player.deaths}D {player.assists}A
-                          </p>
-                        </div>
-                        <span
-                          className={`text-xs font-bold font-mono ${
-                            player.rating >= 1.2
-                              ? 'text-neon-green'
-                              : player.rating >= 1.0
-                              ? 'text-green-400'
-                              : 'text-yellow-400'
-                          }`}
-                        >
-                          {player.rating.toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>

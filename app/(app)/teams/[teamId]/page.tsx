@@ -85,22 +85,25 @@ export default async function TeamPage({
     demosByOpponent[key].push(demo)
   }
 
-  // Compute top players across all completed demos
+  // Compute top opponent players across all completed demos (exclude own team)
   const playerMap: Record<string, PlayerStats & { count: number }> = {}
   for (const demo of demos ?? []) {
     if (demo.status === 'completed' && demo.parsed_data) {
-      const pd = demo.parsed_data as { players?: PlayerStats[] }
+      const pd = demo.parsed_data as { header?: { team1?: string }; players?: PlayerStats[] }
+      const ownTeamName = pd.header?.team1 ?? 'My Team'
       for (const p of pd.players ?? []) {
+        if (p.team === ownTeamName) continue
         if (!playerMap[p.steam_id]) {
-          playerMap[p.steam_id] = { ...p, count: 0 }
+          playerMap[p.steam_id] = { ...p, count: 1 }
         } else {
-          playerMap[p.steam_id].kills += p.kills
-          playerMap[p.steam_id].deaths += p.deaths
-          playerMap[p.steam_id].assists += p.assists
-          playerMap[p.steam_id].adr = (playerMap[p.steam_id].adr + p.adr) / 2
-          playerMap[p.steam_id].rating = (playerMap[p.steam_id].rating + p.rating) / 2
+          const existing = playerMap[p.steam_id]
+          existing.kills += p.kills
+          existing.deaths += p.deaths
+          existing.assists += p.assists
+          existing.adr = (existing.adr * existing.count + p.adr) / (existing.count + 1)
+          existing.rating = (existing.rating * existing.count + p.rating) / (existing.count + 1)
+          existing.count++
         }
-        playerMap[p.steam_id].count++
       }
     }
   }
@@ -262,44 +265,65 @@ export default async function TeamPage({
                     </div>
                   ) : (
                     <div className="divide-y divide-border">
-                      {topPlayers.map((player, idx) => (
-                        <div key={player.steam_id} className="flex items-center gap-3 px-6 py-3">
-                          <span
-                            className={`text-sm font-bold w-5 text-center font-mono ${
-                              idx === 0 ? 'text-yellow-400' : 'text-muted-foreground'
-                            }`}
-                          >
-                            #{idx + 1}
-                          </span>
-                          <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center">
-                            <span className="text-xs font-bold text-foreground">
-                              {player.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{player.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {player.kills}K / {player.deaths}D / {player.assists}A
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p
-                              className={`text-sm font-bold font-mono ${
-                                player.rating >= 1.2
-                                  ? 'text-neon-green'
-                                  : player.rating >= 1.0
-                                  ? 'text-green-400'
-                                  : player.rating >= 0.8
-                                  ? 'text-yellow-400'
-                                  : 'text-red-400'
+                      {topPlayers.map((player, idx) => {
+                        const role = player.headshot_percentage < 20
+                          ? 'AWP'
+                          : player.flash_assists >= 4
+                          ? 'Support'
+                          : player.kills >= 20
+                          ? 'Entry'
+                          : 'Rifler'
+                        const roleColor = role === 'AWP'
+                          ? 'text-purple-400 bg-purple-400/10'
+                          : role === 'Entry'
+                          ? 'text-orange-400 bg-orange-400/10'
+                          : role === 'Support'
+                          ? 'text-blue-400 bg-blue-400/10'
+                          : 'text-muted-foreground bg-accent'
+                        return (
+                          <div key={player.steam_id} className="flex items-center gap-3 px-6 py-3">
+                            <span
+                              className={`text-sm font-bold w-5 text-center font-mono ${
+                                idx === 0 ? 'text-yellow-400' : 'text-muted-foreground'
                               }`}
                             >
-                              {player.rating.toFixed(2)}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground">rating</p>
+                              #{idx + 1}
+                            </span>
+                            <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center">
+                              <span className="text-xs font-bold text-foreground">
+                                {player.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-medium text-foreground truncate">{player.name}</p>
+                                <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${roleColor} shrink-0`}>
+                                  {role}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {player.kills}K / {player.deaths}D / {player.assists}A · {player.adr.toFixed(0)} ADR
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p
+                                className={`text-sm font-bold font-mono ${
+                                  player.rating >= 1.2
+                                    ? 'text-neon-green'
+                                    : player.rating >= 1.0
+                                    ? 'text-green-400'
+                                    : player.rating >= 0.8
+                                    ? 'text-yellow-400'
+                                    : 'text-red-400'
+                                }`}
+                              >
+                                {player.rating.toFixed(2)}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">rating</p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </CardContent>

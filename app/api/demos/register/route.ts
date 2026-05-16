@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { generateMockDemoData } from '@/lib/demo-parser/mock-parser'
+import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import { slugify } from '@/lib/utils'
 import { getPublicUrl } from '@/lib/r2'
 import { z } from 'zod'
@@ -115,6 +116,8 @@ export async function POST(request: Request) {
           if (m) mapsPlayed[m] = (mapsPlayed[m] ?? 0) + 1
         })
 
+        const topPlayers = computeTopPlayers(allDemos)
+
         await admin
           .from('team_folders')
           .update({
@@ -124,9 +127,9 @@ export async function POST(request: Request) {
               losses: allDemos.length - wins,
               draws: 0,
               win_rate: wins / allDemos.length,
-              avg_rating: 1.05,
+              avg_rating: topPlayers.length > 0 ? topPlayers.reduce((s, p) => s + p.rating, 0) / topPlayers.length : 1.0,
               maps_played: mapsPlayed,
-              top_players: [],
+              top_players: topPlayers,
             },
           })
           .eq('user_team_id', teamId)
