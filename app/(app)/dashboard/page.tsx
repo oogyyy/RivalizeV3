@@ -9,16 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  Users, Upload, Brain, BarChart3, TrendingUp,
-  Trophy, Crosshair, Clock, Plus, ArrowRight,
+  Target, Upload, Brain, BarChart3, TrendingUp,
+  Crosshair, Clock, ArrowRight, Trophy,
 } from 'lucide-react'
+import type { AggregatedStats } from '@/types/database'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Use admin client to bypass RLS recursion; authorization enforced by filtering on user.id
   const admin = createAdminClient()
 
   const { data: profile } = await supabase
@@ -33,18 +33,17 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
 
   const teamIds = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
+  const primaryTeamId = teamIds[0] ?? null
 
-  const { data: teamsData } = teamIds.length
+  // Fetch all opponent folders
+  const { data: folders } = teamIds.length
     ? await admin
-        .from('teams')
-        .select('id, name, slug, logo_url')
-        .in('id', teamIds)
+        .from('team_folders')
+        .select('*')
+        .in('user_team_id', teamIds)
+        .order('updated_at', { ascending: false, nullsFirst: false })
+        .limit(6)
     : { data: [] }
-
-  const teams = (teamsData ?? []).map((t) => {
-    const membership = (memberships ?? []).find((m) => m.team_id === t.id)
-    return { ...t, userRole: membership?.role ?? 'member' }
-  }) as Array<{ id: string; name: string; slug: string; logo_url: string | null; userRole: string }>
 
   // Fetch recent demos across all teams
   const { data: recentDemos } = teamIds.length
@@ -53,62 +52,36 @@ export default async function DashboardPage() {
         .select('id, team_id, opponent_name, map, match_date, status, created_at')
         .in('team_id', teamIds)
         .order('created_at', { ascending: false })
-        .limit(5)
+        .limit(6)
     : { data: [] }
 
-  // Fetch demo counts per team
-  const { data: demoCounts } = teamIds.length
+  // Fetch demo counts
+  const { data: allDemos } = teamIds.length
     ? await admin
         .from('demos')
         .select('team_id, status')
         .in('team_id', teamIds)
     : { data: [] }
 
-  const demoCountMap: Record<string, number> = {}
-  for (const d of demoCounts ?? []) {
-    demoCountMap[d.team_id] = (demoCountMap[d.team_id] ?? 0) + 1
-  }
+  const totalDemos = (allDemos ?? []).length
+  const analyzedDemos = (allDemos ?? []).filter((d) => d.status === 'completed').length
 
-  const totalDemos = (demoCounts ?? []).length
-  const completedDemos = (demoCounts ?? []).filter((d) => d.status === 'completed').length
+  // Total opponents scouted
+  const { data: allFolders } = teamIds.length
+    ? await admin
+        .from('team_folders')
+        .select('id')
+        .in('user_team_id', teamIds)
+    : { data: [] }
+
+  const totalOpponents = (allFolders ?? []).length
 
   const displayName = profile?.display_name || profile?.username || 'Player'
 
-  const statsCards = [
-    {
-      label: 'Total Teams',
-      value: teams.length,
-      icon: Users,
-      color: 'text-neon-green',
-      bg: 'bg-neon-green/10',
-    },
-    {
-      label: 'Opponent Demos',
-      value: totalDemos,
-      icon: BarChart3,
-      color: 'text-neon-blue',
-      bg: 'bg-neon-blue/10',
-    },
-    {
-      label: 'Opponents Scouted',
-      value: completedDemos,
-      icon: TrendingUp,
-      color: 'text-neon-green',
-      bg: 'bg-neon-green/10',
-    },
-    {
-      label: 'Active Teams',
-      value: teams.length,
-      icon: Trophy,
-      color: 'text-yellow-400',
-      bg: 'bg-yellow-400/10',
-    },
-  ]
-
   const statusVariant = (status: string) => {
-    if (status === 'completed') return 'neon'
-    if (status === 'processing') return 'processing'
-    return 'destructive'
+    if (status === 'completed') return 'neon' as const
+    if (status === 'processing') return 'processing' as const
+    return 'destructive' as const
   }
 
   return (
@@ -121,16 +94,10 @@ export default async function DashboardPage() {
             <span className="text-neon-green neon-text">{displayName}</span>
           </h1>
           <p className="mt-1 text-muted-foreground text-sm">
-            Your war room for upcoming match preparation.
+            Your match prep hub — study opponents, generate anti-strats, win.
           </p>
         </div>
-        <div className="flex gap-2 sm:gap-3 shrink-0">
-          <Link href="/teams">
-            <Button variant="outline" className="gap-2">
-              <Plus size={16} />
-              New Team
-            </Button>
-          </Link>
+        <div className="flex gap-2 shrink-0">
           <Link href="/ai-coach">
             <Button variant="neon" className="gap-2">
               <Brain size={16} />
@@ -141,8 +108,12 @@ export default async function DashboardPage() {
       </div>
 
       {/* Quick stats */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {statsCards.map(({ label, value, icon: Icon, color, bg }) => (
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Opponents Scouted', value: totalOpponents, icon: Target, color: 'text-neon-green', bg: 'bg-neon-green/10' },
+          { label: 'Demos Uploaded', value: totalDemos, icon: BarChart3, color: 'text-foreground', bg: 'bg-accent' },
+          { label: 'Demos Analyzed', value: analyzedDemos, icon: TrendingUp, color: 'text-neon-green', bg: 'bg-neon-green/10' },
+        ].map(({ label, value, icon: Icon, color, bg }) => (
           <Card key={label} className="bg-card border-border">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
@@ -168,8 +139,8 @@ export default async function DashboardPage() {
                 <Clock size={16} className="text-neon-green" />
                 Recent Demos
               </CardTitle>
-              {teams.length > 0 && (
-                <Link href="/teams">
+              {totalDemos > 0 && (
+                <Link href="/opponents">
                   <Button variant="ghost" size="sm" className="gap-1 text-xs">
                     View all <ArrowRight size={12} />
                   </Button>
@@ -184,60 +155,58 @@ export default async function DashboardPage() {
                   </div>
                   <p className="text-sm font-medium text-foreground">No scouting data yet</p>
                   <p className="text-xs text-muted-foreground mt-1 mb-4">
-                    Upload opponent demos to start scouting your upcoming matches.
+                    Upload opponent demos to start preparing for your next match.
                   </p>
-                  <Link href="/teams">
+                  <Link href="/opponents">
                     <Button variant="neon" size="sm" className="gap-2">
-                      <Plus size={14} />
-                      Scout Opponent
+                      <Target size={14} />
+                      Add First Opponent
                     </Button>
                   </Link>
                 </div>
               ) : (
                 <div className="divide-y divide-border">
-                  {(recentDemos ?? []).map((demo) => {
-                    const team = teams.find((t) => t.id === demo.team_id)
-                    return (
-                      <div
-                        key={demo.id}
-                        className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0">
-                          <Crosshair size={14} className="text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            vs {demo.opponent_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {demo.map} {team ? `· ${team.name}` : ''}{' '}
-                            {demo.match_date
-                              ? `· ${formatDate(demo.match_date)}`
-                              : demo.created_at
-                              ? `· ${formatDate(demo.created_at)}`
-                              : ''}
-                          </p>
-                        </div>
-                        <Badge variant={statusVariant(demo.status)} className="text-xs shrink-0">
-                          {demo.status}
-                        </Badge>
+                  {(recentDemos ?? []).map((demo) => (
+                    <div
+                      key={demo.id}
+                      className="flex items-center gap-4 px-6 py-3 hover:bg-accent/30 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0">
+                        <Crosshair size={14} className="text-muted-foreground" />
                       </div>
-                    )
-                  })}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {demo.opponent_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {demo.map}
+                          {demo.match_date
+                            ? ` · ${formatDate(demo.match_date)}`
+                            : demo.created_at
+                            ? ` · ${formatDate(demo.created_at)}`
+                            : ''}
+                        </p>
+                      </div>
+                      <Badge variant={statusVariant(demo.status)} className="text-xs shrink-0">
+                        {demo.status}
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Quick Actions */}
+        {/* Right column */}
         <div className="space-y-4">
+          {/* Quick Actions */}
           <Card className="bg-card border-border">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/teams" className="block">
+              <Link href="/opponents" className="block">
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-3 h-11 hover:border-neon-green/50 hover:text-neon-green"
@@ -246,13 +215,13 @@ export default async function DashboardPage() {
                   Upload Opponent Demo
                 </Button>
               </Link>
-              <Link href="/teams" className="block">
+              <Link href="/opponents" className="block">
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-3 h-11 hover:border-neon-green/50 hover:text-neon-green"
                 >
-                  <Plus size={16} />
-                  Create Team
+                  <Target size={16} />
+                  View All Opponents
                 </Button>
               </Link>
               <Link href="/ai-coach" className="block">
@@ -267,100 +236,76 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Teams overview mini */}
-          {teams.length > 0 && (
+          {/* Recent opponents mini-list */}
+          {(folders ?? []).length > 0 && (
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Users size={16} className="text-neon-green" />
-                  My Teams
+                  <Target size={16} className="text-neon-green" />
+                  Opponents
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {teams.slice(0, 4).map((team) => (
-                  <Link
-                    key={team.id}
-                    href={`/teams/${team.id}`}
-                    className="flex items-center gap-3 rounded-md p-2 hover:bg-accent/50 transition-colors group"
-                  >
-                    <div className="w-8 h-8 rounded bg-neon-green/10 border border-neon-green/20 flex items-center justify-center shrink-0">
-                      <span className="text-xs font-bold text-neon-green">
-                        {team.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate group-hover:text-neon-green transition-colors">
-                        {team.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {demoCountMap[team.id] ?? 0} opponent demos
-                      </p>
-                    </div>
-                    <ArrowRight size={14} className="text-muted-foreground group-hover:text-neon-green transition-colors shrink-0" />
-                  </Link>
-                ))}
-                {teams.length > 4 && (
-                  <Link href="/teams">
-                    <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground">
-                      +{teams.length - 4} more teams
+              <CardContent className="space-y-1 p-2">
+                {(folders ?? []).slice(0, 5).map((folder) => {
+                  const stats = folder.aggregated_stats as AggregatedStats | null
+                  const wins = stats?.wins ?? 0
+                  const losses = stats?.losses ?? 0
+                  return (
+                    <Link
+                      key={folder.id}
+                      href={`/opponents/${folder.id}`}
+                      className="flex items-center gap-3 rounded-md p-2 hover:bg-accent/50 transition-colors group"
+                    >
+                      <div className="w-7 h-7 rounded bg-accent flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-foreground">
+                          {folder.opponent_display_name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate group-hover:text-neon-green transition-colors">
+                          {folder.opponent_display_name}
+                        </p>
+                        {(wins + losses) > 0 && (
+                          <p className="text-[10px] text-muted-foreground font-mono">
+                            {wins}W–{losses}L
+                          </p>
+                        )}
+                      </div>
+                      <ArrowRight size={13} className="text-muted-foreground group-hover:text-neon-green shrink-0" />
+                    </Link>
+                  )
+                })}
+                {(allFolders ?? []).length > 5 && (
+                  <Link href="/opponents">
+                    <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground mt-1">
+                      +{(allFolders ?? []).length - 5} more opponents
                     </Button>
                   </Link>
                 )}
               </CardContent>
             </Card>
           )}
+
+          {/* AI CTA */}
+          {totalDemos > 0 && (
+            <Card className="bg-gradient-to-br from-neon-green/10 to-transparent border border-neon-green/20">
+              <CardContent className="p-4 text-center">
+                <Brain size={22} className="text-neon-green mx-auto mb-2" />
+                <p className="text-sm font-semibold text-foreground mb-1">Ready to prep?</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  {analyzedDemos} demo{analyzedDemos !== 1 ? 's' : ''} analyzed and ready for AI scouting
+                </p>
+                <Link href="/ai-coach">
+                  <Button variant="neon" size="sm" className="w-full gap-2">
+                    <Brain size={14} />
+                    Open AI Scout
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
-
-      {/* Teams overview grid */}
-      {teams.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-foreground">Teams Overview</h2>
-            <Link href="/teams">
-              <Button variant="ghost" size="sm" className="gap-1 text-sm">
-                Manage teams <ArrowRight size={14} />
-              </Button>
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {teams.map((team) => (
-              <Link key={team.id} href={`/teams/${team.id}`}>
-                <Card className="bg-card border-border hover:border-neon-green/30 transition-all duration-200 cursor-pointer group">
-                  <CardContent className="p-5">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-lg bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
-                        {team.logo_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={team.logo_url} alt={team.name} className="w-full h-full object-cover rounded-lg" />
-                        ) : (
-                          <span className="text-sm font-bold text-neon-green">
-                            {team.name.charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground truncate group-hover:text-neon-green transition-colors">
-                          {team.name}
-                        </p>
-                        <Badge variant="secondary" className="text-xs mt-0.5">
-                          {team.userRole}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {demoCountMap[team.id] ?? 0} opponent demos
-                      </span>
-                      <ArrowRight size={14} className="text-muted-foreground group-hover:text-neon-green transition-colors" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

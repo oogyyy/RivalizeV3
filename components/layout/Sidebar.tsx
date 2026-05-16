@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard, Users, Brain, User, Settings,
+  LayoutDashboard, Target, Brain, User, Settings,
   LogOut, ChevronLeft, ChevronRight, Crosshair,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
@@ -18,7 +18,7 @@ interface SidebarProps {
 
 export const navLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/teams', label: 'Teams', icon: Users },
+  { href: '/opponents', label: 'Opponents', icon: Target },
   { href: '/ai-coach', label: 'AI Scout', icon: Brain },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/settings', label: 'Settings', icon: Settings },

@@ -25,7 +25,7 @@ export default function FolderCard({ folder }: FolderCardProps) {
   const isNegative = folder.losses > folder.wins
 
   return (
-    <Link href={`/teams/${folder.teamId}/folders/${folder.id}`}>
+    <Link href={`/opponents/${folder.id}`}>
       <Card className="bg-card border-border hover:border-neon-green/40 transition-all duration-200 cursor-pointer group">
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-3">
@@ -39,7 +39,7 @@ export default function FolderCard({ folder }: FolderCardProps) {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate group-hover:text-neon-green transition-colors">
-                    vs {folder.opponent_display_name}
+                    {folder.opponent_display_name}
                   </p>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <FileVideo size={10} className="text-muted-foreground" />
