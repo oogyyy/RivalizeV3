@@ -55,7 +55,11 @@ export async function POST(request: Request) {
       expiresIn: 3600,
     })
   } catch (err) {
-    console.error('[presign] R2 error:', err)
-    return NextResponse.json({ error: 'Failed to generate upload URL' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[presign] R2 error:', message)
+    return NextResponse.json(
+      { error: `Failed to generate upload URL: ${message}` },
+      { status: 500 },
+    )
   }
 }
