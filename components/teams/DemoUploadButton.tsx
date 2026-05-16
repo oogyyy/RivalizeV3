@@ -94,7 +94,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
       const { error: storageError } = await supabase.storage
         .from('demos')
         .uploadToSignedUrl(path, token, file, {
-          contentType: 'application/octet-stream',
+          contentType: file.name.endsWith('.zst') ? 'application/zstd' : 'application/octet-stream',
         })
 
       if (storageError) throw new Error(storageError.message)
