@@ -11,11 +11,11 @@ const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
 
 interface DemoUploadButtonProps {
   teamId: string
-  teamName?: string
   onSuccess?: () => void
 }
 
 type UploadStatus = 'pending' | 'presigning' | 'uploading' | 'registering' | 'done' | 'error'
+type OpponentSide = 'team1' | 'team2'
 
 interface FileUpload {
   file: File
@@ -29,42 +29,36 @@ function isValidDemoFile(name: string) {
   return name.toLowerCase().endsWith('.dem')
 }
 
-/** Upload a file directly to R2 via a presigned PUT URL with progress reporting. */
 function uploadToR2(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', url)
     xhr.setRequestHeader('Content-Type', 'application/octet-stream')
-
     xhr.upload.addEventListener('progress', e => {
-      if (e.lengthComputable) {
-        onProgress(Math.round((e.loaded / e.total) * 100))
-      }
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
     })
-
     xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve()
-      } else {
-        reject(new Error(`R2 upload failed: HTTP ${xhr.status}`))
-      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else reject(new Error(`R2 upload failed: HTTP ${xhr.status}`))
     })
-
     xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
     xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
-
     xhr.send(file)
   })
 }
 
-export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUploadButtonProps) {
+export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButtonProps) {
   const [open, setOpen] = useState(false)
   const [uploads, setUploads] = useState<FileUpload[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [opponentName, setOpponentName] = useState('')
+  const [opponentSide, setOpponentSide] = useState<OpponentSide>('team2')
 
-  const updateUpload = useCallback((index: number, update: Partial<FileUpload>) =>
-    setUploads(prev => prev.map((u, i) => (i === index ? { ...u, ...update } : u))), [])
+  const updateUpload = useCallback(
+    (index: number, update: Partial<FileUpload>) =>
+      setUploads(prev => prev.map((u, i) => (i === index ? { ...u, ...update } : u))),
+    []
+  )
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const valid = acceptedFiles.filter(f => isValidDemoFile(f.name) && f.size <= MAX_FILE_SIZE)
@@ -91,14 +85,14 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
     setUploads(prev => prev.filter((_, i) => i !== index))
 
   const retryFailed = () =>
-    setUploads(prev => prev.map(u =>
-      u.status === 'error' ? { ...u, status: 'pending', progress: 0, error: undefined } : u
-    ))
+    setUploads(prev =>
+      prev.map(u =>
+        u.status === 'error' ? { ...u, status: 'pending', progress: 0, error: undefined } : u
+      )
+    )
 
-  /** Upload a single file. Returns true on success. */
   const uploadOne = async (i: number, file: File): Promise<boolean> => {
     try {
-      // Step 1 — get a presigned R2 PUT URL from our API
       updateUpload(i, { status: 'presigning', progress: 2 })
 
       const presignRes = await fetch('/api/demos/presign', {
@@ -114,17 +108,13 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
 
       const { key, uploadUrl } = await presignRes.json()
 
-      // Step 2 — stream file directly to R2 (never touches Vercel's body limit)
       updateUpload(i, { status: 'uploading', progress: 5 })
-
       await uploadToR2(uploadUrl, file, pct => {
-        // Map raw upload progress (0–100) into the 5–88 display range
         updateUpload(i, { progress: 5 + Math.round(pct * 0.83) })
       })
 
       updateUpload(i, { progress: 90, status: 'registering' })
 
-      // Step 3 — register the demo record in Supabase; opponent folder is auto-created
       const registerRes = await fetch('/api/demos/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,6 +122,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
           teamId,
           r2Key: key,
           opponentName: opponentName.trim(),
+          opponentSide,
           map: 'unknown',
           fileSize: file.size,
         }),
@@ -178,6 +169,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
     setOpen(false)
     setUploads([])
     setOpponentName('')
+    setOpponentSide('team2')
   }
 
   const pendingCount = uploads.filter(u => u.status === 'pending').length
@@ -187,6 +179,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
   const hasLargeFile = uploads.some(
     u => u.file.size > LARGE_FILE_THRESHOLD && (u.status === 'pending' || u.status === 'uploading')
   )
+  const opponentLabel = opponentName.trim() || 'the opponent'
 
   const statusLabel = (u: FileUpload) => {
     switch (u.status) {
@@ -203,22 +196,20 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
     return (
       <Button variant="neon" onClick={() => setOpen(true)} className="gap-2">
         <Upload size={16} />
-        Upload Opponent Demo
+        Upload Demo
       </Button>
     )
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl">
+      <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border">
+        <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card z-10">
           <div>
-            <h2 className="text-lg font-bold text-foreground">
-              Upload Opponent Demo{teamName ? ` for ${teamName}` : ''}
-            </h2>
+            <h2 className="text-lg font-bold text-foreground">Upload Opponent Demo</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Accepts .dem files — up to 500 MB per file
+              .dem files · up to 500 MB per file
             </p>
           </div>
           <button
@@ -230,12 +221,15 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
-          {/* Opponent name */}
+        <div className="p-5 space-y-5">
+          {/* Step 1 — Opponent name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground">
-              Opponent Team Name <span className="text-red-400">*</span>
-            </label>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
+                STEP 1
+              </span>
+              <span className="text-xs font-semibold text-foreground">Who are you scouting?</span>
+            </div>
             <input
               type="text"
               value={opponentName}
@@ -246,113 +240,216 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
             />
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Info size={10} className="shrink-0" />
-              Opponent does not need to exist in Rivalize — scouting folder created automatically.
+              A scouting folder will be created automatically if it doesn&apos;t exist yet.
             </p>
           </div>
 
-          {/* Large file notice */}
-          {hasLargeFile && (
-            <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
-              <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-yellow-300">
-                CS2 demos are typically 200–500 MB. Large files upload directly to cloud storage — keep this tab open while uploading.
-              </p>
+          {/* Step 2 — Which team in the demo is the opponent */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
+                STEP 2
+              </span>
+              <span className="text-xs font-semibold text-foreground">
+                Which team in this demo is{' '}
+                <span className="text-neon-green">{opponentLabel}</span>?
+              </span>
             </div>
-          )}
 
-          {/* Dropzone */}
-          <div
-            {...getRootProps()}
-            className={cn(
-              'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200',
-              isDragActive
-                ? 'border-[#00ff87] bg-[#00ff87]/5'
-                : 'border-border hover:border-[#00ff87]/50 hover:bg-accent/30'
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    value: 'team1' as const,
+                    label: 'Team 1',
+                    sub: 'First team in the demo file',
+                  },
+                  {
+                    value: 'team2' as const,
+                    label: 'Team 2',
+                    sub: 'Second team in the demo file',
+                  },
+                ] as const
+              ).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => setOpponentSide(opt.value)}
+                  className={cn(
+                    'flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-all',
+                    opponentSide === opt.value
+                      ? 'border-neon-green/60 bg-neon-green/10 ring-1 ring-neon-green/30'
+                      : 'border-border bg-background hover:border-neon-green/30 hover:bg-accent/40',
+                    'disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={cn(
+                        'text-sm font-semibold',
+                        opponentSide === opt.value ? 'text-neon-green' : 'text-foreground'
+                      )}
+                    >
+                      {opt.label}
+                    </span>
+                    <div
+                      className={cn(
+                        'w-3.5 h-3.5 rounded-full border-2 transition-colors shrink-0',
+                        opponentSide === opt.value
+                          ? 'border-neon-green bg-neon-green'
+                          : 'border-muted-foreground/40 bg-transparent'
+                      )}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">{opt.sub}</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="text-[10px] text-muted-foreground flex items-start gap-1 pt-0.5">
+              <Info size={10} className="shrink-0 mt-0.5" />
+              In most CS2 demos, the team you were watching appears as Team 2. If unsure, pick
+              either — you can re-analyze after upload.
+            </p>
+          </div>
+
+          {/* Step 3 — Files */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
+                STEP 3
+              </span>
+              <span className="text-xs font-semibold text-foreground">Add demo files</span>
+            </div>
+
+            {/* Large file notice */}
+            {hasLargeFile && (
+              <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
+                <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-yellow-300">
+                  CS2 demos are typically 200–500 MB. Large files upload directly to cloud
+                  storage — keep this tab open.
+                </p>
+              </div>
             )}
-          >
-            <input {...getInputProps()} />
-            <Upload
-              size={28}
-              className={cn('mx-auto mb-3 transition-colors', isDragActive ? 'text-[#00ff87]' : 'text-muted-foreground')}
-            />
-            {isDragActive ? (
-              <p className="text-sm font-medium text-[#00ff87]">Drop .dem files here…</p>
-            ) : (
-              <>
-                <p className="text-sm font-medium text-foreground">Drag & drop opponent demo files here</p>
-                <p className="text-xs text-muted-foreground mt-1">.dem files only · up to 500 MB · click to browse</p>
-              </>
+
+            {/* Dropzone */}
+            <div
+              {...getRootProps()}
+              className={cn(
+                'border-2 border-dashed rounded-lg p-7 text-center cursor-pointer transition-all duration-200',
+                isDragActive
+                  ? 'border-[#00ff87] bg-[#00ff87]/5'
+                  : 'border-border hover:border-[#00ff87]/50 hover:bg-accent/30'
+              )}
+            >
+              <input {...getInputProps()} />
+              <Upload
+                size={26}
+                className={cn(
+                  'mx-auto mb-2.5 transition-colors',
+                  isDragActive ? 'text-[#00ff87]' : 'text-muted-foreground'
+                )}
+              />
+              {isDragActive ? (
+                <p className="text-sm font-medium text-[#00ff87]">Drop .dem files here…</p>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-foreground">
+                    Drag & drop demo files here
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    .dem files only · up to 500 MB · click to browse
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* File list */}
+            {uploads.length > 0 && (
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {uploads.map((upload, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'flex items-center gap-3 rounded-md border bg-background/50 px-3 py-2',
+                      upload.status === 'error' ? 'border-red-500/40' : 'border-border'
+                    )}
+                  >
+                    <FileVideo
+                      size={16}
+                      className={cn(
+                        'shrink-0',
+                        upload.status === 'done'
+                          ? 'text-[#00ff87]'
+                          : upload.status === 'error'
+                          ? 'text-red-400'
+                          : 'text-muted-foreground'
+                      )}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">
+                        {upload.file.name}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {formatFileSize(upload.file.size)}
+                        </span>
+                        {upload.status === 'uploading' ||
+                        upload.status === 'presigning' ||
+                        upload.status === 'registering' ? (
+                          <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#00ff87] rounded-full transition-all duration-300"
+                              style={{ width: `${upload.progress}%` }}
+                            />
+                          </div>
+                        ) : (
+                          <span
+                            className={cn(
+                              'text-[10px] font-medium truncate',
+                              upload.status === 'done'
+                                ? 'text-[#00ff87]'
+                                : upload.status === 'error'
+                                ? 'text-red-400'
+                                : 'text-muted-foreground'
+                            )}
+                          >
+                            {statusLabel(upload)}
+                          </span>
+                        )}
+                      </div>
+                      {(upload.status === 'uploading' || upload.status === 'presigning') && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {statusLabel(upload)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="shrink-0">
+                      {upload.status === 'done' ? (
+                        <CheckCircle2 size={14} className="text-[#00ff87]" />
+                      ) : upload.status === 'error' ? (
+                        <AlertCircle size={14} className="text-red-400" />
+                      ) : upload.status !== 'pending' ? (
+                        <Loader2 size={14} className="text-[#00ff87] animate-spin" />
+                      ) : (
+                        <button
+                          onClick={() => removeFile(i)}
+                          className="text-muted-foreground hover:text-red-400 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* File list */}
-          {uploads.length > 0 && (
-            <div className="space-y-2 max-h-52 overflow-y-auto">
-              {uploads.map((upload, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'flex items-center gap-3 rounded-md border bg-background/50 px-3 py-2',
-                    upload.status === 'error' ? 'border-red-500/40' : 'border-border'
-                  )}
-                >
-                  <FileVideo
-                    size={16}
-                    className={cn(
-                      'shrink-0',
-                      upload.status === 'done' ? 'text-[#00ff87]' :
-                      upload.status === 'error' ? 'text-red-400' :
-                      'text-muted-foreground'
-                    )}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">{upload.file.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {formatFileSize(upload.file.size)}
-                      </span>
-                      {upload.status === 'uploading' || upload.status === 'presigning' || upload.status === 'registering' ? (
-                        <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-[#00ff87] rounded-full transition-all duration-300"
-                            style={{ width: `${upload.progress}%` }}
-                          />
-                        </div>
-                      ) : (
-                        <span className={cn(
-                          'text-[10px] font-medium truncate',
-                          upload.status === 'done' ? 'text-[#00ff87]' :
-                          upload.status === 'error' ? 'text-red-400' :
-                          'text-muted-foreground'
-                        )}>
-                          {statusLabel(upload)}
-                        </span>
-                      )}
-                    </div>
-                    {(upload.status === 'uploading' || upload.status === 'presigning') && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{statusLabel(upload)}</p>
-                    )}
-                  </div>
-                  <div className="shrink-0">
-                    {upload.status === 'done' ? (
-                      <CheckCircle2 size={14} className="text-[#00ff87]" />
-                    ) : upload.status === 'error' ? (
-                      <AlertCircle size={14} className="text-red-400" />
-                    ) : upload.status !== 'pending' ? (
-                      <Loader2 size={14} className="text-[#00ff87] animate-spin" />
-                    ) : (
-                      <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-red-400 transition-colors">
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Footer */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-1 border-t border-border">
             <span className="text-xs text-muted-foreground">
               {uploads.length === 0
                 ? 'No files selected'
@@ -369,7 +466,12 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
                   Retry {errorCount} failed
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={handleClose} disabled={isProcessing}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClose}
+                disabled={isProcessing}
+              >
                 {doneCount > 0 && pendingCount === 0 && errorCount === 0 ? 'Close' : 'Cancel'}
               </Button>
               {pendingCount > 0 && (
@@ -379,12 +481,17 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
                   onClick={uploadAll}
                   disabled={isProcessing || !canUpload}
                   className="gap-2"
-                  title={!opponentName.trim() ? 'Enter opponent team name first' : undefined}
+                  title={!opponentName.trim() ? 'Enter opponent name first' : undefined}
                 >
                   {isProcessing ? (
-                    <><Loader2 size={14} className="animate-spin" /> Uploading…</>
+                    <>
+                      <Loader2 size={14} className="animate-spin" /> Uploading…
+                    </>
                   ) : (
-                    <><Upload size={14} /> Upload {pendingCount} file{pendingCount !== 1 ? 's' : ''}</>
+                    <>
+                      <Upload size={14} /> Upload{' '}
+                      {pendingCount > 1 ? `${pendingCount} files` : 'demo'}
+                    </>
                   )}
                 </Button>
               )}

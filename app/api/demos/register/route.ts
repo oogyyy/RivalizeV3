@@ -15,6 +15,7 @@ const schema = z.object({
   fileSize: z.number().positive().optional(),
   matchDate: z.string().optional(),
   league: z.string().optional(),
+  opponentSide: z.enum(['team1', 'team2']).default('team2'),
 })
 
 // Called by the client after a successful direct upload to R2.
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { teamId, r2Key, opponentName, map, fileSize, matchDate, league } = parsed.data
+  const { teamId, r2Key, opponentName, map, fileSize, matchDate, league, opponentSide } = parsed.data
 
   const admin = createAdminClient()
 
@@ -89,7 +90,13 @@ export async function POST(request: Request) {
     try {
       await new Promise(resolve => setTimeout(resolve, 1500))
 
-      const parsedData = generateMockDemoData('My Team', opponentName, map)
+      // opponentSide tells us which team slot the opponent occupies in the original demo.
+      // Internally we always store: team1 = user's side, team2 = scouted opponent.
+      // With a real parser this would reorder the teams based on opponentSide.
+      const parsedData = {
+        ...generateMockDemoData('My Team', opponentName, map),
+        opponentSide,
+      }
 
       await admin
         .from('demos')
