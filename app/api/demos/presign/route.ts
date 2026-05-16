@@ -5,6 +5,12 @@ import { z } from 'zod'
 
 const VALID_EXTENSIONS = ['.dem', '.dem.zst']
 
+function getMimeType(filename: string): string {
+  return filename.toLowerCase().endsWith('.zst')
+    ? 'application/zstd'
+    : 'application/octet-stream'
+}
+
 const schema = z.object({
   teamId: z.string().uuid(),
   filename: z.string().min(1).max(255),
@@ -64,12 +70,10 @@ export async function POST(request: Request) {
     )
   }
 
-  // Return path + token so the browser can call uploadToSignedUrl() directly,
-  // which uses the correct /object/upload/sign/ endpoint (not the raw signedUrl).
   return NextResponse.json({
     path: storagePath,
     token: data.token,
-    // signedUrl is also included for reference / debugging
+    contentType: getMimeType(filename),
     signedUrl: data.signedUrl,
     expiresIn: 3600,
   })

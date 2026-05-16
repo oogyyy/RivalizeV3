@@ -50,7 +50,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'application/octet-stream': ['.dem', '.zst'] },
+    accept: { 'application/octet-stream': ['.dem', '.zst'], 'application/zstd': ['.zst'] },
     multiple: true,
   })
 
@@ -83,21 +83,23 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
         throw new Error(err.error ?? `Presign failed (${presignRes.status})`)
       }
 
-      const { path, token } = await presignRes.json()
+      const { path, token, contentType } = await presignRes.json()
 
       // Step 2 — upload directly to Supabase Storage using the SDK method.
-      // uploadToSignedUrl() builds the correct /object/upload/sign/ endpoint,
-      // handles CORS, and streams progress events.
       updateUpload(i, { status: 'uploading', progress: 10 })
 
       const supabase = createClient()
       const { error: storageError } = await supabase.storage
         .from('demos')
-        .uploadToSignedUrl(path, token, file, {
-          contentType: file.name.endsWith('.zst') ? 'application/zstd' : 'application/octet-stream',
-        })
+        .uploadToSignedUrl(path, token, file, { contentType })
 
-      if (storageError) throw new Error(storageError.message)
+      if (storageError) {
+        const msg = storageError.message ?? ''
+        if (msg.toLowerCase().includes('mime') || msg.toLowerCase().includes('not supported')) {
+          throw new Error(`File type not allowed by storage (${contentType}). Contact support if this persists.`)
+        }
+        throw new Error(msg)
+      }
 
       updateUpload(i, { progress: 88, status: 'registering' })
 
@@ -196,7 +198,7 @@ export default function DemoUploadButton({ teamId, teamName, onSuccess }: DemoUp
               Upload Opponent Demo{teamName ? ` for ${teamName}` : ''}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Accepts .dem and .dem.zst — up to 512 MB per file
+              Accepts .dem and .dem.zst — up to 1 GB per file
             </p>
           </div>
           <button
