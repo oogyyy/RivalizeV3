@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic'
 
-import React from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
@@ -13,7 +12,7 @@ import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
   Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink, BarChart2,
-  HardDrive, ChevronRight,
+  HardDrive,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AggregatedStats, DemoHeader, PlayerStats } from '@/types/database'
@@ -257,22 +256,19 @@ export default async function OpponentPage({
                     ? `/demos/${demo.id}?folder=${folderId}`
                     : null
 
-                  const cardBody = (
-                    <Card className={cn(
-                      'bg-card border-border transition-all duration-150',
-                      href && 'cursor-pointer hover:border-neon-green/40 hover:shadow-[0_0_16px_rgba(0,255,135,0.06)] group'
-                    )}>
+                  return (
+                    <Card key={demo.id} className="bg-card border-border transition-all duration-150 hover:border-border/80">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-4">
                           {/* Map icon */}
-                          <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0 border border-border group-hover:border-neon-green/30 transition-colors">
-                            <MapPin size={15} className="text-muted-foreground group-hover:text-neon-green transition-colors" />
+                          <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0 border border-border">
+                            <MapPin size={15} className="text-muted-foreground" />
                           </div>
 
                           {/* Main info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-sm font-semibold text-foreground group-hover:text-neon-green transition-colors">
+                              <span className="font-mono text-sm font-semibold text-foreground">
                                 {demo.map && demo.map !== 'unknown' ? demo.map : 'Unknown map'}
                               </span>
                               {header && (
@@ -307,14 +303,11 @@ export default async function OpponentPage({
                             </div>
                           </div>
 
-                          {/* Right actions */}
+                          {/* Right actions — explicit Links, no onClick handlers */}
                           <div className="flex items-center gap-1.5 shrink-0">
                             {demo.status === 'completed' && (
                               <>
-                                <Link
-                                  href={`/ai-coach?folder=${folderId}`}
-                                  onClick={e => e.stopPropagation()}
-                                >
+                                <Link href={`/ai-coach?folder=${folderId}`}>
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -324,22 +317,22 @@ export default async function OpponentPage({
                                     Scout
                                   </Button>
                                 </Link>
-                                <ChevronRight
-                                  size={14}
-                                  className="text-muted-foreground/40 group-hover:text-neon-green transition-colors"
-                                />
+                                <Link href={`/demos/${demo.id}?folder=${folderId}`}>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs gap-1 h-7 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <BarChart2 size={11} />
+                                    Stats
+                                  </Button>
+                                </Link>
                               </>
                             )}
                           </div>
                         </div>
                       </CardContent>
                     </Card>
-                  )
-
-                  return href ? (
-                    <Link key={demo.id} href={href}>{cardBody}</Link>
-                  ) : (
-                    <div key={demo.id}>{cardBody}</div>
                   )
                 })}
 
