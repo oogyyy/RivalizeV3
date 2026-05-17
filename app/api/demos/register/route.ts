@@ -92,16 +92,20 @@ export async function POST(request: Request) {
     try {
       await new Promise(resolve => setTimeout(resolve, 1500))
 
-      // Try to extract real map name from the demo binary header
+      // Try to extract real map name from the demo binary header.
+      // Skip for .zst files — the raw bytes are compressed and not directly parseable.
       let realMapName: string | null = null
-      try {
-        const fileBytes = await getFirstBytes(r2Key, 8192)
-        const header = parseDemoHeader(fileBytes)
-        if (header?.mapName) {
-          realMapName = header.mapName
+      const isCompressed = r2Key.toLowerCase().endsWith('.zst')
+      if (!isCompressed) {
+        try {
+          const fileBytes = await getFirstBytes(r2Key, 8192)
+          const header = parseDemoHeader(fileBytes)
+          if (header?.mapName) {
+            realMapName = header.mapName
+          }
+        } catch (headerErr) {
+          console.warn('[register] Could not read demo header from R2:', String(headerErr))
         }
-      } catch (headerErr) {
-        console.warn('[register] Could not read demo header from R2:', String(headerErr))
       }
 
       // Use real map name if found, otherwise fall back to what was submitted (if not 'unknown')

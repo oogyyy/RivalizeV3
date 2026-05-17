@@ -26,7 +26,8 @@ interface FileUpload {
 }
 
 function isValidDemoFile(name: string) {
-  return name.toLowerCase().endsWith('.dem')
+  const lower = name.toLowerCase()
+  return lower.endsWith('.dem') || lower.endsWith('.zst')
 }
 
 function uploadToR2(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
@@ -77,7 +78,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'application/octet-stream': ['.dem'] },
+    accept: { 'application/octet-stream': ['.dem', '.zst'] },
     multiple: true,
   })
 
@@ -209,7 +210,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
           <div>
             <h2 className="text-lg font-bold text-foreground">Upload Opponent Demo</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              .dem files · up to 500 MB per file
+              .dem / .zst files · up to 500 MB per file
             </p>
           </div>
           <button
@@ -290,7 +291,7 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
                     Drag & drop demo files here
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    .dem files only · up to 500 MB · click to browse
+                    .dem or .zst · up to 500 MB · click to browse
                   </p>
                 </>
               )}
