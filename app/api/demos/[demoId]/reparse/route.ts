@@ -49,12 +49,9 @@ export async function POST(
       const isCompressed = r2Key.toLowerCase().endsWith('.zst')
 
       if (!isCompressed) {
-        console.log(`[reparse] Downloading ${demoId} from R2 key: ${r2Key}`)
         const buf = await downloadObject(r2Key)
-        console.log(`[reparse] Downloaded ${buf.length} bytes, parsing...`)
         const { parsedData: realData, warnings } = parseCS2Demo(buf)
         if (warnings.length > 0) console.warn('[reparse] warnings:', warnings)
-        console.log(`[reparse] Result: ${realData.players.length} players, map=${realData.header.map}, score=${realData.header.score_team1}-${realData.header.score_team2}`)
 
         if (realData.players.length === 0) {
           const fallbackMap = realData.header.map !== 'unknown' ? realData.header.map : undefined
