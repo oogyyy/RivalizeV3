@@ -1,426 +1,36 @@
-'use client'
+export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { cn, formatDate, formatDuration, formatPercent, getRatingColor } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import PlayerStatsTable from '@/components/demos/PlayerStatsTable'
-import RoundTimeline from '@/components/demos/RoundTimeline'
-import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
-import {
-  Trophy, Crosshair, Target, Shield, Zap, TrendingUp,
-  BarChart3, Map, Clock, Brain, ArrowLeft, RefreshCw,
-  Loader2, AlertCircle, ChevronUp, ChevronDown
-} from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { notFound, redirect } from 'next/navigation'
+import { AlertCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import type { Demo, ParsedDemoData, PlayerStats, Round } from '@/types/database'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { Button } from '@/components/ui/button'
+import DemoPageClient from '@/components/demos/DemoPageClient'
+import type { Demo } from '@/types/database'
 
-type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy'
-
-const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview', label: 'Overview', icon: <BarChart3 size={14} /> },
-  { id: 'players', label: 'Player Stats', icon: <Crosshair size={14} /> },
-  { id: 'rounds', label: 'Round Timeline', icon: <Clock size={14} /> },
-  { id: 'heatmap', label: 'Heatmap', icon: <Map size={14} /> },
-  { id: 'economy', label: 'Economy', icon: <TrendingUp size={14} /> },
-]
-
-function StatCard({ label, value, sub, color = 'text-foreground' }: {
-  label: string
-  value: string | number
-  sub?: string
-  color?: string
-}) {
-  return (
-    <div className="bg-muted/20 rounded-lg border border-border p-4">
-      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
-      <p className={cn('text-2xl font-bold font-mono', color)}>{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
-    </div>
-  )
+interface Props {
+  params: Promise<{ demoId: string }>
+  searchParams: Promise<{ folder?: string }>
 }
 
-function TeamComparisonBar({ label, v1, v2, fmt }: {
-  label: string
-  v1: number
-  v2: number
-  fmt?: (n: number) => string
-}) {
-  const total = v1 + v2
-  const pct1 = total > 0 ? (v1 / total) * 100 : 50
-  const format = fmt || ((n: number) => n.toString())
-  return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-sm">
-        <span className="text-neon-green font-mono font-semibold">{format(v1)}</span>
-        <span className="text-xs text-muted-foreground uppercase tracking-wider">{label}</span>
-        <span className="text-red-400 font-mono font-semibold">{format(v2)}</span>
-      </div>
-      <div className="h-2 rounded-full bg-muted overflow-hidden flex">
-        <div
-          className="h-full bg-neon-green rounded-l-full transition-all duration-700"
-          style={{ width: `${pct1}%` }}
-        />
-        <div
-          className="h-full bg-red-400 flex-1 rounded-r-full"
-        />
-      </div>
-    </div>
-  )
-}
+export default async function DemoPage({ params, searchParams }: Props) {
+  const { demoId } = await params
+  const { folder: folderId = null } = await searchParams
 
-function ScoreBanner({ parsed, demo }: { parsed: ParsedDemoData; demo: Demo }) {
-  const h = parsed.header
-  const team1Won = h.score_team1 > h.score_team2
-  const isDraw = h.score_team1 === h.score_team2
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card">
-      {/* Background glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-1/2 h-full bg-gradient-to-r from-neon-green/5 to-transparent" />
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-red-500/5 to-transparent" />
-      </div>
+  const admin = createAdminClient()
 
-      <div className="relative p-6">
-        {/* Map + meta row */}
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <Badge variant="outline" className="font-mono text-xs gap-1">
-            <Map size={11} />
-            {h.map}
-          </Badge>
-          {demo.match_date && (
-            <Badge variant="outline" className="text-xs gap-1">
-              <Clock size={11} />
-              {formatDate(demo.match_date)}
-            </Badge>
-          )}
-          <Badge variant="outline" className="font-mono text-xs gap-1">
-            <Clock size={11} />
-            {formatDuration(h.duration)}
-          </Badge>
-          <Badge variant="outline" className="text-xs gap-1">
-            {h.total_rounds} rounds
-          </Badge>
-        </div>
+  const { data: demo } = await admin
+    .from('demos')
+    .select('*')
+    .eq('id', demoId)
+    .single()
 
-        {/* Score display */}
-        <div className="flex items-center gap-6">
-          {/* Team 1 */}
-          <div className="flex-1 text-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-neon-green/20 border border-neon-green/30 mb-3">
-              <span className="text-xl font-bold text-neon-green">{h.team1.charAt(0)}</span>
-            </div>
-            <p className="font-bold text-lg text-foreground truncate">{h.team1}</p>
-            {team1Won && (
-              <Badge variant="neon" className="mt-1 text-xs">WINNER</Badge>
-            )}
-          </div>
-
-          {/* Score center */}
-          <div className="text-center shrink-0">
-            <div className="flex items-center gap-3">
-              <span className={cn('text-6xl font-black font-mono', team1Won ? 'text-neon-green' : isDraw ? 'text-yellow-400' : 'text-muted-foreground')}>
-                {h.score_team1}
-              </span>
-              <span className="text-3xl text-muted-foreground font-bold">:</span>
-              <span className={cn('text-6xl font-black font-mono', !team1Won && !isDraw ? 'text-red-400' : isDraw ? 'text-yellow-400' : 'text-muted-foreground')}>
-                {h.score_team2}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 uppercase tracking-widest">
-              {isDraw ? 'Draw' : team1Won ? 'Victory' : 'Defeat'}
-            </p>
-          </div>
-
-          {/* Team 2 */}
-          <div className="flex-1 text-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-400/20 border border-red-400/30 mb-3">
-              <span className="text-xl font-bold text-red-400">{h.team2.charAt(0)}</span>
-            </div>
-            <p className="font-bold text-lg text-foreground truncate">{h.team2}</p>
-            {!team1Won && !isDraw && (
-              <Badge variant="destructive" className="mt-1 text-xs">WINNER</Badge>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function OverviewTab({ parsed }: { parsed: ParsedDemoData }) {
-  const h = parsed.header
-  const players = parsed.players || []
-  const team1Players = players.filter(p => p.team === h.team1)
-  const team2Players = players.filter(p => p.team === h.team2)
-
-  const avgStat = (arr: PlayerStats[], key: keyof PlayerStats) => {
-    if (!arr.length) return 0
-    return arr.reduce((s, p) => s + (p[key] as number), 0) / arr.length
-  }
-
-  const sumStat = (arr: PlayerStats[], key: keyof PlayerStats) =>
-    arr.reduce((s, p) => s + (p[key] as number), 0)
-
-  const mvp = [...players].sort((a, b) => b.rating - a.rating)[0]
-  const topKills = [...players].sort((a, b) => b.kills - a.kills)[0]
-  const topAdr = [...players].sort((a, b) => b.adr - a.adr)[0]
-
-  return (
-    <div className="space-y-6">
-      {/* Team comparison */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Target size={16} className="text-neon-green" />
-            Team Comparison
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-neon-green truncate">{h.team1}</span>
-            <span className="text-sm font-semibold text-red-400 truncate text-right">{h.team2}</span>
-          </div>
-          <TeamComparisonBar label="Avg Rating" v1={avgStat(team1Players, 'rating')} v2={avgStat(team2Players, 'rating')} fmt={(n) => n.toFixed(2)} />
-          <TeamComparisonBar label="Total Kills" v1={sumStat(team1Players, 'kills')} v2={sumStat(team2Players, 'kills')} />
-          <TeamComparisonBar label="Avg ADR" v1={avgStat(team1Players, 'adr')} v2={avgStat(team2Players, 'adr')} fmt={(n) => n.toFixed(1)} />
-          <TeamComparisonBar label="Avg KAST%" v1={avgStat(team1Players, 'kast')} v2={avgStat(team2Players, 'kast')} fmt={(n) => n.toFixed(1)} />
-          <TeamComparisonBar label="HS%" v1={avgStat(team1Players, 'headshot_percentage')} v2={avgStat(team2Players, 'headshot_percentage')} fmt={(n) => n.toFixed(1)} />
-          <TeamComparisonBar label="Utility Dmg" v1={sumStat(team1Players, 'utility_damage')} v2={sumStat(team2Players, 'utility_damage')} />
-        </CardContent>
-      </Card>
-
-      {/* Key performers */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {mvp && (
-          <Card className="border-neon-green/20 bg-neon-green/5">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Trophy size={14} className="text-neon-green" />
-                <span className="text-xs font-semibold text-neon-green uppercase tracking-wider">MVP</span>
-              </div>
-              <p className="font-bold text-foreground text-lg">{mvp.name}</p>
-              <p className="text-xs text-muted-foreground">{mvp.team}</p>
-              <p className={cn('text-2xl font-black font-mono mt-2', getRatingColor(mvp.rating))}>
-                {mvp.rating.toFixed(2)}
-              </p>
-              <p className="text-xs text-muted-foreground">Rating</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {mvp.kills}K / {mvp.deaths}D / {mvp.assists}A
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {topKills && (
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Crosshair size={14} className="text-yellow-400" />
-                <span className="text-xs font-semibold text-yellow-400 uppercase tracking-wider">Top Fragger</span>
-              </div>
-              <p className="font-bold text-foreground text-lg">{topKills.name}</p>
-              <p className="text-xs text-muted-foreground">{topKills.team}</p>
-              <p className="text-2xl font-black font-mono mt-2 text-yellow-400">{topKills.kills}</p>
-              <p className="text-xs text-muted-foreground">Kills</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                ADR: {topKills.adr.toFixed(1)} | HS: {formatPercent(topKills.headshot_percentage)}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {topAdr && (
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap size={14} className="text-neon-blue" />
-                <span className="text-xs font-semibold text-neon-blue uppercase tracking-wider">Top ADR</span>
-              </div>
-              <p className="font-bold text-foreground text-lg">{topAdr.name}</p>
-              <p className="text-xs text-muted-foreground">{topAdr.team}</p>
-              <p className="text-2xl font-black font-mono mt-2 text-neon-blue">{topAdr.adr.toFixed(1)}</p>
-              <p className="text-xs text-muted-foreground">ADR</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Rating: {topAdr.rating.toFixed(2)} | KAST: {topAdr.kast.toFixed(1)}%
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Match stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Total Rounds" value={h.total_rounds} />
-        <StatCard label="Match Duration" value={formatDuration(h.duration)} />
-        <StatCard
-          label="Avg Rating"
-          value={avgStat(players, 'rating').toFixed(2)}
-          color={getRatingColor(avgStat(players, 'rating'))}
-        />
-        <StatCard
-          label="Total Kills"
-          value={sumStat(players, 'kills')}
-        />
-      </div>
-    </div>
-  )
-}
-
-function EconomyTab({ parsed }: { parsed: ParsedDemoData }) {
-  const rounds = parsed.rounds || []
-  const h = parsed.header
-
-  const chartData = rounds.map(r => ({
-    round: r.number,
-    [h.team1]: r.team1_economy,
-    [h.team2]: r.team2_economy,
-  }))
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null
-    return (
-      <div className="bg-card border border-border rounded-lg p-3 text-xs shadow-xl">
-        <p className="text-muted-foreground mb-2">Round {label}</p>
-        {payload.map((entry: any) => (
-          <div key={entry.name} className="flex items-center gap-2 mb-1">
-            <div className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-            <span className="text-foreground">{entry.name}:</span>
-            <span className="font-mono text-foreground">${entry.value?.toLocaleString()}</span>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <TrendingUp size={16} className="text-neon-green" />
-            Economy by Round
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={320}>
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorT1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00ff87" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#00ff87" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorT2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ff3860" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#ff3860" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis
-                dataKey="round"
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                label={{ value: 'Round', position: 'insideBottom', offset: -2, fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-              />
-              <YAxis
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend
-                wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }}
-                formatter={(value) => <span style={{ color: 'hsl(var(--foreground))' }}>{value}</span>}
-              />
-              <Area type="monotone" dataKey={h.team1} stroke="#00ff87" strokeWidth={2} fill="url(#colorT1)" dot={false} />
-              <Area type="monotone" dataKey={h.team2} stroke="#ff3860" strokeWidth={2} fill="url(#colorT2)" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Economy summary stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {(() => {
-          const t1Eco = rounds.map(r => r.team1_economy)
-          const t2Eco = rounds.map(r => r.team2_economy)
-          const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
-          const max = (arr: number[]) => arr.length ? Math.max(...arr) : 0
-          return [
-            { label: `${h.team1} Avg Eco`, value: `$${Math.round(avg(t1Eco)).toLocaleString()}`, color: 'text-neon-green' },
-            { label: `${h.team1} Peak Eco`, value: `$${Math.round(max(t1Eco)).toLocaleString()}`, color: 'text-neon-green' },
-            { label: `${h.team2} Avg Eco`, value: `$${Math.round(avg(t2Eco)).toLocaleString()}`, color: 'text-red-400' },
-            { label: `${h.team2} Peak Eco`, value: `$${Math.round(max(t2Eco)).toLocaleString()}`, color: 'text-red-400' },
-          ]
-        })().map(stat => (
-          <StatCard key={stat.label} label={stat.label} value={stat.value} color={stat.color} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-export default function DemoPage() {
-  const params = useParams()
-  const searchParams = useSearchParams()
-  const demoId = params?.demoId as string
-  const folderId = searchParams?.get('folder')
-
-  const [demo, setDemo] = useState<Demo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [parsing, setParsing] = useState(false)
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchDemo = useCallback(async () => {
-    const supabase = createClient()
-    const { data, error: err } = await supabase
-      .from('demos')
-      .select('*')
-      .eq('id', demoId)
-      .single()
-
-    if (err || !data) {
-      setError('Demo not found')
-    } else {
-      setDemo(data as Demo)
-    }
-    setLoading(false)
-  }, [demoId])
-
-  useEffect(() => {
-    fetchDemo()
-  }, [fetchDemo])
-
-  const handleParse = async () => {
-    if (!demo) return
-    setParsing(true)
-    try {
-      const res = await fetch(`/api/demos/${demo.id}/parse`, { method: 'POST' })
-      if (res.ok) {
-        await fetchDemo()
-      }
-    } finally {
-      setParsing(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
-        <Loader2 className="animate-spin text-neon-green" size={32} />
-      </div>
-    )
-  }
-
-  if (error || !demo) {
+  if (!demo) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
         <AlertCircle size={40} className="text-red-400" />
@@ -435,181 +45,28 @@ export default function DemoPage() {
     )
   }
 
-  const parsed = demo.parsed_data as ParsedDemoData | null
-  const backHref = folderId ? `/opponents/${folderId}` : '/opponents'
-  const aiScoutHref = folderId ? `/ai-coach?folder=${folderId}` : '/ai-coach'
+  // Verify the caller is a member of the demo's team
+  const { data: member } = await admin
+    .from('team_members')
+    .select('role')
+    .eq('team_id', demo.team_id)
+    .eq('user_id', user.id)
+    .single()
 
-  return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Back nav */}
-      <div className="flex items-center justify-between">
-        <Link href={backHref}>
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+  if (!member) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
+        <AlertCircle size={40} className="text-red-400" />
+        <p className="text-foreground font-medium">Access denied</p>
+        <Link href="/opponents">
+          <Button variant="outline" size="sm" className="gap-2">
             <ArrowLeft size={14} />
-            {folderId ? `Back to ${demo.opponent_name}` : 'Back to Opponents'}
+            Back to Opponents
           </Button>
         </Link>
-        <div className="flex items-center gap-2">
-          {demo.status === 'processing' && (
-            <Badge variant="processing">Processing...</Badge>
-          )}
-          {demo.status === 'failed' && (
-            <Badge variant="destructive">Failed</Badge>
-          )}
-          {demo.status === 'completed' && (
-            <Badge variant="neon">Analyzed</Badge>
-          )}
-          {(demo.status === 'processing' || demo.status === 'failed') && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={handleParse}
-              disabled={parsing}
-            >
-              {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {parsing ? 'Parsing...' : 'Parse Now'}
-            </Button>
-          )}
-          <Link href={aiScoutHref}>
-            <Button variant="neon" size="sm" className="gap-2">
-              <Brain size={14} />
-              AI Scout
-            </Button>
-          </Link>
-        </div>
       </div>
+    )
+  }
 
-      {/* Demo header info */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          <span className="text-neon-green">{demo.opponent_name}</span>
-        </h1>
-        <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-          <span className="font-mono">{demo.map}</span>
-          {demo.match_date && <span>{formatDate(demo.match_date)}</span>}
-          <span className="capitalize">{demo.status}</span>
-        </div>
-      </div>
-
-      {/* No data state */}
-      {!parsed ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-              <BarChart3 size={28} className="text-muted-foreground" />
-            </div>
-            <div>
-              <p className="font-semibold text-foreground">
-                {demo.status === 'processing' ? 'Demo is being processed...' : 'No analysis data yet'}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {demo.status === 'processing'
-                  ? 'This usually takes a few seconds. Refresh to check.'
-                  : 'Click Parse Now to analyze this demo.'}
-              </p>
-            </div>
-            <Button variant="neon" onClick={handleParse} disabled={parsing} className="gap-2">
-              {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {parsing ? 'Parsing...' : 'Parse Demo'}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Score banner */}
-          <ScoreBanner parsed={parsed} demo={demo} />
-
-          {/* Tab nav */}
-          <div className="flex gap-1 p-1 bg-muted/30 rounded-lg border border-border w-fit">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-all duration-150',
-                  activeTab === tab.id
-                    ? 'bg-card text-neon-green border border-neon-green/20 shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab content */}
-          <div className="min-h-[400px]">
-            {activeTab === 'overview' && <OverviewTab parsed={parsed} />}
-
-            {activeTab === 'players' && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Crosshair size={16} className="text-neon-green" />
-                    Player Statistics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <PlayerStatsTable
-                    players={parsed.players || []}
-                    highlightTeam={parsed.header.team1}
-                  />
-                </CardContent>
-              </Card>
-            )}
-
-            {activeTab === 'rounds' && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Clock size={16} className="text-neon-green" />
-                    Round Timeline
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RoundTimeline
-                    rounds={parsed.rounds || []}
-                    team1Name={parsed.header.team1}
-                    team2Name={parsed.header.team2}
-                  />
-                </CardContent>
-              </Card>
-            )}
-
-            {activeTab === 'heatmap' && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Map size={16} className="text-neon-green" />
-                    Position Heatmap
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {parsed.heatmap_data && parsed.heatmap_data.length > 0 ? (
-                    <div className="flex justify-center">
-                      <HeatmapCanvas
-                        points={parsed.heatmap_data}
-                        mapName={parsed.header.map}
-                        width={512}
-                        height={512}
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-                      <Map size={32} className="text-muted-foreground" />
-                      <p className="text-muted-foreground">No heatmap data available for this demo</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {activeTab === 'economy' && <EconomyTab parsed={parsed} />}
-          </div>
-        </>
-      )}
-    </div>
-  )
+  return <DemoPageClient demo={demo as Demo} folderId={folderId} />
 }
