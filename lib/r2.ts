@@ -47,6 +47,26 @@ export async function deleteObject(key: string): Promise<void> {
 }
 
 /**
+ * Download the complete content of an R2 object as a Buffer.
+ * Use for demo parsing — may be hundreds of MB, so only call from background tasks.
+ */
+export async function downloadObject(key: string): Promise<Buffer> {
+  const client = getR2Client()
+  const command = new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME!,
+    Key: key,
+  })
+  const response = await client.send(command)
+  const body = response.Body
+  if (!body) throw new Error('Empty response body from R2')
+  const chunks: Uint8Array[] = []
+  for await (const chunk of body as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks)
+}
+
+/**
  * Download the first `bytes` bytes of an R2 object as a Buffer.
  * Uses a range request so we never download the full demo file.
  */
