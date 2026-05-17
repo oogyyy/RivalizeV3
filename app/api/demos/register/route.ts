@@ -97,11 +97,14 @@ export async function POST(request: Request) {
 
       if (!isCompressed) {
         // Download the full demo and run the real parser
+        console.log(`[register] Downloading demo ${demoId} from R2 key: ${r2Key}`)
         const buf = await downloadObject(r2Key)
+        console.log(`[register] Downloaded ${buf.length} bytes, parsing...`)
         const { parsedData: realData, warnings } = parseCS2Demo(buf)
         if (warnings.length > 0) {
           console.warn('[register] Parser warnings:', warnings)
         }
+        console.log(`[register] Parser result: ${realData.players.length} players, map=${realData.header.map}, score=${realData.header.score_team1}-${realData.header.score_team2}`)
         // Fall back to mock only if we got no players at all
         if (realData.players.length === 0) {
           console.warn('[register] Real parser returned 0 players — falling back to mock')
