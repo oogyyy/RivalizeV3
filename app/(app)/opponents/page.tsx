@@ -4,15 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { formatDate } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import {
-  Target, Brain, ChevronRight, FileVideo, Trophy, Upload, Calendar,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+import OpponentCardWithDelete from '@/components/teams/OpponentCardWithDelete'
+import { Target, Brain, Upload } from 'lucide-react'
 import type { AggregatedStats } from '@/types/database'
 
 export default async function OpponentsPage() {
@@ -150,102 +146,24 @@ export default async function OpponentsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {(folders ?? []).map((folder) => {
-            const stats = folder.aggregated_stats as AggregatedStats | null
             const demos = demosBySlug[folder.opponent_slug] ?? []
             const lastActivity = demos
               .map(d => d.match_date ?? d.created_at)
               .sort()
               .at(-1)
-            const wins = stats?.wins ?? 0
-            const losses = stats?.losses ?? 0
-            const draws = stats?.draws ?? 0
-            const total = wins + losses + draws
-            const winRate = total > 0 ? Math.round((wins / total) * 100) : null
-            const isPositive = wins > losses
-            const isNegative = losses > wins
-            const demoCount = demos.length
 
             return (
-              <Link key={folder.id} href={`/opponents/${folder.id}`}>
-                <Card className="bg-card border-border hover:border-neon-green/40 hover:shadow-[0_0_20px_rgba(0,255,135,0.06)] transition-all duration-200 cursor-pointer group h-full">
-                  <CardContent className="p-5 flex flex-col h-full gap-4">
-                    {/* Top: avatar + name + chevron */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-neon-green/20 to-accent flex items-center justify-center shrink-0 border border-neon-green/20">
-                          <span className="text-base font-bold text-neon-green">
-                            {folder.opponent_display_name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-foreground truncate group-hover:text-neon-green transition-colors leading-tight">
-                            {folder.opponent_display_name}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <FileVideo size={10} />
-                              {demoCount} {demoCount === 1 ? 'demo' : 'demos'}
-                            </span>
-                            {lastActivity && (
-                              <>
-                                <span className="text-muted-foreground/30">·</span>
-                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Calendar size={10} />
-                                  {formatDate(lastActivity)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <ChevronRight
-                        size={15}
-                        className="text-muted-foreground/50 group-hover:text-neon-green transition-colors shrink-0 mt-1"
-                      />
-                    </div>
-
-                    {/* Bottom: record + win rate */}
-                    <div className="flex items-center justify-between border-t border-border pt-3 mt-auto">
-                      {total > 0 ? (
-                        <>
-                          <div className="flex items-center gap-1.5">
-                            <span className={cn(
-                              'text-base font-bold font-mono',
-                              isPositive ? 'text-neon-green' : isNegative ? 'text-red-400' : 'text-muted-foreground'
-                            )}>
-                              {wins}W
-                            </span>
-                            <span className="text-muted-foreground text-xs">–</span>
-                            <span className={cn(
-                              'text-base font-bold font-mono',
-                              isNegative ? 'text-red-400' : 'text-muted-foreground'
-                            )}>
-                              {losses}L
-                            </span>
-                            {draws > 0 && (
-                              <>
-                                <span className="text-muted-foreground text-xs">–</span>
-                                <span className="text-base font-bold font-mono text-yellow-400">{draws}D</span>
-                              </>
-                            )}
-                          </div>
-                          {winRate !== null && (
-                            <Badge
-                              variant={isPositive ? 'neon' : isNegative ? 'destructive' : 'secondary'}
-                              className="text-[10px] gap-1"
-                            >
-                              <Trophy size={9} />
-                              {winRate}%
-                            </Badge>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">No completed matches</span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              <OpponentCardWithDelete
+                key={folder.id}
+                folder={{
+                  id: folder.id,
+                  opponent_display_name: folder.opponent_display_name,
+                  opponent_slug: folder.opponent_slug,
+                  aggregated_stats: folder.aggregated_stats as AggregatedStats | null,
+                }}
+                demoCount={demos.length}
+                lastActivity={lastActivity}
+              />
             )
           })}
 
