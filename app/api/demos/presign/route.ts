@@ -25,8 +25,9 @@ export async function POST(request: Request) {
 
   const { teamId, filename, fileSize } = parsed.data
 
-  if (!filename.toLowerCase().endsWith('.dem')) {
-    return NextResponse.json({ error: 'Only .dem files are accepted' }, { status: 400 })
+  const lowerName = filename.toLowerCase()
+  if (!lowerName.endsWith('.dem') && !lowerName.endsWith('.zst')) {
+    return NextResponse.json({ error: 'Only .dem and .zst files are accepted' }, { status: 400 })
   }
 
   // Admin client bypasses RLS — identity is verified via auth.getUser() above
