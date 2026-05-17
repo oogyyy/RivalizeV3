@@ -30,9 +30,47 @@ function readNullTerminated(buf: Buffer, offset: number, maxLen: number): string
   return slice.slice(0, nullIdx >= 0 ? nullIdx : maxLen).toString('ascii').trim()
 }
 
-/** Scan a buffer for known CS2 map name patterns. */
+const MAP_NAME_RE = /^(?:de|ar|cs|gg|aim|surf|kz)_[a-z0-9_]{2,40}$/
+
+/**
+ * Primary: search for the protobuf field-5 (map_name in CDemoFileHeader) tag byte.
+ * In CS2 PBDEMS2 files the CDemoFileHeader proto encodes map_name as field 5,
+ * wire type 2 (length-delimited) → tag byte 0x2a.  Reading the exact length
+ * prefix means we get the real string without false positives.
+ */
+function findProtoMapName(buf: Buffer): string | null {
+  // (5 << 3) | 2 = 42 = 0x2a
+  const TAG = 0x2a
+
+  for (let i = 8; i < buf.length - 6; i++) {
+    if (buf[i] !== TAG) continue
+
+    // Decode the length varint that follows the tag byte
+    let pos = i + 1
+    let len = 0
+    let shift = 0
+    let ok = false
+    while (pos < buf.length) {
+      const b = buf[pos++]
+      len |= (b & 0x7f) << shift
+      if (!(b & 0x80)) { ok = true; break }
+      shift += 7
+      if (shift > 21) break // varint too long
+    }
+
+    if (!ok || len < 4 || len > 60 || pos + len > buf.length) continue
+
+    const candidate = buf.slice(pos, pos + len).toString('ascii')
+    if (MAP_NAME_RE.test(candidate)) return candidate
+  }
+  return null
+}
+
+/**
+ * Fallback: scan raw bytes for known CS2 map prefixes.
+ * Used when the protobuf tag approach finds nothing (e.g. unusual encoding).
+ */
 function scanForMapName(buf: Buffer): string | null {
-  // Convert to latin-1 so we can indexOf on raw bytes
   const raw = buf.toString('binary')
   const prefixes = ['de_', 'ar_', 'cs_', 'gg_', 'aim_', 'surf_', 'kz_']
 
@@ -41,20 +79,12 @@ function scanForMapName(buf: Buffer): string | null {
     while (true) {
       const idx = raw.indexOf(prefix, searchFrom)
       if (idx === -1) break
-      // Must be at the start of a word — previous char must be non-alphanumeric or start of buffer
       const prevChar = idx > 0 ? raw[idx - 1] : ''
-      if (prevChar && /[a-z0-9_]/i.test(prevChar)) {
-        searchFrom = idx + 1
-        continue
-      }
-      // Read until non-alphanumeric-or-underscore
+      if (prevChar && /[a-z0-9_]/i.test(prevChar)) { searchFrom = idx + 1; continue }
       let end = idx
       while (end < raw.length && /[a-z0-9_]/i.test(raw[end])) end++
       const candidate = raw.slice(idx, end)
-      // Sanity: between 5 and 48 chars, contains at least one letter after prefix
-      if (candidate.length >= 5 && candidate.length <= 48) {
-        return candidate
-      }
+      if (MAP_NAME_RE.test(candidate)) return candidate
       searchFrom = idx + 1
     }
   }
@@ -88,9 +118,9 @@ export function parseDemoHeader(buf: Buffer): DemoHeaderInfo | null {
 
   // ── CS2 / Source 2 (protobuf) ─────────────────────────────────────────────
   if (magic.equals(CS2_MAGIC)) {
-    // The CDemoFileHeader is encoded after the 16-byte file prelude.
-    // We scan the entire downloaded slice for map name strings.
-    const mapName = scanForMapName(buf.slice(16))
+    // Try the proto-aware extractor first (reads the exact CDemoFileHeader
+    // map_name field via its tag byte), then fall back to a raw prefix scan.
+    const mapName = findProtoMapName(buf) ?? scanForMapName(buf.slice(16))
     return {
       format: 'cs2',
       mapName,

@@ -54,11 +54,14 @@ function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-function generatePlayer(name: string, team: string): PlayerStats {
+function generatePlayer(name: string, team: string, totalRounds: number): PlayerStats {
   const seed = hashStr(name + team)
-  const kills   = rng(seed,     8,  28)
-  const deaths  = rng(seed + 1, 8,  24)
-  const assists = rng(seed + 2, 1,  8)
+  // Scale kills/deaths to the actual number of rounds (MR12 max ~30 rounds in regulation)
+  const killsPerRound  = rng(seed,     35, 90) / 100  // 0.35–0.90 K/R
+  const deathsPerRound = rng(seed + 1, 35, 85) / 100
+  const kills   = Math.round(killsPerRound * totalRounds)
+  const deaths  = Math.round(deathsPerRound * totalRounds)
+  const assists = rng(seed + 2, 1, Math.max(2, Math.round(totalRounds * 0.15)))
   const headshots = Math.floor(kills * (rng(seed + 3, 25, 65) / 100))
 
   return {
@@ -75,9 +78,38 @@ function generatePlayer(name: string, team: string): PlayerStats {
     rating:         parseFloat((rng(seed + 6, 70, 148) / 100).toFixed(2)),
     utility_damage: rng(seed + 7, 8,  80),
     flash_assists:  rng(seed + 8, 0,  8),
-    mvps:           rng(seed + 9, 0,  6),
-    rounds_played:  rng(seed + 10, 20, 30),
+    mvps:           rng(seed + 9, 0,  Math.max(1, Math.round(totalRounds * 0.2))),
+    rounds_played:  totalRounds,
   }
+}
+
+// ─── CS2 MR12 score generation ────────────────────────────────────────────────
+// Valid overtime winner/loser score pairs (cumulative from 0).
+// In MR12: first to 13 in regulation; 12-12 → OT MR3 (first to 4 OT rounds).
+// Cumulative OT totals: 1 OT → 16 wins, 2 OT → 19, 3 OT → 22.
+const OT_OUTCOMES: Array<[number, number]> = [
+  [16, 14], [16, 13], [16, 12],  // 1 OT period
+  [19, 17], [19, 16], [19, 15],  // 2 OT periods
+  [22, 20], [22, 18],            // 3 OT periods
+]
+
+interface MatchScore { score1: number; score2: number; totalRounds: number }
+
+function generateMR12Score(seed: number): MatchScore {
+  // ~12% of CS2 matches go to overtime (12-12 regulation)
+  if (rng(seed, 0, 99) < 12) {
+    const [w, l] = OT_OUTCOMES[rng(seed + 5, 0, OT_OUTCOMES.length - 1)]
+    const team1Wins = rng(seed + 6, 0, 1) === 0
+    const score1 = team1Wins ? w : l
+    const score2 = team1Wins ? l : w
+    return { score1, score2, totalRounds: score1 + score2 }
+  }
+  // Regulation: one team reaches 13
+  const loserScore = rng(seed + 1, 0, 12)
+  const team1Wins = rng(seed + 2, 0, 1) === 0
+  const score1 = team1Wins ? 13 : loserScore
+  const score2 = team1Wins ? loserScore : 13
+  return { score1, score2, totalRounds: score1 + score2 }
 }
 
 function generateRound(roundNum: number, team1: string, team2: string): Round {
@@ -106,16 +138,15 @@ export function generateMockDemoData(
     ? mapName
     : MAPS[hashStr(team2Name) % MAPS.length]
 
-  const totalRounds = randomBetween(16, 30)
-  const score1 = randomBetween(7, Math.min(16, totalRounds))
-  const score2 = totalRounds - score1
+  const scoreSeed = hashStr(team1Name + team2Name + resolvedMap)
+  const { score1, score2, totalRounds } = generateMR12Score(scoreSeed)
 
   // Deterministic player names: same opponent always gets the same 5 players
   const team1Names = pickNames(`${team1Name}:t1:${resolvedMap}`, 5)
   const team2Names = pickNames(`${team2Name}:t2:${resolvedMap}`, 5)
 
-  const team1Players = team1Names.map(n => generatePlayer(n, team1Name))
-  const team2Players = team2Names.map(n => generatePlayer(n, team2Name))
+  const team1Players = team1Names.map(n => generatePlayer(n, team1Name, totalRounds))
+  const team2Players = team2Names.map(n => generatePlayer(n, team2Name, totalRounds))
 
   const rounds = Array.from({ length: totalRounds }, (_, i) =>
     generateRound(i + 1, team1Name, team2Name)

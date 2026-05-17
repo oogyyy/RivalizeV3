@@ -98,7 +98,8 @@ export async function POST(request: Request) {
       const isCompressed = r2Key.toLowerCase().endsWith('.zst')
       if (!isCompressed) {
         try {
-          const fileBytes = await getFirstBytes(r2Key, 8192)
+          // 32 KB gives enough coverage for large CS2 CDemoFileHeader protos
+          const fileBytes = await getFirstBytes(r2Key, 32768)
           const header = parseDemoHeader(fileBytes)
           if (header?.mapName) {
             realMapName = header.mapName
@@ -130,9 +131,23 @@ export async function POST(request: Request) {
         .eq('status', 'completed')
 
       if (allDemos && allDemos.length > 0) {
+        // "Win" = our team's score > opponent's score.
+        // opponentSide tells us which header team slot is the opponent:
+        //   'team2' → opponent is score_team2, we won if score_team1 > score_team2
+        //   'team1' → opponent is score_team1, we won if score_team2 > score_team1
+        type DemoRow = { header?: { score_team1?: number; score_team2?: number }; opponentSide?: string }
         const wins = allDemos.filter(d => {
-          const h = (d.parsed_data as { header?: { score_team1?: number; score_team2?: number } } | null)?.header
-          return h && (h.score_team1 ?? 0) > (h.score_team2 ?? 0)
+          const pd = d.parsed_data as DemoRow | null
+          const h = pd?.header
+          if (!h) return false
+          const s1 = h.score_team1 ?? 0
+          const s2 = h.score_team2 ?? 0
+          return (pd?.opponentSide === 'team1') ? s2 > s1 : s1 > s2
+        }).length
+
+        const draws = allDemos.filter(d => {
+          const h = (d.parsed_data as DemoRow | null)?.header
+          return h && (h.score_team1 ?? 0) === (h.score_team2 ?? 0)
         }).length
 
         const mapsPlayed: Record<string, number> = {}
@@ -149,8 +164,8 @@ export async function POST(request: Request) {
             aggregated_stats: {
               total_matches: allDemos.length,
               wins,
-              losses: allDemos.length - wins,
-              draws: 0,
+              losses: allDemos.length - wins - draws,
+              draws,
               win_rate: wins / allDemos.length,
               avg_rating: topPlayers.length > 0 ? topPlayers.reduce((s, p) => s + p.rating, 0) / topPlayers.length : 1.0,
               maps_played: mapsPlayed,
