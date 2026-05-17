@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import DeleteDemoButton from '@/components/teams/DeleteDemoButton'
 import DeleteFolderButton from '@/components/teams/DeleteFolderButton'
+import SetOpponentSideButton from '@/components/teams/SetOpponentSideButton'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
   Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink, BarChart2,
@@ -261,6 +262,8 @@ export default async function OpponentPage({
                     ? `/demos/${demo.id}?folder=${folderId}`
                     : null
 
+                  const demoOpponentSide = ((demo.parsed_data as { opponentSide?: 'team1' | 'team2' } | null)?.opponentSide) ?? 'team2'
+
                   return (
                     <Card key={demo.id} className="bg-card border-border transition-all duration-150 hover:border-border/80">
                       <CardContent className="p-4">
@@ -304,6 +307,12 @@ export default async function OpponentPage({
                                   <BarChart3 size={10} />
                                   {header.total_rounds} rounds
                                 </span>
+                              )}
+                              {demo.status === 'completed' && isOwnerOrAdmin && (
+                                <SetOpponentSideButton
+                                  demoId={demo.id}
+                                  currentSide={demoOpponentSide}
+                                />
                               )}
                             </div>
                           </div>

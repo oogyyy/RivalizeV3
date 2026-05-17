@@ -5,6 +5,7 @@ import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import { Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info, RefreshCw } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 
 const LARGE_FILE_THRESHOLD = 300 * 1024 * 1024 // 300 MB
 const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
@@ -15,7 +16,6 @@ interface DemoUploadButtonProps {
 }
 
 type UploadStatus = 'pending' | 'presigning' | 'uploading' | 'registering' | 'done' | 'error'
-type OpponentSide = 'team1' | 'team2'
 
 interface FileUpload {
   file: File
@@ -48,11 +48,11 @@ function uploadToR2(url: string, file: File, onProgress: (pct: number) => void):
 }
 
 export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButtonProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [uploads, setUploads] = useState<FileUpload[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [opponentName, setOpponentName] = useState('')
-  const [opponentSide, setOpponentSide] = useState<OpponentSide>('team2')
 
   const updateUpload = useCallback(
     (index: number, update: Partial<FileUpload>) =>
@@ -122,7 +122,6 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
           teamId,
           r2Key: key,
           opponentName: opponentName.trim(),
-          opponentSide,
           map: 'unknown',
           fileSize: file.size,
         }),
@@ -161,7 +160,10 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
     }
 
     setIsProcessing(false)
-    if (successCount > 0) onSuccess?.()
+    if (successCount > 0) {
+      onSuccess?.()
+      router.refresh()
+    }
   }
 
   const handleClose = () => {
@@ -169,7 +171,6 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
     setOpen(false)
     setUploads([])
     setOpponentName('')
-    setOpponentSide('team2')
   }
 
   const pendingCount = uploads.filter(u => u.status === 'pending').length
@@ -179,7 +180,6 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
   const hasLargeFile = uploads.some(
     u => u.file.size > LARGE_FILE_THRESHOLD && (u.status === 'pending' || u.status === 'uploading')
   )
-  const opponentLabel = opponentName.trim() || 'the opponent'
 
   const statusLabel = (u: FileUpload) => {
     switch (u.status) {
@@ -240,85 +240,15 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
             />
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Info size={10} className="shrink-0" />
-              A scouting folder will be created automatically if it doesn&apos;t exist yet.
+              After upload, you&apos;ll select which team to scout as the opponent.
             </p>
           </div>
 
-          {/* Step 2 — Which team in the demo is the opponent */}
+          {/* Step 2 — Files */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
                 STEP 2
-              </span>
-              <span className="text-xs font-semibold text-foreground">
-                Which team in this demo is{' '}
-                <span className="text-neon-green">{opponentLabel}</span>?
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  {
-                    value: 'team1' as const,
-                    label: 'Team 1',
-                    sub: 'First team in the demo file',
-                  },
-                  {
-                    value: 'team2' as const,
-                    label: 'Team 2',
-                    sub: 'Second team in the demo file',
-                  },
-                ] as const
-              ).map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => setOpponentSide(opt.value)}
-                  className={cn(
-                    'flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-all',
-                    opponentSide === opt.value
-                      ? 'border-neon-green/60 bg-neon-green/10 ring-1 ring-neon-green/30'
-                      : 'border-border bg-background hover:border-neon-green/30 hover:bg-accent/40',
-                    'disabled:opacity-50 disabled:cursor-not-allowed'
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={cn(
-                        'text-sm font-semibold',
-                        opponentSide === opt.value ? 'text-neon-green' : 'text-foreground'
-                      )}
-                    >
-                      {opt.label}
-                    </span>
-                    <div
-                      className={cn(
-                        'w-3.5 h-3.5 rounded-full border-2 transition-colors shrink-0',
-                        opponentSide === opt.value
-                          ? 'border-neon-green bg-neon-green'
-                          : 'border-muted-foreground/40 bg-transparent'
-                      )}
-                    />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">{opt.sub}</span>
-                </button>
-              ))}
-            </div>
-
-            <p className="text-[10px] text-muted-foreground flex items-start gap-1 pt-0.5">
-              <Info size={10} className="shrink-0 mt-0.5" />
-              In most CS2 demos, the team you were watching appears as Team 2. If unsure, pick
-              either — you can re-analyze after upload.
-            </p>
-          </div>
-
-          {/* Step 3 — Files */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
-                STEP 3
               </span>
               <span className="text-xs font-semibold text-foreground">Add demo files</span>
             </div>
