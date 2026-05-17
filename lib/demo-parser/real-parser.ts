@@ -3,7 +3,7 @@
  *
  * Strategy:
  *  - parseHeader       → map name
- *  - parseEvents (one scan) → player_death, round_end, player_hurt, round_mvp
+ *  - parseEvent (per type) → player_death, round_end, player_hurt, round_mvp
  *    • player_death    → K/D/HS per player (attacker-centric), team assignment
  *    • round_end       → total rounds, T/CT winner per round
  *    • player_hurt     → real ADR (damage dealt per round)
@@ -11,11 +11,22 @@
  *  - parsePlayerInfo   → display names, bot/HLTV filter
  *  - Score computation: per-round winner mapped to team name via cross-referencing
  *    team_num of victims within each round's tick window
+ *
+ * NOTE: `event_name` is auto-included by demoparser2 and must NOT be passed as
+ * an otherExtra prop — doing so causes rm_user_friendly_names() to throw,
+ * which silently zeros out all events. We use parseEvent() per event type to
+ * avoid the need to partition on event_name entirely.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const dp = require('@laihoe/demoparser2') as {
   parseHeader: (b: Buffer) => Record<string, unknown>
+  parseEvent: (
+    b: Buffer,
+    event: string,
+    playerExtra: string[],
+    otherExtra: string[],
+  ) => Record<string, unknown>[]
   parseEvents: (
     b: Buffer,
     events: string[],
@@ -73,41 +84,64 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     warnings.push(`header: ${e}`)
   }
 
-  // ── 2. All events in a single scan ───────────────────────────────────────
-  let allEvents: Row[] = []
+  // ── 2. Per-event-type scans (parseEvent singular avoids event_name prop issue) ─
+  //
+  // IMPORTANT: `event_name` is auto-included in every row by demoparser2 and
+  // must NOT be listed in otherExtra — passing it causes an Err from
+  // rm_user_friendly_names() which throws and zeros out all results.
+  // By using parseEvent() per type we also skip the partition step entirely.
+
+  const PLAYER_EXTRA = ['team_name', 'team_num', 'name', 'steamid']
+
+  let deathEvents: Row[] = []
   try {
-    allEvents = dp.parseEvents(
+    deathEvents = dp.parseEvent(
       buf,
-      ['player_death', 'round_end', 'player_hurt', 'round_mvp'],
-      // player props (attached to the event's associated player = victim for deaths, etc.)
-      ['team_name', 'team_num', 'name', 'steamid'],
-      // event-level props
-      [
-        'event_name',         // so we can split by type
-        'tick',
-        // round_end
-        'winner', 'reason',
-        // player_death
-        'headshot', 'weapon',
-        'attacker_steamid', 'attacker_name',
-        'assister_steamid',  'assister_name',
-        // player_hurt
-        'dmg_health',
-        // round_mvp — no extra fields needed
-      ],
+      'player_death',
+      PLAYER_EXTRA,
+      ['tick', 'headshot', 'weapon',
+       'attacker_steamid', 'attacker_name',
+       'assister_steamid', 'assister_name'],
     ) ?? []
   } catch (e) {
-    warnings.push(`parseEvents: ${e}`)
+    warnings.push(`parseEvent(player_death): ${e}`)
   }
 
-  // Partition events (event_name may be top-level or inside the row)
-  const getEvName = (row: Row) =>
-    s(row, 'event_name') || s(row, 'event')
+  let roundEnds: Row[] = []
+  try {
+    roundEnds = dp.parseEvent(
+      buf,
+      'round_end',
+      [],
+      ['tick', 'winner', 'reason'],
+    ) ?? []
+  } catch (e) {
+    warnings.push(`parseEvent(round_end): ${e}`)
+  }
 
-  const deathEvents  = allEvents.filter(r => getEvName(r) === 'player_death')
-  const roundEnds    = allEvents.filter(r => getEvName(r) === 'round_end')
-  const hurtEvents   = allEvents.filter(r => getEvName(r) === 'player_hurt')
-  const mvpEvents    = allEvents.filter(r => getEvName(r) === 'round_mvp')
+  let hurtEvents: Row[] = []
+  try {
+    hurtEvents = dp.parseEvent(
+      buf,
+      'player_hurt',
+      PLAYER_EXTRA,
+      ['tick', 'attacker_steamid', 'dmg_health'],
+    ) ?? []
+  } catch (e) {
+    warnings.push(`parseEvent(player_hurt): ${e}`)
+  }
+
+  let mvpEvents: Row[] = []
+  try {
+    mvpEvents = dp.parseEvent(
+      buf,
+      'round_mvp',
+      PLAYER_EXTRA,
+      ['tick'],
+    ) ?? []
+  } catch (e) {
+    warnings.push(`parseEvent(round_mvp): ${e}`)
+  }
 
   const totalRounds = roundEnds.length
 
@@ -143,9 +177,11 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   for (const ev of deathEvents) {
     const atkSid = s(ev, 'attacker_steamid')
-    const vicSid = s(ev, 'user_steamid', 'steamid')   // victim steamid
-    const vicTeam = s(ev, 'team_name')                 // victim's team (player prop)
-    const vicNum  = n(ev, 'team_num')
+    // demoparser2 auto-includes `steamid` for the user/victim entity; also try user_steamid
+    const vicSid = s(ev, 'steamid', 'user_steamid')
+    // player_extra keys come back as-is; also try user_ prefixed variants as fallback
+    const vicTeam = s(ev, 'team_name', 'user_team_name')
+    const vicNum  = n(ev, 'team_num', 'user_team_num')
 
     if (atkSid && atkSid !== '0') {
       killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
@@ -175,8 +211,8 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   }
 
   for (const ev of mvpEvents) {
-    // round_mvp victim player prop carries the MVP player's steamid
-    const sid = s(ev, 'user_steamid', 'steamid')
+    // round_mvp: demoparser2 auto-includes `steamid` for the user entity
+    const sid = s(ev, 'steamid', 'user_steamid')
     if (sid && sid !== '0') mvpMap.set(sid, (mvpMap.get(sid) ?? 0) + 1)
   }
 
@@ -244,6 +280,17 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       mvps,
       rounds_played:       totalRounds,
     })
+  }
+
+  // Log diagnostics when no players were found so callers can see why
+  if (players.length === 0) {
+    warnings.push(
+      `players=0 diagnostics: deaths=${deathEvents.length} roundEnds=${roundEnds.length} ` +
+      `hurt=${hurtEvents.length} mvp=${mvpEvents.length} allSids=${allSids.size}`,
+    )
+    if (warnings.length > 0) {
+      console.warn('[real-parser] 0 players extracted. Warnings:', warnings)
+    }
   }
 
   // ── 6. Determine team1 / team2 names (keep teams with ≥ 3 players) ────────
