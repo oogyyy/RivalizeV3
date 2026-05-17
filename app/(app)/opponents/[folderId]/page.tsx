@@ -12,6 +12,7 @@ import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import DeleteDemoButton from '@/components/teams/DeleteDemoButton'
 import DeleteFolderButton from '@/components/teams/DeleteFolderButton'
 import SetOpponentSideButton from '@/components/teams/SetOpponentSideButton'
+import ReparseButton from '@/components/teams/ReparseButton'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
   Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink, BarChart2,
@@ -309,10 +310,13 @@ export default async function OpponentPage({
                                 </span>
                               )}
                               {demo.status === 'completed' && isOwnerOrAdmin && (
-                                <SetOpponentSideButton
-                                  demoId={demo.id}
-                                  currentSide={demoOpponentSide}
-                                />
+                                <>
+                                  <SetOpponentSideButton
+                                    demoId={demo.id}
+                                    currentSide={demoOpponentSide}
+                                  />
+                                  <ReparseButton demoId={demo.id} />
+                                </>
                               )}
                             </div>
                           </div>

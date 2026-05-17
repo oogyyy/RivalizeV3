@@ -2,10 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { generateMockDemoData } from '@/lib/demo-parser/mock-parser'
+import { parseCS2Demo } from '@/lib/demo-parser/real-parser'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import { slugify } from '@/lib/utils'
-import { getPublicUrl, getFirstBytes } from '@/lib/r2'
-import { parseDemoHeader } from '@/lib/demo-parser/header-parser'
+import { getPublicUrl, downloadObject } from '@/lib/r2'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -92,34 +92,34 @@ export async function POST(request: Request) {
     try {
       await new Promise(resolve => setTimeout(resolve, 1500))
 
-      // Try to extract real map name from the demo binary header.
-      // Skip for .zst files — the raw bytes are compressed and not directly parseable.
-      let realMapName: string | null = null
+      let parsedData: Record<string, unknown>
       const isCompressed = r2Key.toLowerCase().endsWith('.zst')
+
       if (!isCompressed) {
-        try {
-          // 32 KB gives enough coverage for large CS2 CDemoFileHeader protos
-          const fileBytes = await getFirstBytes(r2Key, 32768)
-          const header = parseDemoHeader(fileBytes)
-          if (header?.mapName) {
-            realMapName = header.mapName
-          }
-        } catch (headerErr) {
-          console.warn('[register] Could not read demo header from R2:', String(headerErr))
+        // Download the full demo and run the real parser
+        const buf = await downloadObject(r2Key)
+        const { parsedData: realData, warnings } = parseCS2Demo(buf)
+        if (warnings.length > 0) {
+          console.warn('[register] Parser warnings:', warnings)
         }
+        // Fall back to mock only if we got no players at all
+        if (realData.players.length === 0) {
+          console.warn('[register] Real parser returned 0 players — falling back to mock')
+          const effectiveMap = realData.header.map !== 'unknown' ? realData.header.map : (map !== 'unknown' ? map : undefined)
+          parsedData = { ...generateMockDemoData('My Team', opponentName, effectiveMap), opponentSide }
+        } else {
+          parsedData = { ...realData, opponentSide }
+        }
+      } else {
+        // Compressed demos: can't parse natively — use mock with submitted map
+        const effectiveMap = map !== 'unknown' ? map : undefined
+        parsedData = { ...generateMockDemoData('My Team', opponentName, effectiveMap), opponentSide }
       }
 
-      // Use real map name if found, otherwise fall back to what was submitted (if not 'unknown')
-      const effectiveMap = realMapName ?? (map !== 'unknown' ? map : undefined)
-
-      const parsedData = {
-        ...generateMockDemoData('My Team', opponentName, effectiveMap),
-        opponentSide,
-      }
-
+      const resolvedMap = (parsedData.header as { map?: string } | undefined)?.map ?? 'unknown'
       await admin
         .from('demos')
-        .update({ parsed_data: parsedData, status: 'completed', map: parsedData.header.map })
+        .update({ parsed_data: parsedData, status: 'completed', map: resolvedMap })
         .eq('id', demoId)
 
       // Recalculate folder aggregated stats
