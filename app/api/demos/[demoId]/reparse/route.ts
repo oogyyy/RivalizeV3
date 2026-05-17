@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { parseCS2Demo } from '@/lib/demo-parser/real-parser'
-import { generateMockDemoData } from '@/lib/demo-parser/mock-parser'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import { downloadObject } from '@/lib/r2'
 
@@ -45,31 +44,31 @@ export async function POST(
 
   void (async () => {
     try {
-      let parsedData: Record<string, unknown>
-      const isCompressed = r2Key.toLowerCase().endsWith('.zst')
-
-      if (!isCompressed) {
-        const buf = await downloadObject(r2Key)
-        const { parsedData: realData, warnings } = parseCS2Demo(buf)
-        if (warnings.length > 0) console.warn('[reparse] warnings:', warnings)
-
-        if (realData.players.length === 0) {
-          const fallbackMap = realData.header.map !== 'unknown' ? realData.header.map : undefined
-          parsedData = {
-            ...generateMockDemoData('My Team', demo.opponent_slug, fallbackMap),
-            opponentSide: existingOpponentSide,
-          }
-        } else {
-          parsedData = { ...realData, opponentSide: existingOpponentSide }
-        }
-      } else {
-        parsedData = {
-          ...generateMockDemoData('My Team', demo.opponent_slug),
-          opponentSide: existingOpponentSide,
-        }
+      if (r2Key.toLowerCase().endsWith('.zst')) {
+        await admin
+          .from('demos')
+          .update({ status: 'failed', error_message: 'Compressed .zst demos are not supported' })
+          .eq('id', demoId)
+        return
       }
 
-      const resolvedMap = (parsedData.header as { map?: string } | undefined)?.map ?? 'unknown'
+      console.log(`[reparse] Downloading ${demoId} from R2 key: ${r2Key}`)
+      const buf = await downloadObject(r2Key)
+      console.log(`[reparse] Downloaded ${buf.length} bytes, parsing...`)
+      const { parsedData: realData, warnings } = parseCS2Demo(buf)
+      if (warnings.length > 0) console.warn('[reparse] warnings:', warnings)
+      console.log(`[reparse] Result: ${realData.players.length} players, map=${realData.header.map}, score=${realData.header.score_team1}-${realData.header.score_team2}`)
+
+      if (realData.players.length === 0) {
+        await admin
+          .from('demos')
+          .update({ status: 'failed', error_message: 'Demo parsed but no player data could be extracted' })
+          .eq('id', demoId)
+        return
+      }
+
+      const parsedData = { ...realData, opponentSide: existingOpponentSide }
+      const resolvedMap = realData.header.map !== 'unknown' ? realData.header.map : 'unknown'
       await admin
         .from('demos')
         .update({ parsed_data: parsedData, status: 'completed', map: resolvedMap })

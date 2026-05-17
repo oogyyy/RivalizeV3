@@ -380,7 +380,7 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
   const handleParse = async () => {
     setParsing(true)
     try {
-      const res = await fetch(`/api/demos/${demo.id}/parse`, { method: 'POST' })
+      const res = await fetch(`/api/demos/${demo.id}/reparse`, { method: 'POST' })
       if (res.ok) await fetchDemo()
     } finally {
       setParsing(false)
