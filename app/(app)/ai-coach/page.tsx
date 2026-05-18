@@ -8,11 +8,12 @@ import {
   Brain, Send, RotateCcw, Loader2,
   Target, Crosshair, Shield, Users, Map as MapIcon,
   Sparkles, MessageSquare, ChevronRight, ExternalLink, Database,
-  SlidersHorizontal, X, ChevronDown,
+  SlidersHorizontal, X, ChevronDown, BarChart3,
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
 
-type FocusArea = 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player'
+type Mode = 'opponent' | 'myteam'
+type FocusArea = 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player' | 'executes' | 'rounds' | 'drills'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -20,7 +21,7 @@ interface Message {
   timestamp: Date
 }
 
-const FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
+const OPPONENT_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
   { id: 'general',   label: 'Scouting Report', icon: <Brain size={14} />,    description: 'Full opponent overview' },
   { id: 'weakness',  label: 'Weak Spots',       icon: <Target size={14} />,   description: 'Exploitable patterns' },
   { id: 'antistrat', label: 'Anti-Strat',        icon: <Shield size={14} />,   description: 'Counter their strategies' },
@@ -28,16 +29,32 @@ const FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; descri
   { id: 'player',    label: 'Player Focus',      icon: <Users size={14} />,    description: 'Opponent player deep-dive' },
 ]
 
+const MY_TEAM_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
+  { id: 'general',   label: 'Team Overview',    icon: <Brain size={14} />,    description: 'Strengths, weaknesses, roadmap' },
+  { id: 'weakness',  label: 'Weak Spots',       icon: <Target size={14} />,   description: 'Patterns costing you rounds' },
+  { id: 'executes',  label: 'Executes',         icon: <Crosshair size={14} />, description: 'Improve execute quality' },
+  { id: 'rounds',    label: 'Round Review',     icon: <BarChart3 size={14} />, description: 'Key rounds deep-dive' },
+  { id: 'drills',    label: 'Practice Drills',  icon: <Sparkles size={14} />, description: 'Tailored drill recommendations' },
+  { id: 'strategy',  label: 'Playbook',         icon: <Shield size={14} />,   description: 'Build your team playbook' },
+]
+
 const CS2_MAPS = [
   'de_dust2', 'de_mirage', 'de_inferno', 'de_nuke',
   'de_overpass', 'de_vertigo', 'de_ancient', 'de_anubis',
 ]
 
-const SUGGESTED_QUESTIONS = [
+const OPPONENT_QUESTIONS = [
   { label: 'Opponent weaknesses',       prompt: "What are this opponent's biggest weaknesses we can exploit?" },
   { label: 'Full anti-strat',           prompt: "Create a detailed anti-strat — their tendencies, executes, and how we counter them." },
   { label: 'T-side tendencies',         prompt: "What are this opponent's most common T-side executes and how should we set up CT rotations?" },
   { label: 'Key threat players',        prompt: "Who are the most dangerous players on this roster and how do we neutralise them?" },
+]
+
+const MY_TEAM_QUESTIONS = [
+  { label: 'Our biggest weaknesses',    prompt: "What are our team's biggest weaknesses based on the demo data? Be specific and prioritised." },
+  { label: 'Improve our executes',      prompt: "How can we improve our site executes? Review our utility usage, timing, and coordination." },
+  { label: 'Practice drill plan',       prompt: "Create a personalised practice plan with specific drills to improve based on our recent performance." },
+  { label: 'Build our playbook',        prompt: "Help us build a structured T-side and CT-side playbook with clear roles and go-to strategies." },
 ]
 
 function MarkdownContent({ content }: { content: string }) {
@@ -98,6 +115,7 @@ function TypingIndicator() {
 }
 
 export default function AIScoutPage() {
+  const [mode, setMode] = useState<Mode>('opponent')
   const [opponents, setOpponents] = useState<TeamFolder[]>([])
   const [selectedFolderId, setSelectedFolderId] = useState<string>('')
   const [focusArea, setFocusArea] = useState<FocusArea>('general')
@@ -110,6 +128,7 @@ export default function AIScoutPage() {
   const [loadingOpponents, setLoadingOpponents] = useState(true)
   const [includeProDataset, setIncludeProDataset] = useState(false)
   const [isContextOpen, setIsContextOpen] = useState(false)
+  const [teamId, setTeamId] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -118,18 +137,26 @@ export default function AIScoutPage() {
   useEffect(() => {
     const load = async () => {
       const res = await fetch('/api/opponents')
-      if (res.ok) setOpponents((await res.json()) as TeamFolder[])
+      if (res.ok) {
+        const data = (await res.json()) as TeamFolder[]
+        setOpponents(data)
+        if (data.length > 0) setTeamId((data[0] as TeamFolder & { user_team_id?: string }).user_team_id ?? null)
+      }
       setLoadingOpponents(false)
     }
     load()
   }, [])
 
-  // Pre-select folder from URL param if present (?folder=xxx)
+  // Read URL params — ?folder=xxx or ?mode=myteam&focus=xxx
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const fid = params.get('folder')
     if (fid) setSelectedFolderId(fid)
+    const m = params.get('mode')
+    if (m === 'myteam' || m === 'opponent') setMode(m)
+    const f = params.get('focus')
+    if (f) setFocusArea(f as FocusArea)
   }, [])
 
   useEffect(() => {
@@ -137,6 +164,8 @@ export default function AIScoutPage() {
   }, [messages, streamingContent, streaming])
 
   const selectedFolder = opponents.find(f => f.id === selectedFolderId)
+  const activeFocusAreas = mode === 'myteam' ? MY_TEAM_FOCUS_AREAS : OPPONENT_FOCUS_AREAS
+  const suggestedQuestions = mode === 'myteam' ? MY_TEAM_QUESTIONS : OPPONENT_QUESTIONS
 
   // Derive player list from selected folder's aggregated stats
   const availablePlayers: string[] = (selectedFolder?.aggregated_stats as { top_players?: { name: string }[] } | null)
@@ -159,13 +188,13 @@ export default function AIScoutPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            // teamId derived from the selected folder; falls back to null for general coaching
-            teamId: selectedFolder?.user_team_id ?? null,
-            folderId: selectedFolderId || null,
+            teamId: mode === 'myteam' ? teamId : (selectedFolder?.user_team_id ?? null),
+            folderId: mode === 'opponent' ? (selectedFolderId || null) : null,
             focusArea,
+            mode,
             playerName: focusArea === 'player' ? selectedPlayer : undefined,
-            mapName: focusArea === 'strategy' ? selectedMap : undefined,
-            includeProDataset,
+            mapName: (focusArea === 'strategy' || focusArea === 'executes') ? selectedMap : undefined,
+            includeProDataset: mode === 'opponent' ? includeProDataset : false,
             messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
           }),
         })
@@ -205,7 +234,7 @@ export default function AIScoutPage() {
         setStreamingContent('')
       }
     },
-    [messages, streaming, selectedFolder, selectedFolderId, focusArea, selectedPlayer, selectedMap, includeProDataset]
+    [messages, streaming, selectedFolder, selectedFolderId, focusArea, selectedPlayer, selectedMap, includeProDataset, mode, teamId]
   )
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -239,54 +268,92 @@ export default function AIScoutPage() {
 
         {/* Panel header */}
         <div className="p-5 border-b border-border">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-3">
             <Brain size={18} className="text-neon-green" />
-            <h1 className="text-lg font-bold text-foreground">AI Scout</h1>
+            <h1 className="text-lg font-bold text-foreground">AI Coach</h1>
             <Badge variant="neon" className="text-xs ml-auto">GPT-4o</Badge>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Study opponents · Generate anti-strats
-          </p>
+          {/* Mode toggle */}
+          <div className="flex rounded-lg border border-border bg-background p-0.5 gap-0.5">
+            <button
+              onClick={() => { setMode('opponent'); setFocusArea('general'); setMessages([]) }}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
+                mode === 'opponent'
+                  ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Target size={12} />
+              Opponent
+            </button>
+            <button
+              onClick={() => { setMode('myteam'); setFocusArea('general'); setMessages([]) }}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
+                mode === 'myteam'
+                  ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Shield size={12} />
+              My Team
+            </button>
+          </div>
         </div>
 
         <div className="p-4 space-y-5 flex-1">
-          {/* Opponent selector */}
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
-              Opponent
-            </label>
-            {loadingOpponents ? (
-              <div className="h-9 bg-muted/30 rounded-md animate-pulse" />
-            ) : opponents.length === 0 ? (
-              <div className="rounded-md border border-border bg-background/50 px-3 py-2.5 text-xs text-muted-foreground">
-                No opponents yet —{' '}
-                <a href="/opponents" className="text-neon-green hover:underline">
-                  upload a demo first
-                </a>
-              </div>
-            ) : (
-              <select
-                value={selectedFolderId}
-                onChange={e => { setSelectedFolderId(e.target.value); setSelectedPlayer('') }}
-                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50 transition-colors"
-              >
-                <option value="">Select an opponent…</option>
-                {opponents.map(f => (
-                  <option key={f.id} value={f.id}>{f.opponent_display_name}</option>
-                ))}
-              </select>
-            )}
+          {/* Opponent selector — only in opponent mode */}
+          {mode === 'opponent' && (
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
+                Opponent
+              </label>
+              {loadingOpponents ? (
+                <div className="h-9 bg-muted/30 rounded-md animate-pulse" />
+              ) : opponents.length === 0 ? (
+                <div className="rounded-md border border-border bg-background/50 px-3 py-2.5 text-xs text-muted-foreground">
+                  No opponents yet —{' '}
+                  <a href="/opponents" className="text-neon-green hover:underline">
+                    upload a demo first
+                  </a>
+                </div>
+              ) : (
+                <select
+                  value={selectedFolderId}
+                  onChange={e => { setSelectedFolderId(e.target.value); setSelectedPlayer('') }}
+                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50 transition-colors"
+                >
+                  <option value="">Select an opponent…</option>
+                  {opponents.map(f => (
+                    <option key={f.id} value={f.id}>{f.opponent_display_name}</option>
+                  ))}
+                </select>
+              )}
 
-            {selectedFolder && (
-              <div className="mt-2 p-2.5 bg-neon-green/5 rounded-md border border-neon-green/20 text-xs">
-                <p className="text-neon-green font-semibold">{selectedFolder.opponent_display_name}</p>
-                <p className="text-muted-foreground mt-0.5">
-                  {(selectedFolder.aggregated_stats as { total_matches?: number } | null)?.total_matches ?? 0} matches ·{' '}
-                  {Math.round(((selectedFolder.aggregated_stats as { win_rate?: number } | null)?.win_rate ?? 0) * 100)}% win rate
-                </p>
-              </div>
-            )}
-          </div>
+              {selectedFolder && (
+                <div className="mt-2 p-2.5 bg-neon-green/5 rounded-md border border-neon-green/20 text-xs">
+                  <p className="text-neon-green font-semibold">{selectedFolder.opponent_display_name}</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    {(selectedFolder.aggregated_stats as { total_matches?: number } | null)?.total_matches ?? 0} matches ·{' '}
+                    {Math.round(((selectedFolder.aggregated_stats as { win_rate?: number } | null)?.win_rate ?? 0) * 100)}% win rate
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* My team indicator */}
+          {mode === 'myteam' && (
+            <div className="p-2.5 bg-neon-green/5 rounded-md border border-neon-green/20 text-xs">
+              <p className="text-neon-green font-semibold flex items-center gap-1.5">
+                <Shield size={11} /> My Team Analysis
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                AI will analyse your own demos to help you improve.
+              </p>
+            </div>
+          )}
 
           {/* Focus area */}
           <div>
@@ -294,7 +361,7 @@ export default function AIScoutPage() {
               Focus Area
             </label>
             <div className="space-y-1.5">
-              {FOCUS_AREAS.map(area => (
+              {activeFocusAreas.map(area => (
                 <button
                   key={area.id}
                   onClick={() => setFocusArea(area.id)}
@@ -318,8 +385,8 @@ export default function AIScoutPage() {
             </div>
           </div>
 
-          {/* Player selector — only when Player Focus and a folder is selected */}
-          {focusArea === 'player' && (
+          {/* Player selector — only when Player Focus and a folder is selected (opponent mode) */}
+          {mode === 'opponent' && focusArea === 'player' && (
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
                 Player
@@ -345,8 +412,8 @@ export default function AIScoutPage() {
             </div>
           )}
 
-          {/* Map selector — only when Match Prep */}
-          {focusArea === 'strategy' && (
+          {/* Map selector — when Match Prep or Executes */}
+          {(focusArea === 'strategy' || focusArea === 'executes') && (
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
                 Map
@@ -364,58 +431,63 @@ export default function AIScoutPage() {
             </div>
           )}
 
-          {/* Pro dataset toggle */}
-          <div className="border-t border-border pt-4">
-            <button
-              onClick={() => setIncludeProDataset(v => !v)}
-              className={cn(
-                'w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-all',
-                includeProDataset
-                  ? 'bg-blue-500/10 border-blue-500/30'
-                  : 'bg-background border-border hover:border-border/80 hover:bg-accent/40'
-              )}
-            >
-              <div className={cn('w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5', includeProDataset ? 'bg-blue-500/20' : 'bg-muted')}>
-                <Database size={13} className={includeProDataset ? 'text-blue-400' : 'text-muted-foreground'} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <p className={cn('text-xs font-semibold', includeProDataset ? 'text-blue-300' : 'text-foreground')}>
-                    Pro Dataset Insights
-                  </p>
-                  <div className={cn('w-7 h-4 rounded-full transition-colors shrink-0', includeProDataset ? 'bg-blue-500' : 'bg-muted-foreground/30')}>
-                    <div className={cn('w-3 h-3 rounded-full bg-white shadow transition-transform mt-0.5', includeProDataset ? 'translate-x-3.5' : 'translate-x-0.5')} />
-                  </div>
+          {/* Pro dataset toggle — opponent mode only */}
+          {mode === 'opponent' && (
+            <div className="border-t border-border pt-4">
+              <button
+                onClick={() => setIncludeProDataset(v => !v)}
+                className={cn(
+                  'w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-all',
+                  includeProDataset
+                    ? 'bg-blue-500/10 border-blue-500/30'
+                    : 'bg-background border-border hover:border-border/80 hover:bg-accent/40'
+                )}
+              >
+                <div className={cn('w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5', includeProDataset ? 'bg-blue-500/20' : 'bg-muted')}>
+                  <Database size={13} className={includeProDataset ? 'text-blue-400' : 'text-muted-foreground'} />
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
-                  Cross-reference pro meta from a public dataset.
-                </p>
-              </div>
-            </button>
-            {includeProDataset && (
-              <div className="mt-2 px-3 py-2 rounded-md bg-blue-500/5 border border-blue-500/15">
-                <p className="text-[10px] text-blue-400/80 leading-relaxed">
-                  AI will reference pro-level meta from the{' '}
-                  <a href="https://huggingface.co/datasets/blanchon/opencs2_dataset" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300 inline-flex items-center gap-0.5">
-                    OpenCS2 dataset <ExternalLink size={9} />
-                  </a>{' '}
-                  (200k+ pro matches).
-                </p>
-              </div>
-            )}
-          </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={cn('text-xs font-semibold', includeProDataset ? 'text-blue-300' : 'text-foreground')}>
+                      Pro Dataset Insights
+                    </p>
+                    <div className={cn('w-7 h-4 rounded-full transition-colors shrink-0', includeProDataset ? 'bg-blue-500' : 'bg-muted-foreground/30')}>
+                      <div className={cn('w-3 h-3 rounded-full bg-white shadow transition-transform mt-0.5', includeProDataset ? 'translate-x-3.5' : 'translate-x-0.5')} />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
+                    Cross-reference pro meta from a public dataset.
+                  </p>
+                </div>
+              </button>
+              {includeProDataset && (
+                <div className="mt-2 px-3 py-2 rounded-md bg-blue-500/5 border border-blue-500/15">
+                  <p className="text-[10px] text-blue-400/80 leading-relaxed">
+                    AI will reference pro-level meta from the{' '}
+                    <a href="https://huggingface.co/datasets/blanchon/opencs2_dataset" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300 inline-flex items-center gap-0.5">
+                      OpenCS2 dataset <ExternalLink size={9} />
+                    </a>{' '}
+                    (200k+ pro matches).
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Active context summary */}
         <div className="p-4 border-t border-border">
           <p className="text-xs text-muted-foreground mb-1">Active context</p>
           <div className="flex flex-wrap gap-1">
-            {selectedFolder
-              ? <Badge variant="neon" className="text-xs">{selectedFolder.opponent_display_name}</Badge>
-              : <Badge variant="outline" className="text-xs text-muted-foreground">No opponent selected</Badge>
-            }
+            {mode === 'myteam' ? (
+              <Badge variant="neon" className="text-xs">My Team</Badge>
+            ) : selectedFolder ? (
+              <Badge variant="neon" className="text-xs">{selectedFolder.opponent_display_name}</Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs text-muted-foreground">No opponent selected</Badge>
+            )}
             <Badge variant="secondary" className="text-xs capitalize">{focusArea}</Badge>
-            {includeProDataset && (
+            {mode === 'opponent' && includeProDataset && (
               <Badge className="text-xs bg-blue-500/20 text-blue-300 border-blue-500/30">Pro data</Badge>
             )}
           </div>
@@ -439,11 +511,9 @@ export default function AIScoutPage() {
             <MessageSquare size={16} className="text-neon-green hidden md:block" />
             <div className="hidden md:flex items-baseline gap-1.5">
               <span className="text-sm font-semibold text-foreground">
-                {selectedFolder ? selectedFolder.opponent_display_name : 'AI Scout'}
+                {mode === 'myteam' ? 'My Team' : selectedFolder ? selectedFolder.opponent_display_name : 'AI Coach'}
               </span>
-              {selectedFolder && (
-                <span className="text-xs text-muted-foreground capitalize">· {focusArea}</span>
-              )}
+              <span className="text-xs text-muted-foreground capitalize">· {focusArea}</span>
             </div>
             <span className="text-sm font-medium text-foreground md:hidden">
               {messages.length === 0 ? 'AI Scout' : `${messages.length} messages`}
@@ -468,17 +538,21 @@ export default function AIScoutPage() {
                 <Brain size={36} className="text-neon-green" />
               </div>
               <h2 className="text-xl font-bold text-foreground mb-1">
-                {selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Scout Ready'}
+                {mode === 'myteam'
+                  ? 'My Team Coach Ready'
+                  : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Coach Ready'}
               </h2>
               <p className="text-muted-foreground text-sm max-w-sm mb-8">
-                {selectedFolder
-                  ? `Ask anything about ${selectedFolder.opponent_display_name} — tendencies, anti-strats, key players, map reads.`
-                  : 'Select an opponent you\'ve uploaded demos for, then ask for scouting reports and anti-strats.'}
+                {mode === 'myteam'
+                  ? 'Ask anything about your team\'s performance — weaknesses, executes, practice plans, and strategy.'
+                  : selectedFolder
+                    ? `Ask anything about ${selectedFolder.opponent_display_name} — tendencies, anti-strats, key players, map reads.`
+                    : 'Select an opponent you\'ve uploaded demos for, then ask for scouting reports and anti-strats.'}
               </p>
 
               {/* Suggested questions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
-                {SUGGESTED_QUESTIONS.map(q => (
+                {suggestedQuestions.map(q => (
                   <button
                     key={q.label}
                     onClick={() => sendMessage(q.prompt)}
@@ -496,13 +570,13 @@ export default function AIScoutPage() {
                 ))}
               </div>
 
-              {!selectedFolder && opponents.length > 0 && (
+              {mode === 'opponent' && !selectedFolder && opponents.length > 0 && (
                 <p className="text-xs text-muted-foreground mt-5 flex items-center gap-1">
                   <ChevronDown size={12} className="rotate-90" />
                   Pick an opponent in the left panel to get personalised scouting
                 </p>
               )}
-              {!selectedFolder && opponents.length === 0 && !loadingOpponents && (
+              {mode === 'opponent' && !selectedFolder && opponents.length === 0 && !loadingOpponents && (
                 <a
                   href="/opponents"
                   className="mt-5 text-xs text-neon-green hover:underline flex items-center gap-1"
@@ -583,9 +657,11 @@ export default function AIScoutPage() {
               }}
               onKeyDown={handleKeyDown}
               placeholder={
-                selectedFolder
-                  ? `Ask about ${selectedFolder.opponent_display_name}…`
-                  : 'Ask anything about CS2 tactics, or select an opponent for personalised scouting…'
+                mode === 'myteam'
+                  ? 'Ask about your team\'s performance, weaknesses, or strategy…'
+                  : selectedFolder
+                    ? `Ask about ${selectedFolder.opponent_display_name}…`
+                    : 'Ask anything about CS2 tactics, or select an opponent for personalised scouting…'
               }
               disabled={streaming}
               rows={1}
@@ -603,9 +679,11 @@ export default function AIScoutPage() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground text-center mt-2">
-            {selectedFolder
-              ? `Analysing demos from your ${selectedFolder.opponent_display_name} folder`
-              : 'Select an opponent folder for personalised anti-strats and scouting reports'}
+            {mode === 'myteam'
+              ? 'Analysing your team\'s own demos for self-improvement coaching'
+              : selectedFolder
+                ? `Analysing demos from your ${selectedFolder.opponent_display_name} folder`
+                : 'Select an opponent folder for personalised anti-strats and scouting reports'}
           </p>
         </div>
       </div>
