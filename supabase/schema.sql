@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS demos (
   raw_file_path TEXT NOT NULL,
   parsed_data JSONB,
   status TEXT DEFAULT 'processing' CHECK (status IN ('processing', 'completed', 'failed')),
+  -- 'opponent' = scouting upload (Opponents flow); 'self' = own-team upload (My Team flow)
+  demo_type TEXT NOT NULL DEFAULT 'opponent' CHECK (demo_type IN ('opponent', 'self')),
   error_message TEXT,
   file_size_bytes BIGINT,
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,

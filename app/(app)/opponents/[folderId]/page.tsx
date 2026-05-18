@@ -54,12 +54,14 @@ export default async function OpponentPage({
 
   const stats = folder.aggregated_stats as AggregatedStats | null
 
-  // Use admin client to bypass RLS — membership already verified above
+  // Use admin client to bypass RLS — membership already verified above.
+  // STRICT: only fetch opponent demos — self-demos must never appear in scouting folders.
   const { data: demos } = await admin
     .from('demos')
     .select('*')
     .eq('team_id', teamId)
     .eq('opponent_slug', folder.opponent_slug)
+    .eq('demo_type', 'opponent')   // enforce data isolation
     .order('created_at', { ascending: false })
 
   const totalDemos = (demos ?? []).length
