@@ -138,6 +138,36 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   const totalRounds = roundEnds.length
 
+  // ── 2b. Optional clan-name scan ───────────────────────────────────────────
+  //
+  // CCSPlayerController.m_szClanTeamname holds the team's clan/org name for
+  // each player (e.g. "NaVi", "G2"). We request it as 'clan_team_name' per
+  // demoparser2's naming convention (m_sz prefix stripped, CamelCase → snake).
+  //
+  // This is intentionally isolated in its own try-catch: if the prop name is
+  // wrong or the demoparser2 version doesn't support it, rm_user_friendly_names()
+  // throws and we catch silently, falling back to 'T-Side' / 'CT-Side'.
+  const clanNameBySid = new Map<string, string>()
+  try {
+    const clanEvents = dp.parseEvent(
+      buf,
+      'player_death',
+      ['team_num', 'clan_team_name'],
+      ['tick', 'attacker_steamid', 'attacker_clan_team_name'],
+    ) ?? []
+    for (const ev of clanEvents) {
+      const vicSid  = s(ev, 'steamid', 'user_steamid')
+      const vicClan = s(ev, 'clan_team_name')
+      if (vicSid && vicSid !== '0' && vicClan) clanNameBySid.set(vicSid, vicClan)
+
+      const atkSid  = s(ev, 'attacker_steamid')
+      const atkClan = s(ev, 'attacker_clan_team_name')
+      if (atkSid && atkSid !== '0' && atkClan) clanNameBySid.set(atkSid, atkClan)
+    }
+  } catch {
+    // clan_team_name unsupported — will label teams as 'T-Side' / 'CT-Side'
+  }
+
   // Sort round_end events chronologically — used for halftime boundary and score
   const sortedRounds = [...roundEnds].sort((a, b) => n(a, 'tick') - n(b, 'tick'))
 
@@ -330,6 +360,34 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     console.warn('[real-parser] 0 players extracted. Warnings:', warnings)
   }
 
+  // ── 6b. Derive real team names from clan names ────────────────────────────
+  //
+  // For each starting side, collect the clan names seen across all players on
+  // that side, then pick the majority name. Falls back to the side label if no
+  // clan names were captured (clanNameBySid empty = prop unsupported).
+  function deriveName(sideLabel: string, sidePlayers: typeof players): string {
+    const counts = new Map<string, number>()
+    for (const p of sidePlayers) {
+      const clan = clanNameBySid.get(p.steam_id)
+      if (clan) counts.set(clan, (counts.get(clan) ?? 0) + 1)
+    }
+    if (counts.size === 0) return sideLabel
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  }
+
+  const tSidePlayers  = players.filter(p => p.team === 'T-Side')
+  const ctSidePlayers = players.filter(p => p.team === 'CT-Side')
+  const team1Name = deriveName('T-Side',  tSidePlayers)
+  const team2Name = deriveName('CT-Side', ctSidePlayers)
+
+  // Patch player team fields to the resolved names
+  if (team1Name !== 'T-Side' || team2Name !== 'CT-Side') {
+    for (const p of players) {
+      if (p.team === 'T-Side')  p.team = team1Name
+      else if (p.team === 'CT-Side') p.team = team2Name
+    }
+  }
+
   // ── 7. Score: halftime-aware round winner → team score ────────────────────
   //
   // First half  (i < halfRoundCount): winner=2 → T-Side wins; winner=3 → CT-Side wins
@@ -355,8 +413,8 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   const parsedData: ParsedDemoData = {
     header: {
       map:          mapName,
-      team1:        'T-Side',
-      team2:        'CT-Side',
+      team1:        team1Name,
+      team2:        team2Name,
       score_team1:  score1,
       score_team2:  score2,
       duration:     totalRounds * 90,
