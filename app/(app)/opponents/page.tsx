@@ -63,12 +63,13 @@ export default async function OpponentsPage() {
         .order('updated_at', { ascending: false })
     : { data: [] }
 
-  // Fetch all demos for this team to compute per-opponent counts & dates
+  // Fetch only opponent demos — self-demos must never appear in the Opponents section.
   const { data: allDemos } = primaryTeamId
     ? await admin
         .from('demos')
         .select('id, opponent_slug, status, created_at, match_date')
         .eq('team_id', primaryTeamId)
+        .eq('demo_type', 'opponent')  // STRICT: only scouting demos counted here
     : { data: [] }
 
   type DemoRow = {

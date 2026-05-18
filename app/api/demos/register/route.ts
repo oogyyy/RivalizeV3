@@ -17,6 +17,9 @@ const schema = z.object({
   matchDate: z.string().optional(),
   league: z.string().optional(),
   opponentSide: z.enum(['team1', 'team2']).default('team2'),
+  // 'opponent' = scouting upload via Opponents flow
+  // 'self'     = own-team upload via My Team flow
+  demoType: z.enum(['opponent', 'self']).default('opponent'),
 })
 
 // Called by the client after a successful direct upload to R2.
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { teamId, r2Key, opponentName, map, fileSize, matchDate, league, opponentSide } = parsed.data
+  const { teamId, r2Key, opponentName, map, fileSize, matchDate, league, opponentSide, demoType } = parsed.data
 
   const admin = createAdminClient()
 
@@ -67,6 +70,9 @@ export async function POST(request: Request) {
       status: 'processing',
       file_size_bytes: fileSize ?? null,
       created_by: user.id,
+      // Strict separation: 'opponent' demos appear only in Opponent folders;
+      // 'self' demos appear only on the My Team page.
+      demo_type: demoType,
     })
     .select()
     .single()
@@ -76,15 +82,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: demoError.message }, { status: 500 })
   }
 
-  // Upsert the team folder for this opponent
-  await admin.from('team_folders').upsert(
-    {
-      user_team_id: teamId,
-      opponent_slug: opponentSlug,
-      opponent_display_name: opponentName,
-    },
-    { onConflict: 'user_team_id,opponent_slug' }
-  )
+  // Only create/update a team folder for opponent demos — self-demos do NOT
+  // belong to any opponent folder and must not appear on the Opponents page.
+  if (demoType === 'opponent') {
+    await admin.from('team_folders').upsert(
+      {
+        user_team_id: teamId,
+        opponent_slug: opponentSlug,
+        opponent_display_name: opponentName,
+      },
+      { onConflict: 'user_team_id,opponent_slug' }
+    )
+  }
 
   // Background parse — in production replace with a proper job queue
   const demoId = demo.id
@@ -115,13 +124,14 @@ export async function POST(request: Request) {
         .update({ parsed_data: parsedData, status: 'completed', map: resolvedMap })
         .eq('id', demoId)
 
-      // Recalculate folder aggregated stats
+      // Recalculate folder aggregated stats — only opponent demos belong in folders
       const { data: allDemos } = await admin
         .from('demos')
         .select('parsed_data')
         .eq('team_id', teamId)
         .eq('opponent_slug', opponentSlug)
         .eq('status', 'completed')
+        .eq('demo_type', 'opponent')
 
       if (allDemos && allDemos.length > 0) {
         // "Win" = our team's score > opponent's score.

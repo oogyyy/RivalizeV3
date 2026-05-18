@@ -12,6 +12,10 @@ const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
 
 interface DemoUploadButtonProps {
   teamId: string
+  /** Controls upload context and data isolation.
+   *  'opponent' (default) → Opponents / scouting flow.
+   *  'self' → My Team / self-analysis flow. */
+  demoType?: 'opponent' | 'self'
   onSuccess?: () => void
 }
 
@@ -48,7 +52,7 @@ function uploadToR2(url: string, file: File, onProgress: (pct: number) => void):
   })
 }
 
-export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButtonProps) {
+export default function DemoUploadButton({ teamId, demoType = 'opponent', onSuccess }: DemoUploadButtonProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [uploads, setUploads] = useState<FileUpload[]>([])
@@ -125,6 +129,8 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
           opponentName: opponentName.trim(),
           map: 'unknown',
           fileSize: file.size,
+          // Pass the upload context so the server can enforce data isolation
+          demoType,
         }),
       })
 
@@ -208,7 +214,9 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card z-10">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Upload Opponent Demo</h2>
+            <h2 className="text-lg font-bold text-foreground">
+              {demoType === 'self' ? 'Upload My Team Demo' : 'Upload Opponent Demo'}
+            </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               .dem / .zst files · up to 500 MB per file
             </p>
@@ -229,7 +237,9 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
               <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
                 STEP 1
               </span>
-              <span className="text-xs font-semibold text-foreground">Who are you scouting?</span>
+              <span className="text-xs font-semibold text-foreground">
+                {demoType === 'self' ? 'Who was your opponent?' : 'Who are you scouting?'}
+              </span>
             </div>
             <input
               type="text"
@@ -241,7 +251,9 @@ export default function DemoUploadButton({ teamId, onSuccess }: DemoUploadButton
             />
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Info size={10} className="shrink-0" />
-              After upload, you&apos;ll select which team to scout as the opponent.
+              {demoType === 'self'
+                ? 'This demo will be analysed as your own team\'s performance — it won\'t appear in Opponent folders.'
+                : 'After upload, you\'ll select which team to scout as the opponent.'}
             </p>
           </div>
 

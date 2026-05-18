@@ -7,10 +7,11 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import {
-  Shield, Upload, Brain, BarChart3, Trophy, Crosshair,
+  Shield, Brain, BarChart3, Trophy, Crosshair,
   TrendingUp, Zap, Map as MapIcon, Users, ArrowRight,
   FileVideo, AlertCircle, CheckCircle2,
 } from 'lucide-react'
+import DemoUploadButton from '@/components/teams/DemoUploadButton'
 
 export default async function MyTeamPage() {
   const supabase = await createClient()
@@ -37,7 +38,9 @@ export default async function MyTeamPage() {
     if (team?.name) teamName = team.name
   }
 
-  // Fetch demos uploaded for this team (not opponent folders — self-demos)
+  // Fetch ONLY self-demos (demo_type = 'self') for the My Team page.
+  // Opponent demos (demo_type = 'opponent') are completely excluded here —
+  // they belong exclusively in the Opponents / scouting section.
   type DemoRow = {
     id: string
     status: string
@@ -72,6 +75,7 @@ export default async function MyTeamPage() {
         .from('demos')
         .select('id, status, map, match_date, created_at, opponent_slug, parsed_data')
         .eq('team_id', primaryTeamId)
+        .eq('demo_type', 'self')   // STRICT: only own-team demos shown here
         .order('created_at', { ascending: false })
         .limit(10)
     : { data: [] }
@@ -198,13 +202,10 @@ export default async function MyTeamPage() {
             <p className="text-sm text-muted-foreground">Your team's performance overview</p>
           </div>
         </div>
-        <Link
-          href="/opponents"
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Upload size={14} />
-          Upload Demo
-        </Link>
+        {/* Self-demo upload — marked demo_type='self' so it never leaks into Opponent folders */}
+        {primaryTeamId && (
+          <DemoUploadButton teamId={primaryTeamId} demoType="self" />
+        )}
       </div>
 
       {/* Team Overview Stats */}
@@ -313,15 +314,12 @@ export default async function MyTeamPage() {
                 <FileVideo size={16} className="text-neon-green" />
                 <h2 className="text-sm font-semibold text-foreground">Recent Demos</h2>
               </div>
-              <Link href="/opponents" className="text-xs text-neon-green hover:underline flex items-center gap-1">
-                All demos <ArrowRight size={11} />
-              </Link>
+              {/* "All demos" here refers only to self-demos on this page */}
             </div>
             {demos.length === 0 ? (
               <EmptyState
-                icon={<Upload size={20} className="text-muted-foreground" />}
-                text="No demos uploaded yet."
-                action={{ href: '/opponents', label: 'Upload your first demo' }}
+                icon={<FileVideo size={20} className="text-muted-foreground" />}
+                text="No team demos uploaded yet. Use the Upload button above to add your team's own demos."
               />
             ) : (
               <div className="space-y-2">
@@ -413,19 +411,14 @@ export default async function MyTeamPage() {
             </div>
           </div>
 
-          {totalMatches === 0 && (
+          {totalMatches === 0 && primaryTeamId && (
             <div className="bg-card border border-border rounded-xl p-5 text-center">
-              <Upload size={24} className="text-muted-foreground mx-auto mb-3" />
+              <FileVideo size={24} className="text-muted-foreground mx-auto mb-3" />
               <p className="text-sm font-medium text-foreground mb-1">Upload your demos</p>
               <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-                Start by uploading your team's match demos to unlock performance analysis.
+                Upload your team's own match demos to unlock performance analysis.
               </p>
-              <Link
-                href="/opponents"
-                className="inline-flex items-center gap-2 text-sm text-neon-green hover:underline"
-              >
-                Get started <ArrowRight size={13} />
-              </Link>
+              <DemoUploadButton teamId={primaryTeamId} demoType="self" />
             </div>
           )}
         </div>

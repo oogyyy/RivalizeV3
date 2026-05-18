@@ -50,12 +50,15 @@ export async function POST(request: Request) {
   }
 
   if (mode === 'myteam' && teamId) {
-    // My Team mode: fetch own team's recent demos and extract our side's stats
+    // My Team mode: fetch ONLY self-demos (demo_type = 'self').
+    // Opponent demos are strictly excluded — they contain the enemy team's stats,
+    // not the user's own team performance data.
     const { data: recentDemos } = await supabase
       .from('demos')
       .select('parsed_data, map, match_date')
       .eq('team_id', teamId)
       .eq('status', 'completed')
+      .eq('demo_type', 'self')   // STRICT: only own-team demos for self-analysis
       .order('created_at', { ascending: false })
       .limit(5)
 
@@ -118,7 +121,8 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
         contextText += `Most played maps: ${mapEntries}\n`
       }
 
-      // Fetch recent completed demos for this folder for richer context
+      // Fetch recent completed opponent demos for richer scouting context.
+      // Only demo_type = 'opponent' — self-demos must never pollute opponent analysis.
       if (teamId) {
         const { data: recentDemos } = await supabase
           .from('demos')
@@ -126,6 +130,7 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
           .eq('team_id', teamId)
           .eq('opponent_slug', folder.opponent_slug)
           .eq('status', 'completed')
+          .eq('demo_type', 'opponent')  // STRICT: only scouting demos for opponent analysis
           .order('created_at', { ascending: false })
           .limit(3)
 

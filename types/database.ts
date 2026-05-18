@@ -51,6 +51,8 @@ export interface Demo {
   raw_file_path: string
   parsed_data: ParsedDemoData | null
   status: 'processing' | 'completed' | 'failed'
+  /** 'opponent' = scouting upload; 'self' = own-team self-analysis upload */
+  demo_type: 'opponent' | 'self'
   created_by: string
   created_at: string
 }
