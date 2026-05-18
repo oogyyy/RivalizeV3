@@ -164,8 +164,13 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       const atkClan = s(ev, 'attacker_clan_team_name')
       if (atkSid && atkSid !== '0' && atkClan) clanNameBySid.set(atkSid, atkClan)
     }
-  } catch {
-    // clan_team_name unsupported — will label teams as 'T-Side' / 'CT-Side'
+  } catch (e) {
+    warnings.push(`clan_team_name scan failed (prop unsupported?): ${e}`)
+  }
+  if (clanNameBySid.size === 0) {
+    warnings.push('no clan names found — team labels will be T-Side / CT-Side')
+  } else {
+    console.log(`[real-parser] clan names found for ${clanNameBySid.size} players:`, [...new Set(clanNameBySid.values())])
   }
 
   // Sort round_end events chronologically — used for halftime boundary and score
