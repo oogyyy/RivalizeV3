@@ -8,14 +8,18 @@ import { cn } from '@/lib/utils'
 interface Props {
   demoId: string
   currentSide: 'team1' | 'team2'
+  teamNames?: { team1: string; team2: string }
 }
 
-const LABELS = { team1: 'Team 1', team2: 'Team 2' } as const
-
-export default function SetOpponentSideButton({ demoId, currentSide }: Props) {
+export default function SetOpponentSideButton({ demoId, currentSide, teamNames }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState<'team1' | 'team2' | null>(null)
+
+  const labels = {
+    team1: teamNames?.team1 || 'Team 1',
+    team2: teamNames?.team2 || 'Team 2',
+  }
 
   async function select(side: 'team1' | 'team2') {
     if (side === currentSide) { setOpen(false); return }
@@ -42,14 +46,14 @@ export default function SetOpponentSideButton({ demoId, currentSide }: Props) {
         title="Choose which team in this demo is the opponent"
       >
         <Users size={9} className="shrink-0" />
-        <span>Scouting: <span className="font-medium">{LABELS[currentSide]}</span></span>
+        <span>Scouting: <span className="font-medium">{labels[currentSide]}</span></span>
         <ChevronDown size={8} className={cn('transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-5 z-20 bg-card border border-border rounded-lg shadow-xl p-1 min-w-[128px]">
+          <div className="absolute left-0 top-5 z-20 bg-card border border-border rounded-lg shadow-xl p-1 min-w-[140px]">
             <p className="text-[9px] text-muted-foreground px-2 pt-1 pb-1.5 font-medium uppercase tracking-wide">
               Scout as opponent
             </p>
@@ -73,7 +77,7 @@ export default function SetOpponentSideButton({ demoId, currentSide }: Props) {
                 ) : (
                   <span className="w-2.5 shrink-0" />
                 )}
-                {LABELS[side]}
+                {labels[side]}
               </button>
             ))}
           </div>

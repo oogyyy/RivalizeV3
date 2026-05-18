@@ -312,6 +312,7 @@ export default async function OpponentPage({
                                 <SetOpponentSideButton
                                   demoId={demo.id}
                                   currentSide={demoOpponentSide}
+                                  teamNames={header ? { team1: header.team1 ?? 'Team 1', team2: header.team2 ?? 'Team 2' } : undefined}
                                 />
                               )}
                               {isOwnerOrAdmin && (demo.status === 'completed' || demo.status === 'failed') && (
