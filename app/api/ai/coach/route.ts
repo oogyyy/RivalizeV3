@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     playerName?: string
     mapName?: string
     includeProDataset?: boolean
+    mode?: 'opponent' | 'myteam'
   }
 
   try {
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { teamId, folderId, messages = [], focusArea, playerName, mapName, includeProDataset } = body
+  const { teamId, folderId, messages = [], focusArea, playerName, mapName, includeProDataset, mode = 'opponent' } = body
 
   // Build context from team/folder data
   let contextText = ''
@@ -48,7 +49,43 @@ export async function POST(request: Request) {
     }
   }
 
-  if (folderId) {
+  if (mode === 'myteam' && teamId) {
+    // My Team mode: fetch own team's recent demos and extract our side's stats
+    const { data: recentDemos } = await supabase
+      .from('demos')
+      .select('parsed_data, map, match_date')
+      .eq('team_id', teamId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (recentDemos && recentDemos.length > 0) {
+      type PD = {
+        header?: { map?: string; score_team1?: number; score_team2?: number; total_rounds?: number; team1?: string; team2?: string }
+        opponentSide?: string
+        players?: Array<{ name: string; kills: number; deaths: number; assists: number; rating: number; adr: number; team: string }>
+      }
+      contextText += `\nTeam: ${teamName}\nMatches analysed: ${recentDemos.length}\n\nRecent match details:\n`
+      recentDemos.forEach((demo, i) => {
+        const pd = demo.parsed_data as PD | null
+        const h = pd?.header
+        const opponentSide = pd?.opponentSide ?? 'team2'
+        if (h) {
+          const ourScore   = opponentSide === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
+          const theirScore = opponentSide === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
+          contextText += `Match ${i + 1}: ${h.map} — Score ${ourScore}-${theirScore} (${h.total_rounds ?? '?'} rounds)\n`
+          if (pd?.players) {
+            const opLabel = opponentSide === 'team1' ? (h.team1 ?? 'T-Side') : (h.team2 ?? 'CT-Side')
+            const myPlayers = pd.players.filter(p => p.team !== opLabel)
+            if (myPlayers.length > 0) {
+              const sorted = [...myPlayers].sort((a, b) => b.rating - a.rating).slice(0, 5)
+              contextText += `My team players:\n${sorted.map(p => `  ${p.name}: ${p.kills}/${p.deaths}/${p.assists}, Rating ${p.rating.toFixed(2)}, ADR ${p.adr.toFixed(1)}`).join('\n')}\n`
+            }
+          }
+        }
+      })
+    }
+  } else if (folderId) {
     const { data: folder } = await supabase
       .from('team_folders')
       .select('*')
@@ -132,7 +169,7 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
   }
 
   // Build system prompt
-  const focusInstructions: Record<string, string> = {
+  const opponentFocusInstructions: Record<string, string> = {
     weakness: `Focus on identifying the OPPONENT's biggest weaknesses and patterns your team can exploit. What mistakes do they repeat? Where are their rotations slow? What setups are predictable? Prioritize by impact and provide specific round-by-round examples where possible.`,
     antistrat: `Create a detailed anti-strat against this opponent. Identify their tendencies, preferred T-side executes, common CT setups, and economic patterns. Provide specific counters for each pattern — how to read their plays and punish them before they can execute.`,
     strategy: `Develop counter-strategies for the upcoming match${mapName ? ` on ${mapName}` : ''}. Provide CT and T-side setups tailored to shut down what this opponent does best. Include specific utility lineups, timings, and positioning that exploit their weaknesses.`,
@@ -140,11 +177,37 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
     general: `Provide a comprehensive scouting report on this opponent. Cover: their T-side and CT-side tendencies, most dangerous players, predictable patterns, exploitable weaknesses, recommended map bans, and key preparation advice for our upcoming match.`,
   }
 
-  const systemPrompt = `You are an elite Counter-Strike 2 scout and tactical analyst specializing in pre-match preparation. You analyze OPPONENT demos to help teams prepare anti-strats and exploit weaknesses before upcoming matches. You communicate like a professional analyst briefing a team before a big game.
+  const myTeamFocusInstructions: Record<string, string> = {
+    weakness: `Analyse the team's demos and identify their most critical weaknesses — poor utility usage, rotation mistakes, predictable T-side patterns, CT anchor issues, or economic decision errors. Be specific about which situations keep costing them rounds and how to fix each one.`,
+    executes: `Review how the team executes onto sites — their entry timing, utility choreography, trade setups, and post-plant positioning. Identify what's working, what's breaking down, and give concrete recommendations to improve their execute quality on the maps in the data.`,
+    rounds: `Go round by round through key moments — won clutches, lost force buys, pistol rounds, and close eco fights. Identify patterns in how they win and lose rounds. What mental or tactical adjustments would have the highest impact?`,
+    drills: `Based on the team's stats and performance patterns, recommend a tailored practice routine. Include: aim-training focus areas for underperforming players, specific map utility lineups to drill, team coordination exercises, and retake/execute scenarios to workshop together.`,
+    strategy: `Help the team build a structured playbook. Analyse their T-side defaults and CT setups, then suggest a cohesive strategy with defined roles, a clear calling structure, default rotations, and 2–3 set executes per map that fit their playstyle.`,
+    general: `Provide a comprehensive self-analysis of the team. Cover: strengths to build on, critical weaknesses to address, player role fit, map pool assessment, and a prioritised improvement roadmap for the next month.`,
+  }
+
+  const isMyTeam = mode === 'myteam'
+
+  const systemPrompt = isMyTeam
+    ? `You are an elite Counter-Strike 2 performance coach specialising in team improvement and self-analysis. You analyse a team's OWN demos to help them grow, fix weaknesses, and build a stronger playbook. You communicate like a dedicated coaching staff member who genuinely wants the team to improve.
+
+IMPORTANT CONTEXT: The demos provided are of the USER'S OWN TEAM — not an opponent. Your analysis should always focus on what ${teamName} can do better, what patterns to build on, and how to maximise their potential.
+
+Your coaching style:
+- Team-focused and constructive — frame insights as "we do X, which costs us Y — here's how to fix it"
+- Data-driven and specific — reference player names, maps, round scores, and stats when available
+- Actionable improvement advice — every insight should connect to a concrete drill, adjustment, or decision change
+- Deep tactical knowledge: executes, utility setups, rotations, economy, CT defaults, T-side timings, role clarity
+- Use CS2 terminology correctly (executes, retakes, defaults, eco rounds, force buys, mid-round calls, lurks, entry fragging, etc.)
+- Format responses clearly with markdown headers and bullet points
+- Be honest but encouraging — highlight what's working as well as what needs fixing
+
+${contextText ? `My Team Performance Data:\n${contextText}` : ''}
+${focusArea ? `Coaching focus: ${myTeamFocusInstructions[focusArea] || myTeamFocusInstructions.general}` : ''}
+${mapName ? `Map focus: ${mapName}` : ''}`
+    : `You are an elite Counter-Strike 2 scout and tactical analyst specializing in pre-match preparation. You analyze OPPONENT demos to help teams prepare anti-strats and exploit weaknesses before upcoming matches. You communicate like a professional analyst briefing a team before a big game.
 
 IMPORTANT CONTEXT: The demos uploaded are of the OPPONENT team — not the user's own team. Your analysis should always focus on what the opponent does, their tendencies, weaknesses, and how the user's team can counter them.
-
-// NOTE: Self-analysis (user's own team demos) is planned for v2.
 
 Your analysis style:
 - Opponent-focused and tactical — always frame insights as "they do X, so we should Y"
@@ -155,7 +218,7 @@ Your analysis style:
 - Format responses clearly with markdown headers and bullet points
 
 ${contextText ? `Opponent Scout Context:\n${contextText}` : ''}
-${focusArea ? `Analysis focus: ${focusInstructions[focusArea] || focusInstructions.general}` : ''}
+${focusArea ? `Analysis focus: ${opponentFocusInstructions[focusArea] || opponentFocusInstructions.general}` : ''}
 ${playerName && focusArea === 'player' ? `Opponent player to analyze: ${playerName}` : ''}
 ${mapName && focusArea === 'strategy' ? `Map focus: ${mapName}` : ''}
 ${includeProDataset ? `
