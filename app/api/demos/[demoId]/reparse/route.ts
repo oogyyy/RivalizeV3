@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { parseCS2Demo } from '@/lib/demo-parser/real-parser'
+import { maybeDecompress } from '@/lib/demo-parser/decompress'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import { downloadObject } from '@/lib/r2'
 
@@ -44,17 +45,10 @@ export async function POST(
 
   void (async () => {
     try {
-      if (r2Key.toLowerCase().endsWith('.zst')) {
-        await admin
-          .from('demos')
-          .update({ status: 'failed', error_message: 'Compressed .zst demos are not supported' })
-          .eq('id', demoId)
-        return
-      }
-
       console.log(`[reparse] Downloading ${demoId} from R2 key: ${r2Key}`)
-      const buf = await downloadObject(r2Key)
-      console.log(`[reparse] Downloaded ${buf.length} bytes, parsing...`)
+      const rawBuf = await downloadObject(r2Key)
+      const buf = maybeDecompress(rawBuf, r2Key)
+      console.log(`[reparse] Downloaded ${rawBuf.length} bytes → ${buf.length} bytes after decompression, parsing...`)
       const { parsedData: realData, warnings } = parseCS2Demo(buf)
       if (warnings.length > 0) console.warn('[reparse] warnings:', warnings)
       console.log(`[reparse] Result: ${realData.players.length} players, map=${realData.header.map}, score=${realData.header.score_team1}-${realData.header.score_team2}`)
