@@ -6,31 +6,46 @@ interface DemoRecord {
 
 /**
  * Aggregates opponent player stats across multiple completed demos.
- * Filters out players whose team matches the user team name (team1 = 'My Team'),
- * keeping only the opponent side players.
+ * Uses opponentSide stored in each demo's parsed_data to identify which
+ * team is the opponent ('T-Side' or 'CT-Side') rather than a hardcoded name.
  */
-export function computeTopPlayers(demos: DemoRecord[], userTeamName = 'My Team'): PlayerStats[] {
+export function computeTopPlayers(demos: DemoRecord[]): PlayerStats[] {
   const playerMap: Record<string, PlayerStats & { count: number }> = {}
 
   for (const demo of demos) {
-    const pd = demo.parsed_data as { players?: PlayerStats[] } | null
-    for (const p of pd?.players ?? []) {
-      // Only aggregate opponent players
-      if (p.team === userTeamName) continue
+    const pd = demo.parsed_data as {
+      players?: PlayerStats[]
+      opponentSide?: string
+      header?: { team1?: string; team2?: string }
+    } | null
+
+    const players = pd?.players ?? []
+    if (players.length === 0) continue
+
+    // Determine which team label belongs to the opponent.
+    // The parser sets team1='T-Side', team2='CT-Side' in the header.
+    // opponentSide='team2' → opponent is CT-Side; 'team1' → opponent is T-Side.
+    const opponentSide = pd?.opponentSide ?? 'team2'
+    const opponentTeamLabel = opponentSide === 'team1'
+      ? (pd?.header?.team1 ?? 'T-Side')
+      : (pd?.header?.team2 ?? 'CT-Side')
+
+    for (const p of players) {
+      if (p.team !== opponentTeamLabel) continue
 
       if (!playerMap[p.steam_id]) {
         playerMap[p.steam_id] = { ...p, count: 1 }
       } else {
-        const existing = playerMap[p.steam_id]
-        existing.kills += p.kills
-        existing.deaths += p.deaths
-        existing.assists += p.assists
-        existing.headshots += p.headshots
-        existing.adr = (existing.adr * existing.count + p.adr) / (existing.count + 1)
-        existing.rating = (existing.rating * existing.count + p.rating) / (existing.count + 1)
-        existing.kast = (existing.kast * existing.count + p.kast) / (existing.count + 1)
-        existing.rounds_played += p.rounds_played
-        existing.count++
+        const e = playerMap[p.steam_id]
+        e.kills    += p.kills
+        e.deaths   += p.deaths
+        e.assists  += p.assists
+        e.headshots += p.headshots
+        e.adr    = (e.adr    * e.count + p.adr)    / (e.count + 1)
+        e.rating = (e.rating * e.count + p.rating) / (e.count + 1)
+        e.kast   = (e.kast   * e.count + p.kast)   / (e.count + 1)
+        e.rounds_played += p.rounds_played
+        e.count++
       }
     }
   }

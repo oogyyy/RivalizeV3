@@ -251,19 +251,18 @@ export default async function OpponentPage({
             ) : (
               <div className="space-y-2">
                 {(demos ?? []).map((demo) => {
-                  const pd = demo.parsed_data as { header?: DemoHeader } | null
+                  const pd = demo.parsed_data as { header?: DemoHeader; opponentSide?: 'team1' | 'team2' } | null
                   const header = pd?.header
-                  const isWin = header
-                    ? (header.score_team1 ?? 0) > (header.score_team2 ?? 0)
-                    : null
-                  const isDraw = header
-                    ? (header.score_team1 ?? 0) === (header.score_team2 ?? 0)
-                    : false
+                  const demoOpponentSide = pd?.opponentSide ?? 'team2'
+
+                  // Score from OUR perspective: we are the team that is NOT the opponent
+                  const ourScore  = header ? (demoOpponentSide === 'team1' ? (header.score_team2 ?? 0) : (header.score_team1 ?? 0)) : null
+                  const theirScore = header ? (demoOpponentSide === 'team1' ? (header.score_team1 ?? 0) : (header.score_team2 ?? 0)) : null
+                  const isWin  = ourScore !== null && theirScore !== null ? ourScore > theirScore : null
+                  const isDraw = ourScore !== null && theirScore !== null ? ourScore === theirScore : false
                   const href = demo.status === 'completed'
                     ? `/demos/${demo.id}?folder=${folderId}`
                     : null
-
-                  const demoOpponentSide = ((demo.parsed_data as { opponentSide?: 'team1' | 'team2' } | null)?.opponentSide) ?? 'team2'
 
                   return (
                     <Card key={demo.id} className="bg-card border-border transition-all duration-150 hover:border-border/80">
@@ -280,12 +279,12 @@ export default async function OpponentPage({
                               <span className="font-mono text-sm font-semibold text-foreground">
                                 {demo.map && demo.map !== 'unknown' ? demo.map : 'Unknown map'}
                               </span>
-                              {header && (
+                              {ourScore !== null && theirScore !== null && (
                                 <span className={cn(
                                   'text-xs font-bold font-mono',
                                   isWin ? 'text-neon-green' : isDraw ? 'text-yellow-400' : 'text-red-400'
                                 )}>
-                                  {header.score_team1}–{header.score_team2}
+                                  {ourScore}–{theirScore}
                                 </span>
                               )}
                               <Badge variant={statusVariant(demo.status)} className="text-[10px] h-4 px-1.5">

@@ -29,8 +29,8 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# libc6-compat needed by some native addons on musl (Alpine)
-RUN apk add --no-cache libc6-compat
+# libc6-compat needed by native addons; zstd for decompressing .dem.zst demos
+RUN apk add --no-cache libc6-compat zstd
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
