@@ -6,11 +6,6 @@ import { maybeDecompress } from '@/lib/demo-parser/decompress'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import { downloadObject } from '@/lib/r2'
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const dp = require('@laihoe/demoparser2') as {
-  listUpdatedFields: (b: Buffer) => string[]
-}
-
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ demoId: string }> }
@@ -54,17 +49,6 @@ export async function POST(
       const rawBuf = await downloadObject(r2Key)
       const buf = maybeDecompress(rawBuf, r2Key)
       console.log(`[reparse] Downloaded ${rawBuf.length} bytes → ${buf.length} bytes after decompression, parsing...`)
-
-      // Log all available prop names so we can identify the correct clan/team name field
-      try {
-        const allFields: string[] = dp.listUpdatedFields(buf) ?? []
-        const teamFields = allFields.filter(f => /clan|team_name|team_clan|organization/i.test(f))
-        console.log('[reparse] team/clan-related fields in this demo:', teamFields)
-        console.log('[reparse] total fields available:', allFields.length)
-      } catch (e) {
-        console.warn('[reparse] listUpdatedFields failed:', e)
-      }
-
       const { parsedData: realData, warnings } = parseCS2Demo(buf)
       if (warnings.length > 0) console.warn('[reparse] warnings:', warnings)
       console.log(`[reparse] Result: ${realData.players.length} players, map=${realData.header.map}, score=${realData.header.score_team1}-${realData.header.score_team2}`)

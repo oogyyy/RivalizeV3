@@ -140,36 +140,29 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   // ── 2b. Optional clan-name scan ───────────────────────────────────────────
   //
-  // CCSPlayerController.m_szClanTeamname holds the team's clan/org name for
-  // each player (e.g. "NaVi", "G2"). We request it as 'clan_team_name' per
-  // demoparser2's naming convention (m_sz prefix stripped, CamelCase → snake).
+  // listUpdatedFields() on a real demo revealed the correct prop is:
+  //   CCSPlayerController.m_szClan  (per-player entity, usable as playerExtra)
+  //   CCSTeam.m_szClanTeamname      (team entity — not accessible via playerExtra)
   //
-  // This is intentionally isolated in its own try-catch: if the prop name is
-  // wrong or the demoparser2 version doesn't support it, rm_user_friendly_names()
-  // throws and we catch silently, falling back to 'T-Side' / 'CT-Side'.
+  // We read m_szClan for every victim in player_death to build a steamid→clan
+  // map, then derive each team's name as the majority clan tag on that side.
   const clanNameBySid = new Map<string, string>()
   try {
     const clanEvents = dp.parseEvent(
       buf,
       'player_death',
-      ['team_num', 'clan_team_name'],
-      ['tick', 'attacker_steamid', 'attacker_clan_team_name'],
+      ['team_num', 'CCSPlayerController.m_szClan'],
+      ['tick', 'attacker_steamid'],
     ) ?? []
     for (const ev of clanEvents) {
       const vicSid  = s(ev, 'steamid', 'user_steamid')
-      const vicClan = s(ev, 'clan_team_name')
+      const vicClan = s(ev, 'CCSPlayerController.m_szClan')
       if (vicSid && vicSid !== '0' && vicClan) clanNameBySid.set(vicSid, vicClan)
-
-      const atkSid  = s(ev, 'attacker_steamid')
-      const atkClan = s(ev, 'attacker_clan_team_name')
-      if (atkSid && atkSid !== '0' && atkClan) clanNameBySid.set(atkSid, atkClan)
     }
   } catch (e) {
-    warnings.push(`clan_team_name scan failed (prop unsupported?): ${e}`)
+    warnings.push(`CCSPlayerController.m_szClan scan failed: ${e}`)
   }
-  if (clanNameBySid.size === 0) {
-    warnings.push('no clan names found — team labels will be T-Side / CT-Side')
-  } else {
+  if (clanNameBySid.size > 0) {
     console.log(`[real-parser] clan names found for ${clanNameBySid.size} players:`, [...new Set(clanNameBySid.values())])
   }
 
@@ -395,9 +388,18 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   // ── 7. Score: halftime-aware round winner → team score ────────────────────
   //
-  // First half  (i < halfRoundCount): winner=2 → T-Side wins; winner=3 → CT-Side wins
-  // Second half (i ≥ halfRoundCount): sides switched, so winner=2 → CT-Side originally,
-  //                                   winner=3 → T-Side originally
+  // CS2 round_end winner values: 2 = T-side won, 3 = CT-side won.
+  // Sides switch at halftime, so second-half winner=2 means the team that
+  // started CT-side wins (they're now T).
+  //
+  // Diagnostic: log distinct winner values so we catch any encoding changes.
+  const distinctWinners = new Set(sortedRounds.map(r => n(r, 'winner')))
+  if ([...distinctWinners].every(w => w === 0)) {
+    warnings.push(`All round_end winner values are 0 — 'winner' prop may be wrong. First round row keys: ${JSON.stringify(Object.keys(sortedRounds[0] ?? {}))}`)
+  } else {
+    console.log('[real-parser] distinct winner values:', [...distinctWinners])
+  }
+
   const halfRoundCount = Math.ceil(totalRounds / 2)
   let score1 = 0  // T-Side (started T)
   let score2 = 0  // CT-Side (started CT)
