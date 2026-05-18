@@ -309,14 +309,14 @@ export default async function OpponentPage({
                                   {header.total_rounds} rounds
                                 </span>
                               )}
-                              {demo.status === 'completed' && isOwnerOrAdmin && (
-                                <>
-                                  <SetOpponentSideButton
-                                    demoId={demo.id}
-                                    currentSide={demoOpponentSide}
-                                  />
-                                  <ReparseButton demoId={demo.id} />
-                                </>
+                              {isOwnerOrAdmin && demo.status === 'completed' && (
+                                <SetOpponentSideButton
+                                  demoId={demo.id}
+                                  currentSide={demoOpponentSide}
+                                />
+                              )}
+                              {isOwnerOrAdmin && (demo.status === 'completed' || demo.status === 'failed') && (
+                                <ReparseButton demoId={demo.id} />
                               )}
                             </div>
                           </div>

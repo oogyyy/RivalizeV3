@@ -10,7 +10,7 @@ interface Props {
 
 export default function ReparseButton({ demoId }: Props) {
   const [loading, setLoading] = useState(false)
-  const [toast, setToast] = useState<'success' | 'error' | null>(null)
+  const [toast, setToast] = useState<'queued' | 'error' | null>(null)
   const router = useRouter()
 
   async function handleReparse(e: React.MouseEvent) {
@@ -20,14 +20,18 @@ export default function ReparseButton({ demoId }: Props) {
     try {
       const res = await fetch(`/api/demos/${demoId}/reparse`, { method: 'POST' })
       if (!res.ok) throw new Error(await res.text())
-      setToast('success')
-      setTimeout(() => {
-        setToast(null)
+      setToast('queued')
+      // Poll for completion — large demos take 10–30 s to download + decompress + parse
+      let attempts = 0
+      const interval = setInterval(() => {
         router.refresh()
-      }, 1500)
+        attempts++
+        if (attempts >= 12) clearInterval(interval) // give up after ~60 s
+      }, 5000)
+      setTimeout(() => setToast(null), 3000)
     } catch {
       setToast('error')
-      setTimeout(() => setToast(null), 2500)
+      setTimeout(() => setToast(null), 3000)
     } finally {
       setLoading(false)
     }
@@ -38,16 +42,16 @@ export default function ReparseButton({ demoId }: Props) {
       <button
         onClick={handleReparse}
         disabled={loading}
-        title="Re-parse demo with real data"
+        title="Re-parse demo"
         className="p-1.5 rounded-md text-muted-foreground hover:text-blue-400 hover:bg-blue-400/10 transition-all duration-150 disabled:opacity-40"
       >
         <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
       </button>
-      {toast === 'success' && (
-        <span className="absolute left-8 top-0 text-xs text-green-400 whitespace-nowrap">Re-parsing…</span>
+      {toast === 'queued' && (
+        <span className="absolute left-8 top-0 text-xs text-blue-400 whitespace-nowrap">Re-parsing…</span>
       )}
       {toast === 'error' && (
-        <span className="absolute left-8 top-0 text-xs text-red-400 whitespace-nowrap">Failed</span>
+        <span className="absolute left-8 top-0 text-xs text-red-400 whitespace-nowrap">Failed to start</span>
       )}
     </span>
   )
