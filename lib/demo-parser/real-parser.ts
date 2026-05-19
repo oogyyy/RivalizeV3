@@ -222,16 +222,26 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       const GENERIC_NAMES = new Set([
         '', 'Unassigned', 'Spectator', 'TERRORIST', 'CT',
         'Terrorist', 'Counter-Terrorist', 'T', 'COUNTER-TERRORIST',
-        'Terrorists', 'Counter-Terrorists',
+        'Terrorists', 'Counter-Terrorists', 'terrorist', 'counter-terrorist',
       ])
+      // Sample at tick 1 (entity initialization) AND last round end tick.
+      // FACEIT sets team names early; tick 1 is more reliable than match-end.
+      const sampleTicks = [...new Set([1, lastRoundTick])]
       const teamRows = dp.parseTicks(
         buf,
         ['CCSTeam.m_szTeamname', 'CCSTeam.m_iTeamNum'],
-        [lastRoundTick],
+        sampleTicks,
       ) ?? []
+
+      // Dump first few rows for diagnostics so we can see what the library returns
+      if (teamRows.length > 0) {
+        console.log('[real-parser] parseTicks raw sample (first 6 rows):', JSON.stringify(teamRows.slice(0, 6)))
+      }
+
       for (const row of teamRows) {
-        const teamNum  = n(row, 'CCSTeam.m_iTeamNum')
-        const teamName = s(row, 'CCSTeam.m_szTeamname')
+        // Try both key formats: with and without class prefix
+        const teamNum  = n(row, 'CCSTeam.m_iTeamNum', 'm_iTeamNum')
+        const teamName = s(row, 'CCSTeam.m_szTeamname', 'm_szTeamname')
         if (!teamName || GENERIC_NAMES.has(teamName)) continue
         if (teamNum === 2 && !tEntityName)  tEntityName  = teamName
         if (teamNum === 3 && !ctEntityName) ctEntityName = teamName
@@ -239,7 +249,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       if (tEntityName || ctEntityName) {
         console.log(`[real-parser] CCSTeam entity names: T="${tEntityName}", CT="${ctEntityName}"`)
       } else {
-        console.log(`[real-parser] CCSTeam scan returned ${teamRows.length} rows but no usable names`)
+        console.log(`[real-parser] CCSTeam scan: ${teamRows.length} rows, no usable names found`)
       }
     } catch (e) {
       warnings.push(`CCSTeam parseTicks: ${e}`)
