@@ -293,6 +293,8 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   const competitiveRounds = sortedRounds.slice(stripCount)
   const totalRounds = competitiveRounds.length
+  // Tick boundary below which events belong to stripped pre-match rounds.
+  const preMatchEndTick = stripCount > 0 ? n(sortedRounds[stripCount - 1], 'tick') : -1
 
   // Halftime tick: end of round 12 (MR12 fixed), or last round if shorter.
   // Used to determine each player's starting side before side-swap.
@@ -363,7 +365,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
     if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, vicTeam)
 
-    if (knifeRoundEndTick >= 0 && tick <= knifeRoundEndTick) continue
+    if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
 
     const isTeamKill = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
     const isSelfKill = atkSid !== '' && atkSid === vicSid
@@ -387,7 +389,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
     if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, vicTeam)
 
-    if (knifeRoundEndTick >= 0 && tick <= knifeRoundEndTick) continue
+    if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
 
     const isFriendlyFire = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
     const isSelfDamage   = atkSid !== '' && vicSid !== '' && atkSid === vicSid
