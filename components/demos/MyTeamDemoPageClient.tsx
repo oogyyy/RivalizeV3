@@ -441,7 +441,7 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
   if (myScore === 0 && theirScore === 0 && parsed?.rounds?.length) {
     const T_WIN  = new Set(['ct_killed', 'bomb_exploded', 'target_bombed', 'terrorists_win'])
     const CT_WIN = new Set(['t_killed', 'bomb_defused', 'hostage_rescued', 'cts_win', 'time_expired'])
-    const half = Math.ceil(parsed.rounds.length / 2)
+    const half = 12
     let s1 = 0, s2 = 0
     for (let i = 0; i < parsed.rounds.length; i++) {
       const reason = parsed.rounds[i].win_reason
