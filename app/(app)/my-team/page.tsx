@@ -336,6 +336,8 @@ export default async function MyTeamPage() {
                   const isDraw = ourScore !== null && theirScore !== null && ourScore === theirScore
                   const isLoss = ourScore !== null && theirScore !== null && ourScore < theirScore
 
+                  const demoHref = demo.status === 'completed' ? `/my-team/demos/${demo.id}` : null
+
                   return (
                     <div key={demo.id} className="py-2 border-b border-border last:border-0 space-y-1">
                       <div className="flex items-center gap-3">
@@ -349,12 +351,21 @@ export default async function MyTeamPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-foreground truncate">
-                            {h?.map ?? demo.map ?? 'Unknown map'}
-                            {demo.opponent_slug && (
-                              <span className="text-muted-foreground"> vs {demo.opponent_slug}</span>
-                            )}
-                          </p>
+                          {demoHref ? (
+                            <Link href={demoHref} className="text-sm text-foreground hover:text-neon-green transition-colors truncate block">
+                              {h?.map ?? demo.map ?? 'Unknown map'}
+                              {demo.opponent_slug && (
+                                <span className="text-muted-foreground"> vs {demo.opponent_slug}</span>
+                              )}
+                            </Link>
+                          ) : (
+                            <p className="text-sm text-foreground truncate">
+                              {h?.map ?? demo.map ?? 'Unknown map'}
+                              {demo.opponent_slug && (
+                                <span className="text-muted-foreground"> vs {demo.opponent_slug}</span>
+                              )}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground">
                             {demo.match_date
                               ? new Date(demo.match_date).toLocaleDateString()
