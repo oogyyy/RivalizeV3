@@ -109,6 +109,7 @@ export default async function DashboardPage() {
   for (const f of (folders ?? []) as FolderRow[]) {
     folderByKey[`${f.user_team_id}:${f.opponent_slug}`] = f.id
   }
+
   const { data: allFolders } = teamIds.length
     ? await admin
         .from('team_folders')
@@ -121,7 +122,7 @@ export default async function DashboardPage() {
     if (!folderByKey[key]) folderByKey[key] = f.id
   }
 
-  // Recent demos — 4 of each type
+  // Recent demos — 3 of each type
   type DemoRow = {
     id: string; team_id: string; opponent_name: string
     opponent_slug: string | null; map: string
@@ -132,7 +133,7 @@ export default async function DashboardPage() {
   const { data: recentOpponentDemos } = teamIds.length
     ? await admin
         .from('demos')
-        .select('id, team_id, opponent_name, opponent_slug, map, match_date, status, created_at')
+        .select('id, team_id, opponent_name, opponent_slug, map, match_date, status, created_at, demo_type')
         .in('team_id', teamIds)
         .eq('demo_type', 'opponent')
         .order('created_at', { ascending: false })
