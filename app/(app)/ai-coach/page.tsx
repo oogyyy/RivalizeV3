@@ -644,7 +644,7 @@ export default function AIScoutPage() {
                       {error.message?.includes('Unauthorized') || error.message?.includes('401')
                         ? 'Not authorised — please refresh the page and try again.'
                         : error.message?.includes('API key') || error.message?.includes('not configured') || error.message?.includes('unavailable') || error.message?.includes('503') || error.message?.includes('OpenAI')
-                          ? 'AI service unavailable. Check that your OpenAI API key is configured in Vercel.'
+                          ? 'AI service unavailable. Check that your OpenAI API key is configured.'
                           : 'Something went wrong. Please try again.'}
                     </p>
                     <Button
