@@ -117,8 +117,8 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   // ── Polling helpers ─────────────────────────────────────────────────────────
 
   const FALLBACK_TEAMS: ParsedTeamInfo = {
-    team1: { name: 'Team 1 (T)',  players: [], score: 0, startSide: 'T' },
-    team2: { name: 'Team 2 (CT)', players: [], score: 0, startSide: 'CT' },
+    team1: { name: 'Team 1',  players: [], score: 0, startSide: 'T' },
+    team2: { name: 'Team 2', players: [], score: 0, startSide: 'CT' },
     map: '',
   }
 
@@ -154,18 +154,17 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
             return raw
           }
 
-          const team1Name = resolveTeamName(h.team1, 'Team 1 (T-Side)')
-          const team2Name = resolveTeamName(h.team2, 'Team 2 (CT-Side)')
+          const team1Name = resolveTeamName(h.team1, 'Team 1')
+          const team2Name = resolveTeamName(h.team2, 'Team 2')
 
-          // Players are keyed to the raw parser team name (which may be "T-Side").
           const t1Players = ps
-            .filter(p => p.team === h.team1 || p.team === 'T-Side')
+            .filter(p => p.team === h.team1 || p.team === team1Name || p.team === 'T-Side')
             .sort((a, b) => b.rating - a.rating)
             .slice(0, 5)
             .map(p => p.name)
 
           const t2Players = ps
-            .filter(p => p.team === h.team2 || p.team === 'CT-Side')
+            .filter(p => p.team === h.team2 || p.team === team2Name || p.team === 'CT-Side')
             .sort((a, b) => b.rating - a.rating)
             .slice(0, 5)
             .map(p => p.name)
@@ -460,14 +459,6 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                             isSelected ? 'text-[#00ff87]' : 'text-foreground'
                           )}>
                             {t.name}
-                          </span>
-                          <span className={cn(
-                            'text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0',
-                            t.startSide === 'T'
-                              ? 'text-orange-400 border-orange-400/30 bg-orange-400/10'
-                              : 'text-blue-400 border-blue-400/30 bg-blue-400/10'
-                          )}>
-                            {t.startSide === 'T' ? 'T-Side' : 'CT-Side'}
                           </span>
                           {isSuggested && (
                             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-neon-green/10 text-neon-green border border-neon-green/20 shrink-0">
