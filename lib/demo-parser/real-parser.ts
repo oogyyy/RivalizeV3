@@ -149,7 +149,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   try {
     hurtEvents = dp.parseEvent(
       buf, 'player_hurt', PLAYER_EXTRA,
-      ['tick', 'attacker_steamid', 'attacker_team_num', 'dmg_health'],
+      ['tick', 'attacker_steamid', 'attacker_team_num', 'dmg_health', 'health'],
     ) ?? []
   } catch (e) { warnings.push(`parseEvent(player_hurt): ${e}`) }
 
@@ -349,7 +349,17 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   console.log(`[real-parser] name sources: parsePlayerInfo=${infoName.size}, victim=${victimName.size}, attacker=${attackerName.size}`)
 
-  // ── 4. Stat maps + team_num observations ──────────────────────────────────
+  // ── 4. Stat maps + two-pass team-aware stat counting ─────────────────────
+  //
+  // PASS 1: Collect team observations from VICTIM-side fields (always
+  // reliable, populated via PLAYER_EXTRA) plus any attacker_team_num we get.
+  // This gives us complete team assignments before we count any stats.
+  //
+  // PASS 2: Count kills/damage using getTeamNumAtTick() for accurate team-
+  // kill and friendly-fire filtering. attacker_team_num is NOT trusted for
+  // filtering — it is often 0 in CS2 demos because it is resolved from the
+  // attacker entity at parse time and may be missing.
+
   const killMap    = new Map<string, number>()
   const hsMap      = new Map<string, number>()
   const assistMap  = new Map<string, number>()
@@ -364,57 +374,30 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     playerTeamObs.get(sid)!.push({ tick, team_num: teamNum })
   }
 
+  // ── Pass 1: team observations only ───────────────────────────────────────
   for (const ev of deathEvents) {
-    const atkSid  = s(ev, 'attacker_steamid')
-    const vicSid  = s(ev, 'steamid', 'user_steamid')
     const tick    = n(ev, 'tick')
-    const atkTeam = n(ev, 'attacker_team_num')
+    const vicSid  = s(ev, 'steamid', 'user_steamid')
     const vicTeam = n(ev, 'team_num', 'user_team_num')
-
-    if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
+    const atkSid  = s(ev, 'attacker_steamid')
+    const atkTeam = n(ev, 'attacker_team_num')
     if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, vicTeam)
-
-    if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
-
-    const isTeamKill = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
-    const isSelfKill = atkSid !== '' && atkSid === vicSid
-
-    if (atkSid && atkSid !== '0' && !isTeamKill && !isSelfKill) {
-      killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
-      if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
-    }
-    const astSid = s(ev, 'assister_steamid')
-    if (astSid && astSid !== '0') assistMap.set(astSid, (assistMap.get(astSid) ?? 0) + 1)
-    if (vicSid && vicSid !== '0') deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1)
+    if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
   }
-
   for (const ev of hurtEvents) {
     const tick    = n(ev, 'tick')
+    const vicSid  = s(ev, 'steamid', 'user_steamid')
+    const vicTeam = n(ev, 'team_num')
     const atkSid  = s(ev, 'attacker_steamid')
     const atkTeam = n(ev, 'attacker_team_num')
-    const vicTeam = n(ev, 'team_num')
-    const vicSid  = s(ev, 'steamid', 'user_steamid')
-
-    if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
     if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, vicTeam)
-
-    if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
-
-    const isFriendlyFire = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
-    const isSelfDamage   = atkSid !== '' && vicSid !== '' && atkSid === vicSid
-
-    if (atkSid && atkSid !== '0' && !isFriendlyFire && !isSelfDamage) {
-      const dmg = Math.min(100, n(ev, 'dmg_health'))
-      damageMap.set(atkSid, (damageMap.get(atkSid) ?? 0) + dmg)
-    }
+    if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
   }
-
   for (const ev of mvpEvents) {
-    const sid = s(ev, 'steamid', 'user_steamid')
-    if (sid && sid !== '0') {
-      mvpMap.set(sid, (mvpMap.get(sid) ?? 0) + 1)
-      recordTeam(sid, n(ev, 'tick'), n(ev, 'team_num', 'user_team_num'))
-    }
+    const sid  = s(ev, 'steamid', 'user_steamid')
+    const tick = n(ev, 'tick')
+    const team = n(ev, 'team_num', 'user_team_num')
+    if (sid && sid !== '0') recordTeam(sid, tick, team)
   }
 
   // ── 5. Derive each player's STARTING team_num ─────────────────────────────
@@ -443,6 +426,130 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     const counts = new Map<number, number>()
     for (const o of obs) counts.set(o.team_num, (counts.get(o.team_num) ?? 0) + 1)
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  }
+
+  // ── Helpers for round-aware team assignment ───────────────────────────────
+  //
+  // Given a round index into competitiveRounds, return whether teams are in
+  // their "first-half orientation" (starting positions).
+  function isFirstHalfOrientation(roundIdx: number): boolean {
+    if (roundIdx < REGULATION_HALF) return true
+    if (roundIdx < REGULATION_HALF * 2) return false
+    // OT: odd mini-halves flip back to first-half orientation
+    const otHalf = Math.floor((roundIdx - REGULATION_HALF * 2) / OT_HALF_SIZE)
+    return otHalf % 2 === 1
+  }
+
+  // Sorted array of end-ticks for competitive rounds (for binary search).
+  const roundEndTickArr = competitiveRounds.map(r => n(r, 'tick'))
+
+  // Binary-search for the competitive round index containing this tick.
+  // Returns -1 if tick is after all rounds.
+  function findRoundIdx(tick: number): number {
+    if (roundEndTickArr.length === 0) return -1
+    let lo = 0, hi = roundEndTickArr.length - 1
+    if (tick > roundEndTickArr[hi]) return -1
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (roundEndTickArr[mid] < tick) lo = mid + 1
+      else hi = mid
+    }
+    return lo
+  }
+
+  // Return the actual team_num (2=T, 3=CT) for a player at a given tick,
+  // accounting for side swaps at halftime and OT mini-halves.
+  function getTeamNumAtTick(sid: string, tick: number): number {
+    const starting = getStartingTeamNum(sid)
+    if (starting < 2) return 0
+    const rIdx = findRoundIdx(tick)
+    if (rIdx === -1) return 0
+    return isFirstHalfOrientation(rIdx) ? starting : (starting === 2 ? 3 : 2)
+  }
+
+  // ── Pass 2a: kills, deaths, assists ──────────────────────────────────────
+  for (const ev of deathEvents) {
+    const tick   = n(ev, 'tick')
+    const vicSid = s(ev, 'steamid', 'user_steamid')
+    const atkSid = s(ev, 'attacker_steamid')
+
+    if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, n(ev, 'team_num', 'user_team_num'))
+    if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, n(ev, 'attacker_team_num'))
+
+    if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
+
+    if (vicSid && vicSid !== '0') {
+      deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1)
+    }
+
+    if (!atkSid || atkSid === '0' || atkSid === vicSid) continue
+
+    const atkTeam = getTeamNumAtTick(atkSid, tick)
+    const vicTeam = getTeamNumAtTick(vicSid, tick)
+    if (atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam) continue  // team kill
+
+    killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
+    if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
+
+    const astSid = s(ev, 'assister_steamid')
+    if (astSid && astSid !== '0') assistMap.set(astSid, (assistMap.get(astSid) ?? 0) + 1)
+  }
+
+  // ── Pass 2b: damage — use HP-delta to avoid raw weapon damage inflation ──
+  //
+  // In CS2 demos, dmg_health can be the raw weapon damage (e.g. 459 for an AWP
+  // headshot) rather than actual HP lost. Using the 'health' field (victim HP
+  // AFTER the hit) and tracking per-round HP gives the correct value.
+  {
+    const sortedHurt = [...hurtEvents].sort((a, b) => n(a, 'tick') - n(b, 'tick'))
+    let trackRoundIdx = -2
+    const victimRoundHP = new Map<string, number>()
+
+    for (const ev of sortedHurt) {
+      const tick   = n(ev, 'tick')
+      const atkSid = s(ev, 'attacker_steamid')
+      const vicSid = s(ev, 'steamid', 'user_steamid')
+
+      if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
+      if (!atkSid || atkSid === '0' || !vicSid || vicSid === '0') continue
+      if (atkSid === vicSid) continue
+
+      const rIdx = findRoundIdx(tick)
+      if (rIdx === -1) continue
+
+      // New round detected — reset HP tracking so everyone starts at 100.
+      if (rIdx !== trackRoundIdx) {
+        victimRoundHP.clear()
+        trackRoundIdx = rIdx
+      }
+
+      const atkTeam = getTeamNumAtTick(atkSid, tick)
+      const vicTeam = getTeamNumAtTick(vicSid, tick)
+      if (atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam) continue  // friendly fire
+
+      // Compute actual HP delta. 'health' = victim HP after hit (0–100).
+      // Fall back to min(100, dmg_health) if health field is unavailable.
+      const healthAfter = ev['health'] != null ? n(ev, 'health') : -1
+      let actualDmg: number
+      if (healthAfter >= 0) {
+        const prevHP = victimRoundHP.get(vicSid) ?? 100
+        actualDmg = Math.max(0, prevHP - healthAfter)
+        victimRoundHP.set(vicSid, Math.max(0, healthAfter))
+      } else {
+        actualDmg = Math.min(100, n(ev, 'dmg_health'))
+      }
+
+      if (actualDmg > 0) {
+        damageMap.set(atkSid, (damageMap.get(atkSid) ?? 0) + actualDmg)
+      }
+    }
+  }
+
+  for (const ev of mvpEvents) {
+    const sid = s(ev, 'steamid', 'user_steamid')
+    if (sid && sid !== '0') {
+      mvpMap.set(sid, (mvpMap.get(sid) ?? 0) + 1)
+    }
   }
 
   // ── 6. Build player list ──────────────────────────────────────────────────
