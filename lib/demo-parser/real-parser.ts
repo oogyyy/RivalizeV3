@@ -209,6 +209,10 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   // We sample it at the last round_end tick so the final team names are read.
   let tEntityName  = ''
   let ctEntityName = ''
+  // Team observations from parseTicks — populated below, merged into
+  // playerTeamObs in Pass 1 to ensure all 10 players have team assignments
+  // even if they never appear as a victim or attacker in any event.
+  const parsedTickTeamObs: Array<{sid: string; tick: number; team_num: number}> = []
 
   // Sort rounds first so we can find the last tick
   const sortedRounds = [...roundEnds].sort((a, b) => n(a, 'tick') - n(b, 'tick'))
@@ -228,21 +232,27 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       const sampleTicks = [...new Set([1, lastRoundTick])]
       const teamRows = dp.parseTicks(
         buf,
+        // team_num is the player entity's team (2=T, 3=CT) at this tick.
         // m_szClan gives the FACEIT/organized team name per player (e.g. "team_Oogy").
         // CCSTeam.m_szTeamname only gives "TERRORIST"/"CT" for most FACEIT matches.
-        ['CCSTeam.m_szTeamname', 'CCSTeam.m_iTeamNum', 'CCSPlayerController.m_szClan'],
+        ['team_num', 'CCSTeam.m_szTeamname', 'CCSTeam.m_iTeamNum', 'CCSPlayerController.m_szClan'],
         sampleTicks,
       ) ?? []
 
       console.log('[real-parser] parseTicks raw sample (first 6 rows):', JSON.stringify(teamRows.slice(0, 6)))
 
-      // Populate clanNameBySid from ALL players visible at these ticks — more
-      // complete than the death/mvp event scans which miss players who never
-      // appeared in those specific events.
+      // Populate clanNameBySid AND parsedTickTeamObs from ALL players visible
+      // at these ticks — more complete than event scans which miss players who
+      // only ever appear as the attacker (attacker_team_num is often 0 in CS2).
       for (const row of teamRows) {
-        const sid  = s(row, 'steamid')
-        const clan = s(row, 'CCSPlayerController.m_szClan', 'm_szClan')
-        if (sid && sid !== '0' && clan) clanNameBySid.set(sid, clan)
+        const sid     = s(row, 'steamid')
+        const clan    = s(row, 'CCSPlayerController.m_szClan', 'm_szClan')
+        const teamNum = n(row, 'team_num')
+        const tickVal = n(row, 'tick')
+        if (sid && sid !== '0') {
+          if (clan) clanNameBySid.set(sid, clan)
+          if (teamNum >= 2) parsedTickTeamObs.push({ sid, tick: tickVal, team_num: teamNum })
+        }
       }
 
       // Also try CCSTeam.m_szTeamname in case the server set real names there.
@@ -400,6 +410,13 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     if (sid && sid !== '0') recordTeam(sid, tick, team)
   }
 
+  // Merge parseTicks team observations — guarantees all 10 players have an
+  // entry in playerTeamObs even if they never appear as a victim or attacker
+  // in any event (attacker_team_num is frequently 0 in CS2 demo events).
+  for (const obs of parsedTickTeamObs) {
+    recordTeam(obs.sid, obs.tick, obs.team_num)
+  }
+
   // ── 5. Derive each player's STARTING team_num ─────────────────────────────
   //
   // Prefer pre-halftime observations (tick ≤ halfTick) — these directly give
@@ -478,15 +495,19 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
     if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
 
-    if (vicSid && vicSid !== '0') {
+    const atkTeam = atkSid && atkSid !== '0' ? getTeamNumAtTick(atkSid, tick) : 0
+    const vicTeam = getTeamNumAtTick(vicSid, tick)
+    const isTeamKill = atkSid && atkSid !== '0' && atkSid !== vicSid &&
+                       atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
+
+    // Count death for the victim, excluding team-kill deaths (FACEIT does not
+    // count deaths caused by a teammate against the victim's death tally).
+    if (vicSid && vicSid !== '0' && !isTeamKill) {
       deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1)
     }
 
     if (!atkSid || atkSid === '0' || atkSid === vicSid) continue
-
-    const atkTeam = getTeamNumAtTick(atkSid, tick)
-    const vicTeam = getTeamNumAtTick(vicSid, tick)
-    if (atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam) continue  // team kill
+    if (isTeamKill) continue
 
     killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
     if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
@@ -501,7 +522,15 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   // headshot) rather than actual HP lost. Using the 'health' field (victim HP
   // AFTER the hit) and tracking per-round HP gives the correct value.
   {
-    const sortedHurt = [...hurtEvents].sort((a, b) => n(a, 'tick') - n(b, 'tick'))
+    // Sort by tick first. Within the same tick, sort by remaining HP descending
+    // so the event where the victim has MORE HP remaining (= earlier hit in the
+    // round) is processed first. This gives correct per-attacker attribution
+    // regardless of the order demoparser2 emits same-tick events.
+    const sortedHurt = [...hurtEvents].sort((a, b) => {
+      const tickDiff = n(a, 'tick') - n(b, 'tick')
+      if (tickDiff !== 0) return tickDiff
+      return n(b, 'health') - n(a, 'health')  // higher remaining HP = earlier hit
+    })
     let trackRoundIdx = -2
     const victimRoundHP = new Map<string, number>()
 
