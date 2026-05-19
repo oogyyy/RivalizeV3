@@ -147,27 +147,38 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
             name: string; team: string; rating: number
           }>
 
+          // The parser stores "T-Side"/"CT-Side" as fallbacks when no clan tag
+          // is found — those are not real team names so we replace them.
+          const resolveTeamName = (raw: string | undefined, fallback: string) => {
+            if (!raw || raw === 'T-Side' || raw === 'CT-Side') return fallback
+            return raw
+          }
+
+          const team1Name = resolveTeamName(h.team1, 'Team 1 (T-Side)')
+          const team2Name = resolveTeamName(h.team2, 'Team 2 (CT-Side)')
+
+          // Players are keyed to the raw parser team name (which may be "T-Side").
           const t1Players = ps
-            .filter(p => p.team === h.team1)
+            .filter(p => p.team === h.team1 || p.team === 'T-Side')
             .sort((a, b) => b.rating - a.rating)
             .slice(0, 5)
             .map(p => p.name)
 
           const t2Players = ps
-            .filter(p => p.team === h.team2)
+            .filter(p => p.team === h.team2 || p.team === 'CT-Side')
             .sort((a, b) => b.rating - a.rating)
             .slice(0, 5)
             .map(p => p.name)
 
           setParsedTeamInfo({
             team1: {
-              name:      h.team1 || 'Team 1 (T)',
+              name:      team1Name,
               players:   t1Players,
               score:     h.score_team1 ?? 0,
               startSide: 'T',
             },
             team2: {
-              name:      h.team2 || 'Team 2 (CT)',
+              name:      team2Name,
               players:   t2Players,
               score:     h.score_team2 ?? 0,
               startSide: 'CT',
@@ -484,28 +495,34 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
                       {/* Score block */}
                       <div className="shrink-0 text-right flex flex-col items-end gap-1">
-                        <div className="flex items-baseline gap-1 font-mono">
-                          <span className={cn(
-                            'text-2xl font-bold',
-                            isWinner
-                              ? isSelected ? 'text-[#00ff87]' : 'text-foreground'
-                              : 'text-muted-foreground'
-                          )}>
-                            {t.score}
-                          </span>
-                          <span className="text-sm text-muted-foreground">:</span>
-                          <span className={cn(
-                            'text-2xl font-bold',
-                            !isWinner
-                              ? isSelected ? 'text-[#00ff87]' : 'text-foreground'
-                              : 'text-muted-foreground'
-                          )}>
-                            {other.score}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          {isWinner ? 'W' : t.score === other.score ? 'Draw' : 'L'}
-                        </p>
+                        {t.score === 0 && other.score === 0 ? (
+                          <p className="text-xs text-muted-foreground italic">score N/A</p>
+                        ) : (
+                          <>
+                            <div className="flex items-baseline gap-1 font-mono">
+                              <span className={cn(
+                                'text-2xl font-bold',
+                                isWinner
+                                  ? isSelected ? 'text-[#00ff87]' : 'text-foreground'
+                                  : 'text-muted-foreground'
+                              )}>
+                                {t.score}
+                              </span>
+                              <span className="text-sm text-muted-foreground">:</span>
+                              <span className={cn(
+                                'text-2xl font-bold',
+                                !isWinner
+                                  ? isSelected ? 'text-[#00ff87]' : 'text-foreground'
+                                  : 'text-muted-foreground'
+                              )}>
+                                {other.score}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                              {isWinner ? 'W' : t.score === other.score ? 'Draw' : 'L'}
+                            </p>
+                          </>
+                        )}
                         {isSelected && (
                           <CheckCircle2 size={16} className="text-[#00ff87] mt-1" />
                         )}
