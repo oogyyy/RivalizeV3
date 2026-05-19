@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { createGroq } from '@ai-sdk/groq'
+import { createOpenAI } from '@ai-sdk/openai'
 import { streamText } from 'ai'
 
 export async function POST(request: Request) {
@@ -243,7 +243,10 @@ CRITICAL RULES for pro dataset references:
     return NextResponse.json({ error: 'Groq API key not configured' }, { status: 503 })
   }
 
-  const groq = createGroq({ apiKey: process.env.GROQ_API_KEY })
+  const groq = createOpenAI({
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: 'https://api.groq.com/openai/v1',
+  })
 
   try {
     const result = streamText({
