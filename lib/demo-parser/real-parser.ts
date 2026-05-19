@@ -162,8 +162,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     warnings.push(`parseEvent(round_mvp): ${e}`)
   }
 
-  const totalRounds = roundEnds.length
-
   // ── 2b. Optional clan-name scan ───────────────────────────────────────────
   //
   // listUpdatedFields() on a real demo revealed the correct prop is:
@@ -195,10 +193,32 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   // Sort round_end events chronologically — used for halftime boundary and score
   const sortedRounds = [...roundEnds].sort((a, b) => n(a, 'tick') - n(b, 'tick'))
 
-  // Halftime tick: tick of the last round in the first half
+  // ── Knife round detection ─────────────────────────────────────────────────
+  // FACEIT/ESEA competitive matches begin with a knife round (side selection).
+  // All kills in that round use melee weapons. We strip it from stats and
+  // totalRounds so counts match the FACEIT scoreboard.
+  function isKnifeWeapon(w: string): boolean {
+    return w.startsWith('knife') || w === 'bayonet'
+  }
+
+  let knifeRoundEndTick = -1
+  if (sortedRounds.length > 0) {
+    const firstEndTick = n(sortedRounds[0], 'tick')
+    const firstRoundDeaths = deathEvents.filter(ev => n(ev, 'tick') <= firstEndTick)
+    if (firstRoundDeaths.length > 0 && firstRoundDeaths.every(ev => isKnifeWeapon(s(ev, 'weapon')))) {
+      knifeRoundEndTick = firstEndTick
+      console.log(`[real-parser] knife round detected (end tick=${firstEndTick}), excluding from stats`)
+    }
+  }
+
+  // Competitive rounds = all rounds after the knife round
+  const competitiveRounds = knifeRoundEndTick >= 0 ? sortedRounds.slice(1) : sortedRounds
+  const totalRounds = competitiveRounds.length
+
+  // Halftime tick: tick of the last round in the first half (competitive only)
   const halfRoundIdx = Math.ceil(totalRounds / 2) - 1
-  const halfTick = halfRoundIdx >= 0 && halfRoundIdx < sortedRounds.length
-    ? n(sortedRounds[halfRoundIdx], 'tick')
+  const halfTick = halfRoundIdx >= 0 && halfRoundIdx < competitiveRounds.length
+    ? n(competitiveRounds[halfRoundIdx], 'tick')
     : Infinity
 
   // ── 3. Player info (display names, bot/HLTV flags) ────────────────────────
@@ -273,16 +293,21 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     const tick    = n(ev, 'tick')
     const atkTeam = n(ev, 'attacker_team_num')
     const vicTeam = n(ev, 'team_num', 'user_team_num')
+
+    // Always record team observations (knife round side = first-half side)
+    if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
+    if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, vicTeam)
+
+    // Skip knife round — don't count kills/deaths/assists from it
+    if (knifeRoundEndTick >= 0 && tick <= knifeRoundEndTick) continue
+
     // Exclude team kills and self-kills from kill/HS counts (matches FACEIT scoring)
     const isTeamKill = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
     const isSelfKill = atkSid !== '' && atkSid === vicSid
 
-    if (atkSid && atkSid !== '0') {
-      if (!isTeamKill && !isSelfKill) {
-        killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
-        if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
-      }
-      recordTeam(atkSid, tick, atkTeam)
+    if (atkSid && atkSid !== '0' && !isTeamKill && !isSelfKill) {
+      killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
+      if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
     }
     const astSid = s(ev, 'assister_steamid')
     if (astSid && astSid !== '0') {
@@ -290,7 +315,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     }
     if (vicSid && vicSid !== '0') {
       deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1)
-      recordTeam(vicSid, tick, vicTeam)
     }
   }
 
@@ -300,19 +324,21 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     const atkTeam = n(ev, 'attacker_team_num')
     const vicTeam = n(ev, 'team_num')  // PLAYER_EXTRA on victim entity
     const vicSid  = s(ev, 'steamid', 'user_steamid')
+
+    // Always record team observations
+    if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
+    if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, vicTeam)
+
+    // Skip knife round damage
+    if (knifeRoundEndTick >= 0 && tick <= knifeRoundEndTick) continue
+
     // Exclude friendly fire and self-damage so ADR matches FACEIT
     const isFriendlyFire = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
     const isSelfDamage   = atkSid !== '' && vicSid !== '' && atkSid === vicSid
 
-    if (atkSid && atkSid !== '0') {
-      if (!isFriendlyFire && !isSelfDamage) {
-        const dmg = Math.min(100, n(ev, 'dmg_health'))
-        damageMap.set(atkSid, (damageMap.get(atkSid) ?? 0) + dmg)
-      }
-      recordTeam(atkSid, tick, atkTeam)
-    }
-    if (vicSid && vicSid !== '0') {
-      recordTeam(vicSid, tick, vicTeam)
+    if (atkSid && atkSid !== '0' && !isFriendlyFire && !isSelfDamage) {
+      const dmg = Math.min(100, n(ev, 'dmg_health'))
+      damageMap.set(atkSid, (damageMap.get(atkSid) ?? 0) + dmg)
     }
   }
 
@@ -471,27 +497,27 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   let score1 = 0  // team1 = started T-Side
   let score2 = 0  // team2 = started CT-Side
 
-  const lastRound = sortedRounds.length > 0 ? sortedRounds[sortedRounds.length - 1] : null
+  const lastRound = competitiveRounds.length > 0 ? competitiveRounds[competitiveRounds.length - 1] : null
   const directT  = lastRound ? n(lastRound, 't_score') : 0
   const directCT = lastRound ? n(lastRound, 'ct_score') : 0
 
   if (directT > 0 || directCT > 0) {
-    // Strategy A: use cumulative scores from the last round_end event
+    // Strategy A: use cumulative scores from the last competitive round_end event
     score1 = directT
     score2 = directCT
     console.log(`[real-parser] scores via t_score/ct_score: ${score1}-${score2}`)
   } else {
-    // Strategy B: halftime-aware winner counting
-    const distinctWinners = new Set(sortedRounds.map(r => n(r, 'winner')))
+    // Strategy B: halftime-aware winner counting (competitive rounds only)
+    const distinctWinners = new Set(competitiveRounds.map(r => n(r, 'winner')))
     if ([...distinctWinners].every(w => w === 0)) {
-      warnings.push(`All round_end winner/t_score/ct_score values are 0 — score unknown. First round row keys: ${JSON.stringify(Object.keys(sortedRounds[0] ?? {}))}`)
+      warnings.push(`All round_end winner/t_score/ct_score values are 0 — score unknown. First round row keys: ${JSON.stringify(Object.keys(competitiveRounds[0] ?? {}))}`)
     } else {
       console.log('[real-parser] distinct winner values:', [...distinctWinners])
     }
 
     const halfRoundCount = Math.ceil(totalRounds / 2)
-    for (let i = 0; i < sortedRounds.length; i++) {
-      const winnerSide = n(sortedRounds[i], 'winner')
+    for (let i = 0; i < competitiveRounds.length; i++) {
+      const winnerSide = n(competitiveRounds[i], 'winner')
       const isSecondHalf = i >= halfRoundCount
       if (!isSecondHalf) {
         if (winnerSide === 2) score1++
@@ -514,7 +540,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       duration:     totalRounds * 90,
       total_rounds: totalRounds,
     },
-    rounds: sortedRounds.map((re, i) => ({
+    rounds: competitiveRounds.map((re, i) => ({
       number:         i + 1,
       winner:         n(re, 'winner') === 2 ? 'T' : 'CT',
       win_reason:     s(re, 'reason') || 'elimination',
