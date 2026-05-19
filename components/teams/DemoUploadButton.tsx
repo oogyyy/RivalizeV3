@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
-import { Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info, RefreshCw } from 'lucide-react'
+import { Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info, RefreshCw, Users } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
@@ -58,6 +58,9 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   const [uploads, setUploads] = useState<FileUpload[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [opponentName, setOpponentName] = useState('')
+  // Self-demo only: which team in the demo file is the user's own team.
+  // Defaults to 'team2' (the most common recording default in GOTV demos).
+  const [userTeamSide, setUserTeamSide] = useState<'team1' | 'team2'>('team2')
 
   const updateUpload = useCallback(
     (index: number, update: Partial<FileUpload>) =>
@@ -131,6 +134,11 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
           fileSize: file.size,
           // Pass the upload context so the server can enforce data isolation
           demoType,
+          // For self-demos: user picks their team side; opponentSide = the other side.
+          // For opponent demos: no selection in this flow (set via SetOpponentSideButton later).
+          ...(demoType === 'self' && {
+            opponentSide: userTeamSide === 'team1' ? 'team2' : 'team1',
+          }),
         }),
       })
 
@@ -178,6 +186,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
     setOpen(false)
     setUploads([])
     setOpponentName('')
+    setUserTeamSide('team2')
   }
 
   const pendingCount = uploads.filter(u => u.status === 'pending').length
@@ -390,6 +399,52 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
               </div>
             )}
           </div>
+
+          {/* Step 3 (self-demos only) — which team in this demo is the user's own team */}
+          {demoType === 'self' && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
+                  STEP 3
+                </span>
+                <span className="text-xs font-semibold text-foreground">Which team are you?</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground flex items-start gap-1.5 -mt-1">
+                <Users size={11} className="shrink-0 mt-0.5 text-neon-green" />
+                Select the team you were playing as so we can show only your team&apos;s stats.
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {(['team1', 'team2'] as const).map(side => (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => setUserTeamSide(side)}
+                    disabled={isProcessing}
+                    className={cn(
+                      'flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-center transition-all disabled:opacity-50',
+                      userTeamSide === side
+                        ? 'border-[#00ff87] bg-[#00ff87]/8 text-[#00ff87]'
+                        : 'border-border bg-background/50 text-muted-foreground hover:border-[#00ff87]/40 hover:text-foreground'
+                    )}
+                  >
+                    <span className="text-sm font-bold">
+                      {side === 'team1' ? 'Team 1' : 'Team 2'}
+                    </span>
+                    <span className="text-[10px] leading-tight opacity-80">
+                      {side === 'team1' ? 'First team in demo' : 'Second team in demo'}
+                    </span>
+                    {userTeamSide === side && (
+                      <CheckCircle2 size={12} className="text-[#00ff87]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1 pt-0.5">
+                <Info size={10} className="shrink-0" />
+                Not sure? Team 2 is the most common default for GOTV recordings. You can change this after upload.
+              </p>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-1 border-t border-border">

@@ -12,6 +12,7 @@ import {
   FileVideo, AlertCircle, CheckCircle2,
 } from 'lucide-react'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
+import SetOpponentSideButton from '@/components/teams/SetOpponentSideButton'
 
 export default async function MyTeamPage() {
   const supabase = await createClient()
@@ -326,7 +327,7 @@ export default async function MyTeamPage() {
                 {demos.slice(0, 6).map(demo => {
                   const pd = demo.parsed_data
                   const h = pd?.header
-                  const opponentSide = pd?.opponentSide ?? 'team2'
+                  const opponentSide = (pd?.opponentSide ?? 'team2') as 'team1' | 'team2'
                   const ourScore  = h ? (opponentSide === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)) : null
                   const theirScore = h ? (opponentSide === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)) : null
                   const isWin  = ourScore !== null && theirScore !== null && ourScore > theirScore
@@ -334,41 +335,54 @@ export default async function MyTeamPage() {
                   const isLoss = ourScore !== null && theirScore !== null && ourScore < theirScore
 
                   return (
-                    <div key={demo.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
-                      <div className="shrink-0">
-                        {demo.status === 'completed' ? (
-                          <CheckCircle2 size={14} className="text-neon-green" />
-                        ) : demo.status === 'failed' ? (
-                          <AlertCircle size={14} className="text-red-400" />
-                        ) : (
-                          <div className="w-3.5 h-3.5 rounded-full border border-yellow-400 border-t-transparent animate-spin" />
+                    <div key={demo.id} className="py-2 border-b border-border last:border-0 space-y-1">
+                      <div className="flex items-center gap-3">
+                        <div className="shrink-0">
+                          {demo.status === 'completed' ? (
+                            <CheckCircle2 size={14} className="text-neon-green" />
+                          ) : demo.status === 'failed' ? (
+                            <AlertCircle size={14} className="text-red-400" />
+                          ) : (
+                            <div className="w-3.5 h-3.5 rounded-full border border-yellow-400 border-t-transparent animate-spin" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-foreground truncate">
+                            {h?.map ?? demo.map ?? 'Unknown map'}
+                            {demo.opponent_slug && (
+                              <span className="text-muted-foreground"> vs {demo.opponent_slug}</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {demo.match_date
+                              ? new Date(demo.match_date).toLocaleDateString()
+                              : new Date(demo.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        {demo.status === 'completed' && ourScore !== null && theirScore !== null && (
+                          <div className={cn(
+                            'text-xs font-mono font-semibold px-2 py-0.5 rounded shrink-0',
+                            isWin  ? 'text-neon-green bg-neon-green/10'   :
+                            isDraw ? 'text-yellow-400 bg-yellow-400/10'   :
+                            isLoss ? 'text-red-400 bg-red-400/10'         : ''
+                          )}>
+                            {ourScore}–{theirScore}
+                          </div>
+                        )}
+                        {demo.status === 'failed' && (
+                          <Badge variant="destructive" className="text-xs shrink-0">Failed</Badge>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground truncate">
-                          {h?.map ?? demo.map ?? 'Unknown map'}
-                          {demo.opponent_slug && (
-                            <span className="text-muted-foreground"> vs {demo.opponent_slug}</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {demo.match_date
-                            ? new Date(demo.match_date).toLocaleDateString()
-                            : new Date(demo.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      {demo.status === 'completed' && ourScore !== null && theirScore !== null && (
-                        <div className={cn(
-                          'text-xs font-mono font-semibold px-2 py-0.5 rounded shrink-0',
-                          isWin  ? 'text-neon-green bg-neon-green/10'   :
-                          isDraw ? 'text-yellow-400 bg-yellow-400/10'   :
-                          isLoss ? 'text-red-400 bg-red-400/10'         : ''
-                        )}>
-                          {ourScore}–{theirScore}
+                      {/* Let the user correct which side was their team — stats recalculate on refresh */}
+                      {demo.status === 'completed' && (
+                        <div className="pl-[22px]">
+                          <SetOpponentSideButton
+                            demoId={demo.id}
+                            currentSide={opponentSide}
+                            variant="self"
+                            teamNames={h ? { team1: h.team1 ?? 'Team 1', team2: h.team2 ?? 'Team 2' } : undefined}
+                          />
                         </div>
-                      )}
-                      {demo.status === 'failed' && (
-                        <Badge variant="destructive" className="text-xs shrink-0">Failed</Badge>
                       )}
                     </div>
                   )
