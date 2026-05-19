@@ -286,7 +286,7 @@ export default function AIScoutPage() {
           <div className="flex items-center gap-2 mb-3">
             <Brain size={18} className="text-neon-green" />
             <h1 className="text-lg font-bold text-foreground">AI Coach</h1>
-            <Badge variant="neon" className="text-xs ml-auto">GPT-4o</Badge>
+            <Badge variant="neon" className="text-xs ml-auto">Llama 3.3</Badge>
           </div>
           {/* Mode toggle */}
           <div className="flex rounded-lg border border-border bg-background p-0.5 gap-0.5">
@@ -657,7 +657,7 @@ export default function AIScoutPage() {
                       {error.message?.includes('Unauthorized')
                         ? 'Not authorised — please refresh the page and try again.'
                         : error.message?.includes('API key') || error.message?.includes('not configured')
-                          ? 'OpenAI API key not configured — add OPENAI_API_KEY in Railway variables.'
+                          ? 'Groq API key not configured — add GROQ_API_KEY in Railway variables.'
                           : error.message && error.message.trim().length > 0 && error.message.trim().length < 200
                             ? error.message.trim()
                             : 'Something went wrong. Please try again.'}

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { openai } from '@ai-sdk/openai'
+import { createGroq } from '@ai-sdk/groq'
 import { streamText } from 'ai'
 
 export async function POST(request: Request) {
@@ -239,13 +239,15 @@ CRITICAL RULES for pro dataset references:
 - Always label every pro-meta observation with [Pro Meta] so the user can clearly distinguish it from opponent-specific findings derived from their uploaded demos
 - Frame [Pro Meta] insights as "professional teams generally..." or "the established meta on this map is..." — never as hard facts about a specific match` : ''}`
 
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 503 })
+  if (!process.env.GROQ_API_KEY) {
+    return NextResponse.json({ error: 'Groq API key not configured' }, { status: 503 })
   }
+
+  const groq = createGroq({ apiKey: process.env.GROQ_API_KEY })
 
   try {
     const result = streamText({
-      model: openai('gpt-4o'),
+      model: groq('llama-3.3-70b-versatile'),
       system: systemPrompt,
       messages: messages
         .filter(m => m.role === 'user' || m.role === 'assistant')
