@@ -1,41 +1,36 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useChat } from 'ai/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   Brain, Send, RotateCcw, Loader2,
-  Target, Crosshair, Shield, Users, Map as MapIcon,
+  Target, Crosshair, Shield, Users,
   Sparkles, MessageSquare, ChevronRight, ExternalLink, Database,
-  SlidersHorizontal, X, ChevronDown, BarChart3,
+  SlidersHorizontal, X, ChevronDown, BarChart3, AlertCircle, RefreshCw,
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
 
 type Mode = 'opponent' | 'myteam'
 type FocusArea = 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player' | 'executes' | 'rounds' | 'drills'
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-}
-
 const OPPONENT_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
-  { id: 'general',   label: 'Scouting Report', icon: <Brain size={14} />,    description: 'Full opponent overview' },
-  { id: 'weakness',  label: 'Weak Spots',       icon: <Target size={14} />,   description: 'Exploitable patterns' },
-  { id: 'antistrat', label: 'Anti-Strat',        icon: <Shield size={14} />,   description: 'Counter their strategies' },
+  { id: 'general',   label: 'Scouting Report', icon: <Brain size={14} />,     description: 'Full opponent overview' },
+  { id: 'weakness',  label: 'Weak Spots',       icon: <Target size={14} />,    description: 'Exploitable patterns' },
+  { id: 'antistrat', label: 'Anti-Strat',        icon: <Shield size={14} />,    description: 'Counter their strategies' },
   { id: 'strategy',  label: 'Match Prep',        icon: <Crosshair size={14} />, description: 'Map-specific counter-plays' },
-  { id: 'player',    label: 'Player Focus',      icon: <Users size={14} />,    description: 'Opponent player deep-dive' },
+  { id: 'player',    label: 'Player Focus',      icon: <Users size={14} />,     description: 'Opponent player deep-dive' },
 ]
 
 const MY_TEAM_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
-  { id: 'general',   label: 'Team Overview',    icon: <Brain size={14} />,    description: 'Strengths, weaknesses, roadmap' },
-  { id: 'weakness',  label: 'Weak Spots',       icon: <Target size={14} />,   description: 'Patterns costing you rounds' },
-  { id: 'executes',  label: 'Executes',         icon: <Crosshair size={14} />, description: 'Improve execute quality' },
-  { id: 'rounds',    label: 'Round Review',     icon: <BarChart3 size={14} />, description: 'Key rounds deep-dive' },
-  { id: 'drills',    label: 'Practice Drills',  icon: <Sparkles size={14} />, description: 'Tailored drill recommendations' },
-  { id: 'strategy',  label: 'Playbook',         icon: <Shield size={14} />,   description: 'Build your team playbook' },
+  { id: 'general',  label: 'Team Overview',   icon: <Brain size={14} />,     description: 'Strengths, weaknesses, roadmap' },
+  { id: 'weakness', label: 'Weak Spots',      icon: <Target size={14} />,    description: 'Patterns costing you rounds' },
+  { id: 'executes', label: 'Executes',        icon: <Crosshair size={14} />, description: 'Improve execute quality' },
+  { id: 'rounds',   label: 'Round Review',    icon: <BarChart3 size={14} />, description: 'Key rounds deep-dive' },
+  { id: 'drills',   label: 'Practice Drills', icon: <Sparkles size={14} />, description: 'Tailored drill recommendations' },
+  { id: 'strategy', label: 'Playbook',        icon: <Shield size={14} />,    description: 'Build your team playbook' },
 ]
 
 const CS2_MAPS = [
@@ -44,17 +39,17 @@ const CS2_MAPS = [
 ]
 
 const OPPONENT_QUESTIONS = [
-  { label: 'Opponent weaknesses',       prompt: "What are this opponent's biggest weaknesses we can exploit?" },
-  { label: 'Full anti-strat',           prompt: "Create a detailed anti-strat — their tendencies, executes, and how we counter them." },
-  { label: 'T-side tendencies',         prompt: "What are this opponent's most common T-side executes and how should we set up CT rotations?" },
-  { label: 'Key threat players',        prompt: "Who are the most dangerous players on this roster and how do we neutralise them?" },
+  { label: 'Opponent weaknesses',  prompt: "What are this opponent's biggest weaknesses we can exploit?" },
+  { label: 'Full anti-strat',      prompt: "Create a detailed anti-strat — their tendencies, executes, and how we counter them." },
+  { label: 'T-side tendencies',    prompt: "What are this opponent's most common T-side executes and how should we set up CT rotations?" },
+  { label: 'Key threat players',   prompt: "Who are the most dangerous players on this roster and how do we neutralise them?" },
 ]
 
 const MY_TEAM_QUESTIONS = [
-  { label: 'Our biggest weaknesses',    prompt: "What are our team's biggest weaknesses based on the demo data? Be specific and prioritised." },
-  { label: 'Improve our executes',      prompt: "How can we improve our site executes? Review our utility usage, timing, and coordination." },
-  { label: 'Practice drill plan',       prompt: "Create a personalised practice plan with specific drills to improve based on our recent performance." },
-  { label: 'Build our playbook',        prompt: "Help us build a structured T-side and CT-side playbook with clear roles and go-to strategies." },
+  { label: 'Our biggest weaknesses', prompt: "What are our team's biggest weaknesses based on the demo data? Be specific and prioritised." },
+  { label: 'Improve our executes',   prompt: "How can we improve our site executes? Review our utility usage, timing, and coordination." },
+  { label: 'Practice drill plan',    prompt: "Create a personalised practice plan with specific drills to improve based on our recent performance." },
+  { label: 'Build our playbook',     prompt: "Help us build a structured T-side and CT-side playbook with clear roles and go-to strategies." },
 ]
 
 function MarkdownContent({ content }: { content: string }) {
@@ -121,33 +116,74 @@ export default function AIScoutPage() {
   const [focusArea, setFocusArea] = useState<FocusArea>('general')
   const [selectedPlayer, setSelectedPlayer] = useState<string>('')
   const [selectedMap, setSelectedMap] = useState<string>('')
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [streaming, setStreaming] = useState(false)
-  const [streamingContent, setStreamingContent] = useState('')
   const [loadingOpponents, setLoadingOpponents] = useState(true)
   const [includeProDataset, setIncludeProDataset] = useState(false)
   const [isContextOpen, setIsContextOpen] = useState(false)
-  const [teamId, setTeamId] = useState<string | null>(null)
+  const [myTeamId, setMyTeamId] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const textareaRef    = useRef<HTMLTextAreaElement>(null)
 
-  // Fetch all opponent folders directly — no team selection needed
+  // Refs so the sendMessage closure always reads the latest context values
+  const modeRef             = useRef(mode)
+  const selectedFolderIdRef = useRef(selectedFolderId)
+  const focusAreaRef        = useRef(focusArea)
+  const selectedPlayerRef   = useRef(selectedPlayer)
+  const selectedMapRef      = useRef(selectedMap)
+  const includeProDatasetRef = useRef(includeProDataset)
+  const myTeamIdRef         = useRef(myTeamId)
+
+  useEffect(() => { modeRef.current = mode },             [mode])
+  useEffect(() => { selectedFolderIdRef.current = selectedFolderId }, [selectedFolderId])
+  useEffect(() => { focusAreaRef.current = focusArea },   [focusArea])
+  useEffect(() => { selectedPlayerRef.current = selectedPlayer }, [selectedPlayer])
+  useEffect(() => { selectedMapRef.current = selectedMap }, [selectedMap])
+  useEffect(() => { includeProDatasetRef.current = includeProDataset }, [includeProDataset])
+  useEffect(() => { myTeamIdRef.current = myTeamId },     [myTeamId])
+
+  const selectedFolder = opponents.find(f => f.id === selectedFolderId)
+
+  // useChat handles all streaming — append() sends messages with per-call body overrides
+  const {
+    messages,
+    input,
+    setInput,
+    isLoading,
+    error,
+    append,
+    reload,
+    setMessages,
+  } = useChat({
+    api: '/api/ai/coach',
+    onError: (err) => console.error('[AI Coach]', err),
+  })
+
+  // Fetch user's own teams for myteam mode
+  useEffect(() => {
+    fetch('/api/teams')
+      .then(r => r.ok ? r.json() : [])
+      .then((teams: Array<{ id: string }>) => {
+        if (teams.length > 0) setMyTeamId(teams[0].id)
+      })
+      .catch(() => {})
+  }, [])
+
+  // Fetch opponent folders
   useEffect(() => {
     const load = async () => {
       const res = await fetch('/api/opponents')
       if (res.ok) {
         const data = (await res.json()) as TeamFolder[]
         setOpponents(data)
-        if (data.length > 0) setTeamId((data[0] as TeamFolder & { user_team_id?: string }).user_team_id ?? null)
+        // Fallback team ID from opponents if teams API returned nothing
+        if (!myTeamId && data.length > 0) setMyTeamId(data[0].user_team_id)
       }
       setLoadingOpponents(false)
     }
     load()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Read URL params — ?folder=xxx or ?mode=myteam&focus=xxx
+  // Read URL params
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -159,83 +195,41 @@ export default function AIScoutPage() {
     if (f) setFocusArea(f as FocusArea)
   }, [])
 
+  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingContent, streaming])
+  }, [messages, isLoading])
 
-  const selectedFolder = opponents.find(f => f.id === selectedFolderId)
-  const activeFocusAreas = mode === 'myteam' ? MY_TEAM_FOCUS_AREAS : OPPONENT_FOCUS_AREAS
-  const suggestedQuestions = mode === 'myteam' ? MY_TEAM_QUESTIONS : OPPONENT_QUESTIONS
+  // Build context body from current refs (called inside sendMessage so it always reads latest)
+  const buildBody = useCallback(() => {
+    const currentFolder = opponents.find(f => f.id === selectedFolderIdRef.current)
+    return {
+      teamId:           modeRef.current === 'myteam'
+                          ? myTeamIdRef.current
+                          : (currentFolder?.user_team_id ?? null),
+      folderId:         modeRef.current === 'opponent' ? (selectedFolderIdRef.current || null) : null,
+      focusArea:        focusAreaRef.current,
+      mode:             modeRef.current,
+      playerName:       focusAreaRef.current === 'player' ? selectedPlayerRef.current : undefined,
+      mapName:          (focusAreaRef.current === 'strategy' || focusAreaRef.current === 'executes')
+                          ? selectedMapRef.current : undefined,
+      includeProDataset: modeRef.current === 'opponent' ? includeProDatasetRef.current : false,
+    }
+  }, [opponents])
 
-  // Derive player list from selected folder's aggregated stats
-  const availablePlayers: string[] = (selectedFolder?.aggregated_stats as { top_players?: { name: string }[] } | null)
-    ?.top_players?.map(p => p.name) ?? []
-
-  const sendMessage = useCallback(
-    async (userMessage: string) => {
-      if (!userMessage.trim() || streaming) return
-
-      const newUserMsg: Message = { role: 'user', content: userMessage.trim(), timestamp: new Date() }
-      const updatedMessages = [...messages, newUserMsg]
-      setMessages(updatedMessages)
-      setInput('')
-      setStreaming(true)
-      setStreamingContent('')
-      setIsContextOpen(false)
-
-      try {
-        const res = await fetch('/api/ai/coach', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            teamId: mode === 'myteam' ? teamId : (selectedFolder?.user_team_id ?? null),
-            folderId: mode === 'opponent' ? (selectedFolderId || null) : null,
-            focusArea,
-            mode,
-            playerName: focusArea === 'player' ? selectedPlayer : undefined,
-            mapName: (focusArea === 'strategy' || focusArea === 'executes') ? selectedMap : undefined,
-            includeProDataset: mode === 'opponent' ? includeProDataset : false,
-            messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
-          }),
-        })
-
-        if (!res.ok) throw new Error('Failed to get AI response')
-        if (!res.body) throw new Error('No response body')
-
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let accum = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          const chunk = decoder.decode(value, { stream: true })
-          for (const line of chunk.split('\n')) {
-            if (line.startsWith('0:')) {
-              try {
-                accum += JSON.parse(line.slice(2))
-                setStreamingContent(accum)
-              } catch { /* skip malformed chunk */ }
-            }
-          }
-        }
-
-        if (accum) {
-          setMessages(prev => [...prev, { role: 'assistant', content: accum, timestamp: new Date() }])
-        }
-      } catch {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: 'Sorry, I encountered an error. Please check your connection and try again.',
-          timestamp: new Date(),
-        }])
-      } finally {
-        setStreaming(false)
-        setStreamingContent('')
-      }
-    },
-    [messages, streaming, selectedFolder, selectedFolderId, focusArea, selectedPlayer, selectedMap, includeProDataset, mode, teamId]
-  )
+  const sendMessage = useCallback((userMessage: string) => {
+    if (!userMessage.trim() || isLoading) return
+    setIsContextOpen(false)
+    append(
+      { role: 'user', content: userMessage.trim() },
+      { body: buildBody() }
+    )
+    setInput('')
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '36px'
+    }
+  }, [isLoading, append, buildBody, setInput])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -244,7 +238,15 @@ export default function AIScoutPage() {
     }
   }
 
-  const isEmpty = messages.length === 0 && !streaming
+  const activeFocusAreas   = mode === 'myteam' ? MY_TEAM_FOCUS_AREAS : OPPONENT_FOCUS_AREAS
+  const suggestedQuestions  = mode === 'myteam' ? MY_TEAM_QUESTIONS   : OPPONENT_QUESTIONS
+  const availablePlayers: string[] = (selectedFolder?.aggregated_stats as { top_players?: { name: string }[] } | null)
+    ?.top_players?.map(p => p.name) ?? []
+
+  const isEmpty     = messages.length === 0 && !isLoading
+  // useChat streams into the last assistant message live — show cursor while loading and last msg is assistant
+  const lastMsg     = messages[messages.length - 1]
+  const isThinking  = isLoading && (!lastMsg || lastMsg.role === 'user')
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -303,7 +305,7 @@ export default function AIScoutPage() {
         </div>
 
         <div className="p-4 space-y-5 flex-1">
-          {/* Opponent selector — only in opponent mode */}
+          {/* Opponent selector */}
           {mode === 'opponent' && (
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
@@ -314,9 +316,7 @@ export default function AIScoutPage() {
               ) : opponents.length === 0 ? (
                 <div className="rounded-md border border-border bg-background/50 px-3 py-2.5 text-xs text-muted-foreground">
                   No opponents yet —{' '}
-                  <a href="/opponents" className="text-neon-green hover:underline">
-                    upload a demo first
-                  </a>
+                  <a href="/opponents" className="text-neon-green hover:underline">upload a demo first</a>
                 </div>
               ) : (
                 <select
@@ -385,7 +385,7 @@ export default function AIScoutPage() {
             </div>
           </div>
 
-          {/* Player selector — only when Player Focus and a folder is selected (opponent mode) */}
+          {/* Player selector */}
           {mode === 'opponent' && focusArea === 'player' && (
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
@@ -404,15 +404,13 @@ export default function AIScoutPage() {
                 </select>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  {selectedFolder
-                    ? 'No player data yet — demos may still be processing.'
-                    : 'Select an opponent to see their players.'}
+                  {selectedFolder ? 'No player data yet.' : 'Select an opponent to see their players.'}
                 </p>
               )}
             </div>
           )}
 
-          {/* Map selector — when Match Prep or Executes */}
+          {/* Map selector */}
           {(focusArea === 'strategy' || focusArea === 'executes') && (
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
@@ -431,7 +429,7 @@ export default function AIScoutPage() {
             </div>
           )}
 
-          {/* Pro dataset toggle — opponent mode only */}
+          {/* Pro dataset toggle */}
           {mode === 'opponent' && (
             <div className="border-t border-border pt-4">
               <button
@@ -522,7 +520,7 @@ export default function AIScoutPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { setMessages([]); setStreamingContent(''); setInput('') }}
+            onClick={() => { setMessages([]); setInput('') }}
             className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
             <RotateCcw size={13} />
@@ -533,6 +531,7 @@ export default function AIScoutPage() {
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto p-5 space-y-1">
           {isEmpty ? (
+            /* ── Welcome / empty state ── */
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
               <div className="w-20 h-20 rounded-full bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mb-5">
                 <Brain size={36} className="text-neon-green" />
@@ -544,19 +543,18 @@ export default function AIScoutPage() {
               </h2>
               <p className="text-muted-foreground text-sm max-w-sm mb-8">
                 {mode === 'myteam'
-                  ? 'Ask anything about your team\'s performance — weaknesses, executes, practice plans, and strategy.'
+                  ? "Ask anything about your team's performance — weaknesses, executes, practice plans, and strategy."
                   : selectedFolder
                     ? `Ask anything about ${selectedFolder.opponent_display_name} — tendencies, anti-strats, key players, map reads.`
-                    : 'Select an opponent you\'ve uploaded demos for, then ask for scouting reports and anti-strats.'}
+                    : "Select an opponent you've uploaded demos for, then ask for scouting reports and anti-strats."}
               </p>
 
-              {/* Suggested questions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
                 {suggestedQuestions.map(q => (
                   <button
                     key={q.label}
                     onClick={() => sendMessage(q.prompt)}
-                    disabled={streaming}
+                    disabled={isLoading}
                     className={cn(
                       'flex items-center gap-2 p-3 text-left rounded-lg border border-border bg-card',
                       'text-sm text-muted-foreground hover:text-foreground hover:border-neon-green/30 hover:bg-neon-green/5',
@@ -576,65 +574,90 @@ export default function AIScoutPage() {
                   Pick an opponent in the left panel to get personalised scouting
                 </p>
               )}
-              {mode === 'opponent' && !selectedFolder && opponents.length === 0 && !loadingOpponents && (
-                <a
-                  href="/opponents"
-                  className="mt-5 text-xs text-neon-green hover:underline flex items-center gap-1"
-                >
+              {mode === 'opponent' && opponents.length === 0 && !loadingOpponents && (
+                <a href="/opponents" className="mt-5 text-xs text-neon-green hover:underline flex items-center gap-1">
                   <Target size={12} />
                   Upload your first opponent demo →
                 </a>
               )}
             </div>
           ) : (
+            /* ── Conversation ── */
             <>
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={cn('flex items-end gap-3 mb-4', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}
-                >
-                  {msg.role === 'assistant' ? (
-                    <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center shrink-0 mb-0.5">
-                      <Brain size={14} className="text-neon-green" />
-                    </div>
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 mb-0.5">
-                      <span className="text-xs font-bold text-muted-foreground">You</span>
-                    </div>
-                  )}
+              {messages.map((msg, i) => {
+                const isLast    = i === messages.length - 1
+                const streaming = isLoading && isLast && msg.role === 'assistant'
+
+                return (
                   <div
-                    className={cn(
-                      'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
-                      msg.role === 'user'
-                        ? 'bg-neon-green/10 border border-neon-green/20 rounded-br-sm'
-                        : 'bg-card border border-border rounded-bl-sm'
-                    )}
+                    key={msg.id}
+                    className={cn('flex items-end gap-3 mb-4', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}
                   >
-                    {msg.role === 'assistant'
-                      ? <MarkdownContent content={msg.content} />
-                      : <p className="text-sm text-foreground">{msg.content}</p>
-                    }
-                    <p className="text-xs text-muted-foreground mt-2 select-none">
-                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {msg.role === 'assistant' ? (
+                      <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center shrink-0 mb-0.5">
+                        <Brain size={14} className="text-neon-green" />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 mb-0.5">
+                        <span className="text-xs font-bold text-muted-foreground">You</span>
+                      </div>
+                    )}
+                    <div
+                      className={cn(
+                        'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
+                        msg.role === 'user'
+                          ? 'bg-neon-green/10 border border-neon-green/20 rounded-br-sm'
+                          : 'bg-card border border-border rounded-bl-sm'
+                      )}
+                    >
+                      {msg.role === 'assistant' ? (
+                        <>
+                          <MarkdownContent content={msg.content} />
+                          {streaming && (
+                            <span className="inline-block w-2 h-4 bg-neon-green ml-0.5 animate-pulse rounded-sm" />
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-foreground">{msg.content}</p>
+                      )}
+                      {msg.createdAt && (
+                        <p className="text-xs text-muted-foreground mt-2 select-none">
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Typing indicator — shows while waiting for the first streaming token */}
+              {isThinking && <TypingIndicator />}
+
+              {/* Error state with retry */}
+              {error && !isLoading && (
+                <div className="flex items-end gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-red-400/20 border border-red-400/30 flex items-center justify-center shrink-0">
+                    <AlertCircle size={14} className="text-red-400" />
+                  </div>
+                  <div className="bg-card border border-red-400/30 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[75%]">
+                    <p className="text-sm text-red-400">
+                      {error.message?.includes('401')
+                        ? 'Not authorised — please refresh the page and try again.'
+                        : error.message?.includes('503') || error.message?.includes('API')
+                          ? 'AI service unavailable. Check that your OpenAI API key is configured.'
+                          : 'Something went wrong. Please try again.'}
                     </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => reload()}
+                      className="mt-2 gap-1.5 text-xs border-red-400/30 text-red-400 hover:border-red-400/60"
+                    >
+                      <RefreshCw size={11} />
+                      Retry
+                    </Button>
                   </div>
                 </div>
-              ))}
-
-              {streaming && (
-                streamingContent ? (
-                  <div className="flex items-end gap-3 mb-4">
-                    <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center shrink-0 mb-0.5">
-                      <Brain size={14} className="text-neon-green" />
-                    </div>
-                    <div className="max-w-[85%] sm:max-w-[75%] bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3">
-                      <MarkdownContent content={streamingContent} />
-                      <span className="inline-block w-2 h-4 bg-neon-green ml-0.5 animate-pulse rounded-sm" />
-                    </div>
-                  </div>
-                ) : (
-                  <TypingIndicator />
-                )
               )}
             </>
           )}
@@ -658,29 +681,29 @@ export default function AIScoutPage() {
               onKeyDown={handleKeyDown}
               placeholder={
                 mode === 'myteam'
-                  ? 'Ask about your team\'s performance, weaknesses, or strategy…'
+                  ? "Ask about your team's performance, weaknesses, or strategy…"
                   : selectedFolder
                     ? `Ask about ${selectedFolder.opponent_display_name}…`
                     : 'Ask anything about CS2 tactics, or select an opponent for personalised scouting…'
               }
-              disabled={streaming}
+              disabled={isLoading}
               rows={1}
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none min-h-[36px] max-h-40 py-2 px-2 disabled:cursor-not-allowed"
               style={{ height: '36px' }}
             />
             <Button
               onClick={() => sendMessage(input)}
-              disabled={!input.trim() || streaming}
+              disabled={!input.trim() || isLoading}
               size="sm"
               variant="neon"
               className="shrink-0 h-10 w-10 p-0 rounded-lg"
             >
-              {streaming ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+              {isLoading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground text-center mt-2">
             {mode === 'myteam'
-              ? 'Analysing your team\'s own demos for self-improvement coaching'
+              ? "Analysing your team's own demos for self-improvement coaching"
               : selectedFolder
                 ? `Analysing demos from your ${selectedFolder.opponent_display_name} folder`
                 : 'Select an opponent folder for personalised anti-strats and scouting reports'}

@@ -3,8 +3,6 @@ import { NextResponse } from 'next/server'
 import { openai } from '@ai-sdk/openai'
 import { streamText } from 'ai'
 
-export const runtime = 'edge'
-
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -255,7 +253,7 @@ CRITICAL RULES for pro dataset references:
       temperature: 0.7,
     })
 
-    return (await result).toDataStreamResponse()
+    return result.toDataStreamResponse()
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'AI service unavailable'
     return NextResponse.json({ error: message }, { status: 503 })
