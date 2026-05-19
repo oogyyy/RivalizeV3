@@ -127,7 +127,7 @@ export default async function DashboardPage() {
     id: string; team_id: string; opponent_name: string
     opponent_slug: string | null; map: string
     match_date: string | null; status: string; created_at: string
-    parsed_data: unknown
+    parsed_data?: unknown
   }
 
   const { data: recentOpponentDemos } = teamIds.length
