@@ -489,11 +489,21 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   // ── 7. Score ──────────────────────────────────────────────────────────────
   //
-  // Strategy A (preferred): each round_end row carries t_score / ct_score —
-  // the cumulative totals up to that round. The LAST row gives the final score.
+  // The CS2 round_end `winner` field (2=T / 3=CT) isn't reliably returned by
+  // demoparser2, but the `reason` string IS: "ct_killed"/"bomb_exploded" → T wins,
+  // "t_killed"/"bomb_defused" → CT wins.  We use reason-first logic everywhere.
   //
-  // Strategy B (fallback): re-derive from winner=2 (T won) / winner=3 (CT won)
-  // with halftime-side-swap correction.
+  // Strategy A (preferred): t_score / ct_score cumulative fields on last round_end.
+  // Strategy B (fallback):  halftime-aware counting via win_reason strings.
+
+  // Reason string → did T-side win? Returns null if unknown.
+  function tSideWonRound(reason: string, winnerNum: number): boolean {
+    if (['ct_killed', 'bomb_exploded', 'target_bombed', 'terrorists_win'].includes(reason)) return true
+    if (['t_killed', 'bomb_defused', 'hostage_rescued', 'cts_win', 'time_expired'].includes(reason)) return false
+    // Fall back to numeric winner (2=T, 3=CT in CS2 proto)
+    return winnerNum === 2
+  }
+
   let score1 = 0  // team1 = started T-Side
   let score2 = 0  // team2 = started CT-Side
 
@@ -502,34 +512,28 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   const directCT = lastRound ? n(lastRound, 'ct_score') : 0
 
   if (directT > 0 || directCT > 0) {
-    // Strategy A: use cumulative scores from the last competitive round_end event
     score1 = directT
     score2 = directCT
     console.log(`[real-parser] scores via t_score/ct_score: ${score1}-${score2}`)
   } else {
-    // Strategy B: halftime-aware winner counting (competitive rounds only)
-    const distinctWinners = new Set(competitiveRounds.map(r => n(r, 'winner')))
-    if ([...distinctWinners].every(w => w === 0)) {
-      warnings.push(`All round_end winner/t_score/ct_score values are 0 — score unknown. First round row keys: ${JSON.stringify(Object.keys(competitiveRounds[0] ?? {}))}`)
-    } else {
-      console.log('[real-parser] distinct winner values:', [...distinctWinners])
-    }
-
+    // Strategy B: reason-string + halftime-swap counting
     const halfRoundCount = Math.ceil(totalRounds / 2)
     for (let i = 0; i < competitiveRounds.length; i++) {
-      const winnerSide = n(competitiveRounds[i], 'winner')
+      const re = competitiveRounds[i]
+      const tWon = tSideWonRound(s(re, 'reason'), n(re, 'winner'))
       const isSecondHalf = i >= halfRoundCount
       if (!isSecondHalf) {
-        if (winnerSide === 2) score1++
-        else if (winnerSide === 3) score2++
+        if (tWon) score1++; else score2++
       } else {
-        if (winnerSide === 2) score2++  // T at this tick started as CT-Side
-        else if (winnerSide === 3) score1++  // CT at this tick started as T-Side
+        if (tWon) score2++; else score1++  // sides swap after halftime
       }
     }
+    console.log(`[real-parser] scores via reason strings: ${score1}-${score2}`)
   }
 
   // ── 8. Assemble ParsedDemoData ────────────────────────────────────────────
+  const halfCount = Math.ceil(totalRounds / 2)
+
   const parsedData: ParsedDemoData = {
     header: {
       map:          mapName,
@@ -540,9 +544,15 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       duration:     totalRounds * 90,
       total_rounds: totalRounds,
     },
-    rounds: competitiveRounds.map((re, i) => ({
+    rounds: competitiveRounds.map((re, i) => {
+      // Store winner as the original team name (with halftime correction) so
+      // RoundTimeline can match it against team1/team2 names directly.
+      const tWon = tSideWonRound(s(re, 'reason'), n(re, 'winner'))
+      const isSecondHalf = i >= halfCount
+      const winnerTeam = (!isSecondHalf ? tWon : !tWon) ? team1Name : team2Name
+      return {
       number:         i + 1,
-      winner:         n(re, 'winner') === 2 ? 'T' : 'CT',
+      winner:         winnerTeam,
       win_reason:     s(re, 'reason') || 'elimination',
       duration:       90,
       team1_economy:  0,
@@ -550,7 +560,8 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       kills:          [],
       bomb_planted:   false,
       bomb_defused:   false,
-    })),
+      }
+    }),
     players,
     events: [],
     heatmap_data: [],

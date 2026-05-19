@@ -433,8 +433,30 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
   const h             = parsed?.header
   const myTeamLabel   = opponentSide === 'team1' ? (h?.team2 ?? 'CT-Side')  : (h?.team1 ?? 'T-Side')
   const opponentLabel = opponentSide === 'team1' ? (h?.team1 ?? 'T-Side')   : (h?.team2 ?? 'CT-Side')
-  const myScore       = opponentSide === 'team1' ? (h?.score_team2 ?? 0)    : (h?.score_team1 ?? 0)
-  const theirScore    = opponentSide === 'team1' ? (h?.score_team1 ?? 0)    : (h?.score_team2 ?? 0)
+  let myScore       = opponentSide === 'team1' ? (h?.score_team2 ?? 0)    : (h?.score_team1 ?? 0)
+  let theirScore    = opponentSide === 'team1' ? (h?.score_team1 ?? 0)    : (h?.score_team2 ?? 0)
+
+  // Fallback for demos parsed before the win_reason fix: if stored scores are
+  // both 0 but rounds exist, derive scores from the win_reason strings.
+  if (myScore === 0 && theirScore === 0 && parsed?.rounds?.length) {
+    const T_WIN  = new Set(['ct_killed', 'bomb_exploded', 'target_bombed', 'terrorists_win'])
+    const CT_WIN = new Set(['t_killed', 'bomb_defused', 'hostage_rescued', 'cts_win', 'time_expired'])
+    const half = Math.ceil(parsed.rounds.length / 2)
+    let s1 = 0, s2 = 0
+    for (let i = 0; i < parsed.rounds.length; i++) {
+      const reason = parsed.rounds[i].win_reason
+      const tWon = T_WIN.has(reason) ? true : CT_WIN.has(reason) ? false : null
+      if (tWon === null) continue
+      const isSecondHalf = i >= half
+      if (!isSecondHalf) { if (tWon) s1++; else s2++ }
+      else               { if (tWon) s2++; else s1++ }
+    }
+    if (s1 > 0 || s2 > 0) {
+      myScore    = opponentSide === 'team1' ? s2 : s1
+      theirScore = opponentSide === 'team1' ? s1 : s2
+    }
+  }
+
   const isWin         = myScore > theirScore
   const isDraw        = myScore === theirScore
 

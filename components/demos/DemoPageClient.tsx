@@ -73,10 +73,34 @@ function TeamComparisonBar({ label, v1, v2, fmt }: {
   )
 }
 
+// Derive score from win_reason strings for demos parsed before the fix.
+function deriveScoresFromRounds(parsed: ParsedDemoData): { s1: number; s2: number } {
+  const T_WIN  = new Set(['ct_killed', 'bomb_exploded', 'target_bombed', 'terrorists_win'])
+  const CT_WIN = new Set(['t_killed', 'bomb_defused', 'hostage_rescued', 'cts_win', 'time_expired'])
+  const half = Math.ceil(parsed.rounds.length / 2)
+  let s1 = 0, s2 = 0
+  for (let i = 0; i < parsed.rounds.length; i++) {
+    const reason = parsed.rounds[i].win_reason
+    const tWon = T_WIN.has(reason) ? true : CT_WIN.has(reason) ? false : null
+    if (tWon === null) continue
+    const isSecondHalf = i >= half
+    if (!isSecondHalf) { if (tWon) s1++; else s2++ }
+    else               { if (tWon) s2++; else s1++ }
+  }
+  return { s1, s2 }
+}
+
 function ScoreBanner({ parsed, demo }: { parsed: ParsedDemoData; demo: Demo }) {
   const h = parsed.header
-  const team1Won = h.score_team1 > h.score_team2
-  const isDraw = h.score_team1 === h.score_team2
+  let score1 = h.score_team1
+  let score2 = h.score_team2
+  // Fallback for older demos where parser stored 0-0
+  if (score1 === 0 && score2 === 0 && parsed.rounds?.length) {
+    const { s1, s2 } = deriveScoresFromRounds(parsed)
+    if (s1 > 0 || s2 > 0) { score1 = s1; score2 = s2 }
+  }
+  const team1Won = score1 > score2
+  const isDraw = score1 === score2
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card">
@@ -120,11 +144,11 @@ function ScoreBanner({ parsed, demo }: { parsed: ParsedDemoData; demo: Demo }) {
           <div className="text-center shrink-0">
             <div className="flex items-center gap-3">
               <span className={cn('text-6xl font-black font-mono', team1Won ? 'text-neon-green' : isDraw ? 'text-yellow-400' : 'text-muted-foreground')}>
-                {h.score_team1}
+                {score1}
               </span>
               <span className="text-3xl text-muted-foreground font-bold">:</span>
               <span className={cn('text-6xl font-black font-mono', !team1Won && !isDraw ? 'text-red-400' : isDraw ? 'text-yellow-400' : 'text-muted-foreground')}>
-                {h.score_team2}
+                {score2}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1 uppercase tracking-widest">
