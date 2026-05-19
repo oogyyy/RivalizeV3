@@ -253,23 +253,35 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     return w.startsWith('knife') || w === 'bayonet'
   }
 
-  let knifeRoundEndTick = -1
-  // Only attempt knife-round detection when there are enough rounds to still
-  // have a full match after stripping one. FACEIT knife rounds frequently have
-  // zero deaths (players run to a side, server decides winner without fighting).
+  // Strip consecutive leading pre-match rounds (knife rounds, warmup rounds).
+  // FACEIT demos often have 1-2 rounds before competitive play starts:
+  //   round 0: warmup/veto round (may have 0 deaths or knife-only deaths)
+  //   round 1: knife round (players run to a side, typically 0 deaths)
+  // We strip any leading round where ALL deaths used knife weapons (including
+  // the case of zero deaths). Stop as soon as a round has a non-knife death.
+  // Cap: never strip more than (totalRounds - REGULATION_HALF) to preserve
+  // at least a full half of competitive rounds.
+  let stripCount = 0
   if (sortedRounds.length > REGULATION_HALF) {
-    const firstEndTick = n(sortedRounds[0], 'tick')
-    const firstRoundDeaths = deathEvents.filter(ev => n(ev, 'tick') <= firstEndTick)
-    const allKnife = firstRoundDeaths.every(ev => isKnifeWeapon(s(ev, 'weapon')))
-    // Treat as knife round if: all deaths were knife kills, OR zero deaths
-    // (FACEIT knife rounds often end with no kills at all).
-    if (allKnife) {
-      knifeRoundEndTick = firstEndTick
-      console.log(`[real-parser] knife round detected (end tick=${firstEndTick}, deaths=${firstRoundDeaths.length}), excluding from stats`)
+    const maxStrip = sortedRounds.length - REGULATION_HALF
+    for (let ri = 0; ri < maxStrip; ri++) {
+      const endTick  = n(sortedRounds[ri], 'tick')
+      const prevTick = ri > 0 ? n(sortedRounds[ri - 1], 'tick') : 0
+      const roundDeaths = deathEvents.filter(ev => {
+        const t = n(ev, 'tick')
+        return t > prevTick && t <= endTick
+      })
+      // allKnifeOrNone is true for 0-death rounds (Array.every on empty = true)
+      if (roundDeaths.every(ev => isKnifeWeapon(s(ev, 'weapon')))) {
+        stripCount++
+        console.log(`[real-parser] stripping pre-match round ${ri + 1} (deaths=${roundDeaths.length}, endTick=${endTick})`)
+      } else {
+        break
+      }
     }
   }
 
-  const competitiveRounds = knifeRoundEndTick >= 0 ? sortedRounds.slice(1) : sortedRounds
+  const competitiveRounds = sortedRounds.slice(stripCount)
   const totalRounds = competitiveRounds.length
 
   // Halftime tick: end of round 12 (MR12 fixed), or last round if shorter.
