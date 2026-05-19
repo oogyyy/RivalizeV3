@@ -106,7 +106,10 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       buf,
       'round_end',
       [],
-      ['tick', 'winner', 'reason'],
+      // t_score / ct_score are the CUMULATIVE team scores up to and including
+      // this round. The last round_end row gives us the final match score directly,
+      // which is more reliable than re-deriving from winner=2/3 values.
+      ['tick', 'winner', 'reason', 't_score', 'ct_score'],
     ) ?? []
   } catch (e) {
     warnings.push(`parseEvent(round_end): ${e}`)
@@ -386,33 +389,45 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     }
   }
 
-  // ── 7. Score: halftime-aware round winner → team score ────────────────────
+  // ── 7. Score ──────────────────────────────────────────────────────────────
   //
-  // CS2 round_end winner values: 2 = T-side won, 3 = CT-side won.
-  // Sides switch at halftime, so second-half winner=2 means the team that
-  // started CT-side wins (they're now T).
+  // Strategy A (preferred): each round_end row carries t_score / ct_score —
+  // the cumulative totals up to that round. The LAST row gives the final score.
   //
-  // Diagnostic: log distinct winner values so we catch any encoding changes.
-  const distinctWinners = new Set(sortedRounds.map(r => n(r, 'winner')))
-  if ([...distinctWinners].every(w => w === 0)) {
-    warnings.push(`All round_end winner values are 0 — 'winner' prop may be wrong. First round row keys: ${JSON.stringify(Object.keys(sortedRounds[0] ?? {}))}`)
+  // Strategy B (fallback): re-derive from winner=2 (T won) / winner=3 (CT won)
+  // with halftime-side-swap correction.
+  let score1 = 0  // team1 = started T-Side
+  let score2 = 0  // team2 = started CT-Side
+
+  const lastRound = sortedRounds.length > 0 ? sortedRounds[sortedRounds.length - 1] : null
+  const directT  = lastRound ? n(lastRound, 't_score') : 0
+  const directCT = lastRound ? n(lastRound, 'ct_score') : 0
+
+  if (directT > 0 || directCT > 0) {
+    // Strategy A: use cumulative scores from the last round_end event
+    score1 = directT
+    score2 = directCT
+    console.log(`[real-parser] scores via t_score/ct_score: ${score1}-${score2}`)
   } else {
-    console.log('[real-parser] distinct winner values:', [...distinctWinners])
-  }
-
-  const halfRoundCount = Math.ceil(totalRounds / 2)
-  let score1 = 0  // T-Side (started T)
-  let score2 = 0  // CT-Side (started CT)
-
-  for (let i = 0; i < sortedRounds.length; i++) {
-    const winnerSide = n(sortedRounds[i], 'winner')
-    const isSecondHalf = i >= halfRoundCount
-    if (!isSecondHalf) {
-      if (winnerSide === 2) score1++
-      else if (winnerSide === 3) score2++
+    // Strategy B: halftime-aware winner counting
+    const distinctWinners = new Set(sortedRounds.map(r => n(r, 'winner')))
+    if ([...distinctWinners].every(w => w === 0)) {
+      warnings.push(`All round_end winner/t_score/ct_score values are 0 — score unknown. First round row keys: ${JSON.stringify(Object.keys(sortedRounds[0] ?? {}))}`)
     } else {
-      if (winnerSide === 2) score2++  // T at this tick started as CT-Side
-      else if (winnerSide === 3) score1++  // CT at this tick started as T-Side
+      console.log('[real-parser] distinct winner values:', [...distinctWinners])
+    }
+
+    const halfRoundCount = Math.ceil(totalRounds / 2)
+    for (let i = 0; i < sortedRounds.length; i++) {
+      const winnerSide = n(sortedRounds[i], 'winner')
+      const isSecondHalf = i >= halfRoundCount
+      if (!isSecondHalf) {
+        if (winnerSide === 2) score1++
+        else if (winnerSide === 3) score2++
+      } else {
+        if (winnerSide === 2) score2++  // T at this tick started as CT-Side
+        else if (winnerSide === 3) score1++  // CT at this tick started as T-Side
+      }
     }
   }
 
