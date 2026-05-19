@@ -223,10 +223,10 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     playerInfoRaw.filter(p => p.is_hltv).map(p => s(p, 'xuid', 'steamid'))
   )
   // Primary name source: parsePlayerInfo keyed by steamid/xuid
-  const infoName = new Map(
+  const infoName = new Map<string, string>(
     playerInfoRaw
       .filter(p => !p.is_bot && !p.is_hltv)
-      .map(p => [s(p, 'xuid', 'steamid'), s(p, 'name')])
+      .map(p => [s(p, 'xuid', 'steamid'), s(p, 'name')] as [string, string])
       .filter(([sid, name]) => sid && name)
   )
 
