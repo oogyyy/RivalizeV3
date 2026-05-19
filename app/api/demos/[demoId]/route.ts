@@ -3,6 +3,44 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { deleteObject } from '@/lib/r2'
 
+// Returns the demo status and the parsed_data fields needed for team selection.
+// Used by the upload modal to poll until parsing completes.
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ demoId: string }> }
+) {
+  const { demoId } = await params
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = createAdminClient()
+
+  const { data: demo } = await admin
+    .from('demos')
+    .select('id, team_id, status, parsed_data')
+    .eq('id', demoId)
+    .single()
+
+  if (!demo) return NextResponse.json({ error: 'Demo not found' }, { status: 404 })
+
+  const { data: member } = await admin
+    .from('team_members')
+    .select('role')
+    .eq('team_id', demo.team_id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  return NextResponse.json({
+    id: demo.id,
+    status: demo.status,
+    parsed_data: demo.parsed_data,
+  })
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ demoId: string }> }
