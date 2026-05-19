@@ -254,12 +254,18 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   }
 
   let knifeRoundEndTick = -1
-  if (sortedRounds.length > 0) {
+  // Only attempt knife-round detection when there are enough rounds to still
+  // have a full match after stripping one. FACEIT knife rounds frequently have
+  // zero deaths (players run to a side, server decides winner without fighting).
+  if (sortedRounds.length > REGULATION_HALF) {
     const firstEndTick = n(sortedRounds[0], 'tick')
     const firstRoundDeaths = deathEvents.filter(ev => n(ev, 'tick') <= firstEndTick)
-    if (firstRoundDeaths.length > 0 && firstRoundDeaths.every(ev => isKnifeWeapon(s(ev, 'weapon')))) {
+    const allKnife = firstRoundDeaths.every(ev => isKnifeWeapon(s(ev, 'weapon')))
+    // Treat as knife round if: all deaths were knife kills, OR zero deaths
+    // (FACEIT knife rounds often end with no kills at all).
+    if (allKnife) {
       knifeRoundEndTick = firstEndTick
-      console.log(`[real-parser] knife round detected (end tick=${firstEndTick}), excluding from stats`)
+      console.log(`[real-parser] knife round detected (end tick=${firstEndTick}, deaths=${firstRoundDeaths.length}), excluding from stats`)
     }
   }
 
@@ -518,25 +524,19 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   let score1 = 0
   let score2 = 0
 
-  const lastRound = competitiveRounds.length > 0
-    ? competitiveRounds[competitiveRounds.length - 1]
-    : null
-  const directT  = lastRound ? n(lastRound, 't_score')  : 0
-  const directCT = lastRound ? n(lastRound, 'ct_score') : 0
-
-  if (directT > 0 || directCT > 0) {
-    score1 = directT
-    score2 = directCT
-    console.log(`[real-parser] scores via t_score/ct_score: ${score1}-${score2}`)
-  } else {
-    for (let i = 0; i < competitiveRounds.length; i++) {
-      const re   = competitiveRounds[i]
-      const tWon = tSideWonRound(s(re, 'reason'), n(re, 'winner'))
-      if (tWinsGoToTeam1(i) ? tWon : !tWon) score1++
-      else score2++
-    }
-    console.log(`[real-parser] scores via reason strings (MR12-aware): ${score1}-${score2}`)
+  // Strategy A (t_score/ct_score) is intentionally avoided: after halftime
+  // the teams swap, so the cumulative t_score mixes team1's first-half T-wins
+  // with team2's second-half T-wins and doesn't map to either team's total.
+  //
+  // Always use Strategy B: count round winners via reason strings with
+  // MR12-aware halftime and OT mini-half correction.
+  for (let i = 0; i < competitiveRounds.length; i++) {
+    const re   = competitiveRounds[i]
+    const tWon = tSideWonRound(s(re, 'reason'), n(re, 'winner'))
+    if (tWinsGoToTeam1(i) ? tWon : !tWon) score1++
+    else score2++
   }
+  console.log(`[real-parser] scores via reason strings (MR12-aware): ${score1}-${score2}`)
 
   // ── 8. Assemble ParsedDemoData ────────────────────────────────────────────
   const parsedData: ParsedDemoData = {
