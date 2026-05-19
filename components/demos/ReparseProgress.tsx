@@ -1,46 +1,46 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   demoId: string
-  /** Called once the demo status flips to 'completed' or 'failed'. */
   onDone: () => void
 }
 
-/**
- * Animated progress bar shown while a demo is being re-parsed.
- *
- * Progress is fake (the backend gives no granular events), so we animate
- * 0 → 85 % over ~30 s via a CSS keyframe and snap to 100 % when the
- * Supabase status flips to 'completed' or 'failed'.
- */
+// Progress checkpoints: [targetPercent, delayMs from mount]
+// Simulates download (fast) → parse (medium) → save (slow) phases.
+const STEPS: Array<[number, number]> = [
+  [12,  300],
+  [28,  2_500],
+  [46,  7_000],
+  [63,  13_000],
+  [79,  21_000],
+  [88,  29_000],
+]
+
 export function ReparseProgress({ demoId, onDone }: Props) {
-  const [done, setDone] = useState(false)
-  const [elapsed, setElapsed] = useState(0)
+  const [progress, setProgress] = useState(0)
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone
 
-  // Elapsed-seconds ticker — drives the "X s" label.
+  // Step up progress on a schedule — JS state + CSS transition is far
+  // more reliable than Tailwind keyframe width animations.
   useEffect(() => {
-    const t = setInterval(() => setElapsed(s => s + 1), 1000)
-    return () => clearInterval(t)
+    const timers = STEPS.map(([target, delay]) =>
+      setTimeout(() => setProgress(p => Math.max(p, target)), delay),
+    )
+    return () => timers.forEach(clearTimeout)
   }, [])
 
-  // Poll Supabase every 2 s until the demo status changes.
+  // Poll Supabase every 2 s for completion.
   const poll = useCallback(async () => {
     const supabase = createClient()
     const { data } = await supabase
-      .from('demos')
-      .select('status')
-      .eq('id', demoId)
-      .single()
+      .from('demos').select('status').eq('id', demoId).single()
     if (data?.status === 'completed' || data?.status === 'failed') {
-      setDone(true)
-      // Small delay so the bar visually reaches 100 % before the parent unmounts it.
-      setTimeout(() => onDoneRef.current(), 600)
+      setProgress(100)
+      setTimeout(() => onDoneRef.current(), 500)
     }
   }, [demoId])
 
@@ -50,39 +50,16 @@ export function ReparseProgress({ demoId, onDone }: Props) {
   }, [poll])
 
   return (
-    <div className="w-full rounded-lg border border-border bg-card/60 px-4 py-3 space-y-2 animate-fade-in">
-      <div className="flex items-center justify-between text-sm">
-        <span className="flex items-center gap-2 text-muted-foreground font-medium">
-          <Loader2 size={13} className="animate-spin text-neon-green" />
-          Re-parsing demo…
-        </span>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {done ? 'Done' : `${elapsed}s — usually 15–30s`}
-        </span>
+    <div className="w-full space-y-1.5">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Re-parsing demo…</span>
+        <span>{progress < 100 ? `${Math.round(progress)}%` : 'Done'}</span>
       </div>
-
-      {/* Track */}
-      <div className="relative h-1.5 w-full rounded-full bg-muted overflow-hidden">
-        {/* Animated fill */}
+      <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
         <div
-          className={
-            done
-              ? 'absolute inset-y-0 left-0 rounded-full bg-neon-green transition-all duration-500 ease-out w-full'
-              : 'absolute inset-y-0 left-0 rounded-full bg-neon-green animate-reparse-fill'
-          }
+          className="h-full rounded-full bg-neon-green transition-all duration-700 ease-out"
+          style={{ width: `${progress}%` }}
         />
-        {/* Shimmer overlay while running */}
-        {!done && (
-          <div
-            className="absolute inset-0 rounded-full opacity-40"
-            style={{
-              background:
-                'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 1.5s linear infinite',
-            }}
-          />
-        )}
       </div>
     </div>
   )
