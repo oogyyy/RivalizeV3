@@ -136,7 +136,7 @@ export default async function DashboardPage() {
         .in('team_id', teamIds)
         .eq('demo_type', 'opponent')
         .order('created_at', { ascending: false })
-        .limit(4)
+        .limit(3)
     : { data: [] }
 
   const { data: recentSelfDemos } = teamIds.length
@@ -146,7 +146,7 @@ export default async function DashboardPage() {
         .in('team_id', teamIds)
         .eq('demo_type', 'self')
         .order('created_at', { ascending: false })
-        .limit(4)
+        .limit(3)
     : { data: [] }
 
   // Totals
@@ -215,9 +215,8 @@ export default async function DashboardPage() {
         <div className="lg:col-span-2 space-y-5">
 
           {/* ── Recent Opponent Demos ── */}
-          <Card className="bg-gradient-to-br from-red-500/[0.04] via-card to-card border-red-500/20 overflow-hidden">
-            {/* coloured top accent bar */}
-            <div className="h-0.5 w-full bg-gradient-to-r from-red-500/60 via-red-500/20 to-transparent" />
+          <Card className="bg-card border-border overflow-hidden">
+            <div className="h-px w-full bg-gradient-to-r from-red-500/40 via-red-500/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4">
               <div>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -270,28 +269,23 @@ export default async function DashboardPage() {
                         className="flex items-center gap-3 px-5 py-3 hover:bg-red-500/5 transition-colors group"
                       >
                         {/* Avatar */}
-                        <div className="w-9 h-9 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0 group-hover:bg-red-500/20 transition-colors">
-                          <span className="text-xs font-bold text-red-400">
+                        <div className="w-9 h-9 rounded-lg bg-muted/60 border border-border flex items-center justify-center shrink-0 group-hover:bg-muted transition-colors">
+                          <span className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">
                             {d.opponent_name.charAt(0).toUpperCase()}
                           </span>
                         </div>
 
-                        {/* Name + meta */}
+                        {/* Name + map + date */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate group-hover:text-red-300 transition-colors">
+                          <p className="text-sm font-semibold text-foreground truncate group-hover:text-foreground transition-colors">
                             {d.opponent_name}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
                             {d.map && d.map !== 'unknown' && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-mono bg-muted/50 border border-border/60 rounded px-1.5 py-0.5 text-muted-foreground">
-                                <Map size={9} />
-                                {d.map.replace('de_', '')}
-                              </span>
+                              <span className="font-normal text-muted-foreground ml-1.5">[{d.map}]</span>
                             )}
-                            <span className="text-[10px] text-muted-foreground/70">
-                              {d.match_date ? formatDate(d.match_date) : formatDate(d.created_at)}
-                            </span>
-                          </div>
+                          </p>
+                          <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                            {d.match_date ? formatDate(d.match_date) : formatDate(d.created_at)}
+                          </p>
                         </div>
 
                         {/* Status */}
@@ -299,7 +293,7 @@ export default async function DashboardPage() {
                           <Badge variant={statusVariant(d.status)} className="text-[10px] px-1.5">
                             {statusLabel(d.status)}
                           </Badge>
-                          <ChevronRight size={13} className="text-muted-foreground/30 group-hover:text-red-400 transition-colors" />
+                          <ChevronRight size={13} className="text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
                         </div>
                       </Link>
                     )
@@ -317,8 +311,8 @@ export default async function DashboardPage() {
           </div>
 
           {/* ── Recent My Team Demos ── */}
-          <Card className="bg-gradient-to-br from-neon-green/[0.04] via-card to-card border-neon-green/20 overflow-hidden">
-            <div className="h-0.5 w-full bg-gradient-to-r from-neon-green/60 via-neon-green/20 to-transparent" />
+          <Card className="bg-card border-border overflow-hidden">
+            <div className="h-px w-full bg-gradient-to-r from-neon-green/40 via-neon-green/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4">
               <div>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -367,46 +361,41 @@ export default async function DashboardPage() {
                         className="flex items-center gap-3 px-5 py-3 hover:bg-neon-green/5 transition-colors group"
                       >
                         {/* Avatar */}
-                        <div className="w-9 h-9 rounded-lg bg-neon-green/10 border border-neon-green/20 flex items-center justify-center shrink-0 group-hover:bg-neon-green/20 transition-colors">
-                          <span className="text-xs font-bold text-neon-green">
+                        <div className="w-9 h-9 rounded-lg bg-muted/60 border border-border flex items-center justify-center shrink-0 group-hover:bg-muted transition-colors">
+                          <span className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">
                             {myTeamName.charAt(0).toUpperCase()}
                           </span>
                         </div>
 
-                        {/* Name + meta */}
+                        {/* Name + result + map + date */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate group-hover:text-neon-green transition-colors">
-                            {myTeamName}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            {d.map && d.map !== 'unknown' && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-mono bg-muted/50 border border-border/60 rounded px-1.5 py-0.5 text-muted-foreground">
-                                <Map size={9} />
-                                {d.map.replace('de_', '')}
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-foreground truncate group-hover:text-foreground transition-colors">
+                              {myTeamName}
+                            </p>
+                            {result && (
+                              <span className={cn(
+                                'text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0',
+                                result === 'Win'  && 'text-neon-green bg-neon-green/10',
+                                result === 'Loss' && 'text-red-400    bg-red-400/10',
+                                result === 'Draw' && 'text-yellow-400 bg-yellow-400/10',
+                              )}>
+                                {result.toUpperCase()}
                               </span>
                             )}
-                            <span className="text-[10px] text-muted-foreground/70">
-                              {d.match_date ? formatDate(d.match_date) : formatDate(d.created_at)}
-                            </span>
                           </div>
+                          <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                            {d.map && d.map !== 'unknown' ? `${d.map} · ` : ''}
+                            {d.match_date ? formatDate(d.match_date) : formatDate(d.created_at)}
+                          </p>
                         </div>
 
-                        {/* Result + status */}
+                        {/* Status */}
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {result && (
-                            <span className={cn(
-                              'text-[10px] font-bold px-1.5 py-0.5 rounded border',
-                              result === 'Win'  && 'text-neon-green border-neon-green/30 bg-neon-green/10',
-                              result === 'Loss' && 'text-red-400    border-red-400/30    bg-red-400/10',
-                              result === 'Draw' && 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10',
-                            )}>
-                              {result.toUpperCase()}
-                            </span>
-                          )}
                           <Badge variant={statusVariant(d.status)} className="text-[10px] px-1.5">
                             {statusLabel(d.status)}
                           </Badge>
-                          <ChevronRight size={13} className="text-muted-foreground/30 group-hover:text-neon-green transition-colors" />
+                          <ChevronRight size={13} className="text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
                         </div>
                       </Link>
                     )
