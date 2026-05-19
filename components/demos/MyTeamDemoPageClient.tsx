@@ -7,12 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import PlayerStatsTable from '@/components/demos/PlayerStatsTable'
+import { ReparseProgress } from '@/components/demos/ReparseProgress'
 import RoundTimeline from '@/components/demos/RoundTimeline'
 import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
 import {
   Trophy, Crosshair, Target, Shield, Zap, TrendingUp,
   BarChart3, Map, Clock, Brain, ArrowLeft, RefreshCw,
-  Loader2, ArrowRight,
+  Loader2, ArrowRight, ChevronDown, ChevronUp, Copy, Check,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Demo, ParsedDemoData, PlayerStats } from '@/types/database'
@@ -412,7 +413,10 @@ interface Props {
 export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
   const [demo, setDemo]     = useState<Demo>(initialDemo)
   const [parsing, setParsing] = useState(false)
+  const [reparsing, setReparsing] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [debugOpen, setDebugOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const fetchDemo = useCallback(async () => {
     const supabase = createClient()
@@ -424,11 +428,16 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
     setParsing(true)
     try {
       const res = await fetch(`/api/demos/${demo.id}/reparse`, { method: 'POST' })
-      if (res.ok) await fetchDemo()
+      if (res.ok) setReparsing(true)
     } finally {
       setParsing(false)
     }
   }
+
+  const handleReparseDone = useCallback(async () => {
+    await fetchDemo()
+    setReparsing(false)
+  }, [fetchDemo])
 
   const parsed = demo.parsed_data as ParsedDemoData | null
 
@@ -492,7 +501,7 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
           )}
           <Button
             variant="outline" size="sm" className="gap-2"
-            onClick={handleReparse} disabled={parsing}
+            onClick={handleReparse} disabled={parsing || reparsing}
           >
             {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             {parsing ? 'Parsing…' : 'Re-parse'}
@@ -505,6 +514,10 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
           </Link>
         </div>
       </div>
+
+      {reparsing && (
+        <ReparseProgress demoId={demo.id} onDone={handleReparseDone} />
+      )}
 
       {/* Title */}
       <div>
@@ -526,6 +539,35 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
           {h?.map && <span className="font-mono text-xs">{h.map}</span>}
           <span className="capitalize">{demo.status}</span>
         </div>
+      </div>
+
+      {/* Debug panel */}
+      <div className="border border-border rounded-lg overflow-hidden">
+        <button
+          onClick={() => setDebugOpen(o => !o)}
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/20 hover:bg-muted/40 transition-colors text-sm text-muted-foreground"
+        >
+          <span className="font-mono text-xs uppercase tracking-wider">Debug — Raw parsed_data</span>
+          {debugOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {debugOpen && (
+          <div className="relative">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(JSON.stringify(demo.parsed_data, null, 2))
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              className="absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-muted/60 hover:bg-muted border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {copied ? <Check size={12} className="text-neon-green" /> : <Copy size={12} />}
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+            <pre className="p-4 overflow-auto max-h-96 text-xs font-mono text-muted-foreground bg-black/30 whitespace-pre-wrap break-all">
+              {JSON.stringify(demo.parsed_data, null, 2) ?? 'null'}
+            </pre>
+          </div>
+        )}
       </div>
 
       {!parsed ? (
