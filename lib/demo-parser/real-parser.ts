@@ -6,33 +6,38 @@
  * switch sides at halftime, so we derive each player's starting side from
  * observations before the halftime tick and flip post-halftime observations.
  *
+ * Team names are resolved in priority order:
+ *   1. CCSTeam.m_szTeamname entity state (set by FACEIT/competitive servers)
+ *   2. Majority clan tag (CCSPlayerController.m_szClan) across all side players
+ *   3. "T-Side" / "CT-Side" fallback labels
+ *
+ * Halftime is fixed at round 12 (MR12 standard). OT mini-halves are 3 rounds.
+ *
  * NOTE: `event_name` is auto-included by demoparser2 and must NOT be passed
  * as an otherExtra prop — doing so causes rm_user_friendly_names() to throw,
- * silently zeroing all events. We call parseEvent() per event type to avoid
- * having to partition on event_name entirely.
+ * silently zeroing all events.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const dp = require('@laihoe/demoparser2') as {
-  parseHeader: (b: Buffer) => Record<string, unknown>
+  parseHeader:    (b: Buffer) => Record<string, unknown>
   parseEvent: (
-    b: Buffer,
-    event: string,
-    playerExtra: string[],
-    otherExtra: string[],
+    b: Buffer, event: string,
+    playerExtra: string[], otherExtra: string[],
   ) => Record<string, unknown>[]
   parseEvents: (
-    b: Buffer,
-    events: string[],
-    playerExtra: string[],
-    otherExtra: string[],
+    b: Buffer, events: string[],
+    playerExtra: string[], otherExtra: string[],
   ) => Record<string, unknown>[]
   parsePlayerInfo: (b: Buffer) => Record<string, unknown>[]
+  // parseTicks is available in demoparser2 ≥ 0.5 and most 0.4x builds.
+  // We access it dynamically so older builds that lack it degrade gracefully.
+  parseTicks?: (b: Buffer, props: string[], ticks?: number[]) => Record<string, unknown>[]
 }
 
 import type { ParsedDemoData, PlayerStats } from '@/types/database'
 
-// ─── tiny helpers ────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 type Row = Record<string, unknown>
 
@@ -47,30 +52,50 @@ function n(obj: Row, ...keys: string[]): number {
   return 0
 }
 
-// Convert any value that could plausibly be a string identifier to string.
-// demoparser2 returns steam IDs as BigInt (64-bit safe) but some props may be
-// plain numbers. We handle all three representations so lookups never silently
-// miss due to type mismatch.
 function s(obj: Row, ...keys: string[]): string {
   for (const k of keys) {
     const v = obj[k]
     if (typeof v === 'string' && v.length > 0) return v
     if (typeof v === 'bigint') return v.toString()
-    // Use Number only as last resort — regular JS numbers lose precision above
-    // 2^53 so steam64 IDs may be corrupted; BigInt is always preferred.
     if (typeof v === 'number' && !isNaN(v) && v !== 0) return String(v)
   }
   return ''
 }
 
-// ─── public result type ───────────────────────────────────────────────────────
+// ─── CS2 MR12 halftime constants ─────────────────────────────────────────────
+
+// Standard CS2 competitive: MR12, regulation halftime after round 12.
+// OT is MR3 (each OT half = 3 rounds).
+const REGULATION_HALF = 12
+const OT_HALF_SIZE    = 3
+
+/**
+ * Returns true if T-side wins this round go to team1 (original T-starters),
+ * accounting for regulation halftime and OT mini-halves.
+ *
+ * team1 = players who started on T in round 1.
+ * After regulation halftime (round 13), teams swap → T wins go to team2.
+ * After OT round 4, teams swap again → back to first-half orientation.
+ */
+function tWinsGoToTeam1(roundIdx: number): boolean {
+  if (roundIdx < REGULATION_HALF) return true   // Rounds 1–12: T is team1
+  if (roundIdx < REGULATION_HALF * 2) return false  // Rounds 13–24: T is team2
+  // OT rounds (25+): each mini-half is OT_HALF_SIZE rounds, alternating
+  const otIdx  = roundIdx - REGULATION_HALF * 2
+  const otHalf = Math.floor(otIdx / OT_HALF_SIZE)
+  // OT halves 0,2,4… (even) continue second-half orientation (T = team2)
+  // OT halves 1,3,5… (odd) flip back to first-half orientation (T = team1)
+  return otHalf % 2 === 1
+}
+
+// ─── Public result type ───────────────────────────────────────────────────────
 
 export interface RealParseResult {
   parsedData: ParsedDemoData
   warnings: string[]
 }
 
-// ─── main entry point ─────────────────────────────────────────────────────────
+// ─── Main entry point ─────────────────────────────────────────────────────────
 
 export function parseCS2Demo(buf: Buffer): RealParseResult {
   const warnings: string[] = []
@@ -89,30 +114,20 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   //
   // PLAYER_EXTRA uses only `team_num` — a confirmed-valid CS2 player entity
   // prop. `team_name` is a TEAM entity field, not a player entity field, so
-  // requesting it via PLAYER_EXTRA returns empty strings and broke all team
-  // assignment, causing the 0-player fallback to mock data.
+  // requesting it via PLAYER_EXTRA returns empty strings.
   const PLAYER_EXTRA = ['team_num']
 
   let deathEvents: Row[] = []
   try {
     deathEvents = dp.parseEvent(
-      buf,
-      'player_death',
-      PLAYER_EXTRA,
-      // user_steamid / user_name are the VICTIM's game-event fields.
-      // We request them explicitly so we can build a steamid→name map from
-      // the victim side too, catching players who never appear as attackers.
+      buf, 'player_death', PLAYER_EXTRA,
       ['tick', 'headshot', 'weapon',
        'attacker_steamid', 'attacker_name', 'attacker_team_num',
        'assister_steamid', 'assister_name',
        'user_steamid', 'user_name'],
     ) ?? []
-  } catch (e) {
-    warnings.push(`parseEvent(player_death): ${e}`)
-  }
+  } catch (e) { warnings.push(`parseEvent(player_death): ${e}`) }
 
-  // Diagnostic: log the field names on the first death event so we can verify
-  // which fields demoparser2 actually returns for this demo format.
   if (deathEvents.length > 0) {
     console.log('[real-parser] player_death field names:', Object.keys(deathEvents[0]))
   }
@@ -120,19 +135,11 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   let roundEnds: Row[] = []
   try {
     roundEnds = dp.parseEvent(
-      buf,
-      'round_end',
-      [],
-      // t_score / ct_score are the CUMULATIVE team scores up to and including
-      // this round. The last round_end row gives us the final match score directly,
-      // which is more reliable than re-deriving from winner=2/3 values.
+      buf, 'round_end', [],
       ['tick', 'winner', 'reason', 't_score', 'ct_score'],
     ) ?? []
-  } catch (e) {
-    warnings.push(`parseEvent(round_end): ${e}`)
-  }
+  } catch (e) { warnings.push(`parseEvent(round_end): ${e}`) }
 
-  // Diagnostic: log first round_end event's field names to verify score fields.
   if (roundEnds.length > 0) {
     console.log('[real-parser] round_end field names:', Object.keys(roundEnds[0]))
     console.log('[real-parser] first round_end values:', roundEnds[0])
@@ -141,62 +148,107 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   let hurtEvents: Row[] = []
   try {
     hurtEvents = dp.parseEvent(
-      buf,
-      'player_hurt',
-      PLAYER_EXTRA,
+      buf, 'player_hurt', PLAYER_EXTRA,
       ['tick', 'attacker_steamid', 'attacker_team_num', 'dmg_health'],
     ) ?? []
-  } catch (e) {
-    warnings.push(`parseEvent(player_hurt): ${e}`)
-  }
+  } catch (e) { warnings.push(`parseEvent(player_hurt): ${e}`) }
 
   let mvpEvents: Row[] = []
   try {
     mvpEvents = dp.parseEvent(
-      buf,
-      'round_mvp',
-      PLAYER_EXTRA,
+      buf, 'round_mvp', PLAYER_EXTRA,
       ['tick'],
     ) ?? []
-  } catch (e) {
-    warnings.push(`parseEvent(round_mvp): ${e}`)
+  } catch (e) { warnings.push(`parseEvent(round_mvp): ${e}`) }
+
+  // ── 2b. Clan-name scans ───────────────────────────────────────────────────
+  //
+  // CCSPlayerController.m_szClan is the only per-player field that contains a
+  // team/clan label. We scan it from multiple event types to maximise coverage:
+  //   • player_death victims   (every player who died at least once)
+  //   • round_mvp subjects     (round winners — complement to victim scan)
+  //
+  // If players haven't set a Steam clan tag (common in MM), these maps stay
+  // empty and we fall through to the CCSTeam entity scan below.
+  const clanNameBySid = new Map<string, string>()
+
+  function absorbClanScan(events: Row[]) {
+    for (const ev of events) {
+      const sid  = s(ev, 'steamid', 'user_steamid')
+      const clan = s(ev, 'CCSPlayerController.m_szClan')
+      if (sid && sid !== '0' && clan) clanNameBySid.set(sid, clan)
+    }
   }
 
-  // ── 2b. Optional clan-name scan ───────────────────────────────────────────
-  //
-  // listUpdatedFields() on a real demo revealed the correct prop is:
-  //   CCSPlayerController.m_szClan  (per-player entity, usable as playerExtra)
-  //   CCSTeam.m_szClanTeamname      (team entity — not accessible via playerExtra)
-  //
-  // We read m_szClan for every victim in player_death to build a steamid→clan
-  // map, then derive each team's name as the majority clan tag on that side.
-  const clanNameBySid = new Map<string, string>()
   try {
-    const clanEvents = dp.parseEvent(
-      buf,
-      'player_death',
+    absorbClanScan(dp.parseEvent(
+      buf, 'player_death',
       ['team_num', 'CCSPlayerController.m_szClan'],
       ['tick', 'attacker_steamid'],
-    ) ?? []
-    for (const ev of clanEvents) {
-      const vicSid  = s(ev, 'steamid', 'user_steamid')
-      const vicClan = s(ev, 'CCSPlayerController.m_szClan')
-      if (vicSid && vicSid !== '0' && vicClan) clanNameBySid.set(vicSid, vicClan)
-    }
-  } catch (e) {
-    warnings.push(`CCSPlayerController.m_szClan scan failed: ${e}`)
-  }
+    ) ?? [])
+  } catch (e) { warnings.push(`clan scan (death): ${e}`) }
+
+  try {
+    absorbClanScan(dp.parseEvent(
+      buf, 'round_mvp',
+      ['team_num', 'CCSPlayerController.m_szClan'],
+      ['tick'],
+    ) ?? [])
+  } catch (e) { warnings.push(`clan scan (mvp): ${e}`) }
+
   if (clanNameBySid.size > 0) {
-    console.log(`[real-parser] clan names found for ${clanNameBySid.size} players:`, [...new Set(clanNameBySid.values())])
+    console.log(`[real-parser] clan tags for ${clanNameBySid.size} players:`, [...new Set(clanNameBySid.values())])
   }
 
-  // Sort round_end events chronologically — used for halftime boundary and score
+  // ── 2c. CCSTeam entity name scan (via parseTicks) ─────────────────────────
+  //
+  // FACEIT and other competitive platforms populate CCSTeam.m_szTeamname with
+  // the real team name. This is a team entity prop (not player entity), so it
+  // can only be read via parseTicks(), not via playerExtra in parseEvent().
+  //
+  // We sample it at the last round_end tick so the final team names are read.
+  let tEntityName  = ''
+  let ctEntityName = ''
+
+  // Sort rounds first so we can find the last tick
   const sortedRounds = [...roundEnds].sort((a, b) => n(a, 'tick') - n(b, 'tick'))
 
+  const lastRoundTick = sortedRounds.length > 0
+    ? n(sortedRounds[sortedRounds.length - 1], 'tick')
+    : 0
+
+  if (lastRoundTick > 0 && typeof dp.parseTicks === 'function') {
+    try {
+      const GENERIC_NAMES = new Set([
+        '', 'Unassigned', 'Spectator', 'TERRORIST', 'CT',
+        'Terrorist', 'Counter-Terrorist', 'T', 'COUNTER-TERRORIST',
+        'Terrorists', 'Counter-Terrorists',
+      ])
+      const teamRows = dp.parseTicks(
+        buf,
+        ['CCSTeam.m_szTeamname', 'CCSTeam.m_iTeamNum'],
+        [lastRoundTick],
+      ) ?? []
+      for (const row of teamRows) {
+        const teamNum  = n(row, 'CCSTeam.m_iTeamNum')
+        const teamName = s(row, 'CCSTeam.m_szTeamname')
+        if (!teamName || GENERIC_NAMES.has(teamName)) continue
+        if (teamNum === 2 && !tEntityName)  tEntityName  = teamName
+        if (teamNum === 3 && !ctEntityName) ctEntityName = teamName
+      }
+      if (tEntityName || ctEntityName) {
+        console.log(`[real-parser] CCSTeam entity names: T="${tEntityName}", CT="${ctEntityName}"`)
+      } else {
+        console.log(`[real-parser] CCSTeam scan returned ${teamRows.length} rows but no usable names`)
+      }
+    } catch (e) {
+      warnings.push(`CCSTeam parseTicks: ${e}`)
+    }
+  } else if (!dp.parseTicks) {
+    warnings.push('parseTicks not available in this demoparser2 build — CCSTeam names skipped')
+  }
+
   // ── Knife round detection ─────────────────────────────────────────────────
-  // FACEIT/ESEA competitive matches begin with a knife round (side selection).
-  // All kills in that round use melee weapons. We strip it from stats and
-  // totalRounds so counts match the FACEIT scoreboard.
   function isKnifeWeapon(w: string): boolean {
     return w.startsWith('knife') || w === 'bayonet'
   }
@@ -211,74 +263,60 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     }
   }
 
-  // Competitive rounds = all rounds after the knife round
   const competitiveRounds = knifeRoundEndTick >= 0 ? sortedRounds.slice(1) : sortedRounds
   const totalRounds = competitiveRounds.length
 
-  // Halftime tick: tick of the last round in the first half (competitive only)
-  const halfRoundIdx = Math.ceil(totalRounds / 2) - 1
-  const halfTick = halfRoundIdx >= 0 && halfRoundIdx < competitiveRounds.length
+  // Halftime tick: end of round 12 (MR12 fixed), or last round if shorter.
+  // Used to determine each player's starting side before side-swap.
+  const halfRoundIdx = Math.min(REGULATION_HALF - 1, competitiveRounds.length - 1)
+  const halfTick = halfRoundIdx >= 0
     ? n(competitiveRounds[halfRoundIdx], 'tick')
     : Infinity
 
-  // ── 3. Player info (display names, bot/HLTV flags) ────────────────────────
+  console.log(`[real-parser] totalRounds=${totalRounds}, halfTick=${halfTick} (idx=${halfRoundIdx})`)
+
+  // ── 3. Player info ────────────────────────────────────────────────────────
   let playerInfoRaw: Row[] = []
   try {
     playerInfoRaw = dp.parsePlayerInfo(buf) ?? []
-  } catch (e) {
-    warnings.push(`playerInfo: ${e}`)
-  }
+  } catch (e) { warnings.push(`playerInfo: ${e}`) }
 
   if (playerInfoRaw.length > 0) {
     console.log('[real-parser] parsePlayerInfo field names:', Object.keys(playerInfoRaw[0]))
-    console.log('[real-parser] parsePlayerInfo first row:', playerInfoRaw[0])
   } else {
     console.warn('[real-parser] parsePlayerInfo returned 0 rows')
   }
 
-  const botSids  = new Set(
-    playerInfoRaw.filter(p => p.is_bot).map(p => s(p, 'xuid', 'steamid'))
-  )
-  const hltvSids = new Set(
-    playerInfoRaw.filter(p => p.is_hltv).map(p => s(p, 'xuid', 'steamid'))
-  )
-  // Primary name source: parsePlayerInfo keyed by steamid/xuid
+  const botSids  = new Set(playerInfoRaw.filter(p => p.is_bot ).map(p => s(p, 'xuid', 'steamid')))
+  const hltvSids = new Set(playerInfoRaw.filter(p => p.is_hltv).map(p => s(p, 'xuid', 'steamid')))
+
   const infoName = new Map<string, string>(
     playerInfoRaw
       .filter(p => !p.is_bot && !p.is_hltv)
       .map(p => [s(p, 'xuid', 'steamid'), s(p, 'name')] as [string, string])
-      .filter(([sid, name]) => sid && name)
+      .filter(([sid, name]) => sid && name),
   )
 
-  // Secondary name source: victim names from death events (user_name / user_steamid).
-  // Catches players who would otherwise fall back to Player_XXXX because their
-  // steamid from parsePlayerInfo didn't match the event steamid format.
-  const victimName = new Map<string, string>()
+  const victimName   = new Map<string, string>()
+  const attackerName = new Map<string, string>()
   for (const ev of deathEvents) {
     const vicSid  = s(ev, 'user_steamid', 'steamid')
     const vicName = s(ev, 'user_name')
     if (vicSid && vicName) victimName.set(vicSid, vicName)
-  }
-
-  // Tertiary: attacker names from death events (already available as otherExtra)
-  const attackerName = new Map<string, string>()
-  for (const ev of deathEvents) {
     const atkSid  = s(ev, 'attacker_steamid')
     const atkName = s(ev, 'attacker_name')
     if (atkSid && atkName) attackerName.set(atkSid, atkName)
   }
 
-  console.log(`[real-parser] name sources: parsePlayerInfo=${infoName.size}, victimNames=${victimName.size}, attackerNames=${attackerName.size}`)
+  console.log(`[real-parser] name sources: parsePlayerInfo=${infoName.size}, victim=${victimName.size}, attacker=${attackerName.size}`)
 
-  // ── 4. Stat maps + team_num observations per player ───────────────────────
+  // ── 4. Stat maps + team_num observations ──────────────────────────────────
   const killMap    = new Map<string, number>()
   const hsMap      = new Map<string, number>()
   const assistMap  = new Map<string, number>()
   const damageMap  = new Map<string, number>()
   const mvpMap     = new Map<string, number>()
   const deathCount = new Map<string, number>()
-
-  // playerTeamObs: steamid → array of {tick, team_num} seen across all events
   const playerTeamObs = new Map<string, { tick: number; team_num: number }[]>()
 
   function recordTeam(sid: string, tick: number, teamNum: number) {
@@ -294,14 +332,11 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     const atkTeam = n(ev, 'attacker_team_num')
     const vicTeam = n(ev, 'team_num', 'user_team_num')
 
-    // Always record team observations (knife round side = first-half side)
     if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
     if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, vicTeam)
 
-    // Skip knife round — don't count kills/deaths/assists from it
     if (knifeRoundEndTick >= 0 && tick <= knifeRoundEndTick) continue
 
-    // Exclude team kills and self-kills from kill/HS counts (matches FACEIT scoring)
     const isTeamKill = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
     const isSelfKill = atkSid !== '' && atkSid === vicSid
 
@@ -310,29 +345,22 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
     }
     const astSid = s(ev, 'assister_steamid')
-    if (astSid && astSid !== '0') {
-      assistMap.set(astSid, (assistMap.get(astSid) ?? 0) + 1)
-    }
-    if (vicSid && vicSid !== '0') {
-      deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1)
-    }
+    if (astSid && astSid !== '0') assistMap.set(astSid, (assistMap.get(astSid) ?? 0) + 1)
+    if (vicSid && vicSid !== '0') deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1)
   }
 
   for (const ev of hurtEvents) {
     const tick    = n(ev, 'tick')
     const atkSid  = s(ev, 'attacker_steamid')
     const atkTeam = n(ev, 'attacker_team_num')
-    const vicTeam = n(ev, 'team_num')  // PLAYER_EXTRA on victim entity
+    const vicTeam = n(ev, 'team_num')
     const vicSid  = s(ev, 'steamid', 'user_steamid')
 
-    // Always record team observations
     if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, atkTeam)
     if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, vicTeam)
 
-    // Skip knife round damage
     if (knifeRoundEndTick >= 0 && tick <= knifeRoundEndTick) continue
 
-    // Exclude friendly fire and self-damage so ADR matches FACEIT
     const isFriendlyFire = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
     const isSelfDamage   = atkSid !== '' && vicSid !== '' && atkSid === vicSid
 
@@ -350,17 +378,14 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     }
   }
 
-  // ── 5. Derive each player's STARTING team_num (before halftime switch) ────
+  // ── 5. Derive each player's STARTING team_num ─────────────────────────────
   //
-  // In CS2, teams switch sides at halftime. A player with team_num=2 (T) in
-  // round 1–12 becomes team_num=3 (CT) in rounds 13–24. We normalise each
-  // observation to its starting-side equivalent so we can group players into
-  // two stable teams regardless of the match length.
+  // Prefer pre-halftime observations (tick ≤ halfTick) — these directly give
+  // the player's starting side. Post-halftime observations are flipped 2↔3.
   function getStartingTeamNum(sid: string): number {
     const obs = playerTeamObs.get(sid) ?? []
     if (obs.length === 0) return 0
 
-    // Use observations from the first half (≤ halfTick) as-is
     const preHalf = obs.filter(o => o.tick <= halfTick && o.team_num >= 2)
     if (preHalf.length > 0) {
       const counts = new Map<number, number>()
@@ -368,7 +393,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
     }
 
-    // Only post-halftime data available: flip 2↔3 to recover starting side
     const postHalf = obs.filter(o => o.tick > halfTick && o.team_num >= 2)
     if (postHalf.length > 0) {
       const counts = new Map<number, number>()
@@ -377,7 +401,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       return dominant === 2 ? 3 : 2
     }
 
-    // Absolute fallback: use all obs, take majority
     const counts = new Map<number, number>()
     for (const o of obs) counts.set(o.team_num, (counts.get(o.team_num) ?? 0) + 1)
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
@@ -385,11 +408,8 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   // ── 6. Build player list ──────────────────────────────────────────────────
   const allSids = new Set<string>([
-    ...killMap.keys(),
-    ...deathCount.keys(),
-    ...assistMap.keys(),
-    ...mvpMap.keys(),
-    ...playerTeamObs.keys(),
+    ...killMap.keys(), ...deathCount.keys(),
+    ...assistMap.keys(), ...mvpMap.keys(), ...playerTeamObs.keys(),
   ])
 
   const players: PlayerStats[] = []
@@ -398,23 +418,21 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     if (!sid || sid === '0' || botSids.has(sid) || hltvSids.has(sid)) continue
 
     const startingNum = getStartingTeamNum(sid)
-    if (startingNum < 2) continue  // spectator or unknown
+    if (startingNum < 2) continue
 
-    // Team label is stable regardless of halftime switch
     const team = startingNum === 2 ? 'T-Side' : 'CT-Side'
 
-    // Resolve player name: try all sources in decreasing reliability order
     const name =
-      infoName.get(sid)      ||   // parsePlayerInfo (most reliable)
-      victimName.get(sid)    ||   // user_name from death events (victim side)
-      attackerName.get(sid)  ||   // attacker_name from death events
-      `Player_${sid.slice(-4)}`   // last resort — visible in logs as a signal
+      infoName.get(sid)     ||
+      victimName.get(sid)   ||
+      attackerName.get(sid) ||
+      `Player_${sid.slice(-4)}`
 
-    const kills    = killMap.get(sid)    ?? 0
-    const deaths   = deathCount.get(sid) ?? 0
-    const assists  = assistMap.get(sid)  ?? 0
-    const headshots = hsMap.get(sid)     ?? 0
-    const mvps     = mvpMap.get(sid)     ?? 0
+    const kills     = killMap.get(sid)    ?? 0
+    const deaths    = deathCount.get(sid) ?? 0
+    const assists   = assistMap.get(sid)  ?? 0
+    const headshots = hsMap.get(sid)      ?? 0
+    const mvps      = mvpMap.get(sid)     ?? 0
 
     const hsPercent = kills > 0 ? Math.round((headshots / kills) * 100) : 0
     const totalDmg  = damageMap.get(sid) ?? 0
@@ -428,43 +446,38 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     )
 
     players.push({
-      steam_id:            sid,
-      name,
-      team,
-      kills,
-      deaths,
-      assists,
-      headshots,
-      headshot_percentage: hsPercent,
-      adr,
-      kast:                65,
-      rating,
-      utility_damage:      0,
-      flash_assists:       0,
-      mvps,
-      rounds_played:       totalRounds,
+      steam_id: sid, name, team, kills, deaths, assists, headshots,
+      headshot_percentage: hsPercent, adr,
+      kast: 65,  // stub — full KAST requires round-by-round survival tracking
+      rating, utility_damage: 0, flash_assists: 0, mvps,
+      rounds_played: totalRounds,
     })
   }
 
   if (players.length === 0) {
     warnings.push(
-      `players=0 diagnostics: deaths=${deathEvents.length} roundEnds=${roundEnds.length} ` +
-      `hurt=${hurtEvents.length} mvp=${mvpEvents.length} allSids=${allSids.size} ` +
-      `teamObsSids=${playerTeamObs.size} halfTick=${halfTick}`,
+      `players=0: deaths=${deathEvents.length} roundEnds=${roundEnds.length} ` +
+      `hurt=${hurtEvents.length} mvp=${mvpEvents.length} sids=${allSids.size} halfTick=${halfTick}`,
     )
     console.warn('[real-parser] 0 players extracted. Warnings:', warnings)
   } else {
-    const fakenames = players.filter(p => p.name.startsWith('Player_')).length
-    console.log(`[real-parser] ${players.length} players extracted, ${fakenames} with fallback names`)
-    console.log('[real-parser] player names:', players.map(p => p.name))
+    const fakes = players.filter(p => p.name.startsWith('Player_')).length
+    console.log(`[real-parser] ${players.length} players (${fakes} with fallback names):`, players.map(p => p.name))
   }
 
-  // ── 6b. Derive real team names from clan names ────────────────────────────
+  // ── 6b. Resolve real team names ───────────────────────────────────────────
   //
-  // For each starting side, collect the clan names seen across all players on
-  // that side, then pick the majority name. Falls back to the side label if no
-  // clan names were captured (clanNameBySid empty = prop unsupported).
-  function deriveName(sideLabel: string, sidePlayers: typeof players): string {
+  // Priority 1: CCSTeam entity name (populated by FACEIT / competitive servers)
+  // Priority 2: Majority clan tag across all players on this side
+  // Priority 3: Generic "T-Side" / "CT-Side" fallback
+
+  function deriveName(
+    sideLabel: string,
+    sidePlayers: typeof players,
+    entityName: string,
+  ): string {
+    if (entityName) return entityName
+
     const counts = new Map<string, number>()
     for (const p of sidePlayers) {
       const clan = clanNameBySid.get(p.steam_id)
@@ -476,10 +489,11 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   const tSidePlayers  = players.filter(p => p.team === 'T-Side')
   const ctSidePlayers = players.filter(p => p.team === 'CT-Side')
-  const team1Name = deriveName('T-Side',  tSidePlayers)
-  const team2Name = deriveName('CT-Side', ctSidePlayers)
+  const team1Name = deriveName('T-Side',  tSidePlayers,  tEntityName)
+  const team2Name = deriveName('CT-Side', ctSidePlayers, ctEntityName)
 
-  // Patch player team fields to the resolved names
+  console.log(`[real-parser] team names: "${team1Name}" vs "${team2Name}"`)
+
   if (team1Name !== 'T-Side' || team2Name !== 'CT-Side') {
     for (const p of players) {
       if (p.team === 'T-Side')  p.team = team1Name
@@ -489,26 +503,25 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   // ── 7. Score ──────────────────────────────────────────────────────────────
   //
-  // The CS2 round_end `winner` field (2=T / 3=CT) isn't reliably returned by
-  // demoparser2, but the `reason` string IS: "ct_killed"/"bomb_exploded" → T wins,
-  // "t_killed"/"bomb_defused" → CT wins.  We use reason-first logic everywhere.
+  // Strategy A (preferred): read cumulative t_score / ct_score from the last
+  // competitive round_end event. These are populated in some CS2 demo builds.
   //
-  // Strategy A (preferred): t_score / ct_score cumulative fields on last round_end.
-  // Strategy B (fallback):  halftime-aware counting via win_reason strings.
+  // Strategy B (fallback): count round winners via reason strings with
+  // MR12-aware halftime and OT mini-half correction (tWinsGoToTeam1).
 
-  // Reason string → did T-side win? Returns null if unknown.
   function tSideWonRound(reason: string, winnerNum: number): boolean {
     if (['ct_killed', 'bomb_exploded', 'target_bombed', 'terrorists_win'].includes(reason)) return true
     if (['t_killed', 'bomb_defused', 'hostage_rescued', 'cts_win', 'time_expired'].includes(reason)) return false
-    // Fall back to numeric winner (2=T, 3=CT in CS2 proto)
     return winnerNum === 2
   }
 
-  let score1 = 0  // team1 = started T-Side
-  let score2 = 0  // team2 = started CT-Side
+  let score1 = 0
+  let score2 = 0
 
-  const lastRound = competitiveRounds.length > 0 ? competitiveRounds[competitiveRounds.length - 1] : null
-  const directT  = lastRound ? n(lastRound, 't_score') : 0
+  const lastRound = competitiveRounds.length > 0
+    ? competitiveRounds[competitiveRounds.length - 1]
+    : null
+  const directT  = lastRound ? n(lastRound, 't_score')  : 0
   const directCT = lastRound ? n(lastRound, 'ct_score') : 0
 
   if (directT > 0 || directCT > 0) {
@@ -516,24 +529,16 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     score2 = directCT
     console.log(`[real-parser] scores via t_score/ct_score: ${score1}-${score2}`)
   } else {
-    // Strategy B: reason-string + halftime-swap counting
-    const halfRoundCount = Math.ceil(totalRounds / 2)
     for (let i = 0; i < competitiveRounds.length; i++) {
-      const re = competitiveRounds[i]
+      const re   = competitiveRounds[i]
       const tWon = tSideWonRound(s(re, 'reason'), n(re, 'winner'))
-      const isSecondHalf = i >= halfRoundCount
-      if (!isSecondHalf) {
-        if (tWon) score1++; else score2++
-      } else {
-        if (tWon) score2++; else score1++  // sides swap after halftime
-      }
+      if (tWinsGoToTeam1(i) ? tWon : !tWon) score1++
+      else score2++
     }
-    console.log(`[real-parser] scores via reason strings: ${score1}-${score2}`)
+    console.log(`[real-parser] scores via reason strings (MR12-aware): ${score1}-${score2}`)
   }
 
   // ── 8. Assemble ParsedDemoData ────────────────────────────────────────────
-  const halfCount = Math.ceil(totalRounds / 2)
-
   const parsedData: ParsedDemoData = {
     header: {
       map:          mapName,
@@ -545,25 +550,22 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       total_rounds: totalRounds,
     },
     rounds: competitiveRounds.map((re, i) => {
-      // Store winner as the original team name (with halftime correction) so
-      // RoundTimeline can match it against team1/team2 names directly.
-      const tWon = tSideWonRound(s(re, 'reason'), n(re, 'winner'))
-      const isSecondHalf = i >= halfCount
-      const winnerTeam = (!isSecondHalf ? tWon : !tWon) ? team1Name : team2Name
+      const tWon       = tSideWonRound(s(re, 'reason'), n(re, 'winner'))
+      const winnerTeam = (tWinsGoToTeam1(i) ? tWon : !tWon) ? team1Name : team2Name
       return {
-      number:         i + 1,
-      winner:         winnerTeam,
-      win_reason:     s(re, 'reason') || 'elimination',
-      duration:       90,
-      team1_economy:  0,
-      team2_economy:  0,
-      kills:          [],
-      bomb_planted:   false,
-      bomb_defused:   false,
+        number:        i + 1,
+        winner:        winnerTeam,
+        win_reason:    s(re, 'reason') || 'elimination',
+        duration:      90,
+        team1_economy: 0,
+        team2_economy: 0,
+        kills:         [],
+        bomb_planted:  false,
+        bomb_defused:  false,
       }
     }),
     players,
-    events: [],
+    events:       [],
     heatmap_data: [],
   }
 
