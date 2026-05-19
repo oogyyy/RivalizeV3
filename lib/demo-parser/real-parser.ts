@@ -47,11 +47,18 @@ function n(obj: Row, ...keys: string[]): number {
   return 0
 }
 
+// Convert any value that could plausibly be a string identifier to string.
+// demoparser2 returns steam IDs as BigInt (64-bit safe) but some props may be
+// plain numbers. We handle all three representations so lookups never silently
+// miss due to type mismatch.
 function s(obj: Row, ...keys: string[]): string {
   for (const k of keys) {
     const v = obj[k]
     if (typeof v === 'string' && v.length > 0) return v
     if (typeof v === 'bigint') return v.toString()
+    // Use Number only as last resort — regular JS numbers lose precision above
+    // 2^53 so steam64 IDs may be corrupted; BigInt is always preferred.
+    if (typeof v === 'number' && !isNaN(v) && v !== 0) return String(v)
   }
   return ''
 }
@@ -92,12 +99,22 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       buf,
       'player_death',
       PLAYER_EXTRA,
+      // user_steamid / user_name are the VICTIM's game-event fields.
+      // We request them explicitly so we can build a steamid→name map from
+      // the victim side too, catching players who never appear as attackers.
       ['tick', 'headshot', 'weapon',
        'attacker_steamid', 'attacker_name', 'attacker_team_num',
-       'assister_steamid', 'assister_name'],
+       'assister_steamid', 'assister_name',
+       'user_steamid', 'user_name'],
     ) ?? []
   } catch (e) {
     warnings.push(`parseEvent(player_death): ${e}`)
+  }
+
+  // Diagnostic: log the field names on the first death event so we can verify
+  // which fields demoparser2 actually returns for this demo format.
+  if (deathEvents.length > 0) {
+    console.log('[real-parser] player_death field names:', Object.keys(deathEvents[0]))
   }
 
   let roundEnds: Row[] = []
@@ -113,6 +130,12 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     ) ?? []
   } catch (e) {
     warnings.push(`parseEvent(round_end): ${e}`)
+  }
+
+  // Diagnostic: log first round_end event's field names to verify score fields.
+  if (roundEnds.length > 0) {
+    console.log('[real-parser] round_end field names:', Object.keys(roundEnds[0]))
+    console.log('[real-parser] first round_end values:', roundEnds[0])
   }
 
   let hurtEvents: Row[] = []
@@ -186,15 +209,46 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     warnings.push(`playerInfo: ${e}`)
   }
 
+  if (playerInfoRaw.length > 0) {
+    console.log('[real-parser] parsePlayerInfo field names:', Object.keys(playerInfoRaw[0]))
+    console.log('[real-parser] parsePlayerInfo first row:', playerInfoRaw[0])
+  } else {
+    console.warn('[real-parser] parsePlayerInfo returned 0 rows')
+  }
+
   const botSids  = new Set(
     playerInfoRaw.filter(p => p.is_bot).map(p => s(p, 'xuid', 'steamid'))
   )
   const hltvSids = new Set(
     playerInfoRaw.filter(p => p.is_hltv).map(p => s(p, 'xuid', 'steamid'))
   )
+  // Primary name source: parsePlayerInfo keyed by steamid/xuid
   const infoName = new Map(
-    playerInfoRaw.map(p => [s(p, 'xuid', 'steamid'), s(p, 'name')])
+    playerInfoRaw
+      .filter(p => !p.is_bot && !p.is_hltv)
+      .map(p => [s(p, 'xuid', 'steamid'), s(p, 'name')])
+      .filter(([sid, name]) => sid && name)
   )
+
+  // Secondary name source: victim names from death events (user_name / user_steamid).
+  // Catches players who would otherwise fall back to Player_XXXX because their
+  // steamid from parsePlayerInfo didn't match the event steamid format.
+  const victimName = new Map<string, string>()
+  for (const ev of deathEvents) {
+    const vicSid  = s(ev, 'user_steamid', 'steamid')
+    const vicName = s(ev, 'user_name')
+    if (vicSid && vicName) victimName.set(vicSid, vicName)
+  }
+
+  // Tertiary: attacker names from death events (already available as otherExtra)
+  const attackerName = new Map<string, string>()
+  for (const ev of deathEvents) {
+    const atkSid  = s(ev, 'attacker_steamid')
+    const atkName = s(ev, 'attacker_name')
+    if (atkSid && atkName) attackerName.set(atkSid, atkName)
+  }
+
+  console.log(`[real-parser] name sources: parsePlayerInfo=${infoName.size}, victimNames=${victimName.size}, attackerNames=${attackerName.size}`)
 
   // ── 4. Stat maps + team_num observations per player ───────────────────────
   const killMap    = new Map<string, number>()
@@ -308,13 +362,12 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     // Team label is stable regardless of halftime switch
     const team = startingNum === 2 ? 'T-Side' : 'CT-Side'
 
+    // Resolve player name: try all sources in decreasing reliability order
     const name =
-      infoName.get(sid) ||
-      s(
-        deathEvents.find(e => s(e, 'attacker_steamid') === sid) ?? {},
-        'attacker_name',
-      ) ||
-      `Player_${sid.slice(-4)}`
+      infoName.get(sid)      ||   // parsePlayerInfo (most reliable)
+      victimName.get(sid)    ||   // user_name from death events (victim side)
+      attackerName.get(sid)  ||   // attacker_name from death events
+      `Player_${sid.slice(-4)}`   // last resort — visible in logs as a signal
 
     const kills    = killMap.get(sid)    ?? 0
     const deaths   = deathCount.get(sid) ?? 0
@@ -359,6 +412,10 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       `teamObsSids=${playerTeamObs.size} halfTick=${halfTick}`,
     )
     console.warn('[real-parser] 0 players extracted. Warnings:', warnings)
+  } else {
+    const fakenames = players.filter(p => p.name.startsWith('Player_')).length
+    console.log(`[real-parser] ${players.length} players extracted, ${fakenames} with fallback names`)
+    console.log('[real-parser] player names:', players.map(p => p.name))
   }
 
   // ── 6b. Derive real team names from clan names ────────────────────────────

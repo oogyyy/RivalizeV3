@@ -84,16 +84,31 @@ export default async function OpponentPage({
 
   const isOwnerOrAdmin = membership.role === 'owner' || membership.role === 'admin'
 
+  // Normalise "T-Side"/"CT-Side" parser fallback strings to friendly labels
+  function normaliseTeamName(raw: string | undefined, fallback: string): string {
+    if (!raw || raw === 'T-Side' || raw === 'CT-Side') return fallback
+    return raw
+  }
+
   // Top players: prefer aggregated_stats, fall back to computing from raw demo data
   let topPlayers: PlayerStats[] = stats?.top_players ?? []
   if (topPlayers.length === 0 && (demos ?? []).length > 0) {
     const playerMap: Record<string, PlayerStats & { count: number }> = {}
     for (const demo of demos ?? []) {
       if (demo.status !== 'completed' || !demo.parsed_data) continue
-      const pd = demo.parsed_data as { header?: { team1?: string }; players?: PlayerStats[] }
-      const ownTeamName = pd.header?.team1 ?? 'My Team'
+      const pd = demo.parsed_data as {
+        header?: { team1?: string; team2?: string }
+        opponentSide?: string
+        players?: PlayerStats[]
+      }
+      // Use opponentSide to identify which team to KEEP (the opponent team)
+      const demoOpSide = pd.opponentSide ?? 'team2'
+      const opponentTeamRaw = demoOpSide === 'team1' ? pd.header?.team1 : pd.header?.team2
+      // Also accept "T-Side"/"CT-Side" as team identifiers since parser may use those as fallbacks
+      const opponentTeamAlt = demoOpSide === 'team1' ? 'T-Side' : 'CT-Side'
+
       for (const p of pd.players ?? []) {
-        if (p.team === ownTeamName) continue
+        if (p.team !== opponentTeamRaw && p.team !== opponentTeamAlt) continue
         if (!playerMap[p.steam_id]) {
           playerMap[p.steam_id] = { ...p, count: 1 }
         } else {
@@ -314,7 +329,10 @@ export default async function OpponentPage({
                                 <SetOpponentSideButton
                                   demoId={demo.id}
                                   currentSide={demoOpponentSide}
-                                  teamNames={header ? { team1: header.team1 ?? 'Team 1', team2: header.team2 ?? 'Team 2' } : undefined}
+                                  teamNames={header ? {
+                                    team1: normaliseTeamName(header.team1, 'Team 1 (T-Side)'),
+                                    team2: normaliseTeamName(header.team2, 'Team 2 (CT-Side)'),
+                                  } : undefined}
                                 />
                               )}
                               {isOwnerOrAdmin && (demo.status === 'completed' || demo.status === 'failed') && (

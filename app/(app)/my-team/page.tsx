@@ -14,6 +14,7 @@ import {
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import SetOpponentSideButton from '@/components/teams/SetOpponentSideButton'
 import DeleteDemoButton from '@/components/teams/DeleteDemoButton'
+import ReparseButton from '@/components/teams/ReparseButton'
 
 export default async function MyTeamPage() {
   const supabase = await createClient()
@@ -373,7 +374,9 @@ export default async function MyTeamPage() {
                         {demo.status === 'failed' && (
                           <Badge variant="destructive" className="text-xs shrink-0">Failed</Badge>
                         )}
-                        {/* Delete button — team membership checked server-side in the API */}
+                        {(demo.status === 'completed' || demo.status === 'failed') && (
+                          <ReparseButton demoId={demo.id} />
+                        )}
                         <DeleteDemoButton demoId={demo.id} />
                       </div>
                       {/* Let the user correct which side was their team — stats recalculate on refresh */}
@@ -383,7 +386,10 @@ export default async function MyTeamPage() {
                             demoId={demo.id}
                             currentSide={opponentSide}
                             variant="self"
-                            teamNames={h ? { team1: h.team1 ?? 'Team 1', team2: h.team2 ?? 'Team 2' } : undefined}
+                            teamNames={h ? {
+                              team1: (!h.team1 || h.team1 === 'T-Side' || h.team1 === 'CT-Side') ? 'Team 1 (T-Side)' : h.team1,
+                              team2: (!h.team2 || h.team2 === 'T-Side' || h.team2 === 'CT-Side') ? 'Team 2 (CT-Side)' : h.team2,
+                            } : undefined}
                           />
                         </div>
                       )}
