@@ -258,12 +258,19 @@ CRITICAL RULES for pro dataset references:
     })
 
     return result.toDataStreamResponse({
+      headers: {
+        // Prevent Railway/nginx from buffering the stream, which would break
+        // the SSE protocol and cause useChat to error on every request.
+        'X-Accel-Buffering': 'no',
+      },
       getErrorMessage: (error) => {
+        console.error('[AI Coach] streaming error:', error)
         if (error instanceof Error) return error.message
         return 'AI service error'
       },
     })
   } catch (err: unknown) {
+    console.error('[AI Coach] route error:', err)
     const message = err instanceof Error ? err.message : 'AI service unavailable'
     return NextResponse.json({ error: message }, { status: 503 })
   }

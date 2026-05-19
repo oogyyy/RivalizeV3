@@ -121,8 +121,9 @@ export default function AIScoutPage() {
   const [isContextOpen, setIsContextOpen] = useState(false)
   const [myTeamId, setMyTeamId] = useState<string | null>(null)
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const textareaRef    = useRef<HTMLTextAreaElement>(null)
+  const messagesEndRef    = useRef<HTMLDivElement>(null)
+  const textareaRef       = useRef<HTMLTextAreaElement>(null)
+  const lastSentMessageRef = useRef<string>('')
 
   // Refs so the sendMessage closure always reads the latest context values
   const modeRef             = useRef(mode)
@@ -219,17 +220,29 @@ export default function AIScoutPage() {
 
   const sendMessage = useCallback((userMessage: string) => {
     if (!userMessage.trim() || isLoading) return
+    lastSentMessageRef.current = userMessage.trim()
     setIsContextOpen(false)
     append(
       { role: 'user', content: userMessage.trim() },
       { body: buildBody() }
     )
     setInput('')
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = '36px'
     }
   }, [isLoading, append, buildBody, setInput])
+
+  const retryLastMessage = useCallback(() => {
+    const text = lastSentMessageRef.current
+    if (!text) return
+    // Strip the failed user message so append doesn't duplicate it
+    setMessages(prev => {
+      const idx = [...prev].reverse().findIndex(m => m.role === 'user' && m.content === text)
+      if (idx === -1) return prev
+      return prev.slice(0, prev.length - 1 - idx)
+    })
+    append({ role: 'user', content: text }, { body: buildBody() })
+  }, [append, buildBody, setMessages])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -641,16 +654,18 @@ export default function AIScoutPage() {
                   </div>
                   <div className="bg-card border border-red-400/30 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[75%]">
                     <p className="text-sm text-red-400">
-                      {error.message?.includes('Unauthorized') || error.message?.includes('401')
+                      {error.message?.includes('Unauthorized')
                         ? 'Not authorised — please refresh the page and try again.'
-                        : error.message?.includes('API key') || error.message?.includes('not configured') || error.message?.includes('unavailable') || error.message?.includes('503') || error.message?.includes('OpenAI')
-                          ? 'AI service unavailable. Check that your OpenAI API key is configured.'
-                          : 'Something went wrong. Please try again.'}
+                        : error.message?.includes('API key') || error.message?.includes('not configured')
+                          ? 'OpenAI API key not configured — add OPENAI_API_KEY in Railway variables.'
+                          : error.message && error.message.trim().length > 0 && error.message.trim().length < 200
+                            ? error.message.trim()
+                            : 'Something went wrong. Please try again.'}
                     </p>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => reload()}
+                      onClick={retryLastMessage}
                       className="mt-2 gap-1.5 text-xs border-red-400/30 text-red-400 hover:border-red-400/60"
                     >
                       <RefreshCw size={11} />
