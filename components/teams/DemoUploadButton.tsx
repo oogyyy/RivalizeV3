@@ -117,8 +117,8 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   // ── Polling helpers ─────────────────────────────────────────────────────────
 
   const FALLBACK_TEAMS: ParsedTeamInfo = {
-    team1: { name: 'Team 1 (T-Side)',  players: [], score: 0, startSide: 'T' },
-    team2: { name: 'Team 2 (CT-Side)', players: [], score: 0, startSide: 'CT' },
+    team1: { name: 'Team 1 (T)',  players: [], score: 0, startSide: 'T' },
+    team2: { name: 'Team 2 (CT)', players: [], score: 0, startSide: 'CT' },
     map: '',
   }
 
@@ -150,24 +150,24 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
           const t1Players = ps
             .filter(p => p.team === h.team1)
             .sort((a, b) => b.rating - a.rating)
-            .slice(0, 4)
+            .slice(0, 5)
             .map(p => p.name)
 
           const t2Players = ps
             .filter(p => p.team === h.team2)
             .sort((a, b) => b.rating - a.rating)
-            .slice(0, 4)
+            .slice(0, 5)
             .map(p => p.name)
 
           setParsedTeamInfo({
             team1: {
-              name:      h.team1 || 'Team 1 (T-Side)',
+              name:      h.team1 || 'Team 1 (T)',
               players:   t1Players,
               score:     h.score_team1 ?? 0,
               startSide: 'T',
             },
             team2: {
-              name:      h.team2 || 'Team 2 (CT-Side)',
+              name:      h.team2 || 'Team 2 (CT)',
               players:   t2Players,
               score:     h.score_team2 ?? 0,
               startSide: 'CT',
@@ -419,7 +419,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
             <div className="space-y-3">
               {(['team1', 'team2'] as const).map(side => {
                 const t    = parsedTeamInfo[side]
-                const isSelected = userTeamChoice === side
+                const isSelected  = userTeamChoice === side
                 const isSuggested = side === 'team2'  // CT-Side is the typical GOTV default
 
                 return (
@@ -428,21 +428,22 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                     type="button"
                     onClick={() => setUserTeamChoice(side)}
                     className={cn(
-                      'w-full text-left rounded-xl border-2 p-4 transition-all',
+                      'w-full text-left rounded-xl border-2 p-5 transition-all',
                       isSelected
                         ? 'border-[#00ff87] bg-[#00ff87]/5'
                         : 'border-border bg-background/50 hover:border-[#00ff87]/40'
                     )}
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
+                        {/* Team name row */}
                         <div className="flex items-center gap-2 flex-wrap">
                           <Shield
-                            size={13}
+                            size={14}
                             className={isSelected ? 'text-[#00ff87]' : 'text-muted-foreground'}
                           />
                           <span className={cn(
-                            'text-sm font-bold truncate',
+                            'text-base font-bold',
                             isSelected ? 'text-[#00ff87]' : 'text-foreground'
                           )}>
                             {t.name}
@@ -455,19 +456,25 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                           )}>
                             {t.startSide === 'T' ? 'T-Side start' : 'CT-Side start'}
                           </span>
-                          {isSuggested && !isSelected && (
+                          {isSuggested && (
                             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-neon-green/10 text-neon-green border border-neon-green/20 shrink-0">
-                              Suggested
+                              Recommended
                             </span>
                           )}
                         </div>
 
+                        {/* Player list */}
                         {t.players.length > 0 ? (
-                          <p className="text-[11px] text-muted-foreground mt-1.5 truncate">
-                            {t.players.join(' · ')}
-                          </p>
+                          <ul className="mt-2 space-y-0.5">
+                            {t.players.map(name => (
+                              <li key={name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <span className="w-1 h-1 rounded-full bg-muted-foreground/40 shrink-0" />
+                                {name}
+                              </li>
+                            ))}
+                          </ul>
                         ) : (
-                          <p className="text-[11px] text-muted-foreground mt-1.5 italic">
+                          <p className="text-[11px] text-muted-foreground mt-2 italic">
                             Player names available after analysis
                           </p>
                         )}
@@ -475,14 +482,14 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
                       <div className="shrink-0 text-right">
                         <p className={cn(
-                          'text-lg font-bold font-mono',
+                          'text-2xl font-bold font-mono',
                           isSelected ? 'text-[#00ff87]' : 'text-foreground'
                         )}>
                           {t.score}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">rounds won</p>
+                        <p className="text-[10px] text-muted-foreground">rounds</p>
                         {isSelected && (
-                          <CheckCircle2 size={14} className="text-[#00ff87] mt-1 ml-auto" />
+                          <CheckCircle2 size={16} className="text-[#00ff87] mt-2 ml-auto" />
                         )}
                       </div>
                     </div>
@@ -493,7 +500,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Info size={10} className="shrink-0" />
-              Not sure? The CT-Side starter is suggested as a common GOTV default. You can always change this on the My Team page.
+              In most demos, the team you were playing on appears as the second team.
             </p>
 
             <div className="flex justify-end pt-1 border-t border-border">
