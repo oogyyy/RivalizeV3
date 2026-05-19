@@ -641,10 +641,10 @@ export default function AIScoutPage() {
                   </div>
                   <div className="bg-card border border-red-400/30 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[75%]">
                     <p className="text-sm text-red-400">
-                      {error.message?.includes('401')
+                      {error.message?.includes('Unauthorized') || error.message?.includes('401')
                         ? 'Not authorised — please refresh the page and try again.'
-                        : error.message?.includes('503') || error.message?.includes('API')
-                          ? 'AI service unavailable. Check that your OpenAI API key is configured.'
+                        : error.message?.includes('API key') || error.message?.includes('not configured') || error.message?.includes('unavailable') || error.message?.includes('503') || error.message?.includes('OpenAI')
+                          ? 'AI service unavailable. Check that your OpenAI API key is configured in Vercel.'
                           : 'Something went wrong. Please try again.'}
                     </p>
                     <Button

@@ -239,6 +239,10 @@ CRITICAL RULES for pro dataset references:
 - Always label every pro-meta observation with [Pro Meta] so the user can clearly distinguish it from opponent-specific findings derived from their uploaded demos
 - Frame [Pro Meta] insights as "professional teams generally..." or "the established meta on this map is..." — never as hard facts about a specific match` : ''}`
 
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 503 })
+  }
+
   try {
     const result = streamText({
       model: openai('gpt-4o'),
@@ -253,7 +257,12 @@ CRITICAL RULES for pro dataset references:
       temperature: 0.7,
     })
 
-    return result.toDataStreamResponse()
+    return result.toDataStreamResponse({
+      getErrorMessage: (error) => {
+        if (error instanceof Error) return error.message
+        return 'AI service error'
+      },
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'AI service unavailable'
     return NextResponse.json({ error: message }, { status: 503 })
