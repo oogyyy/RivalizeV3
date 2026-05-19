@@ -171,6 +171,17 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
     }
   }
 
+  // Annotate context sparseness so the AI knows when it must stay conservative
+  const matchCount = (contextText.match(/Match \d+:/g) || []).length
+  const hasPlayerData = contextText.includes('Rating')
+  const dataWarning = matchCount === 0
+    ? '\n⚠ DATA AVAILABILITY: No completed demos are available for this analysis. You MUST NOT invent or assume any maps, players, scores, or strategies. Acknowledge the lack of data and tell the user to upload demos before you can provide specific analysis.'
+    : matchCount < 2
+      ? `\n⚠ DATA AVAILABILITY: Only ${matchCount} match is available. Base your entire analysis EXCLUSIVELY on the data shown above. Do NOT reference any maps, rounds, players, or tendencies not explicitly listed in the context. If the data is insufficient to answer confidently, say so.`
+      : !hasPlayerData
+        ? '\n⚠ DATA AVAILABILITY: Match data exists but contains no individual player stats. Base analysis only on the aggregate stats provided. Do NOT invent player names, ratings, or individual tendencies.'
+        : ''
+
   // Build system prompt
   const opponentFocusInstructions: Record<string, string> = {
     weakness: `Focus on identifying the OPPONENT's biggest weaknesses and patterns your team can exploit. What mistakes do they repeat? Where are their rotations slow? What setups are predictable? Prioritize by impact and provide specific round-by-round examples where possible.`,
@@ -196,6 +207,8 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
 
 IMPORTANT CONTEXT: The demos provided are of the USER'S OWN TEAM — not an opponent. Your analysis should always focus on what ${teamName} can do better, what patterns to build on, and how to maximise their potential.
 
+CRITICAL — DATA INTEGRITY RULE: You MUST base your entire analysis ONLY on the data explicitly provided below. Never invent, assume, or extrapolate maps, player names, scores, rounds, strategies, or statistics that are not present in the context. If the available data is insufficient to answer a question, clearly state what data is missing and ask the user to upload more demos.
+
 Your coaching style:
 - Team-focused and constructive — frame insights as "we do X, which costs us Y — here's how to fix it"
 - Data-driven and specific — reference player names, maps, round scores, and stats when available
@@ -204,13 +217,16 @@ Your coaching style:
 - Use CS2 terminology correctly (executes, retakes, defaults, eco rounds, force buys, mid-round calls, lurks, entry fragging, etc.)
 - Format responses clearly with markdown headers and bullet points
 - Be honest but encouraging — highlight what's working as well as what needs fixing
+${dataWarning}
 
-${contextText ? `My Team Performance Data:\n${contextText}` : ''}
+${contextText ? `My Team Performance Data:\n${contextText}` : 'No demo data available.'}
 ${focusArea ? `Coaching focus: ${myTeamFocusInstructions[focusArea] || myTeamFocusInstructions.general}` : ''}
 ${mapName ? `Map focus: ${mapName}` : ''}`
     : `You are an elite Counter-Strike 2 scout and tactical analyst specializing in pre-match preparation. You analyze OPPONENT demos to help teams prepare anti-strats and exploit weaknesses before upcoming matches. You communicate like a professional analyst briefing a team before a big game.
 
 IMPORTANT CONTEXT: The demos uploaded are of the OPPONENT team — not the user's own team. Your analysis should always focus on what the opponent does, their tendencies, weaknesses, and how the user's team can counter them.
+
+CRITICAL — DATA INTEGRITY RULE: You MUST base your entire analysis ONLY on the data explicitly provided below. Never invent, assume, or extrapolate maps, player names, scores, rounds, strategies, or statistics that are not present in the context. If the available data is insufficient to answer a question, clearly state what data is missing and ask the user to upload more demos.
 
 Your analysis style:
 - Opponent-focused and tactical — always frame insights as "they do X, so we should Y"
@@ -219,8 +235,9 @@ Your analysis style:
 - Deep tactical knowledge: executes, utility setups, rotations, economy, CT defaults, T-side timings
 - Use CS2 terminology correctly (executes, retakes, defaults, eco rounds, force buys, mid-round calls, etc.)
 - Format responses clearly with markdown headers and bullet points
+${dataWarning}
 
-${contextText ? `Opponent Scout Context:\n${contextText}` : ''}
+${contextText ? `Opponent Scout Context:\n${contextText}` : 'No demo data available.'}
 ${focusArea ? `Analysis focus: ${opponentFocusInstructions[focusArea] || opponentFocusInstructions.general}` : ''}
 ${playerName && focusArea === 'player' ? `Opponent player to analyze: ${playerName}` : ''}
 ${mapName && focusArea === 'strategy' ? `Map focus: ${mapName}` : ''}
