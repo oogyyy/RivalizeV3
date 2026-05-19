@@ -235,7 +235,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
         // team_num is the player entity's team (2=T, 3=CT) at this tick.
         // m_szClan gives the FACEIT/organized team name per player (e.g. "team_Oogy").
         // CCSTeam.m_szTeamname only gives "TERRORIST"/"CT" for most FACEIT matches.
-        ['team_num', 'CCSTeam.m_szTeamname', 'CCSTeam.m_iTeamNum', 'CCSPlayerController.m_szClan'],
+        ['team_num', 'm_iTeamNum', 'CCSTeam.m_szTeamname', 'CCSTeam.m_iTeamNum', 'CCSPlayerController.m_szClan'],
         sampleTicks,
       ) ?? []
 
@@ -247,7 +247,9 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       for (const row of teamRows) {
         const sid     = s(row, 'steamid')
         const clan    = s(row, 'CCSPlayerController.m_szClan', 'm_szClan')
-        const teamNum = n(row, 'team_num')
+        // demoparser2 may expose the player entity team number under different
+        // names depending on build version — try all known aliases.
+        const teamNum = n(row, 'team_num', 'm_iTeamNum', 'CCSPlayerController.m_iTeamNum')
         const tickVal = n(row, 'tick')
         if (sid && sid !== '0') {
           if (clan) clanNameBySid.set(sid, clan)
@@ -460,6 +462,19 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   // Sorted array of end-ticks for competitive rounds (for binary search).
   const roundEndTickArr = competitiveRounds.map(r => n(r, 'tick'))
 
+  // Tick of the very last competitive round_end — events after this are
+  // post-match (players messing around on the server after the game ends).
+  // FACEIT does not count those kills/deaths/damage in its stats.
+  const matchEndTick = roundEndTickArr.length > 0
+    ? roundEndTickArr[roundEndTickArr.length - 1]
+    : Infinity
+
+  const postMatchDeaths = deathEvents.filter(ev => n(ev, 'tick') > matchEndTick).length
+  const postMatchHurts  = hurtEvents.filter(ev => n(ev, 'tick') > matchEndTick).length
+  if (postMatchDeaths > 0 || postMatchHurts > 0) {
+    console.log(`[real-parser] post-match events: ${postMatchDeaths} deaths, ${postMatchHurts} hurt events (matchEndTick=${matchEndTick})`)
+  }
+
   // Binary-search for the competitive round index containing this tick.
   // Returns -1 if tick is after all rounds.
   function findRoundIdx(tick: number): number {
@@ -494,6 +509,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, n(ev, 'attacker_team_num'))
 
     if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
+    if (tick > matchEndTick) continue  // post-match events not counted by FACEIT
 
     const atkTeam = atkSid && atkSid !== '0' ? getTeamNumAtTick(atkSid, tick) : 0
     const vicTeam = getTeamNumAtTick(vicSid, tick)
