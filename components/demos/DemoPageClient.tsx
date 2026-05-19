@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import PlayerStatsTable from '@/components/demos/PlayerStatsTable'
+import { ReparseProgress } from '@/components/demos/ReparseProgress'
 import RoundTimeline from '@/components/demos/RoundTimeline'
 import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
 import {
@@ -389,6 +390,7 @@ interface Props {
 export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
   const [demo, setDemo] = useState<Demo>(initialDemo)
   const [parsing, setParsing] = useState(false)
+  const [reparsing, setReparsing] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   const fetchDemo = useCallback(async () => {
@@ -405,11 +407,16 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
     setParsing(true)
     try {
       const res = await fetch(`/api/demos/${demo.id}/reparse`, { method: 'POST' })
-      if (res.ok) await fetchDemo()
+      if (res.ok) setReparsing(true)
     } finally {
       setParsing(false)
     }
   }
+
+  const handleReparseDone = useCallback(async () => {
+    await fetchDemo()
+    setReparsing(false)
+  }, [fetchDemo])
 
   const parsed = demo.parsed_data as ParsedDemoData | null
   const backHref = folderId ? `/opponents/${folderId}` : '/opponents'
@@ -440,10 +447,22 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
               size="sm"
               className="gap-2"
               onClick={handleParse}
-              disabled={parsing}
+              disabled={parsing || reparsing}
             >
               {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               {parsing ? 'Parsing...' : 'Parse Now'}
+            </Button>
+          )}
+          {demo.status === 'completed' && !reparsing && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleParse}
+              disabled={parsing}
+            >
+              {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Re-parse
             </Button>
           )}
           <Link href={aiScoutHref}>
@@ -454,6 +473,10 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
           </Link>
         </div>
       </div>
+
+      {reparsing && (
+        <ReparseProgress demoId={demo.id} onDone={handleReparseDone} />
+      )}
 
       <div>
         <h1 className="text-2xl font-bold text-foreground">

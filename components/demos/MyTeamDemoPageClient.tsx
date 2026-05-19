@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import PlayerStatsTable from '@/components/demos/PlayerStatsTable'
+import { ReparseProgress } from '@/components/demos/ReparseProgress'
 import RoundTimeline from '@/components/demos/RoundTimeline'
 import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
 import {
@@ -412,6 +413,7 @@ interface Props {
 export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
   const [demo, setDemo]     = useState<Demo>(initialDemo)
   const [parsing, setParsing] = useState(false)
+  const [reparsing, setReparsing] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   const fetchDemo = useCallback(async () => {
@@ -424,11 +426,16 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
     setParsing(true)
     try {
       const res = await fetch(`/api/demos/${demo.id}/reparse`, { method: 'POST' })
-      if (res.ok) await fetchDemo()
+      if (res.ok) setReparsing(true)
     } finally {
       setParsing(false)
     }
   }
+
+  const handleReparseDone = useCallback(async () => {
+    await fetchDemo()
+    setReparsing(false)
+  }, [fetchDemo])
 
   const parsed = demo.parsed_data as ParsedDemoData | null
 
@@ -492,7 +499,7 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
           )}
           <Button
             variant="outline" size="sm" className="gap-2"
-            onClick={handleReparse} disabled={parsing}
+            onClick={handleReparse} disabled={parsing || reparsing}
           >
             {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             {parsing ? 'Parsing…' : 'Re-parse'}
@@ -505,6 +512,10 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
           </Link>
         </div>
       </div>
+
+      {reparsing && (
+        <ReparseProgress demoId={demo.id} onDone={handleReparseDone} />
+      )}
 
       {/* Title */}
       <div>

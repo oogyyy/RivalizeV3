@@ -61,6 +61,8 @@ const config: Config = {
         'pulse-neon': 'pulse-neon 2s ease-in-out infinite',
         'slide-in': 'slide-in 0.3s ease-out',
         'fade-in': 'fade-in 0.2s ease-out',
+        'reparse-fill': 'reparse-fill 30s ease-out forwards',
+        'shimmer': 'shimmer 1.5s linear infinite',
       },
       keyframes: {
         'pulse-neon': {
@@ -74,6 +76,19 @@ const config: Config = {
         'fade-in': {
           from: { opacity: '0', transform: 'translateY(-4px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        // Fills 0 → 85 % over 30 s; parent snaps to 100 % on completion.
+        'reparse-fill': {
+          '0%':   { width: '0%' },
+          '8%':   { width: '18%' },
+          '20%':  { width: '38%' },
+          '40%':  { width: '56%' },
+          '65%':  { width: '72%' },
+          '100%': { width: '85%' },
+        },
+        'shimmer': {
+          '0%':   { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
         },
       },
     },
