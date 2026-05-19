@@ -268,14 +268,21 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   }
 
   for (const ev of deathEvents) {
-    const atkSid = s(ev, 'attacker_steamid')
-    const vicSid = s(ev, 'steamid', 'user_steamid')
-    const tick   = n(ev, 'tick')
+    const atkSid  = s(ev, 'attacker_steamid')
+    const vicSid  = s(ev, 'steamid', 'user_steamid')
+    const tick    = n(ev, 'tick')
+    const atkTeam = n(ev, 'attacker_team_num')
+    const vicTeam = n(ev, 'team_num', 'user_team_num')
+    // Exclude team kills and self-kills from kill/HS counts (matches FACEIT scoring)
+    const isTeamKill = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
+    const isSelfKill = atkSid !== '' && atkSid === vicSid
 
     if (atkSid && atkSid !== '0') {
-      killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
-      if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
-      recordTeam(atkSid, tick, n(ev, 'attacker_team_num'))
+      if (!isTeamKill && !isSelfKill) {
+        killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
+        if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
+      }
+      recordTeam(atkSid, tick, atkTeam)
     }
     const astSid = s(ev, 'assister_steamid')
     if (astSid && astSid !== '0') {
@@ -283,21 +290,29 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     }
     if (vicSid && vicSid !== '0') {
       deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1)
-      recordTeam(vicSid, tick, n(ev, 'team_num', 'user_team_num'))
+      recordTeam(vicSid, tick, vicTeam)
     }
   }
 
   for (const ev of hurtEvents) {
-    const tick   = n(ev, 'tick')
-    const atkSid = s(ev, 'attacker_steamid')
+    const tick    = n(ev, 'tick')
+    const atkSid  = s(ev, 'attacker_steamid')
+    const atkTeam = n(ev, 'attacker_team_num')
+    const vicTeam = n(ev, 'team_num')  // PLAYER_EXTRA on victim entity
+    const vicSid  = s(ev, 'steamid', 'user_steamid')
+    // Exclude friendly fire and self-damage so ADR matches FACEIT
+    const isFriendlyFire = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
+    const isSelfDamage   = atkSid !== '' && vicSid !== '' && atkSid === vicSid
+
     if (atkSid && atkSid !== '0') {
-      const dmg = Math.min(100, n(ev, 'dmg_health'))
-      damageMap.set(atkSid, (damageMap.get(atkSid) ?? 0) + dmg)
-      recordTeam(atkSid, tick, n(ev, 'attacker_team_num'))
+      if (!isFriendlyFire && !isSelfDamage) {
+        const dmg = Math.min(100, n(ev, 'dmg_health'))
+        damageMap.set(atkSid, (damageMap.get(atkSid) ?? 0) + dmg)
+      }
+      recordTeam(atkSid, tick, atkTeam)
     }
-    const vicSid = s(ev, 'steamid', 'user_steamid')
     if (vicSid && vicSid !== '0') {
-      recordTeam(vicSid, tick, n(ev, 'team_num', 'user_team_num'))
+      recordTeam(vicSid, tick, vicTeam)
     }
   }
 
