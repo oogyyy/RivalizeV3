@@ -418,9 +418,11 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
             <div className="space-y-3">
               {(['team1', 'team2'] as const).map(side => {
-                const t    = parsedTeamInfo[side]
+                const t       = parsedTeamInfo[side]
+                const other   = parsedTeamInfo[side === 'team1' ? 'team2' : 'team1']
                 const isSelected  = userTeamChoice === side
                 const isSuggested = side === 'team2'  // CT-Side is the typical GOTV default
+                const isWinner    = t.score > other.score
 
                 return (
                   <button
@@ -436,7 +438,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        {/* Team name row */}
+                        {/* Team name + badges row */}
                         <div className="flex items-center gap-2 flex-wrap">
                           <Shield
                             size={14}
@@ -454,7 +456,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                               ? 'text-orange-400 border-orange-400/30 bg-orange-400/10'
                               : 'text-blue-400 border-blue-400/30 bg-blue-400/10'
                           )}>
-                            {t.startSide === 'T' ? 'T-Side start' : 'CT-Side start'}
+                            {t.startSide === 'T' ? 'T-Side' : 'CT-Side'}
                           </span>
                           {isSuggested && (
                             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-neon-green/10 text-neon-green border border-neon-green/20 shrink-0">
@@ -480,16 +482,32 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                         )}
                       </div>
 
-                      <div className="shrink-0 text-right">
-                        <p className={cn(
-                          'text-2xl font-bold font-mono',
-                          isSelected ? 'text-[#00ff87]' : 'text-foreground'
-                        )}>
-                          {t.score}
+                      {/* Score block */}
+                      <div className="shrink-0 text-right flex flex-col items-end gap-1">
+                        <div className="flex items-baseline gap-1 font-mono">
+                          <span className={cn(
+                            'text-2xl font-bold',
+                            isWinner
+                              ? isSelected ? 'text-[#00ff87]' : 'text-foreground'
+                              : 'text-muted-foreground'
+                          )}>
+                            {t.score}
+                          </span>
+                          <span className="text-sm text-muted-foreground">:</span>
+                          <span className={cn(
+                            'text-2xl font-bold',
+                            !isWinner
+                              ? isSelected ? 'text-[#00ff87]' : 'text-foreground'
+                              : 'text-muted-foreground'
+                          )}>
+                            {other.score}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          {isWinner ? 'W' : t.score === other.score ? 'Draw' : 'L'}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">rounds</p>
                         {isSelected && (
-                          <CheckCircle2 size={16} className="text-[#00ff87] mt-2 ml-auto" />
+                          <CheckCircle2 size={16} className="text-[#00ff87] mt-1" />
                         )}
                       </div>
                     </div>
