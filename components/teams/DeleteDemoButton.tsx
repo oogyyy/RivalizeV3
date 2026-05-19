@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Trash2, AlertTriangle, Loader2 } from 'lucide-react'
+import { Trash2, AlertTriangle, Loader2, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface Props {
@@ -11,9 +11,10 @@ interface Props {
 
 export default function DeleteDemoButton({ demoId }: Props) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]         = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [deleted, setDeleted]   = useState(false)
+  const [error, setError]       = useState<string | null>(null)
 
   async function handleDelete() {
     setDeleting(true)
@@ -24,7 +25,12 @@ export default function DeleteDemoButton({ demoId }: Props) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error ?? 'Delete failed')
       }
-      router.refresh()
+      setDeleted(true)
+      // Brief success flash before the page refreshes and the row disappears
+      setTimeout(() => {
+        setOpen(false)
+        router.refresh()
+      }, 900)
     } catch (err) {
       setError(String(err instanceof Error ? err.message : err))
       setDeleting(false)
@@ -46,7 +52,7 @@ export default function DeleteDemoButton({ demoId }: Props) {
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={(e) => { if (e.target === e.currentTarget && !deleting) setOpen(false) }}
+          onClick={(e) => { if (e.target === e.currentTarget && !deleting && !deleted) setOpen(false) }}
         >
           <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
             <div className="flex items-start gap-3">
@@ -61,32 +67,41 @@ export default function DeleteDemoButton({ demoId }: Props) {
               </div>
             </div>
 
-            {error && (
-              <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>
-            )}
-
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setOpen(false)}
-                disabled={deleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                className="bg-red-500 hover:bg-red-600 text-white gap-1.5"
-                onClick={handleDelete}
-                disabled={deleting}
-              >
-                {deleting ? (
-                  <><Loader2 size={13} className="animate-spin" /> Deleting…</>
-                ) : (
-                  <><Trash2 size={13} /> Delete Demo</>
+            {deleted ? (
+              <div className="flex items-center gap-2 rounded-lg bg-neon-green/10 border border-neon-green/20 px-3 py-2.5">
+                <CheckCircle2 size={15} className="text-neon-green shrink-0" />
+                <p className="text-xs font-medium text-neon-green">Demo deleted successfully</p>
+              </div>
+            ) : (
+              <>
+                {error && (
+                  <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>
                 )}
-              </Button>
-            </div>
+
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOpen(false)}
+                    disabled={deleting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-red-500 hover:bg-red-600 text-white gap-1.5"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                  >
+                    {deleting ? (
+                      <><Loader2 size={13} className="animate-spin" /> Deleting…</>
+                    ) : (
+                      <><Trash2 size={13} /> Delete Demo</>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

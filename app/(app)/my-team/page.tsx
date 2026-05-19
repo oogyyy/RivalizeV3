@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import SetOpponentSideButton from '@/components/teams/SetOpponentSideButton'
+import DeleteDemoButton from '@/components/teams/DeleteDemoButton'
 
 export default async function MyTeamPage() {
   const supabase = await createClient()
@@ -372,6 +373,8 @@ export default async function MyTeamPage() {
                         {demo.status === 'failed' && (
                           <Badge variant="destructive" className="text-xs shrink-0">Failed</Badge>
                         )}
+                        {/* Delete button — team membership checked server-side in the API */}
+                        <DeleteDemoButton demoId={demo.id} />
                       </div>
                       {/* Let the user correct which side was their team — stats recalculate on refresh */}
                       {demo.status === 'completed' && (
