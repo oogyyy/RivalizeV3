@@ -6,6 +6,9 @@ interface RoundTimelineProps {
   rounds: Round[]
   team1Name: string
   team2Name: string
+  /** Optional display-only overrides — used when team1Name/team2Name are raw parser keys like 'T-Side' */
+  team1DisplayName?: string
+  team2DisplayName?: string
 }
 
 function getEcoLevel(economy: number): { label: string; color: string } {
@@ -33,21 +36,23 @@ function WinReasonLabel({ reason }: { reason: string }) {
   return <>{map[reason] || reason}</>
 }
 
-export default function RoundTimeline({ rounds, team1Name, team2Name }: RoundTimelineProps) {
+export default function RoundTimeline({ rounds, team1Name, team2Name, team1DisplayName, team2DisplayName }: RoundTimelineProps) {
   const team1Wins = rounds.filter(r => r.winner === team1Name).length
   const team2Wins = rounds.filter(r => r.winner === team2Name).length
+  const t1Display = team1DisplayName || team1Name
+  const t2Display = team2DisplayName || team2Name
 
   return (
     <div className="space-y-4">
       {/* Score summary bar */}
       <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/30 border border-border">
         <div className="flex-1 text-right">
-          <p className="text-sm font-semibold text-foreground truncate">{team1Name}</p>
+          <p className="text-sm font-semibold text-foreground truncate">{t1Display}</p>
           <p className="text-2xl font-bold text-neon-green">{team1Wins}</p>
         </div>
         <div className="text-muted-foreground font-mono text-lg">:</div>
         <div className="flex-1 text-left">
-          <p className="text-sm font-semibold text-foreground truncate">{team2Name}</p>
+          <p className="text-sm font-semibold text-foreground truncate">{t2Display}</p>
           <p className="text-2xl font-bold text-red-400">{team2Wins}</p>
         </div>
       </div>

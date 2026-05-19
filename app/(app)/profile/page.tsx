@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useDropzone } from 'react-dropzone'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,9 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { cn, formatDate } from '@/lib/utils'
 import {
-  User, Camera, Save, Link2, Trophy, Brain, Upload,
+  User, Save, Link2, Trophy, Brain, Upload,
   Check, Loader2, Shield, AlertCircle, ExternalLink,
-  Crosshair, Users, FileVideo
+  Crosshair, Users, FileVideo, Unlink, X
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
@@ -140,6 +141,7 @@ function ChipSelect({
 }
 
 export default function ProfilePage() {
+  const searchParams = useSearchParams()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -147,6 +149,8 @@ export default function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState({ demos: 0, teams: 0 })
+  const [linkBanner, setLinkBanner] = useState<string | null>(null)
+  const [unlinking, setUnlinking] = useState<'steam' | 'faceit' | null>(null)
 
   // Form state
   const [displayName, setDisplayName] = useState('')
@@ -190,6 +194,56 @@ export default function ProfilePage() {
     }
     fetchProfile()
   }, [])
+
+  // Show banner when returning from Steam/FACEIT OAuth
+  useEffect(() => {
+    const linked = searchParams.get('linked')
+    const linkError = searchParams.get('error')
+    if (linked === 'steam') {
+      setLinkBanner('Steam account linked successfully!')
+      // Refresh profile to show the linked Steam ID
+      setLoading(true)
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return
+        supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
+          if (data) {
+            setSteamId(data.steam_id || '')
+          }
+          setLoading(false)
+        })
+      })
+    } else if (linked === 'faceit') {
+      const nickname = searchParams.get('nickname') ?? ''
+      setLinkBanner(`FACEIT account linked${nickname ? ` as ${nickname}` : ''}!`)
+      setLoading(true)
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return
+        supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
+          if (data) {
+            setFaceitId(data.faceit_id || '')
+          }
+          setLoading(false)
+        })
+      })
+    } else if (linkError) {
+      setLinkBanner(`Link failed: ${linkError.replace(/_/g, ' ')}`)
+    }
+  }, [searchParams])
+
+  const handleUnlink = async (provider: 'steam' | 'faceit') => {
+    setUnlinking(provider)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setUnlinking(null); return }
+    await supabase.from('profiles').update({
+      [provider === 'steam' ? 'steam_id' : 'faceit_id']: null,
+    }).eq('id', user.id)
+    if (provider === 'steam') setSteamId('')
+    else setFaceitId('')
+    setUnlinking(null)
+  }
 
   const handleAvatarUpload = async (file: File) => {
     setUploadingAvatar(true)
@@ -446,27 +500,123 @@ export default function ProfilePage() {
           <CardDescription>Connect your gaming accounts for enhanced features</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Link success / error banner */}
+          {linkBanner && (
+            <div className={cn(
+              'flex items-center justify-between gap-3 px-4 py-3 rounded-lg border text-sm',
+              linkBanner.startsWith('Link failed')
+                ? 'bg-red-400/10 border-red-400/30 text-red-400'
+                : 'bg-neon-green/10 border-neon-green/30 text-neon-green'
+            )}>
+              <span className="flex items-center gap-2">
+                {linkBanner.startsWith('Link failed')
+                  ? <AlertCircle size={14} />
+                  : <Check size={14} />}
+                {linkBanner}
+              </span>
+              <button onClick={() => setLinkBanner(null)} className="opacity-60 hover:opacity-100">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           {/* Steam */}
-          <div className="flex items-center gap-4 p-4 rounded-lg border border-border bg-muted/10">
+          <div className={cn(
+            'flex items-center gap-4 p-4 rounded-lg border bg-muted/10 transition-colors',
+            steamId ? 'border-[#c7d5e0]/30' : 'border-border'
+          )}>
             <div className="w-10 h-10 rounded-lg bg-[#1b2838] border border-border flex items-center justify-center shrink-0">
               <Shield size={18} className="text-[#c7d5e0]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">Steam</p>
-              <Input
-                value={steamId}
-                onChange={e => setSteamId(e.target.value)}
-                placeholder="Your Steam ID (e.g. 76561198...)"
-                className="mt-1.5 text-xs h-8"
-              />
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground">Steam</p>
+                {steamId && (
+                  <Badge variant="outline" className="text-[10px] text-[#c7d5e0] border-[#c7d5e0]/30 bg-[#1b2838]/50">
+                    Linked
+                  </Badge>
+                )}
+              </div>
+              {steamId ? (
+                <p className="text-xs text-muted-foreground mt-0.5 font-mono">{steamId}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-0.5">Link your Steam account to verify your identity</p>
+              )}
             </div>
-            <Button variant="outline" size="sm" className="shrink-0 gap-1.5 text-xs">
-              <ExternalLink size={11} />
-              Connect
-            </Button>
+            {steamId ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5 text-xs text-red-400 hover:text-red-300 border-red-400/30 hover:border-red-400/60"
+                onClick={() => handleUnlink('steam')}
+                disabled={unlinking === 'steam'}
+              >
+                {unlinking === 'steam' ? <Loader2 size={11} className="animate-spin" /> : <Unlink size={11} />}
+                Unlink
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5 text-xs"
+                onClick={() => window.location.href = '/api/auth/steam'}
+              >
+                <ExternalLink size={11} />
+                Link Steam
+              </Button>
+            )}
           </div>
 
-          {/* Discord */}
+          {/* FACEIT */}
+          <div className={cn(
+            'flex items-center gap-4 p-4 rounded-lg border bg-muted/10 transition-colors',
+            faceitId ? 'border-orange-500/30' : 'border-border'
+          )}>
+            <div className="w-10 h-10 rounded-lg bg-orange-500/20 border border-orange-500/30 flex items-center justify-center shrink-0">
+              <Crosshair size={16} className="text-orange-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground">FACEIT</p>
+                {faceitId && (
+                  <Badge variant="outline" className="text-[10px] text-orange-400 border-orange-400/30 bg-orange-500/10">
+                    Linked
+                  </Badge>
+                )}
+              </div>
+              {faceitId ? (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  <span className="font-mono">{faceitId}</span>
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-0.5">Link your FACEIT account to auto-detect team names</p>
+              )}
+            </div>
+            {faceitId ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5 text-xs text-red-400 hover:text-red-300 border-red-400/30 hover:border-red-400/60"
+                onClick={() => handleUnlink('faceit')}
+                disabled={unlinking === 'faceit'}
+              >
+                {unlinking === 'faceit' ? <Loader2 size={11} className="animate-spin" /> : <Unlink size={11} />}
+                Unlink
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5 text-xs text-orange-400 border-orange-400/30 hover:border-orange-400/60 hover:text-orange-300"
+                onClick={() => window.location.href = '/api/auth/faceit'}
+              >
+                <ExternalLink size={11} />
+                Link FACEIT
+              </Button>
+            )}
+          </div>
+
+          {/* Discord — manual entry (no OAuth app yet) */}
           <div className="flex items-center gap-4 p-4 rounded-lg border border-border bg-muted/10">
             <div className="w-10 h-10 rounded-lg bg-[#5865F2]/20 border border-[#5865F2]/30 flex items-center justify-center shrink-0">
               <span className="text-[#5865F2] font-bold text-sm">DC</span>
@@ -476,32 +626,12 @@ export default function ProfilePage() {
               <Input
                 value={discordId}
                 onChange={e => setDiscordId(e.target.value)}
-                placeholder="Your Discord ID or username"
+                placeholder="Your Discord username"
                 className="mt-1.5 text-xs h-8"
               />
             </div>
-            <Button variant="outline" size="sm" className="shrink-0 gap-1.5 text-xs">
-              <ExternalLink size={11} />
-              Connect
-            </Button>
-          </div>
-
-          {/* FACEIT */}
-          <div className="flex items-center gap-4 p-4 rounded-lg border border-border bg-muted/10">
-            <div className="w-10 h-10 rounded-lg bg-orange-500/20 border border-orange-500/30 flex items-center justify-center shrink-0">
-              <Crosshair size={16} className="text-orange-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">FACEIT</p>
-              <Input
-                value={faceitId}
-                onChange={e => setFaceitId(e.target.value)}
-                placeholder="Your FACEIT username"
-                className="mt-1.5 text-xs h-8"
-              />
-            </div>
-            <Button variant="outline" size="sm" className="shrink-0 gap-1.5 text-xs" onClick={handleSave}>
-              <Save size={11} />
+            <Button variant="outline" size="sm" className="shrink-0 gap-1.5 text-xs" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
               Save
             </Button>
           </div>

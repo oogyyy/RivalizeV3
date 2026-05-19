@@ -165,16 +165,18 @@ function sum(players: PlayerStats[], key: keyof PlayerStats): number {
 }
 
 function OverviewTab({
-  parsed, myTeamLabel, opponentLabel, myScore, theirScore,
+  parsed, myTeamLabel, opponentLabel, myRawTeam, oppRawTeam, myScore, theirScore,
 }: {
   parsed: ParsedDemoData
   myTeamLabel: string
   opponentLabel: string
+  myRawTeam: string
+  oppRawTeam: string
   myScore: number
   theirScore: number
 }) {
-  const myPlayers  = (parsed.players ?? []).filter(p => p.team === myTeamLabel)
-  const oppPlayers = (parsed.players ?? []).filter(p => p.team === opponentLabel)
+  const myPlayers  = (parsed.players ?? []).filter(p => p.team === myRawTeam)
+  const oppPlayers = (parsed.players ?? []).filter(p => p.team === oppRawTeam)
 
   const mvp = [...myPlayers].sort((a, b) => b.rating - a.rating)[0]
   const topFrag = [...myPlayers].sort((a, b) => b.kills - a.kills)[0]
@@ -319,17 +321,19 @@ function OverviewTab({
   )
 }
 
-function EconomyTab({ parsed, myTeamLabel, opponentLabel }: {
+function EconomyTab({ parsed, myTeamLabel, opponentLabel, myRawTeam, oppRawTeam }: {
   parsed: ParsedDemoData
   myTeamLabel: string
   opponentLabel: string
+  myRawTeam: string
+  oppRawTeam: string
 }) {
   const h = parsed.header
   const rounds = parsed.rounds ?? []
 
-  // Map team labels to team1/team2 keys in the round data
-  const myKey   = myTeamLabel   === h.team1 ? 'team1_economy' : 'team2_economy'
-  const oppKey  = opponentLabel === h.team1 ? 'team1_economy' : 'team2_economy'
+  // Map raw team names to team1/team2 economy keys in the round data
+  const myKey   = myRawTeam  === h.team1 ? 'team1_economy' : 'team2_economy'
+  const oppKey  = oppRawTeam === h.team1 ? 'team1_economy' : 'team2_economy'
 
   const chartData = rounds.map(r => ({
     round: r.number,
@@ -431,8 +435,14 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
   // Derive which team label is ours
   const opponentSide  = ((parsed as any)?.opponentSide ?? 'team2') as 'team1' | 'team2'
   const h             = parsed?.header
-  const myTeamLabel   = opponentSide === 'team1' ? (h?.team2 ?? 'CT-Side')  : (h?.team1 ?? 'T-Side')
-  const opponentLabel = opponentSide === 'team1' ? (h?.team1 ?? 'T-Side')   : (h?.team2 ?? 'CT-Side')
+  // Raw names from the parser — used for data lookups (player.team, round.winner, economy keys)
+  const myRawTeam   = opponentSide === 'team1' ? (h?.team2 ?? '') : (h?.team1 ?? '')
+  const oppRawTeam  = opponentSide === 'team1' ? (h?.team1 ?? '') : (h?.team2 ?? '')
+  // Display labels — fall back to generic strings when parser stored 'T-Side'/'CT-Side'
+  const resolveLabel = (raw: string, fallback: string) =>
+    (!raw || raw === 'T-Side' || raw === 'CT-Side') ? fallback : raw
+  const myTeamLabel   = resolveLabel(myRawTeam,  'Your Team')
+  const opponentLabel = resolveLabel(oppRawTeam, 'Opponent')
   let myScore       = opponentSide === 'team1' ? (h?.score_team2 ?? 0)    : (h?.score_team1 ?? 0)
   let theirScore    = opponentSide === 'team1' ? (h?.score_team1 ?? 0)    : (h?.score_team2 ?? 0)
 
@@ -460,7 +470,7 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
   const isWin         = myScore > theirScore
   const isDraw        = myScore === theirScore
 
-  const myPlayers = (parsed?.players ?? []).filter(p => p.team === myTeamLabel)
+  const myPlayers = (parsed?.players ?? []).filter(p => p.team === myRawTeam)
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -579,6 +589,8 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                     parsed={parsed}
                     myTeamLabel={myTeamLabel}
                     opponentLabel={opponentLabel}
+                    myRawTeam={myRawTeam}
+                    oppRawTeam={oppRawTeam}
                     myScore={myScore}
                     theirScore={theirScore}
                   />
@@ -595,7 +607,7 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                     <CardContent className="p-0">
                       <PlayerStatsTable
                         players={myPlayers}
-                        highlightTeam={myTeamLabel}
+                        highlightTeam={myRawTeam}
                       />
                     </CardContent>
                   </Card>
@@ -612,8 +624,10 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                     <CardContent>
                       <RoundTimeline
                         rounds={parsed.rounds ?? []}
-                        team1Name={myTeamLabel}
-                        team2Name={opponentLabel}
+                        team1Name={myRawTeam}
+                        team2Name={oppRawTeam}
+                        team1DisplayName={myTeamLabel}
+                        team2DisplayName={opponentLabel}
                       />
                     </CardContent>
                   </Card>
@@ -652,6 +666,8 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                     parsed={parsed}
                     myTeamLabel={myTeamLabel}
                     opponentLabel={opponentLabel}
+                    myRawTeam={myRawTeam}
+                    oppRawTeam={oppRawTeam}
                   />
                 )}
               </div>
