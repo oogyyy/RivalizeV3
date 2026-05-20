@@ -29,8 +29,8 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# libc6-compat needed by native addons; zstd for decompressing .dem.zst demos
-RUN apk add --no-cache libc6-compat zstd
+# zstd for decompressing .dem.zst demos
+RUN apk add --no-cache zstd
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -42,10 +42,6 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Explicitly copy the native demoparser2 addon — Next.js file tracing doesn't
-# reliably pick up .node binaries, so we force-include the whole @laihoe scope.
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@laihoe ./node_modules/@laihoe
 
 USER nextjs
 

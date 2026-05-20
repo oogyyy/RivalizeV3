@@ -2,8 +2,6 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  // Prevent webpack from trying to bundle native .node binaries
-  serverExternalPackages: ['@laihoe/demoparser2'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },

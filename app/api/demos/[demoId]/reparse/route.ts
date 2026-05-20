@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import { parseCS2Demo } from '@/lib/demo-parser/real-parser'
+import { parseCS2Demo } from '@/lib/demo-parser/go-parser-client'
 import { maybeDecompress } from '@/lib/demo-parser/decompress'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import { downloadObject } from '@/lib/r2'
@@ -49,7 +49,7 @@ export async function POST(
       const rawBuf = await downloadObject(r2Key)
       const buf = maybeDecompress(rawBuf, r2Key)
       console.log(`[reparse] Downloaded ${rawBuf.length} bytes → ${buf.length} bytes after decompression, parsing...`)
-      const { parsedData: realData, warnings } = parseCS2Demo(buf)
+      const { parsedData: realData, warnings } = await parseCS2Demo(buf)
       if (warnings.length > 0) console.warn('[reparse] warnings:', warnings)
       console.log(`[reparse] Result: ${realData.players.length} players, map=${realData.header.map}, score=${realData.header.score_team1}-${realData.header.score_team2}`)
 
