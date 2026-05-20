@@ -71,6 +71,7 @@ export interface ParsedDemoData {
   players: PlayerStats[]
   events: GameEvent[]
   heatmap_data?: HeatmapPoint[]
+  _debug?: Record<string, unknown>
 }
 
 export interface DemoHeader {

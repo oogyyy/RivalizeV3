@@ -500,6 +500,24 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   }
 
   // ── Pass 2a: kills, deaths, assists ──────────────────────────────────────
+  //
+  // Debug tracking: per-player kill/death breakdown so mismatches can be
+  // diagnosed by inspecting parsedData._debug in the UI debug panel.
+  interface DbStat {
+    startingTeam: number
+    kValid: number; kTK: number; kPost: number; kPre: number; kNoTeam: number
+    dValid: number; dPost: number; dPre: number; dNoTeam: number
+  }
+  const debugStats = new Map<string, DbStat>()
+  const getDs = (sid: string): DbStat => {
+    if (!debugStats.has(sid)) debugStats.set(sid, {
+      startingTeam: 0,
+      kValid: 0, kTK: 0, kPost: 0, kPre: 0, kNoTeam: 0,
+      dValid: 0, dPost: 0, dPre: 0, dNoTeam: 0,
+    })
+    return debugStats.get(sid)!
+  }
+
   for (const ev of deathEvents) {
     const tick   = n(ev, 'tick')
     const vicSid = s(ev, 'steamid', 'user_steamid')
@@ -508,22 +526,30 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, n(ev, 'team_num', 'user_team_num'))
     if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, n(ev, 'attacker_team_num'))
 
-    if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
-    if (tick > matchEndTick) continue  // post-match events not counted by FACEIT
+    const isPre  = preMatchEndTick >= 0 && tick <= preMatchEndTick
+    const isPost = tick > matchEndTick
 
-    const atkTeam = atkSid && atkSid !== '0' ? getTeamNumAtTick(atkSid, tick) : 0
-    const vicTeam = getTeamNumAtTick(vicSid, tick)
-    const isTeamKill = atkSid && atkSid !== '0' && atkSid !== vicSid &&
-                       atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
-
-    // Count death for the victim, excluding team-kill deaths (FACEIT does not
-    // count deaths caused by a teammate against the victim's death tally).
-    if (vicSid && vicSid !== '0' && !isTeamKill) {
-      deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1)
+    // Death counting — FACEIT counts deaths from team kills too.
+    if (vicSid && vicSid !== '0') {
+      const vicTeam = getTeamNumAtTick(vicSid, tick)
+      const ds = getDs(vicSid)
+      if (isPre)          ds.dPre++
+      else if (isPost)    ds.dPost++
+      else if (vicTeam < 2) ds.dNoTeam++
+      else { ds.dValid++; deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1) }
     }
 
-    if (!atkSid || atkSid === '0' || atkSid === vicSid) continue
-    if (isTeamKill) continue
+    // Kill counting — skip pre/post-match, self-kills, team kills.
+    if (!atkSid || atkSid === '0' || atkSid === vicSid || isPre || isPost) continue
+
+    const atkTeam = getTeamNumAtTick(atkSid, tick)
+    const vicTeam = getTeamNumAtTick(vicSid, tick)
+    const isTeamKill = atkTeam >= 2 && vicTeam >= 2 && atkTeam === vicTeam
+
+    const ds = getDs(atkSid)
+    if (isTeamKill)               { ds.kTK++;     continue }
+    if (atkTeam < 2 || vicTeam < 2) ds.kNoTeam++
+    else                            ds.kValid++
 
     killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
     if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
@@ -603,6 +629,68 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     ...assistMap.keys(), ...mvpMap.keys(), ...playerTeamObs.keys(),
   ])
 
+  // ── KAST calculation ──────────────────────────────────────────────────────
+  //
+  // A player earns KAST credit in a round if they:
+  //   K – got at least one valid (non-TK) kill
+  //   A – got at least one assist
+  //   S – survived (did not die)
+  //   T – were traded (their killer was killed by a teammate in the same round)
+  const kastRoundCount = new Map<string, number>()
+
+  for (let ri = 0; ri < competitiveRounds.length; ri++) {
+    const roundStartTick = ri > 0 ? n(competitiveRounds[ri - 1], 'tick') : (preMatchEndTick >= 0 ? preMatchEndTick : 0)
+    const roundEndTick   = n(competitiveRounds[ri], 'tick')
+
+    const roundEvs = deathEvents.filter(ev => {
+      const t = n(ev, 'tick')
+      return t > roundStartTick && t <= roundEndTick
+    })
+
+    const killedInRound   = new Set<string>()
+    const killerInRound   = new Set<string>()
+    const assistedInRound = new Set<string>()
+    // victim → { attacker, tick } so we can detect trades
+    const killedByMap = new Map<string, { atkSid: string; tick: number }>()
+
+    for (const ev of roundEvs) {
+      const t      = n(ev, 'tick')
+      const vicSid = s(ev, 'steamid', 'user_steamid')
+      const atkSid = s(ev, 'attacker_steamid')
+      const astSid = s(ev, 'assister_steamid')
+
+      if (vicSid && vicSid !== '0') {
+        killedInRound.add(vicSid)
+        if (atkSid && atkSid !== '0' && atkSid !== vicSid) killedByMap.set(vicSid, { atkSid, tick: t })
+      }
+      if (atkSid && atkSid !== '0' && atkSid !== vicSid) {
+        const at = getTeamNumAtTick(atkSid, t)
+        const vt = getTeamNumAtTick(vicSid, t)
+        if (at >= 2 && vt >= 2 && at !== vt) killerInRound.add(atkSid)
+      }
+      if (astSid && astSid !== '0') assistedInRound.add(astSid)
+    }
+
+    // Trade: victim was killed, and their killer was later killed in the same round
+    const tradedInRound = new Set<string>()
+    for (const [vicSid, { atkSid, tick: vicTick }] of killedByMap.entries()) {
+      if (killedInRound.has(atkSid)) {
+        const atkDeath = killedByMap.get(atkSid)
+        if (atkDeath && atkDeath.tick > vicTick) tradedInRound.add(vicSid)
+      }
+    }
+
+    for (const sid of allSids) {
+      if (!sid || sid === '0' || botSids.has(sid) || hltvSids.has(sid)) continue
+      if (getStartingTeamNum(sid) < 2) continue
+      const K = killerInRound.has(sid)
+      const A = assistedInRound.has(sid)
+      const S = !killedInRound.has(sid)
+      const T = tradedInRound.has(sid)
+      if (K || A || S || T) kastRoundCount.set(sid, (kastRoundCount.get(sid) ?? 0) + 1)
+    }
+  }
+
   const players: PlayerStats[] = []
 
   for (const sid of allSids) {
@@ -625,9 +713,11 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     const headshots = hsMap.get(sid)      ?? 0
     const mvps      = mvpMap.get(sid)     ?? 0
 
-    const hsPercent = kills > 0 ? Math.round((headshots / kills) * 100) : 0
-    const totalDmg  = damageMap.get(sid) ?? 0
-    const adr = totalRounds > 0 ? Math.round(totalDmg / totalRounds) : 0
+    const hsPercent   = kills > 0 ? Math.round((headshots / kills) * 100) : 0
+    const totalDmg    = damageMap.get(sid) ?? 0
+    const adr         = totalRounds > 0 ? Math.round(totalDmg / totalRounds) : 0
+    const kastRounds  = kastRoundCount.get(sid) ?? 0
+    const kast        = totalRounds > 0 ? Math.round((kastRounds / totalRounds) * 100) : 0
 
     const kd = deaths > 0 ? kills / deaths : kills + 1
     const rating = parseFloat(
@@ -636,10 +726,13 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       )).toFixed(2),
     )
 
+    // Stamp debug stats with starting team for reference
+    const ds = getDs(sid)
+    ds.startingTeam = getStartingTeamNum(sid)
+
     players.push({
       steam_id: sid, name, team, kills, deaths, assists, headshots,
-      headshot_percentage: hsPercent, adr,
-      kast: 65,  // stub — full KAST requires round-by-round survival tracking
+      headshot_percentage: hsPercent, adr, kast,
       rating, utility_damage: 0, flash_assists: 0, mvps,
       rounds_played: totalRounds,
     })
@@ -724,6 +817,14 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   console.log(`[real-parser] scores via reason strings (MR12-aware): ${score1}-${score2}`)
 
   // ── 8. Assemble ParsedDemoData ────────────────────────────────────────────
+  // Build _debug object: per-player kill/death breakdown keyed by steam_id.
+  // Visible in the UI debug panel — paste it to diagnose stat mismatches.
+  const debugPlayers: Record<string, unknown> = {}
+  for (const [sid, ds] of debugStats.entries()) {
+    const pName = infoName.get(sid) || victimName.get(sid) || attackerName.get(sid) || sid
+    debugPlayers[sid] = { name: pName, ...ds }
+  }
+
   const parsedData: ParsedDemoData = {
     header: {
       map:          mapName,
@@ -752,6 +853,16 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     players,
     events:       [],
     heatmap_data: [],
+    _debug: {
+      matchEndTick,
+      preMatchEndTick,
+      stripCount,
+      postMatchDeaths,
+      postMatchHurts,
+      totalRounds,
+      halfTick,
+      players: debugPlayers,
+    },
   }
 
   return { parsedData, warnings }
