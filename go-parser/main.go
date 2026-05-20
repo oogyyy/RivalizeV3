@@ -35,6 +35,16 @@ func handleParse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Recover from unexpected panics so a bad demo file can't bring down the server
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("[parse] recovered from panic: %v", rec)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("parser panic: %v", rec)})
+		}
+	}()
+
 	// Accept either multipart form upload or raw body
 	var buf []byte
 	var err error

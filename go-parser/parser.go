@@ -12,14 +12,34 @@ import (
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/events"
 )
 
+// ── MR12 halftime constants ───────────────────────────────────────────────────
+
+const regulationHalf = 12
+const otHalfSize = 3
+
+// tWinsGoToTeam1 returns true when T-side wins in this round should be credited
+// to team1 (the original first-half T-starters). Matches the TypeScript logic.
+func tWinsGoToTeam1(roundIdx int) bool {
+	if roundIdx < regulationHalf {
+		return true // Rounds 1-12: T is team1
+	}
+	if roundIdx < regulationHalf*2 {
+		return false // Rounds 13-24: T is team2
+	}
+	// OT: each mini-half is otHalfSize rounds, alternating orientation
+	otIdx := roundIdx - regulationHalf*2
+	otHalf := otIdx / otHalfSize
+	return otHalf%2 == 1
+}
+
 // ── Output types (match ParsedDemoData in types/database.ts) ─────────────────
 
 type ParseResult struct {
-	Header      DemoHeader   `json:"header"`
-	Rounds      []Round      `json:"rounds"`
-	Players     []PlayerStat `json:"players"`
-	Events      []GameEvent  `json:"events"`
-	Warnings    []string     `json:"warnings"`
+	Header   DemoHeader   `json:"header"`
+	Rounds   []Round      `json:"rounds"`
+	Players  []PlayerStat `json:"players"`
+	Events   []GameEvent  `json:"events"`
+	Warnings []string     `json:"warnings"`
 }
 
 type DemoHeader struct {
@@ -33,15 +53,15 @@ type DemoHeader struct {
 }
 
 type Round struct {
-	Number       int    `json:"number"`
-	Winner       string `json:"winner"`
-	WinReason    string `json:"win_reason"`
-	Duration     int    `json:"duration"`
-	Team1Economy int    `json:"team1_economy"`
-	Team2Economy int    `json:"team2_economy"`
-	BombPlanted  bool   `json:"bomb_planted"`
-	BombDefused  bool   `json:"bomb_defused"`
-	Kills        []Kill `json:"kills"`
+	Number       int     `json:"number"`
+	Winner       string  `json:"winner"`
+	WinReason    string  `json:"win_reason"`
+	Duration     int     `json:"duration"`
+	Team1Economy int     `json:"team1_economy"`
+	Team2Economy int     `json:"team2_economy"`
+	BombPlanted  bool    `json:"bomb_planted"`
+	BombDefused  bool    `json:"bomb_defused"`
+	Kills        []Kill  `json:"kills"`
 }
 
 type Kill struct {
@@ -66,11 +86,11 @@ type PlayerStat struct {
 	Assists            int     `json:"assists"`
 	Headshots          int     `json:"headshots"`
 	HeadshotPercentage int     `json:"headshot_percentage"`
-	ADR                int     `json:"adr"`
+	ADR                float64 `json:"adr"`
 	KAST               int     `json:"kast"`
 	Rating             float64 `json:"rating"`
 	UtilityDamage      int     `json:"utility_damage"`
-	FlashAssists       int     `json:"flash_assists"` //nolint
+	FlashAssists       int     `json:"flash_assists"`
 	MVPs               int     `json:"mvps"`
 	RoundsPlayed       int     `json:"rounds_played"`
 }
@@ -83,20 +103,20 @@ type GameEvent struct {
 // ── Internal per-player state ─────────────────────────────────────────────────
 
 type playerAccum struct {
-	name      string
-	steamID   string
-	team      string
-	totalDmg  int
-	utilDmg   int
-	kills     int
-	deaths    int
-	assists   int
-	headshots int
+	name       string
+	steamID    string
+	team       string
+	totalDmg   int
+	utilDmg    int
+	kills      int
+	deaths     int
+	assists    int
+	headshots  int
 	mvps       int
 	kastRounds int
 }
 
-// ── Internal per-round state ───────────────────────────────────────────────────
+// ── Internal per-round state ──────────────────────────────────────────────────
 
 type roundState struct {
 	startTick   int
@@ -122,7 +142,14 @@ type killedByEntry struct {
 
 // ── Main parse function ───────────────────────────────────────────────────────
 
-func parseDemo(buf []byte) (*ParseResult, error) {
+func parseDemo(buf []byte) (result *ParseResult, err error) {
+	// Recover from panics caused by corrupt / truncated demo files
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("parser panic: %v", r)
+		}
+	}()
+
 	p := dem.NewParser(bytes.NewReader(buf))
 	defer p.Close()
 
@@ -132,7 +159,8 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 	var cur *roundState
 	score1, score2 := 0, 0
 
-	// Team name tracking — collected on every RoundEnd
+	// Team names — only collected from the FIRST HALF (rounds 0–11) so the names
+	// are anchored to the original T/CT starting sides before the halftime swap.
 	tNames := map[string]int{}
 	ctNames := map[string]int{}
 
@@ -148,7 +176,7 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 			}
 			accums[pl.SteamID64] = a
 		} else if pl.Name != "" {
-			a.name = pl.Name // keep latest name
+			a.name = pl.Name
 		}
 		return a
 	}
@@ -164,7 +192,6 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 			assisters: map[uint64]bool{},
 			killedBy:  map[uint64]killedByEntry{},
 		}
-		// Economy at round start (freeze-time end is when players have bought)
 		if t := gs.TeamTerrorists(); t != nil {
 			r.team1Eco = t.MoneySpentThisRound()
 		}
@@ -175,7 +202,7 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 	})
 
 	p.RegisterEventHandler(func(e events.RoundFreezetimeEnd) {
-		// Capture economy after freeze-time (more accurate than round start)
+		// Economy after freeze-time is more accurate (captures buy-phase spending)
 		if cur == nil {
 			return
 		}
@@ -197,23 +224,40 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 		cur.winnerTeam = e.Winner
 		cur.winReason = e.Reason
 
-		if e.Winner == common.TeamTerrorists {
-			score1++
-		} else if e.Winner == common.TeamCounterTerrorists {
-			score2++
-		}
-
-		// Collect team names — prefer non-generic values
-		if t := gs.TeamTerrorists(); t != nil {
-			n := strings.TrimSpace(t.ClanName())
-			if n != "" && n != "Terrorists" && n != "TERRORIST" && n != "T" {
-				tNames[n]++
+		// ── MR12-aware score counting ──────────────────────────────────────────
+		// roundIdx is 0-based index of the round being completed.
+		// In the first half (rounds 0-11) T wins go to team1.
+		// After halftime the sides swap, so T wins go to team2, etc.
+		roundIdx := len(completedRounds)
+		if tWinsGoToTeam1(roundIdx) {
+			if e.Winner == common.TeamTerrorists {
+				score1++
+			} else {
+				score2++
+			}
+		} else {
+			if e.Winner == common.TeamTerrorists {
+				score2++
+			} else {
+				score1++
 			}
 		}
-		if ct := gs.TeamCounterTerrorists(); ct != nil {
-			n := strings.TrimSpace(ct.ClanName())
-			if n != "" && n != "Counter-Terrorists" && n != "CT" && n != "Counter Terrorists" {
-				ctNames[n]++
+
+		// ── Team name collection — first half only ─────────────────────────────
+		// Collecting from all rounds would mix post-halftime names (wrong team
+		// labeled as T or CT). First-half names are stable and unambiguous.
+		if roundIdx < regulationHalf {
+			if t := gs.TeamTerrorists(); t != nil {
+				n := strings.TrimSpace(t.ClanName())
+				if isRealTeamName(n) {
+					tNames[n]++
+				}
+			}
+			if ct := gs.TeamCounterTerrorists(); ct != nil {
+				n := strings.TrimSpace(ct.ClanName())
+				if isRealTeamName(n) {
+					ctNames[n]++
+				}
 			}
 		}
 
@@ -250,7 +294,10 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 			}
 			cur.victims[victim.SteamID64] = true
 			if killer != nil && killer.SteamID64 != 0 && killer.SteamID64 != victim.SteamID64 {
-				cur.killedBy[victim.SteamID64] = killedByEntry{attackerID: killer.SteamID64, tick: tick}
+				cur.killedBy[victim.SteamID64] = killedByEntry{
+					attackerID: killer.SteamID64,
+					tick:       tick,
+				}
 			}
 		}
 
@@ -297,7 +344,7 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 			return
 		}
 		if e.Attacker.Team == e.Player.Team {
-			return
+			return // skip friendly fire
 		}
 		atk := getOrCreate(e.Attacker)
 		if atk == nil {
@@ -322,9 +369,7 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 		}
 	})
 
-	// ── Parse ─────────────────────────────────────────────────────────────────
-
-	// Capture map name from ConVars during parsing
+	// Capture map name from ConVars
 	mapName := "unknown"
 	p.RegisterEventHandler(func(e events.ConVarsUpdated) {
 		if m, ok := e.UpdatedConVars["mapname"]; ok && m != "" {
@@ -332,11 +377,13 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 		}
 	})
 
+	// ── Parse ─────────────────────────────────────────────────────────────────
+
 	if err := p.ParseToEnd(); err != nil {
 		warnings = append(warnings, fmt.Sprintf("ParseToEnd: %v", err))
 	}
 
-	// Fallback: try game rules convar
+	// Fallback: game rules ConVars
 	if mapName == "unknown" {
 		if cv := p.GameState().Rules().ConVars(); cv != nil {
 			if m, ok := cv["mapname"]; ok && m != "" {
@@ -347,8 +394,8 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 
 	// ── Resolve team names ────────────────────────────────────────────────────
 
-	team1Name := mostCommon(tNames)
-	team2Name := mostCommon(ctNames)
+	team1Name := mostCommon(tNames) // original T-starters
+	team2Name := mostCommon(ctNames) // original CT-starters
 	if team1Name == "" {
 		team1Name = "T-Side"
 	}
@@ -358,10 +405,11 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 
 	totalRounds := len(completedRounds)
 
-	// ── Assign player teams ───────────────────────────────────────────────────
-	// Use current team from game state at parse end, then adjust for halftime.
-	// For a standard MR12 game the teams swap after round 12. At game end,
-	// players are on their second-half side. We need their starting side.
+	// ── Assign player starting teams ─────────────────────────────────────────
+	// At parse end, players are on their current (possibly post-halftime) side.
+	// For regulation games (≤24 rounds), if more than 12 rounds completed the
+	// teams have swapped, so we flip current team → starting team.
+	// OT (>24 rounds) is not adjusted — acceptable known limitation.
 	for _, pl := range p.GameState().Participants().All() {
 		if pl.SteamID64 == 0 {
 			continue
@@ -370,18 +418,14 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 		if a == nil {
 			continue
 		}
-		// Determine starting team accounting for halftime swap.
-		// If we're past regulation (>24 rounds) we don't try to guess OT swaps.
 		currentTeam := pl.Team
 		startTeam := currentTeam
-		if totalRounds > 0 && totalRounds <= 24 {
-			// After halftime the sides swap, so starting team = opposite of current
-			if totalRounds > 12 {
-				if currentTeam == common.TeamTerrorists {
-					startTeam = common.TeamCounterTerrorists
-				} else if currentTeam == common.TeamCounterTerrorists {
-					startTeam = common.TeamTerrorists
-				}
+		if totalRounds > regulationHalf && totalRounds <= regulationHalf*2 {
+			// Regulation second half: flip to get starting side
+			if currentTeam == common.TeamTerrorists {
+				startTeam = common.TeamCounterTerrorists
+			} else if currentTeam == common.TeamCounterTerrorists {
+				startTeam = common.TeamTerrorists
 			}
 		}
 		if startTeam == common.TeamTerrorists {
@@ -430,9 +474,10 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 		if a.kills > 0 {
 			hsPercent = int(math.Round(float64(a.headshots) / float64(a.kills) * 100))
 		}
-		adr := 0
+		// ADR: one decimal place for precision matching reference stat sites
+		adr := 0.0
 		if totalRounds > 0 {
-			adr = int(math.Round(float64(a.totalDmg) / float64(totalRounds)))
+			adr = math.Round(float64(a.totalDmg)/float64(totalRounds)*10) / 10
 		}
 		kast := 0
 		if totalRounds > 0 {
@@ -440,7 +485,7 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 		}
 		kd := float64(a.kills) / math.Max(float64(a.deaths), 1)
 		rating := math.Round(math.Max(0.3, math.Min(2.5,
-			kd*0.38+float64(adr)/100.0*0.42+0.317+float64(a.mvps)/math.Max(float64(totalRounds), 1)*0.1,
+			kd*0.38+adr/100.0*0.42+0.317+float64(a.mvps)/math.Max(float64(totalRounds), 1)*0.1,
 		))*100) / 100
 
 		players = append(players, PlayerStat{
@@ -456,7 +501,7 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 			KAST:               kast,
 			Rating:             rating,
 			UtilityDamage:      a.utilDmg,
-			FlashAssists:       0, // flash assist detection requires extra event tracking
+			FlashAssists:       0,
 			MVPs:               a.mvps,
 			RoundsPlayed:       totalRounds,
 		})
@@ -470,10 +515,22 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 
 	var outRounds []Round
 	for i, rnd := range completedRounds {
-		winner := team1Name
-		if rnd.winnerTeam == common.TeamCounterTerrorists {
-			winner = team2Name
+		// Use the same MR12 logic to determine the winner team name
+		var winner string
+		if tWinsGoToTeam1(i) {
+			if rnd.winnerTeam == common.TeamTerrorists {
+				winner = team1Name
+			} else {
+				winner = team2Name
+			}
+		} else {
+			if rnd.winnerTeam == common.TeamTerrorists {
+				winner = team2Name
+			} else {
+				winner = team1Name
+			}
 		}
+
 		dur := 90
 		if rnd.endTick > rnd.startTick {
 			dur = (rnd.endTick - rnd.startTick) / 64
@@ -510,6 +567,25 @@ func parseDemo(buf []byte) (*ParseResult, error) {
 		Events:   []GameEvent{},
 		Warnings: warnings,
 	}, nil
+}
+
+// isRealTeamName returns true when a clan name is a genuine team name and not
+// a CS2 placeholder string.
+func isRealTeamName(n string) bool {
+	if n == "" {
+		return false
+	}
+	bad := []string{
+		"Terrorists", "TERRORIST", "T",
+		"Counter-Terrorists", "Counter Terrorists", "CT",
+		"Unassigned", "Spectator",
+	}
+	for _, b := range bad {
+		if strings.EqualFold(n, b) {
+			return false
+		}
+	}
+	return true
 }
 
 // mostCommon returns the most frequently occurring key in a count map.

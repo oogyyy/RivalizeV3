@@ -5,28 +5,44 @@ export interface RealParseResult {
   warnings: string[]
 }
 
+// 8-minute timeout — generous enough for 500 MB demos while still detecting hangs
+const PARSER_TIMEOUT_MS = 8 * 60 * 1000
+
 /**
  * Sends a demo buffer to the Go parser service and returns structured data.
- * PARSER_URL must point to the deployed go-parser service, e.g. https://go-parser.up.railway.app
+ * PARSER_URL must point to the deployed go-parser service.
  */
 export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
   const parserUrl = process.env.PARSER_URL
   if (!parserUrl) {
-    throw new Error('PARSER_URL environment variable is not set')
+    throw new Error('PARSER_URL environment variable is not set. Deploy the go-parser service and set PARSER_URL.')
   }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), PARSER_TIMEOUT_MS)
 
   const form = new FormData()
   form.append('demo', new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), 'demo.dem')
 
-  const res = await fetch(`${parserUrl.replace(/\/$/, '')}/parse`, {
-    method: 'POST',
-    body: form,
-    // No Content-Type header — fetch sets it automatically with the multipart boundary
-  })
+  let res: Response
+  try {
+    res = await fetch(`${parserUrl.replace(/\/$/, '')}/parse`, {
+      method: 'POST',
+      body: form,
+      signal: controller.signal,
+    })
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') {
+      throw new Error(`Go parser timed out after ${PARSER_TIMEOUT_MS / 1000}s`)
+    }
+    throw new Error(`Go parser unreachable (${parserUrl}): ${(e as Error).message}`)
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`Go parser returned ${res.status}: ${text}`)
+    throw new Error(`Go parser returned HTTP ${res.status}: ${text}`)
   }
 
   const raw = await res.json() as {
@@ -34,6 +50,10 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
     rounds:   GoRound[]
     players:  GoPlayer[]
     warnings: string[]
+  }
+
+  if (raw.warnings?.length) {
+    console.warn('[go-parser] warnings:', raw.warnings)
   }
 
   const parsedData: ParsedDemoData = {
