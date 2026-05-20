@@ -528,10 +528,12 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   //
   // Debug tracking: per-player kill/death breakdown so mismatches can be
   // diagnosed by inspecting parsedData._debug in the UI debug panel.
+  const nRounds = competitiveRounds.length
   interface DbStat {
     startingTeam: number
     kValid: number; kTK: number; kPost: number; kPre: number; kNoTeam: number; kFreeze: number
     dValid: number; dPost: number; dPre: number; dNoTeam: number; dFreeze: number
+    killsByRound: number[]; deathsByRound: number[]
   }
   const debugStats = new Map<string, DbStat>()
   const getDs = (sid: string): DbStat => {
@@ -539,6 +541,8 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       startingTeam: 0,
       kValid: 0, kTK: 0, kPost: 0, kPre: 0, kNoTeam: 0, kFreeze: 0,
       dValid: 0, dPost: 0, dPre: 0, dNoTeam: 0, dFreeze: 0,
+      killsByRound: new Array(nRounds).fill(0),
+      deathsByRound: new Array(nRounds).fill(0),
     })
     return debugStats.get(sid)!
   }
@@ -566,6 +570,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     const isFreeze = !isPre && !isPost && isInFreezeTime(tick)
 
     // Death counting — FACEIT counts deaths from team kills too.
+    // Freeze-time deaths are excluded (carry-over damage before the round starts).
     if (vicSid && vicSid !== '0') {
       const vicTeam = getTeamNumAtTick(vicSid, tick)
       const ds = getDs(vicSid)
@@ -573,11 +578,18 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       else if (isPost)      ds.dPost++
       else if (isFreeze)    ds.dFreeze++
       else if (vicTeam < 2) ds.dNoTeam++
-      else { ds.dValid++; deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1) }
+      else {
+        ds.dValid++
+        deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1)
+        const ri = findRoundIdx(tick)
+        if (ri >= 0) ds.deathsByRound[ri]++
+      }
     }
 
-    // Kill counting — skip pre/post-match, freeze-time, self-kills, team kills.
-    if (!atkSid || atkSid === '0' || atkSid === vicSid || isPre || isPost || isFreeze) continue
+    // Kill counting — skip pre/post-match, self-kills, and team kills.
+    // NOTE: freeze-time kills ARE counted (FACEIT gives credit for carry-over
+    // grenade/molotov kills even though the victim's death is excluded).
+    if (!atkSid || atkSid === '0' || atkSid === vicSid || isPre || isPost) continue
 
     const atkTeam = getTeamNumAtTick(atkSid, tick)
     const vicTeam = getTeamNumAtTick(vicSid, tick)
@@ -585,8 +597,12 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
     const ds = getDs(atkSid)
     if (isTeamKill)               { ds.kTK++;     continue }
-    if (atkTeam < 2 || vicTeam < 2) ds.kNoTeam++
-    else                            ds.kValid++
+    if (atkTeam < 2 || vicTeam < 2) { ds.kNoTeam++ }
+    else {
+      ds.kValid++
+      const ri = findRoundIdx(tick)
+      if (ri >= 0) ds.killsByRound[ri]++
+    }
 
     killMap.set(atkSid, (killMap.get(atkSid) ?? 0) + 1)
     if (ev.headshot) hsMap.set(atkSid, (hsMap.get(atkSid) ?? 0) + 1)
