@@ -145,6 +145,15 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     console.log('[real-parser] first round_end values:', roundEnds[0])
   }
 
+  // round_freeze_end fires when the buy phase ends and players can move.
+  // Deaths/damage before a round's freeze_end are carry-over from the
+  // previous round (lingering nades, knife-round aftermath) and must be
+  // excluded — FACEIT does not count these events.
+  let freezeEndEvents: Row[] = []
+  try {
+    freezeEndEvents = dp.parseEvent(buf, 'round_freeze_end', [], ['tick']) ?? []
+  } catch (e) { warnings.push(`parseEvent(round_freeze_end): ${e}`) }
+
   let hurtEvents: Row[] = []
   try {
     hurtEvents = dp.parseEvent(
@@ -489,6 +498,22 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     return lo
   }
 
+  // Build a per-competitive-round freeze_end tick array.
+  // Events before a round's freeze_end are knife-round aftermath / carry-over
+  // grenade damage from the previous round and must not be counted.
+  const roundFreezeEndTick: number[] = new Array(competitiveRounds.length).fill(0)
+  {
+    const sortedFreezeEnds = freezeEndEvents
+      .map(ev => n(ev, 'tick'))
+      .filter(t => t > preMatchEndTick && t <= matchEndTick)
+      .sort((a, b) => a - b)
+    for (const ft of sortedFreezeEnds) {
+      const ri = findRoundIdx(ft)
+      if (ri >= 0 && roundFreezeEndTick[ri] === 0) roundFreezeEndTick[ri] = ft
+    }
+    console.log(`[real-parser] round_freeze_end events mapped: ${sortedFreezeEnds.length} events → ${roundFreezeEndTick.filter(t => t > 0).length} rounds`)
+  }
+
   // Return the actual team_num (2=T, 3=CT) for a player at a given tick,
   // accounting for side swaps at halftime and OT mini-halves.
   function getTeamNumAtTick(sid: string, tick: number): number {
@@ -505,17 +530,27 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   // diagnosed by inspecting parsedData._debug in the UI debug panel.
   interface DbStat {
     startingTeam: number
-    kValid: number; kTK: number; kPost: number; kPre: number; kNoTeam: number
-    dValid: number; dPost: number; dPre: number; dNoTeam: number
+    kValid: number; kTK: number; kPost: number; kPre: number; kNoTeam: number; kFreeze: number
+    dValid: number; dPost: number; dPre: number; dNoTeam: number; dFreeze: number
   }
   const debugStats = new Map<string, DbStat>()
   const getDs = (sid: string): DbStat => {
     if (!debugStats.has(sid)) debugStats.set(sid, {
       startingTeam: 0,
-      kValid: 0, kTK: 0, kPost: 0, kPre: 0, kNoTeam: 0,
-      dValid: 0, dPost: 0, dPre: 0, dNoTeam: 0,
+      kValid: 0, kTK: 0, kPost: 0, kPre: 0, kNoTeam: 0, kFreeze: 0,
+      dValid: 0, dPost: 0, dPre: 0, dNoTeam: 0, dFreeze: 0,
     })
     return debugStats.get(sid)!
+  }
+
+  // Returns true if this tick falls before the competitive round's freeze_end —
+  // i.e. the round hasn't actually started yet (knife-round aftermath / carry-over
+  // grenade damage). FACEIT excludes these events from stats.
+  function isInFreezeTime(tick: number): boolean {
+    const ri = findRoundIdx(tick)
+    if (ri < 0) return false
+    const fe = roundFreezeEndTick[ri]
+    return fe > 0 && tick < fe
   }
 
   for (const ev of deathEvents) {
@@ -526,21 +561,23 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     if (vicSid && vicSid !== '0') recordTeam(vicSid, tick, n(ev, 'team_num', 'user_team_num'))
     if (atkSid && atkSid !== '0') recordTeam(atkSid, tick, n(ev, 'attacker_team_num'))
 
-    const isPre  = preMatchEndTick >= 0 && tick <= preMatchEndTick
-    const isPost = tick > matchEndTick
+    const isPre    = preMatchEndTick >= 0 && tick <= preMatchEndTick
+    const isPost   = tick > matchEndTick
+    const isFreeze = !isPre && !isPost && isInFreezeTime(tick)
 
     // Death counting — FACEIT counts deaths from team kills too.
     if (vicSid && vicSid !== '0') {
       const vicTeam = getTeamNumAtTick(vicSid, tick)
       const ds = getDs(vicSid)
-      if (isPre)          ds.dPre++
-      else if (isPost)    ds.dPost++
+      if (isPre)            ds.dPre++
+      else if (isPost)      ds.dPost++
+      else if (isFreeze)    ds.dFreeze++
       else if (vicTeam < 2) ds.dNoTeam++
       else { ds.dValid++; deathCount.set(vicSid, (deathCount.get(vicSid) ?? 0) + 1) }
     }
 
-    // Kill counting — skip pre/post-match, self-kills, team kills.
-    if (!atkSid || atkSid === '0' || atkSid === vicSid || isPre || isPost) continue
+    // Kill counting — skip pre/post-match, freeze-time, self-kills, team kills.
+    if (!atkSid || atkSid === '0' || atkSid === vicSid || isPre || isPost || isFreeze) continue
 
     const atkTeam = getTeamNumAtTick(atkSid, tick)
     const vicTeam = getTeamNumAtTick(vicSid, tick)
@@ -582,6 +619,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       const vicSid = s(ev, 'steamid', 'user_steamid')
 
       if (preMatchEndTick >= 0 && tick <= preMatchEndTick) continue
+      if (isInFreezeTime(tick)) continue
       if (!atkSid || atkSid === '0' || !vicSid || vicSid === '0') continue
       if (atkSid === vicSid) continue
 
@@ -861,6 +899,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       postMatchHurts,
       totalRounds,
       halfTick,
+      freezeEndsMapped: roundFreezeEndTick.filter(t => t > 0).length,
       players: debugPlayers,
     },
   }
