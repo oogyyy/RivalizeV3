@@ -771,7 +771,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     const totalDmg    = damageMap.get(sid) ?? 0
     const adr         = totalRounds > 0 ? Math.round(totalDmg / totalRounds) : 0
     const kastRounds  = kastRoundCount.get(sid) ?? 0
-    const kast        = totalRounds > 0 ? Math.round((kastRounds / totalRounds) * 100) : 0
+    const kast        = totalRounds > 0 ? Math.round((kastRounds / totalRounds) * 1000) / 10 : 0
 
     const kd = deaths > 0 ? kills / deaths : kills + 1
     const rating = parseFloat(

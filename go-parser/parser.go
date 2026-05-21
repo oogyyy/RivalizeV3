@@ -88,7 +88,7 @@ type PlayerStat struct {
 	Headshots          int     `json:"headshots"`
 	HeadshotPercentage float64 `json:"headshot_percentage"`
 	ADR                float64 `json:"adr"`
-	KAST               int     `json:"kast"`
+	KAST               float64 `json:"kast"`
 	Rating             float64 `json:"rating"`
 	UtilityDamage      int     `json:"utility_damage"`
 	FlashAssists       int     `json:"flash_assists"`
@@ -651,9 +651,9 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		if nonKnifeRounds > 0 {
 			adr = math.Round(float64(a.totalDmg)/float64(nonKnifeRounds)*10) / 10
 		}
-		kast := 0
+		kast := 0.0
 		if nonKnifeRounds > 0 {
-			kast = int(math.Round(float64(a.kastRounds) / float64(nonKnifeRounds) * 100))
+			kast = math.Round(float64(a.kastRounds)/float64(nonKnifeRounds)*1000) / 10
 		}
 		kd := float64(a.kills) / math.Max(float64(a.deaths), 1)
 		rating := math.Round(math.Max(0.3, math.Min(2.5,
