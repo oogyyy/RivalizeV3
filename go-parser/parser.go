@@ -10,6 +10,7 @@ import (
 	dem "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/events"
+	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/msg"
 )
 
 // ── MR12 halftime constants ───────────────────────────────────────────────────
@@ -153,17 +154,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	p := dem.NewParser(bytes.NewReader(buf))
 	defer p.Close()
 
-	// Parse the demo header first to get the map name reliably.
-	// ParseToEnd will skip re-parsing the header if already done.
-	demoHeader, headerErr := p.ParseHeader()
-	mapName := ""
-	if headerErr == nil {
-		mapName = strings.TrimSpace(demoHeader.MapName)
-	}
-	if mapName == "" {
-		mapName = "unknown"
-	}
-
+	mapName := "unknown"
 	var warnings []string
 	accums := map[uint64]*playerAccum{}
 	var completedRounds []roundState
@@ -388,7 +379,14 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		}
 	})
 
-	// Fall back to ConVars if the demo header didn't have a map name
+	// Primary: capture map name from the binary demo file header message
+	p.RegisterNetMessageHandler(func(m *msg.CDemoFileHeader) {
+		if n := strings.TrimSpace(m.GetMapName()); n != "" {
+			mapName = n
+		}
+	})
+
+	// Fallback: ConVars event (fires during gameplay, after the header)
 	p.RegisterEventHandler(func(e events.ConVarsUpdated) {
 		if mapName != "unknown" {
 			return
