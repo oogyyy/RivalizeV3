@@ -173,10 +173,12 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	accums := map[uint64]*playerAccum{}
 	var completedRounds []roundState
 	var cur *roundState
-	score1, score2 := 0, 0
 
-	// Team names — only collected from the FIRST HALF (rounds 0–11) so the names
-	// are anchored to the original T/CT starting sides before the halftime swap.
+	// Team names — only collected from the first half so the names are anchored
+	// to the original T/CT starting sides before the halftime swap.
+	// nonKnifeCollected tracks how many real (non-knife) rounds we've seen so far
+	// in the RoundEnd handler so we stop collecting after regulationHalf rounds.
+	nonKnifeCollected := 0
 	tNames := map[string]int{}
 	ctNames := map[string]int{}
 
@@ -252,24 +254,23 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		cur.winnerTeam = e.Winner
 		cur.winReason = e.Reason
 
-		// ── MR12-aware score counting ──────────────────────────────────────────
-		roundIdx := len(completedRounds)
-		if tWinsGoToTeam1(roundIdx) {
-			if e.Winner == common.TeamTerrorists {
-				score1++
-			} else {
-				score2++
+		// Mark as knife round if every kill used a knife — detected at RoundEnd
+		// after all Kill events for this round have already fired.
+		if len(cur.kills) > 0 {
+			allKnife := true
+			for _, k := range cur.kills {
+				if !isKnifeWeapon(k.Weapon) {
+					allKnife = false
+					break
+				}
 			}
-		} else {
-			if e.Winner == common.TeamTerrorists {
-				score2++
-			} else {
-				score1++
-			}
+			cur.isKnifeRound = allKnife
 		}
 
-		// ── Team name collection — first half only ─────────────────────────────
-		if roundIdx < regulationHalf {
+		// ── Team name collection — first half real rounds only ─────────────────
+		// Score counting is done in post-processing where we know the knife offset.
+		// Team names: collect while we haven't yet seen regulationHalf non-knife rounds.
+		if !cur.isKnifeRound && nonKnifeCollected < regulationHalf {
 			if t := gs.TeamTerrorists(); t != nil {
 				n := strings.TrimSpace(t.ClanName())
 				if isRealTeamName(n) {
@@ -282,19 +283,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 					ctNames[n]++
 				}
 			}
-		}
-
-		// Mark as knife round if every kill used a knife — detected at RoundEnd
-		// after all Kill events for this round have already fired.
-		if len(cur.kills) > 0 {
-			allKnife := true
-			for _, k := range cur.kills {
-				if !isKnifeWeapon(k.Weapon) {
-					allKnife = false
-					break
-				}
-			}
-			cur.isKnifeRound = allKnife
+			nonKnifeCollected++
 		}
 
 		completedRounds = append(completedRounds, *cur)
@@ -503,6 +492,36 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		}
 	}
 
+	// ── Compute scores (post-processing, knife-round aware) ──────────────────
+	// We use a real-round index (skipping knife rounds) so that the MR12 halftime
+	// boundary is correct even when a knife round precedes the actual match.
+	// e.g. knife + 12 first-half rounds means the second half begins at real-idx 12,
+	// not demo-idx 12 — without this adjustment, the 12th real round is incorrectly
+	// counted as a second-half round and its T-win credited to the wrong team.
+	score1, score2 := 0, 0
+	{
+		realIdx := 0
+		for _, rnd := range completedRounds {
+			if rnd.isKnifeRound {
+				continue
+			}
+			if tWinsGoToTeam1(realIdx) {
+				if rnd.winnerTeam == common.TeamTerrorists {
+					score1++
+				} else {
+					score2++
+				}
+			} else {
+				if rnd.winnerTeam == common.TeamTerrorists {
+					score2++
+				} else {
+					score1++
+				}
+			}
+			realIdx++
+		}
+	}
+
 	// ── Resolve team names ────────────────────────────────────────────────────
 
 	team1Name := mostCommon(tNames) // original T-starters
@@ -527,7 +546,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		}
 		currentTeam := pl.Team
 		startTeam := currentTeam
-		if totalRounds > regulationHalf && totalRounds <= regulationHalf*2 {
+		if nonKnifeRounds > regulationHalf && nonKnifeRounds <= regulationHalf*2 {
 			if currentTeam == common.TeamTerrorists {
 				startTeam = common.TeamCounterTerrorists
 			} else if currentTeam == common.TeamCounterTerrorists {
@@ -623,37 +642,47 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	// ── Build round list ──────────────────────────────────────────────────────
 
 	var outRounds []Round
-	for i, rnd := range completedRounds {
-		var winner string
-		if tWinsGoToTeam1(i) {
-			if rnd.winnerTeam == common.TeamTerrorists {
-				winner = team1Name
+	{
+		realIdx := 0
+		for i, rnd := range completedRounds {
+			// Knife rounds are in the "first half" orientation by definition;
+			// real rounds use a 0-based index that excludes knife rounds so the
+			// MR12 halftime boundary is correct regardless of how many knife rounds
+			// preceded the match.
+			var winner string
+			if rnd.isKnifeRound || tWinsGoToTeam1(realIdx) {
+				if rnd.winnerTeam == common.TeamTerrorists {
+					winner = team1Name
+				} else {
+					winner = team2Name
+				}
 			} else {
-				winner = team2Name
+				if rnd.winnerTeam == common.TeamTerrorists {
+					winner = team2Name
+				} else {
+					winner = team1Name
+				}
 			}
-		} else {
-			if rnd.winnerTeam == common.TeamTerrorists {
-				winner = team2Name
-			} else {
-				winner = team1Name
+			if !rnd.isKnifeRound {
+				realIdx++
 			}
-		}
 
-		dur := 90
-		if rnd.endTick > rnd.startTick {
-			dur = (rnd.endTick - rnd.startTick) / 64
+			dur := 90
+			if rnd.endTick > rnd.startTick {
+				dur = (rnd.endTick - rnd.startTick) / 64
+			}
+			outRounds = append(outRounds, Round{
+				Number:       i + 1,
+				Winner:       winner,
+				WinReason:    roundReasonString(rnd.winReason),
+				Duration:     dur,
+				Team1Economy: rnd.team1Eco,
+				Team2Economy: rnd.team2Eco,
+				BombPlanted:  rnd.bombPlanted,
+				BombDefused:  rnd.bombDefused,
+				Kills:        rnd.kills,
+			})
 		}
-		outRounds = append(outRounds, Round{
-			Number:       i + 1,
-			Winner:       winner,
-			WinReason:    roundReasonString(rnd.winReason),
-			Duration:     dur,
-			Team1Economy: rnd.team1Eco,
-			Team2Economy: rnd.team2Eco,
-			BombPlanted:  rnd.bombPlanted,
-			BombDefused:  rnd.bombDefused,
-			Kills:        rnd.kills,
-		})
 	}
 
 	if len(players) == 0 {
