@@ -319,20 +319,28 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 			cur.assisters[assister.SteamID64] = true
 		}
 
-		k := Kill{Tick: tick, Headshot: e.IsHeadshot}
+		// Skip self-kills (fall damage, world kills) — they corrupt stats and heatmaps
+		isSelfKill := killer == nil || victim == nil || killer.SteamID64 == 0 || victim.SteamID64 == 0 ||
+			killer.SteamID64 == victim.SteamID64
+		if isSelfKill {
+			return
+		}
+
+		timeInRound := 0.0
+		if cur.startTick > 0 && tick > cur.startTick {
+			timeInRound = float64(tick-cur.startTick) / 64.0
+		}
+
+		k := Kill{Tick: tick, Time: timeInRound, Headshot: e.IsHeadshot}
 		if e.Weapon != nil {
 			k.Weapon = e.Weapon.String()
 		}
-		if killer != nil {
-			k.KillerName = killer.Name
-			pos := killer.Position()
-			k.KillerX, k.KillerY = float64(pos.X), float64(pos.Y)
-		}
-		if victim != nil {
-			k.VictimName = victim.Name
-			pos := victim.Position()
-			k.VictimX, k.VictimY = float64(pos.X), float64(pos.Y)
-		}
+		k.KillerName = killer.Name
+		pos := killer.Position()
+		k.KillerX, k.KillerY = float64(pos.X), float64(pos.Y)
+		k.VictimName = victim.Name
+		pos = victim.Position()
+		k.VictimX, k.VictimY = float64(pos.X), float64(pos.Y)
 		cur.kills = append(cur.kills, k)
 	})
 
@@ -369,9 +377,15 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		}
 	})
 
-	// Capture map name from ConVars
-	mapName := "unknown"
+	// Capture map name — prefer demo header, fall back to ConVars
+	mapName := strings.TrimSpace(p.Header().MapName)
+	if mapName == "" {
+		mapName = "unknown"
+	}
 	p.RegisterEventHandler(func(e events.ConVarsUpdated) {
+		if mapName != "unknown" {
+			return
+		}
 		if m, ok := e.UpdatedConVars["mapname"]; ok && m != "" {
 			mapName = strings.TrimSpace(m)
 		}
@@ -383,13 +397,16 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		warnings = append(warnings, fmt.Sprintf("ParseToEnd: %v", err))
 	}
 
-	// Fallback: game rules ConVars
+	// Final fallback: game rules ConVars (checked after ParseToEnd)
 	if mapName == "unknown" {
 		if cv := p.GameState().Rules().ConVars(); cv != nil {
 			if m, ok := cv["mapname"]; ok && m != "" {
 				mapName = strings.TrimSpace(m)
 			}
 		}
+	}
+	if mapName == "" {
+		mapName = "unknown"
 	}
 
 	// ── Resolve team names ────────────────────────────────────────────────────
