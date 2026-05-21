@@ -332,15 +332,9 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 			return
 		}
 
-		// True self-kills (same player ID): count as death, skip kill credit + list.
+		// True self-kills (fall damage etc. where killer == victim): skip entirely.
+		// FACEIT does not count self-kills as deaths, so neither do we.
 		if victim == nil || victim.SteamID64 == 0 || killer.SteamID64 == victim.SteamID64 {
-			if victim != nil && victim.SteamID64 != 0 {
-				if va := getOrCreate(victim); va != nil {
-					va.deaths++
-				}
-				cur.victims[victim.SteamID64] = true
-				getContrib(cur, victim.SteamID64).deaths++
-			}
 			return
 		}
 
