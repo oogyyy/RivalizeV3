@@ -217,6 +217,13 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 
 	p.RegisterEventHandler(func(e events.RoundStart) {
 		gs := p.GameState()
+		// Warmup rounds must not create a tracked round state — kills/damage that
+		// fire during warmup are guarded individually, but we also need to ensure
+		// no warmup roundState is ever handed to RoundEnd and counted.
+		if gs.IsWarmupPeriod() {
+			cur = nil
+			return
+		}
 		r := &roundState{
 			startTick: gs.IngameTick(),
 			contribs:  map[uint64]*roundContrib{},
@@ -249,10 +256,13 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	})
 
 	p.RegisterEventHandler(func(e events.RoundEnd) {
-		if cur == nil {
+		gs := p.GameState()
+		// Discard any round that ended while still in warmup (e.g. a practice round
+		// before the knife or the warmup round itself ending with RoundEndReasonGameStart).
+		if cur == nil || gs.IsWarmupPeriod() {
+			cur = nil
 			return
 		}
-		gs := p.GameState()
 		cur.endTick = gs.IngameTick()
 		cur.winnerTeam = e.Winner
 		cur.winReason = e.Reason
@@ -323,8 +333,9 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		victim := e.Victim
 		assister := e.Assister
 
-		// Warmup guard: if no round has ever started, ignore completely.
-		if cur == nil && len(completedRounds) == 0 {
+		// Warmup guard: discard all events during the warmup period.
+		// Also discard kills that fire before any real round has started.
+		if p.GameState().IsWarmupPeriod() || (cur == nil && len(completedRounds) == 0) {
 			return
 		}
 
@@ -345,19 +356,9 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 			return
 		}
 
-		// Self-kills (fall damage where attacker==victim in the event): the victim
-		// gets a death but the killer receives no credit. FACEIT counts self-kill
-		// deaths in the death column.
+		// Self-kills (fall damage where attacker==victim in the event): skip entirely.
+		// FACEIT does not count self-kills in either the K or D column.
 		if victim == nil || victim.SteamID64 == 0 || killer.SteamID64 == victim.SteamID64 {
-			if victim != nil && victim.SteamID64 != 0 {
-				if va := getOrCreate(victim); va != nil {
-					va.deaths++
-				}
-				if cur != nil {
-					cur.victims[victim.SteamID64] = true
-					getContrib(cur, victim.SteamID64).deaths++
-				}
-			}
 			return
 		}
 
@@ -435,7 +436,9 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	})
 
 	p.RegisterEventHandler(func(e events.PlayerHurt) {
-		if cur == nil {
+		// Discard warmup damage — it inflates totalDmg and utility damage accumulators
+		// and increases the ADR denominator (nonKnifeRounds) via extra rounds.
+		if cur == nil || p.GameState().IsWarmupPeriod() {
 			return
 		}
 		// NOTE: Knife-round exclusion handled in post-processing, not here.
