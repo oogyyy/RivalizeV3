@@ -106,8 +106,9 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
       rounds_played:      p.rounds_played,
     })),
     events: [],
-    heatmap_data: buildHeatmapData(parsedData.rounds, parsedData.players),
+    heatmap_data: [],
   }
+  parsedData.heatmap_data = buildHeatmapData(parsedData.rounds, parsedData.players)
 
   return {
     parsedData,
