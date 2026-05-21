@@ -688,13 +688,13 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	var outRounds []Round
 	{
 		realIdx := 0
-		for i, rnd := range completedRounds {
-			// Knife rounds are in the "first half" orientation by definition;
-			// real rounds use a 0-based index that excludes knife rounds so the
-			// MR12 halftime boundary is correct regardless of how many knife rounds
-			// preceded the match.
+		for _, rnd := range completedRounds {
+			if rnd.isKnifeRound {
+				continue // knife rounds are excluded from the output round list
+			}
+
 			var winner string
-			if rnd.isKnifeRound || tWinsGoToTeam1(realIdx) {
+			if tWinsGoToTeam1(realIdx) {
 				if rnd.winnerTeam == common.TeamTerrorists {
 					winner = team1Name
 				} else {
@@ -707,16 +707,14 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 					winner = team1Name
 				}
 			}
-			if !rnd.isKnifeRound {
-				realIdx++
-			}
+			realIdx++
 
 			dur := 90
 			if rnd.endTick > rnd.startTick {
 				dur = (rnd.endTick - rnd.startTick) / 64
 			}
 			outRounds = append(outRounds, Round{
-				Number:       i + 1,
+				Number:       realIdx, // 1-based, knife rounds excluded
 				Winner:       winner,
 				WinReason:    roundReasonString(rnd.winReason),
 				Duration:     dur,
