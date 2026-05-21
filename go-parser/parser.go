@@ -153,6 +153,17 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	p := dem.NewParser(bytes.NewReader(buf))
 	defer p.Close()
 
+	// Parse the demo header first to get the map name reliably.
+	// ParseToEnd will skip re-parsing the header if already done.
+	demoHeader, headerErr := p.ParseHeader()
+	mapName := ""
+	if headerErr == nil {
+		mapName = strings.TrimSpace(demoHeader.MapName)
+	}
+	if mapName == "" {
+		mapName = "unknown"
+	}
+
 	var warnings []string
 	accums := map[uint64]*playerAccum{}
 	var completedRounds []roundState
@@ -377,11 +388,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		}
 	})
 
-	// Capture map name — prefer demo header, fall back to ConVars
-	mapName := strings.TrimSpace(p.Header().MapName)
-	if mapName == "" {
-		mapName = "unknown"
-	}
+	// Fall back to ConVars if the demo header didn't have a map name
 	p.RegisterEventHandler(func(e events.ConVarsUpdated) {
 		if mapName != "unknown" {
 			return
@@ -404,9 +411,6 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 				mapName = strings.TrimSpace(m)
 			}
 		}
-	}
-	if mapName == "" {
-		mapName = "unknown"
 	}
 
 	// ── Resolve team names ────────────────────────────────────────────────────
