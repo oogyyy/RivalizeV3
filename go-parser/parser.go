@@ -104,17 +104,18 @@ type GameEvent struct {
 // ── Internal per-player state ─────────────────────────────────────────────────
 
 type playerAccum struct {
-	name       string
-	steamID    string
-	team       string
-	totalDmg   int
-	utilDmg    int
-	kills      int
-	deaths     int
-	assists    int
-	headshots  int
-	mvps       int
-	kastRounds int
+	name         string
+	steamID      string
+	team         string
+	totalDmg     int
+	utilDmg      int
+	kills        int
+	deaths       int
+	assists      int
+	flashAssists int
+	headshots    int
+	mvps         int
+	kastRounds   int
 }
 
 // roundContrib tracks a single player's contribution within one round so we
@@ -151,8 +152,10 @@ type roundState struct {
 }
 
 type killedByEntry struct {
-	attackerID uint64
-	tick       int
+	attackerID   uint64
+	tick         int
+	attackerTeam common.Team // team of the killer (for trade validation)
+	victimTeam   common.Team // team of the victim
 }
 
 // ── Main parse function ───────────────────────────────────────────────────────
@@ -303,12 +306,15 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	})
 
 	p.RegisterEventHandler(func(e events.Kill) {
-		if cur == nil {
-			return
-		}
 		// NOTE: Do NOT check cur.isKnifeRound here — that flag is set at RoundEnd,
 		// which fires AFTER all Kill events for the round. Knife-round exclusion is
 		// handled in post-processing below.
+		//
+		// Do NOT return early when cur==nil. In CS2, kill events can fire slightly
+		// after RoundEnd due to grenade/fire damage resolving at the tick boundary.
+		// We still credit K/D/A to the global accumulators; we just skip the
+		// round-list and KAST bookkeeping which requires an active roundState.
+		// We suppress warmup kills by requiring at least one round to have fired.
 
 		gs := p.GameState()
 		tick := gs.IngameTick()
@@ -317,24 +323,41 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		victim := e.Victim
 		assister := e.Assister
 
+		// Warmup guard: if no round has ever started, ignore completely.
+		if cur == nil && len(completedRounds) == 0 {
+			return
+		}
+
 		// World kills (C4 explosion, fall damage): killer is nil or SteamID64==0.
 		// The victim still gets a death; there's no killer credit or kill list entry.
 		isWorldKill := killer == nil || killer.SteamID64 == 0
-
 		if isWorldKill {
 			if victim != nil && victim.SteamID64 != 0 {
 				if va := getOrCreate(victim); va != nil {
 					va.deaths++
 				}
-				cur.victims[victim.SteamID64] = true
-				getContrib(cur, victim.SteamID64).deaths++
+				if cur != nil {
+					cur.victims[victim.SteamID64] = true
+					cur.killedBy[victim.SteamID64] = killedByEntry{tick: tick}
+					getContrib(cur, victim.SteamID64).deaths++
+				}
 			}
 			return
 		}
 
-		// True self-kills (fall damage etc. where killer == victim): skip entirely.
-		// FACEIT does not count self-kills as deaths, so neither do we.
+		// Self-kills (fall damage where attacker==victim in the event): the victim
+		// gets a death but the killer receives no credit. FACEIT counts self-kill
+		// deaths in the death column.
 		if victim == nil || victim.SteamID64 == 0 || killer.SteamID64 == victim.SteamID64 {
+			if victim != nil && victim.SteamID64 != 0 {
+				if va := getOrCreate(victim); va != nil {
+					va.deaths++
+				}
+				if cur != nil {
+					cur.victims[victim.SteamID64] = true
+					getContrib(cur, victim.SteamID64).deaths++
+				}
+			}
 			return
 		}
 
@@ -344,9 +367,16 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		if va := getOrCreate(victim); va != nil {
 			va.deaths++
 		}
-		cur.victims[victim.SteamID64] = true
-		cur.killedBy[victim.SteamID64] = killedByEntry{attackerID: killer.SteamID64, tick: tick}
-		getContrib(cur, victim.SteamID64).deaths++
+		if cur != nil {
+			cur.victims[victim.SteamID64] = true
+			cur.killedBy[victim.SteamID64] = killedByEntry{
+				attackerID:   killer.SteamID64,
+				tick:         tick,
+				attackerTeam: killer.Team,
+				victimTeam:   victim.Team,
+			}
+			getContrib(cur, victim.SteamID64).deaths++
+		}
 
 		// Killer stats (cross-team only)
 		if crossTeam {
@@ -356,21 +386,34 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 					ka.headshots++
 				}
 			}
-			cur.killers[killer.SteamID64] = true
-			kc := getContrib(cur, killer.SteamID64)
-			kc.kills++
-			if e.IsHeadshot {
-				kc.headshots++
+			if cur != nil {
+				cur.killers[killer.SteamID64] = true
+				kc := getContrib(cur, killer.SteamID64)
+				kc.kills++
+				if e.IsHeadshot {
+					kc.headshots++
+				}
 			}
 		}
 
-		// Assist (cross-team only)
+		// Assist (cross-team only). e.AssisterFlashAssist flags whether the assister
+		// earned credit through a flash rather than damage assist.
 		if crossTeam && assister != nil && assister.SteamID64 != 0 {
 			if aa := getOrCreate(assister); aa != nil {
 				aa.assists++
+				if e.AssistedFlash {
+					aa.flashAssists++
+				}
 			}
-			cur.assisters[assister.SteamID64] = true
-			getContrib(cur, assister.SteamID64).assists++
+			if cur != nil {
+				cur.assisters[assister.SteamID64] = true
+				getContrib(cur, assister.SteamID64).assists++
+			}
+		}
+
+		// Round kill-list and time calculation require an active round.
+		if cur == nil {
+			return
 		}
 
 		timeInRound := 0.0
@@ -566,7 +609,11 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		for victimID, kb := range rnd.killedBy {
 			if rnd.victims[kb.attackerID] {
 				if atkKb, ok := rnd.killedBy[kb.attackerID]; ok && atkKb.tick > kb.tick {
-					traded[victimID] = true
+					// Only count as a trade if the person who killed the attacker
+					// was on the original victim's team (rules out TK chains etc.).
+					if atkKb.attackerTeam == kb.victimTeam {
+						traded[victimID] = true
+					}
 				}
 			}
 		}
@@ -623,7 +670,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 			KAST:               kast,
 			Rating:             rating,
 			UtilityDamage:      a.utilDmg,
-			FlashAssists:       0,
+			FlashAssists:       a.flashAssists,
 			MVPs:               a.mvps,
 			RoundsPlayed:       nonKnifeRounds,
 		})
@@ -725,7 +772,7 @@ func isKnifeWeapon(w string) bool {
 		"Flip Knife", "Falchion Knife", "Bowie Knife", "Butterfly Knife",
 		"Shadow Daggers", "Huntsman Knife", "Navaja Knife", "Stiletto Knife",
 		"Talon Knife", "Ursus Knife", "Classic Knife", "Paracord Knife",
-		"Survival Knife", "Nomad Knife", "Skeleton Knife":
+		"Survival Knife", "Nomad Knife", "Skeleton Knife", "Kukri Knife":
 		return true
 	}
 	return false
