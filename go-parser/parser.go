@@ -573,7 +573,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		team2Name = "CT-Side"
 	}
 
-	totalRounds := len(completedRounds)
+	totalRounds := len(completedRounds) // includes knife rounds; use nonKnifeRounds for display
 
 	// ── Assign player starting teams ─────────────────────────────────────────
 	for _, pl := range p.GameState().Participants().All() {
@@ -740,8 +740,8 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 			Team2:       team2Name,
 			ScoreTeam1:  score1,
 			ScoreTeam2:  score2,
-			Duration:    totalRounds * 90,
-			TotalRounds: totalRounds,
+			Duration:    nonKnifeRounds * 90,
+			TotalRounds: nonKnifeRounds,
 		},
 		Rounds:   outRounds,
 		Players:  players,
