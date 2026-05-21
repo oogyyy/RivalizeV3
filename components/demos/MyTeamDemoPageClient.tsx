@@ -229,7 +229,7 @@ function OverviewTab({
               </p>
               <p className="text-xs text-muted-foreground mb-1">Rating</p>
               <p className="text-sm text-muted-foreground">{mvp.kills}K / {mvp.deaths}D / {mvp.assists}A</p>
-              <p className="text-sm text-muted-foreground">ADR {mvp.adr.toFixed(1)} · HS {mvp.headshot_percentage}%</p>
+              <p className="text-sm text-muted-foreground">ADR {mvp.adr.toFixed(1)} · HS {mvp.headshot_percentage.toFixed(2)}%</p>
             </CardContent>
           </Card>
         )}
@@ -245,7 +245,7 @@ function OverviewTab({
               <p className="text-3xl font-black font-mono mt-2 text-yellow-400">{topFrag.kills}</p>
               <p className="text-xs text-muted-foreground mb-1">Kills</p>
               <p className="text-sm text-muted-foreground">K/D {(topFrag.kills / Math.max(topFrag.deaths, 1)).toFixed(2)} · ADR {topFrag.adr.toFixed(1)}</p>
-              <p className="text-sm text-muted-foreground">HS {topFrag.headshot_percentage}% · Rating {topFrag.rating.toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground">HS {topFrag.headshot_percentage.toFixed(2)}% · Rating {topFrag.rating.toFixed(2)}</p>
             </CardContent>
           </Card>
         )}

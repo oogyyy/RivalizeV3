@@ -767,7 +767,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     const headshots = hsMap.get(sid)      ?? 0
     const mvps      = mvpMap.get(sid)     ?? 0
 
-    const hsPercent   = kills > 0 ? Math.round((headshots / kills) * 100) : 0
+    const hsPercent   = kills > 0 ? Math.round((headshots / kills) * 10000) / 100 : 0
     const totalDmg    = damageMap.get(sid) ?? 0
     const adr         = totalRounds > 0 ? Math.round(totalDmg / totalRounds) : 0
     const kastRounds  = kastRoundCount.get(sid) ?? 0

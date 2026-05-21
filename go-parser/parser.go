@@ -86,7 +86,7 @@ type PlayerStat struct {
 	Deaths             int     `json:"deaths"`
 	Assists            int     `json:"assists"`
 	Headshots          int     `json:"headshots"`
-	HeadshotPercentage int     `json:"headshot_percentage"`
+	HeadshotPercentage float64 `json:"headshot_percentage"`
 	ADR                float64 `json:"adr"`
 	KAST               int     `json:"kast"`
 	Rating             float64 `json:"rating"`
@@ -642,9 +642,9 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 			continue
 		}
 
-		hsPercent := 0
+		hsPercent := 0.0
 		if a.kills > 0 {
-			hsPercent = int(math.Round(float64(a.headshots) / float64(a.kills) * 100))
+			hsPercent = math.Round(float64(a.headshots)/float64(a.kills)*10000) / 100
 		}
 		// ADR and KAST use nonKnifeRounds to match FACEIT's denominator
 		adr := 0.0

@@ -145,7 +145,7 @@ export default function PlayerStatsTable({ players, highlightTeam }: PlayerStats
                 </td>
                 {/* HS% */}
                 <td className="px-4 py-3 text-center font-mono">
-                  <span className="text-muted-foreground">{formatPercent(player.headshot_percentage)}</span>
+                  <span className="text-muted-foreground">{formatPercent(player.headshot_percentage, 2)}</span>
                 </td>
                 {/* UD */}
                 <td className="px-4 py-3 text-center font-mono">
