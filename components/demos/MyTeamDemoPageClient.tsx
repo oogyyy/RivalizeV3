@@ -10,10 +10,12 @@ import PlayerStatsTable from '@/components/demos/PlayerStatsTable'
 import { ReparseProgress } from '@/components/demos/ReparseProgress'
 import RoundTimeline from '@/components/demos/RoundTimeline'
 import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
+import ReplayCanvas from '@/components/demos/ReplayCanvas'
 import {
   Trophy, Crosshair, Target, Shield, Zap, TrendingUp,
   BarChart3, Map, Clock, Brain, ArrowLeft, RefreshCw,
   Loader2, ArrowRight, ChevronDown, ChevronUp, Copy, Check,
+  Play, Box,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Demo, ParsedDemoData, PlayerStats } from '@/types/database'
@@ -22,7 +24,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts'
 
-type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy'
+type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy' | 'replay' | '3d'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'overview',  label: 'Overview',       icon: <BarChart3 size={14} /> },
@@ -30,6 +32,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'rounds',    label: 'Round Timeline', icon: <Clock size={14} /> },
   { id: 'heatmap',   label: 'Heatmap',        icon: <Map size={14} /> },
   { id: 'economy',   label: 'Economy',        icon: <TrendingUp size={14} /> },
+  { id: 'replay',    label: '2D Replay',      icon: <Play size={14} /> },
+  { id: '3d',        label: '3D Replay',      icon: <Box size={14} /> },
 ]
 
 const AI_ACTIONS = [
@@ -689,6 +693,8 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                           <HeatmapCanvas
                             points={parsed.heatmap_data}
                             mapName={parsed.header.map}
+                            team1Name={myRawTeam}
+                            team2Name={oppRawTeam}
                             width={512}
                             height={512}
                           />
@@ -711,6 +717,46 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                     myRawTeam={myRawTeam}
                     oppRawTeam={oppRawTeam}
                   />
+                )}
+
+                {activeTab === 'replay' && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Play size={16} className="text-neon-green" />
+                        2D Kill Replay
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ReplayCanvas
+                        rounds={parsed.rounds ?? []}
+                        players={parsed.players ?? []}
+                        team1Name={myRawTeam}
+                        team2Name={oppRawTeam}
+                        mapName={parsed.header.map}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {activeTab === '3d' && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Box size={16} className="text-neon-green" />
+                        3D Replay
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                        <Box size={40} className="text-muted-foreground/40" />
+                        <p className="font-semibold text-foreground">3D Replay — Coming Soon</p>
+                        <p className="text-sm text-muted-foreground max-w-sm">
+                          Interactive 3D map replay with player movement paths and utility trajectories is in development.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
             </div>

@@ -106,7 +106,7 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
       rounds_played:      p.rounds_played,
     })),
     events: [],
-    heatmap_data: [],
+    heatmap_data: buildHeatmapData(parsedData.rounds, parsedData.players),
   }
 
   return {
@@ -168,4 +168,48 @@ interface GoPlayer {
   flash_assists:       number
   mvps:                number
   rounds_played:       number
+}
+
+// ── Heatmap generation ────────────────────────────────────────────────────────
+// CS2 coordinates are in game units (roughly -3500 to +3500 per axis depending
+// on the map). We normalise all positions to the 0–1024 range that HeatmapCanvas
+// expects by computing min/max from the actual kill data in this match.
+
+function buildHeatmapData(
+  rounds: ParsedDemoData['rounds'],
+  players: ParsedDemoData['players'],
+): ParsedDemoData['heatmap_data'] {
+  const allKills = rounds.flatMap(r => r.kills ?? [])
+  if (allKills.length === 0) return []
+
+  const teamOf = new Map<string, string>()
+  players.forEach(p => teamOf.set(p.name, p.team))
+
+  const xs = allKills.flatMap(k => [k.killer_x, k.victim_x])
+  const ys = allKills.flatMap(k => [k.killer_y, k.victim_y])
+  const minX = Math.min(...xs), maxX = Math.max(...xs)
+  const minY = Math.min(...ys), maxY = Math.max(...ys)
+  const PAD = 60, SCALE = 1024 - PAD * 2
+
+  const norm = (v: number, min: number, max: number, flip = false) => {
+    const n = max === min ? 0.5 : (v - min) / (max - min)
+    return PAD + (flip ? 1 - n : n) * SCALE
+  }
+
+  const points: NonNullable<ParsedDemoData['heatmap_data']> = []
+  allKills.forEach(k => {
+    points.push({
+      x: norm(k.killer_x, minX, maxX),
+      y: norm(k.killer_y, minY, maxY, true),
+      type: 'kill',
+      team: teamOf.get(k.killer_name) ?? '',
+    })
+    points.push({
+      x: norm(k.victim_x, minX, maxX),
+      y: norm(k.victim_y, minY, maxY, true),
+      type: 'death',
+      team: teamOf.get(k.victim_name) ?? '',
+    })
+  })
+  return points
 }
