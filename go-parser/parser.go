@@ -54,15 +54,15 @@ type DemoHeader struct {
 }
 
 type Round struct {
-	Number       int     `json:"number"`
-	Winner       string  `json:"winner"`
-	WinReason    string  `json:"win_reason"`
-	Duration     int     `json:"duration"`
-	Team1Economy int     `json:"team1_economy"`
-	Team2Economy int     `json:"team2_economy"`
-	BombPlanted  bool    `json:"bomb_planted"`
-	BombDefused  bool    `json:"bomb_defused"`
-	Kills        []Kill  `json:"kills"`
+	Number       int    `json:"number"`
+	Winner       string `json:"winner"`
+	WinReason    string `json:"win_reason"`
+	Duration     int    `json:"duration"`
+	Team1Economy int    `json:"team1_economy"`
+	Team2Economy int    `json:"team2_economy"`
+	BombPlanted  bool   `json:"bomb_planted"`
+	BombDefused  bool   `json:"bomb_defused"`
+	Kills        []Kill `json:"kills"`
 }
 
 type Kill struct {
@@ -117,18 +117,32 @@ type playerAccum struct {
 	kastRounds int
 }
 
+// roundContrib tracks a single player's contribution within one round so we
+// can subtract knife-round contributions from accums in post-processing.
+type roundContrib struct {
+	kills     int
+	deaths    int
+	assists   int
+	headshots int
+	dmg       int
+	utilDmg   int
+}
+
 // ── Internal per-round state ──────────────────────────────────────────────────
 
 type roundState struct {
-	startTick   int
-	endTick     int
-	winnerTeam  common.Team
-	winReason   events.RoundEndReason
-	team1Eco    int
-	team2Eco    int
-	bombPlanted bool
-	bombDefused bool
-	kills       []Kill
+	startTick    int
+	endTick      int
+	winnerTeam   common.Team
+	winReason    events.RoundEndReason
+	team1Eco     int
+	team2Eco     int
+	bombPlanted  bool
+	bombDefused  bool
+	isKnifeRound bool
+	kills        []Kill
+	// per-player contributions this round (for knife-round post-processing)
+	contribs map[uint64]*roundContrib
 	// KAST helpers
 	killers   map[uint64]bool
 	victims   map[uint64]bool
@@ -183,12 +197,24 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		return a
 	}
 
+	// getContrib returns (creating if needed) the per-round contribution tracker
+	// for the given player in the given round.
+	getContrib := func(r *roundState, sid uint64) *roundContrib {
+		if c, ok := r.contribs[sid]; ok {
+			return c
+		}
+		c := &roundContrib{}
+		r.contribs[sid] = c
+		return c
+	}
+
 	// ── Handlers ─────────────────────────────────────────────────────────────
 
 	p.RegisterEventHandler(func(e events.RoundStart) {
 		gs := p.GameState()
 		r := &roundState{
 			startTick: gs.IngameTick(),
+			contribs:  map[uint64]*roundContrib{},
 			killers:   map[uint64]bool{},
 			victims:   map[uint64]bool{},
 			assisters: map[uint64]bool{},
@@ -227,9 +253,6 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		cur.winReason = e.Reason
 
 		// ── MR12-aware score counting ──────────────────────────────────────────
-		// roundIdx is 0-based index of the round being completed.
-		// In the first half (rounds 0-11) T wins go to team1.
-		// After halftime the sides swap, so T wins go to team2, etc.
 		roundIdx := len(completedRounds)
 		if tWinsGoToTeam1(roundIdx) {
 			if e.Winner == common.TeamTerrorists {
@@ -246,8 +269,6 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		}
 
 		// ── Team name collection — first half only ─────────────────────────────
-		// Collecting from all rounds would mix post-halftime names (wrong team
-		// labeled as T or CT). First-half names are stable and unambiguous.
 		if roundIdx < regulationHalf {
 			if t := gs.TeamTerrorists(); t != nil {
 				n := strings.TrimSpace(t.ClanName())
@@ -261,6 +282,19 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 					ctNames[n]++
 				}
 			}
+		}
+
+		// Mark as knife round if every kill used a knife — detected at RoundEnd
+		// after all Kill events for this round have already fired.
+		if len(cur.kills) > 0 {
+			allKnife := true
+			for _, k := range cur.kills {
+				if !isKnifeWeapon(k.Weapon) {
+					allKnife = false
+					break
+				}
+			}
+			cur.isKnifeRound = allKnife
 		}
 
 		completedRounds = append(completedRounds, *cur)
@@ -283,6 +317,10 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		if cur == nil {
 			return
 		}
+		// NOTE: Do NOT check cur.isKnifeRound here — that flag is set at RoundEnd,
+		// which fires AFTER all Kill events for the round. Knife-round exclusion is
+		// handled in post-processing below.
+
 		gs := p.GameState()
 		tick := gs.IngameTick()
 
@@ -290,21 +328,45 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		victim := e.Victim
 		assister := e.Assister
 
-		if victim != nil && victim.SteamID64 != 0 {
-			if va := getOrCreate(victim); va != nil {
-				va.deaths++
-			}
-			cur.victims[victim.SteamID64] = true
-			if killer != nil && killer.SteamID64 != 0 && killer.SteamID64 != victim.SteamID64 {
-				cur.killedBy[victim.SteamID64] = killedByEntry{
-					attackerID: killer.SteamID64,
-					tick:       tick,
+		// World kills (C4 explosion, fall damage): killer is nil or SteamID64==0.
+		// The victim still gets a death; there's no killer credit or kill list entry.
+		isWorldKill := killer == nil || killer.SteamID64 == 0
+
+		if isWorldKill {
+			if victim != nil && victim.SteamID64 != 0 {
+				if va := getOrCreate(victim); va != nil {
+					va.deaths++
 				}
+				cur.victims[victim.SteamID64] = true
+				getContrib(cur, victim.SteamID64).deaths++
 			}
+			return
 		}
 
-		if killer != nil && killer.SteamID64 != 0 && victim != nil && victim.SteamID64 != 0 &&
-			killer.SteamID64 != victim.SteamID64 && killer.Team != victim.Team {
+		// True self-kills (same player ID): count as death, skip kill credit + list.
+		if victim == nil || victim.SteamID64 == 0 || killer.SteamID64 == victim.SteamID64 {
+			if victim != nil && victim.SteamID64 != 0 {
+				if va := getOrCreate(victim); va != nil {
+					va.deaths++
+				}
+				cur.victims[victim.SteamID64] = true
+				getContrib(cur, victim.SteamID64).deaths++
+			}
+			return
+		}
+
+		crossTeam := killer.Team != victim.Team
+
+		// Victim death
+		if va := getOrCreate(victim); va != nil {
+			va.deaths++
+		}
+		cur.victims[victim.SteamID64] = true
+		cur.killedBy[victim.SteamID64] = killedByEntry{attackerID: killer.SteamID64, tick: tick}
+		getContrib(cur, victim.SteamID64).deaths++
+
+		// Killer stats (cross-team only)
+		if crossTeam {
 			if ka := getOrCreate(killer); ka != nil {
 				ka.kills++
 				if e.IsHeadshot {
@@ -312,20 +374,20 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 				}
 			}
 			cur.killers[killer.SteamID64] = true
+			kc := getContrib(cur, killer.SteamID64)
+			kc.kills++
+			if e.IsHeadshot {
+				kc.headshots++
+			}
 		}
 
-		if assister != nil && assister.SteamID64 != 0 {
+		// Assist (cross-team only)
+		if crossTeam && assister != nil && assister.SteamID64 != 0 {
 			if aa := getOrCreate(assister); aa != nil {
 				aa.assists++
 			}
 			cur.assisters[assister.SteamID64] = true
-		}
-
-		// Skip self-kills (fall damage, world kills) — they corrupt stats and heatmaps
-		isSelfKill := killer == nil || victim == nil || killer.SteamID64 == 0 || victim.SteamID64 == 0 ||
-			killer.SteamID64 == victim.SteamID64
-		if isSelfKill {
-			return
+			getContrib(cur, assister.SteamID64).assists++
 		}
 
 		timeInRound := 0.0
@@ -347,6 +409,10 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	})
 
 	p.RegisterEventHandler(func(e events.PlayerHurt) {
+		if cur == nil {
+			return
+		}
+		// NOTE: Knife-round exclusion handled in post-processing, not here.
 		if e.Attacker == nil || e.Player == nil {
 			return
 		}
@@ -365,8 +431,11 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 			dmg = 100
 		}
 		atk.totalDmg += dmg
+		rc := getContrib(cur, e.Attacker.SteamID64)
+		rc.dmg += dmg
 		if e.Weapon != nil && e.Weapon.Class() == common.EqClassGrenade {
 			atk.utilDmg += dmg
+			rc.utilDmg += dmg
 		}
 	})
 
@@ -411,6 +480,29 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		}
 	}
 
+	// ── Post-process: subtract knife-round contributions ──────────────────────
+	// Kill/PlayerHurt handlers fire DURING the round, before isKnifeRound is set
+	// at RoundEnd. We tracked per-round per-player contributions so we can undo
+	// knife-round stats here, after all rounds are complete.
+	nonKnifeRounds := 0
+	for i := range completedRounds {
+		rnd := &completedRounds[i]
+		if rnd.isKnifeRound {
+			for sid, contrib := range rnd.contribs {
+				if a, ok := accums[sid]; ok {
+					a.kills -= contrib.kills
+					a.deaths -= contrib.deaths
+					a.assists -= contrib.assists
+					a.headshots -= contrib.headshots
+					a.totalDmg -= contrib.dmg
+					a.utilDmg -= contrib.utilDmg
+				}
+			}
+		} else {
+			nonKnifeRounds++
+		}
+	}
+
 	// ── Resolve team names ────────────────────────────────────────────────────
 
 	team1Name := mostCommon(tNames) // original T-starters
@@ -425,10 +517,6 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	totalRounds := len(completedRounds)
 
 	// ── Assign player starting teams ─────────────────────────────────────────
-	// At parse end, players are on their current (possibly post-halftime) side.
-	// For regulation games (≤24 rounds), if more than 12 rounds completed the
-	// teams have swapped, so we flip current team → starting team.
-	// OT (>24 rounds) is not adjusted — acceptable known limitation.
 	for _, pl := range p.GameState().Participants().All() {
 		if pl.SteamID64 == 0 {
 			continue
@@ -440,7 +528,6 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		currentTeam := pl.Team
 		startTeam := currentTeam
 		if totalRounds > regulationHalf && totalRounds <= regulationHalf*2 {
-			// Regulation second half: flip to get starting side
 			if currentTeam == common.TeamTerrorists {
 				startTeam = common.TeamCounterTerrorists
 			} else if currentTeam == common.TeamCounterTerrorists {
@@ -456,9 +543,12 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		}
 	}
 
-	// ── KAST ─────────────────────────────────────────────────────────────────
+	// ── KAST (excludes knife rounds) ─────────────────────────────────────────
 
 	for _, rnd := range completedRounds {
+		if rnd.isKnifeRound {
+			continue
+		}
 		traded := map[uint64]bool{}
 		for victimID, kb := range rnd.killedBy {
 			if rnd.victims[kb.attackerID] {
@@ -493,18 +583,18 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		if a.kills > 0 {
 			hsPercent = int(math.Round(float64(a.headshots) / float64(a.kills) * 100))
 		}
-		// ADR: one decimal place for precision matching reference stat sites
+		// ADR and KAST use nonKnifeRounds to match FACEIT's denominator
 		adr := 0.0
-		if totalRounds > 0 {
-			adr = math.Round(float64(a.totalDmg)/float64(totalRounds)*10) / 10
+		if nonKnifeRounds > 0 {
+			adr = math.Round(float64(a.totalDmg)/float64(nonKnifeRounds)*10) / 10
 		}
 		kast := 0
-		if totalRounds > 0 {
-			kast = int(math.Round(float64(a.kastRounds) / float64(totalRounds) * 100))
+		if nonKnifeRounds > 0 {
+			kast = int(math.Round(float64(a.kastRounds) / float64(nonKnifeRounds) * 100))
 		}
 		kd := float64(a.kills) / math.Max(float64(a.deaths), 1)
 		rating := math.Round(math.Max(0.3, math.Min(2.5,
-			kd*0.38+adr/100.0*0.42+0.317+float64(a.mvps)/math.Max(float64(totalRounds), 1)*0.1,
+			kd*0.38+adr/100.0*0.42+0.317+float64(a.mvps)/math.Max(float64(nonKnifeRounds), 1)*0.1,
 		))*100) / 100
 
 		players = append(players, PlayerStat{
@@ -522,7 +612,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 			UtilityDamage:      a.utilDmg,
 			FlashAssists:       0,
 			MVPs:               a.mvps,
-			RoundsPlayed:       totalRounds,
+			RoundsPlayed:       nonKnifeRounds,
 		})
 	}
 
@@ -534,7 +624,6 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 
 	var outRounds []Round
 	for i, rnd := range completedRounds {
-		// Use the same MR12 logic to determine the winner team name
 		var winner string
 		if tWinsGoToTeam1(i) {
 			if rnd.winnerTeam == common.TeamTerrorists {
@@ -605,6 +694,18 @@ func isRealTeamName(n string) bool {
 		}
 	}
 	return true
+}
+
+func isKnifeWeapon(w string) bool {
+	switch w {
+	case "Knife", "Knife T", "Bayonet", "Karambit", "M9 Bayonet", "Gut Knife",
+		"Flip Knife", "Falchion Knife", "Bowie Knife", "Butterfly Knife",
+		"Shadow Daggers", "Huntsman Knife", "Navaja Knife", "Stiletto Knife",
+		"Talon Knife", "Ursus Knife", "Classic Knife", "Paracord Knife",
+		"Survival Knife", "Nomad Knife", "Skeleton Knife":
+		return true
+	}
+	return false
 }
 
 // mostCommon returns the most frequently occurring key in a count map.
