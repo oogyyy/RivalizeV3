@@ -906,7 +906,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     }),
     players,
     events:       [],
-    heatmap_data: buildHeatmapFromRounds(rounds, players),
+    heatmap_data: [],
     _debug: {
       matchEndTick,
       preMatchEndTick,
@@ -919,6 +919,7 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       players: debugPlayers,
     },
   }
+  parsedData.heatmap_data = buildHeatmapFromRounds(parsedData.rounds, parsedData.players)
 
   return { parsedData, warnings }
 }
