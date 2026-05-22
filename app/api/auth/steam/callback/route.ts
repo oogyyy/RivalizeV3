@@ -3,21 +3,32 @@ import { createClient } from '@/lib/supabase/server'
 
 const STEAM_ID_PATTERN = /^https:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/
 
-function getBaseUrl(req: NextRequest): string {
+// Extract the app origin from the openid.return_to param that Steam echoes
+// back — it contains the exact URL the initiator sent, so this is the most
+// reliable way to get the correct public host regardless of proxy headers or
+// missing NEXT_PUBLIC_APP_URL.
+function getAppUrl(params: URLSearchParams, req: NextRequest): string {
+  const returnTo = params.get('openid.return_to')
+  if (returnTo) {
+    try {
+      const u = new URL(returnTo)
+      return `${u.protocol}//${u.host}`
+    } catch { /* fall through */ }
+  }
   if (process.env.NEXT_PUBLIC_APP_URL) {
     return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
   }
-  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
-  const host  = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost:3000'
+  const proto = (req.headers.get('x-forwarded-proto') ?? 'https').split(',')[0].trim()
+  const host  = (req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost:3000').split(',')[0].trim()
   return `${proto}://${host}`
 }
 
 // Receives Steam OpenID callback, validates it, extracts the Steam64 ID,
 // and saves it to the user's profile.
 export async function GET(req: NextRequest) {
-  const appUrl = getBaseUrl(req)
   const url    = new URL(req.url)
   const params = url.searchParams
+  const appUrl = getAppUrl(params, req)
 
   // Must be a positive assertion
   if (params.get('openid.mode') !== 'id_res') {
