@@ -1,18 +1,17 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import {
   Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle,
-  Info, RefreshCw, Users, Shield,
+  Info, RefreshCw,
 } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
 const LARGE_FILE_THRESHOLD = 300 * 1024 * 1024 // 300 MB
 const MAX_FILE_SIZE        = 500 * 1024 * 1024 // 500 MB
-const MAX_POLL_ATTEMPTS    = 40  // 40 × 3 s = 2 min timeout
 
 interface DemoUploadButtonProps {
   teamId: string
@@ -32,17 +31,6 @@ interface FileUpload {
   error?: string
   demoId?: string
 }
-
-// Team data extracted from parsed demo — shown in the post-parse selection step.
-interface ParsedTeamInfo {
-  team1: { name: string; players: string[]; score: number; startSide: 'T' | 'CT' }
-  team2: { name: string; players: string[]; score: number; startSide: 'T' | 'CT' }
-  map: string
-}
-
-// Phase progression for self-demo post-upload team selection:
-//   idle → polling → selecting → saving → confirmed
-type PostUploadPhase = 'idle' | 'polling' | 'selecting' | 'saving' | 'confirmed'
 
 function isValidDemoFile(name: string) {
   const lower = name.toLowerCase()
@@ -74,15 +62,6 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   const [isProcessing, setIsProcessing] = useState(false)
   const [opponentName, setOpponentName] = useState('')
 
-  // Post-upload team selection state (self-demos only)
-  const [postUploadPhase, setPostUploadPhase]   = useState<PostUploadPhase>('idle')
-  const [parsedTeamInfo, setParsedTeamInfo]     = useState<ParsedTeamInfo | null>(null)
-  // 'team2' default: CT-Side is typically the user's team in GOTV recordings
-  const [userTeamChoice, setUserTeamChoice]     = useState<'team1' | 'team2'>('team2')
-  const pollTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pollCountRef  = useRef(0)
-  const doneIdsRef    = useRef<string[]>([])  // demo IDs that were uploaded successfully
-
   const updateUpload = useCallback(
     (index: number, update: Partial<FileUpload>) =>
       setUploads(prev => prev.map((u, i) => (i === index ? { ...u, ...update } : u))),
@@ -90,7 +69,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   )
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const valid    = acceptedFiles.filter(f => isValidDemoFile(f.name) && f.size <= MAX_FILE_SIZE)
+    const valid     = acceptedFiles.filter(f => isValidDemoFile(f.name) && f.size <= MAX_FILE_SIZE)
     const oversized = acceptedFiles.filter(f => f.size > MAX_FILE_SIZE)
     setUploads(prev => [
       ...prev,
@@ -113,116 +92,6 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
     setUploads(prev =>
       prev.map(u => u.status === 'error' ? { ...u, status: 'pending', progress: 0, error: undefined } : u)
     )
-
-  // ── Polling helpers ─────────────────────────────────────────────────────────
-
-  const FALLBACK_TEAMS: ParsedTeamInfo = {
-    team1: { name: 'Team 1',  players: [], score: 0, startSide: 'T' },
-    team2: { name: 'Team 2', players: [], score: 0, startSide: 'CT' },
-    map: '',
-  }
-
-  const startPolling = useCallback((firstDemoId: string) => {
-    setPostUploadPhase('polling')
-    pollCountRef.current = 0
-
-    const poll = async () => {
-      pollCountRef.current++
-
-      if (pollCountRef.current > MAX_POLL_ATTEMPTS) {
-        // Timed out — fall back to generic names so the user can still pick a side
-        setParsedTeamInfo(FALLBACK_TEAMS)
-        setPostUploadPhase('selecting')
-        return
-      }
-
-      try {
-        const res = await fetch(`/api/demos/${firstDemoId}`)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
-
-        if (data.status === 'completed' && data.parsed_data?.header) {
-          const h  = data.parsed_data.header
-          const ps = (data.parsed_data.players ?? []) as Array<{
-            name: string; team: string; rating: number
-          }>
-
-          // The parser stores "T-Side"/"CT-Side" as fallbacks when no clan tag
-          // is found — those are not real team names so we replace them.
-          const resolveTeamName = (raw: string | undefined, fallback: string) => {
-            if (!raw || raw === 'T-Side' || raw === 'CT-Side') return fallback
-            return raw
-          }
-
-          const team1Name = resolveTeamName(h.team1, 'Team 1')
-          const team2Name = resolveTeamName(h.team2, 'Team 2')
-
-          const t1Players = ps
-            .filter(p => p.team === h.team1 || p.team === team1Name || p.team === 'T-Side')
-            .sort((a, b) => b.rating - a.rating)
-            .slice(0, 5)
-            .map(p => p.name)
-
-          const t2Players = ps
-            .filter(p => p.team === h.team2 || p.team === team2Name || p.team === 'CT-Side')
-            .sort((a, b) => b.rating - a.rating)
-            .slice(0, 5)
-            .map(p => p.name)
-
-          setParsedTeamInfo({
-            team1: {
-              name:      team1Name,
-              players:   t1Players,
-              score:     h.score_team1 ?? 0,
-              startSide: 'T',
-            },
-            team2: {
-              name:      team2Name,
-              players:   t2Players,
-              score:     h.score_team2 ?? 0,
-              startSide: 'CT',
-            },
-            map: h.map || '',
-          })
-          setPostUploadPhase('selecting')
-        } else if (data.status === 'failed') {
-          setParsedTeamInfo(FALLBACK_TEAMS)
-          setPostUploadPhase('selecting')
-        } else {
-          // Still processing — schedule next poll
-          pollTimerRef.current = setTimeout(poll, 3000)
-        }
-      } catch {
-        pollTimerRef.current = setTimeout(poll, 3000)
-      }
-    }
-
-    poll()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Saves the user's team choice by PATCHing all uploaded demos
-  const saveTeamSelection = async () => {
-    setPostUploadPhase('saving')
-
-    // user chose 'team1' (T-Side) → opponent is team2 (CT-Side), so opponentSide = 'team2'
-    // user chose 'team2' (CT-Side) → opponent is team1 (T-Side), so opponentSide = 'team1'
-    const opponentSide: 'team1' | 'team2' = userTeamChoice === 'team1' ? 'team2' : 'team1'
-
-    await Promise.all(
-      doneIdsRef.current.map(id =>
-        fetch(`/api/demos/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ opponentSide }),
-        })
-      )
-    )
-
-    setPostUploadPhase('confirmed')
-    onSuccess?.()
-    router.refresh()
-  }
 
   // ── Upload logic ─────────────────────────────────────────────────────────────
 
@@ -258,8 +127,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
           map: 'unknown',
           fileSize: file.size,
           demoType,
-          // Self-demos: default opponentSide = 'team1' (user is CT-Side/team2).
-          // The real choice is captured after parsing in the team-selection step.
+          // Self-demos default to team2 (CT-Side) as "my team"; adjust via the demo card selector.
           ...(demoType === 'self' && { opponentSide: 'team1' }),
         }),
       })
@@ -288,40 +156,20 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
       .map((u, i) => ({ file: u.file, index: i, status: u.status }))
       .filter(u => u.status === 'pending')
 
-    const successIds: string[] = []
     for (const { file, index } of pending) {
-      const demoId = await uploadOne(index, file)
-      if (demoId) successIds.push(demoId)
+      await uploadOne(index, file)
     }
 
     setIsProcessing(false)
-
-    if (successIds.length > 0) {
-      doneIdsRef.current = successIds
-      if (demoType === 'self') {
-        // Start polling the first uploaded demo to get real team names
-        startPolling(successIds[0])
-      } else {
-        onSuccess?.()
-        router.refresh()
-      }
-    }
+    onSuccess?.()
+    router.refresh()
   }
 
   const handleClose = () => {
-    if (isProcessing || postUploadPhase === 'saving') return
-    if (pollTimerRef.current) {
-      clearTimeout(pollTimerRef.current)
-      pollTimerRef.current = null
-    }
+    if (isProcessing) return
     setOpen(false)
     setUploads([])
     setOpponentName('')
-    setPostUploadPhase('idle')
-    setParsedTeamInfo(null)
-    setUserTeamChoice('team2')
-    doneIdsRef.current = []
-    pollCountRef.current = 0
   }
 
   // ── Derived display values ───────────────────────────────────────────────────
@@ -345,14 +193,6 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
     }
   }
 
-  const modalTitle = () => {
-    if (postUploadPhase === 'polling')   return 'Analysing Demo…'
-    if (postUploadPhase === 'selecting') return 'Which Team Is Yours?'
-    if (postUploadPhase === 'saving')    return 'Saving Selection…'
-    if (postUploadPhase === 'confirmed') return 'All Done!'
-    return demoType === 'self' ? 'Upload My Team Demos' : 'Upload Opponent Demo'
-  }
-
   // ── Render ───────────────────────────────────────────────────────────────────
 
   if (!open) {
@@ -371,392 +211,199 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
         {/* Modal header */}
         <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card z-10">
           <div>
-            <h2 className="text-lg font-bold text-foreground">{modalTitle()}</h2>
-            {postUploadPhase === 'idle' && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                .dem / .zst files · up to 500 MB per file
-              </p>
-            )}
-            {postUploadPhase === 'polling' && parsedTeamInfo === null && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Extracting team names and player data…
-              </p>
-            )}
+            <h2 className="text-lg font-bold text-foreground">
+              {demoType === 'self' ? 'Upload My Team Demos' : 'Upload Opponent Demo'}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              .dem / .zst files · up to 500 MB per file
+            </p>
           </div>
           <button
             onClick={handleClose}
-            disabled={isProcessing || postUploadPhase === 'saving'}
+            disabled={isProcessing}
             className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* ── Post-parse views (self-demos only) ───────────────────────── */}
-
-        {postUploadPhase === 'polling' && (
-          <div className="p-8 flex flex-col items-center gap-4 text-center">
-            <div className="w-14 h-14 rounded-full bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
-              <Loader2 size={24} className="text-neon-green animate-spin" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Parsing your demo</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                We&apos;re extracting team names and player stats. This usually takes 30–60 seconds for large demos.
+        <div className="p-5 space-y-5">
+          {/* Step 1 — Opponent name (opponent flow only) */}
+          {demoType === 'opponent' && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
+                  STEP 1
+                </span>
+                <span className="text-xs font-semibold text-foreground">Who are you scouting?</span>
+              </div>
+              <input
+                type="text"
+                value={opponentName}
+                onChange={e => setOpponentName(e.target.value)}
+                placeholder="e.g. NAVI, Astralis, Team Liquid…"
+                disabled={isProcessing}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00ff87] disabled:opacity-50"
+              />
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Info size={10} className="shrink-0" />
+                After upload, you can set which team is the opponent from the demo row.
               </p>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <div className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
-              <div className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse [animation-delay:0.2s]" />
-              <div className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse [animation-delay:0.4s]" />
-            </div>
-          </div>
-        )}
+          )}
 
-        {postUploadPhase === 'selecting' && parsedTeamInfo && (
-          <div className="p-5 space-y-5">
-            <div className="space-y-1">
-              <p className="text-sm text-foreground">
-                We found two teams in this demo
-                {parsedTeamInfo.map ? ` on ${parsedTeamInfo.map}` : ''}.
-              </p>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Users size={11} className="shrink-0 text-neon-green" />
-                Select the team you were <span className="font-medium text-foreground mx-0.5">playing as</span> so we show only your stats.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {(['team1', 'team2'] as const).map(side => {
-                const t       = parsedTeamInfo[side]
-                const other   = parsedTeamInfo[side === 'team1' ? 'team2' : 'team1']
-                const isSelected  = userTeamChoice === side
-                const isSuggested = side === 'team2'  // CT-Side is the typical GOTV default
-                const isWinner    = t.score > other.score
-
-                return (
-                  <button
-                    key={side}
-                    type="button"
-                    onClick={() => setUserTeamChoice(side)}
-                    className={cn(
-                      'w-full text-left rounded-xl border-2 p-5 transition-all',
-                      isSelected
-                        ? 'border-[#00ff87] bg-[#00ff87]/5'
-                        : 'border-border bg-background/50 hover:border-[#00ff87]/40'
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        {/* Team name + badges row */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Shield
-                            size={14}
-                            className={isSelected ? 'text-[#00ff87]' : 'text-muted-foreground'}
-                          />
-                          <span className={cn(
-                            'text-base font-bold',
-                            isSelected ? 'text-[#00ff87]' : 'text-foreground'
-                          )}>
-                            {t.name}
-                          </span>
-                          {isSuggested && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-neon-green/10 text-neon-green border border-neon-green/20 shrink-0">
-                              Recommended
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Player list */}
-                        {t.players.length > 0 ? (
-                          <ul className="mt-2 space-y-0.5">
-                            {t.players.map(name => (
-                              <li key={name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <span className="w-1 h-1 rounded-full bg-muted-foreground/40 shrink-0" />
-                                {name}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-[11px] text-muted-foreground mt-2 italic">
-                            Player names available after analysis
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Score block */}
-                      <div className="shrink-0 text-right flex flex-col items-end gap-1">
-                        {t.score === 0 && other.score === 0 ? (
-                          <p className="text-xs text-muted-foreground italic">score N/A</p>
-                        ) : (
-                          <>
-                            <div className="flex items-baseline gap-1 font-mono">
-                              <span className={cn(
-                                'text-2xl font-bold',
-                                isWinner
-                                  ? isSelected ? 'text-[#00ff87]' : 'text-foreground'
-                                  : 'text-muted-foreground'
-                              )}>
-                                {t.score}
-                              </span>
-                              <span className="text-sm text-muted-foreground">:</span>
-                              <span className={cn(
-                                'text-2xl font-bold',
-                                !isWinner
-                                  ? isSelected ? 'text-[#00ff87]' : 'text-foreground'
-                                  : 'text-muted-foreground'
-                              )}>
-                                {other.score}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground">
-                              {isWinner ? 'W' : t.score === other.score ? 'Draw' : 'L'}
-                            </p>
-                          </>
-                        )}
-                        {isSelected && (
-                          <CheckCircle2 size={16} className="text-[#00ff87] mt-1" />
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-
-            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-              <Info size={10} className="shrink-0" />
-              In most demos, the team you were playing on appears as the second team.
-            </p>
-
-            <div className="flex justify-end pt-1 border-t border-border">
-              <Button
-                variant="neon"
-                size="sm"
-                onClick={saveTeamSelection}
-                className="gap-2"
-              >
-                <CheckCircle2 size={14} />
-                Save &amp; Close
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {(postUploadPhase === 'saving') && (
-          <div className="p-8 flex flex-col items-center gap-3 text-center">
-            <Loader2 size={28} className="text-neon-green animate-spin" />
-            <p className="text-sm text-muted-foreground">Saving your team selection…</p>
-          </div>
-        )}
-
-        {postUploadPhase === 'confirmed' && (
-          <div className="p-8 flex flex-col items-center gap-4 text-center">
-            <div className="w-14 h-14 rounded-full bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
-              <CheckCircle2 size={28} className="text-neon-green" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Team saved successfully</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Your stats will now reflect only your team&apos;s players. You can adjust the selection from the demo row on the My Team page.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleClose}>
-              Close
-            </Button>
-          </div>
-        )}
-
-        {/* ── Normal upload flow (shown when postUploadPhase === 'idle') ─── */}
-
-        {postUploadPhase === 'idle' && (
-          <div className="p-5 space-y-5">
-            {/* Step 1 — Opponent name (opponent flow only) */}
+          {/* File upload area */}
+          <div className="space-y-2">
             {demoType === 'opponent' && (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
-                    STEP 1
-                  </span>
-                  <span className="text-xs font-semibold text-foreground">Who are you scouting?</span>
-                </div>
-                <input
-                  type="text"
-                  value={opponentName}
-                  onChange={e => setOpponentName(e.target.value)}
-                  placeholder="e.g. NAVI, Astralis, Team Liquid…"
-                  disabled={isProcessing}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00ff87] disabled:opacity-50"
-                />
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <Info size={10} className="shrink-0" />
-                  After upload, you&apos;ll select which team to scout as the opponent.
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
+                  STEP 2
+                </span>
+                <span className="text-xs font-semibold text-foreground">Add demo files</span>
+              </div>
+            )}
+
+            {hasLargeFile && (
+              <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
+                <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-yellow-300">
+                  CS2 demos are typically 200–500 MB. Large files upload directly to cloud storage — keep this tab open.
                 </p>
               </div>
             )}
 
-            {/* File upload area */}
-            <div className="space-y-2">
-              {demoType === 'opponent' && (
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
-                    STEP 2
-                  </span>
-                  <span className="text-xs font-semibold text-foreground">Add demo files</span>
-                </div>
+            <div
+              {...getRootProps()}
+              className={cn(
+                'border-2 border-dashed rounded-lg p-7 text-center cursor-pointer transition-all duration-200',
+                isDragActive
+                  ? 'border-[#00ff87] bg-[#00ff87]/5'
+                  : 'border-border hover:border-[#00ff87]/50 hover:bg-accent/30'
               )}
-
-              {demoType === 'self' && (
-                <div className="flex items-start gap-2 rounded-md border border-neon-green/20 bg-neon-green/5 px-3 py-2">
-                  <Users size={12} className="text-neon-green shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-neon-green/80">
-                    After upload, you&apos;ll select which team was yours in each demo.
-                  </p>
-                </div>
-              )}
-
-              {hasLargeFile && (
-                <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
-                  <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-yellow-300">
-                    CS2 demos are typically 200–500 MB. Large files upload directly to cloud storage — keep this tab open.
-                  </p>
-                </div>
-              )}
-
-              <div
-                {...getRootProps()}
-                className={cn(
-                  'border-2 border-dashed rounded-lg p-7 text-center cursor-pointer transition-all duration-200',
-                  isDragActive
-                    ? 'border-[#00ff87] bg-[#00ff87]/5'
-                    : 'border-border hover:border-[#00ff87]/50 hover:bg-accent/30'
-                )}
-              >
-                <input {...getInputProps()} />
-                <Upload
-                  size={26}
-                  className={cn('mx-auto mb-2.5 transition-colors', isDragActive ? 'text-[#00ff87]' : 'text-muted-foreground')}
-                />
-                {isDragActive ? (
-                  <p className="text-sm font-medium text-[#00ff87]">Drop .dem files here…</p>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium text-foreground">Drag & drop demo files here</p>
-                    <p className="text-xs text-muted-foreground mt-1">.dem or .zst · up to 500 MB · click to browse</p>
-                  </>
-                )}
-              </div>
-
-              {uploads.length > 0 && (
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {uploads.map((upload, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        'flex items-center gap-3 rounded-md border bg-background/50 px-3 py-2',
-                        upload.status === 'error' ? 'border-red-500/40' : 'border-border'
-                      )}
-                    >
-                      <FileVideo
-                        size={16}
-                        className={cn(
-                          'shrink-0',
-                          upload.status === 'done'  ? 'text-[#00ff87]'
-                          : upload.status === 'error' ? 'text-red-400'
-                          : 'text-muted-foreground'
-                        )}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-foreground truncate">{upload.file.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] text-muted-foreground shrink-0">
-                            {formatFileSize(upload.file.size)}
-                          </span>
-                          {upload.status === 'uploading' || upload.status === 'presigning' || upload.status === 'registering' ? (
-                            <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-[#00ff87] rounded-full transition-all duration-300"
-                                style={{ width: `${upload.progress}%` }}
-                              />
-                            </div>
-                          ) : (
-                            <span className={cn(
-                              'text-[10px] font-medium truncate',
-                              upload.status === 'done'  ? 'text-[#00ff87]'
-                              : upload.status === 'error' ? 'text-red-400'
-                              : 'text-muted-foreground'
-                            )}>
-                              {statusLabel(upload)}
-                            </span>
-                          )}
-                        </div>
-                        {(upload.status === 'uploading' || upload.status === 'presigning') && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{statusLabel(upload)}</p>
-                        )}
-                      </div>
-                      <div className="shrink-0">
-                        {upload.status === 'done'    ? <CheckCircle2 size={14} className="text-[#00ff87]" />
-                        : upload.status === 'error'  ? <AlertCircle  size={14} className="text-red-400" />
-                        : upload.status !== 'pending' ? <Loader2     size={14} className="text-[#00ff87] animate-spin" />
-                        : (
-                          <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-red-400 transition-colors">
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            >
+              <input {...getInputProps()} />
+              <Upload
+                size={26}
+                className={cn('mx-auto mb-2.5 transition-colors', isDragActive ? 'text-[#00ff87]' : 'text-muted-foreground')}
+              />
+              {isDragActive ? (
+                <p className="text-sm font-medium text-[#00ff87]">Drop .dem files here…</p>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-foreground">Drag & drop demo files here</p>
+                  <p className="text-xs text-muted-foreground mt-1">.dem or .zst · up to 500 MB · click to browse</p>
+                </>
               )}
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between pt-1 border-t border-border">
-              <span className="text-xs text-muted-foreground">
-                {uploads.length === 0
-                  ? 'No files selected'
-                  : doneCount > 0 && errorCount === 0
-                  ? `${doneCount}/${uploads.length} uploaded`
-                  : doneCount > 0
-                  ? `${doneCount} done · ${errorCount} failed`
-                  : `${uploads.length} file${uploads.length !== 1 ? 's' : ''} selected`}
-              </span>
-              <div className="flex gap-2">
-                {errorCount > 0 && !isProcessing && (
-                  <Button variant="outline" size="sm" onClick={retryFailed} className="gap-1.5">
-                    <RefreshCw size={12} />
-                    Retry {errorCount} failed
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleClose}
-                  disabled={isProcessing}
-                >
-                  {doneCount > 0 && pendingCount === 0 && errorCount === 0 ? 'Close' : 'Cancel'}
-                </Button>
-                {pendingCount > 0 && (
-                  <Button
-                    variant="neon"
-                    size="sm"
-                    onClick={uploadAll}
-                    disabled={isProcessing || !canUpload}
-                    className="gap-2"
-                    title={demoType !== 'self' && !opponentName.trim() ? 'Enter opponent name first' : undefined}
-                  >
-                    {isProcessing ? (
-                      <><Loader2 size={14} className="animate-spin" /> Uploading…</>
-                    ) : (
-                      <><Upload size={14} /> Upload {pendingCount > 1 ? `${pendingCount} files` : 'demo'}</>
+            {uploads.length > 0 && (
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {uploads.map((upload, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'flex items-center gap-3 rounded-md border bg-background/50 px-3 py-2',
+                      upload.status === 'error' ? 'border-red-500/40' : 'border-border'
                     )}
-                  </Button>
-                )}
+                  >
+                    <FileVideo
+                      size={16}
+                      className={cn(
+                        'shrink-0',
+                        upload.status === 'done'  ? 'text-[#00ff87]'
+                        : upload.status === 'error' ? 'text-red-400'
+                        : 'text-muted-foreground'
+                      )}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{upload.file.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {formatFileSize(upload.file.size)}
+                        </span>
+                        {upload.status === 'uploading' || upload.status === 'presigning' || upload.status === 'registering' ? (
+                          <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#00ff87] rounded-full transition-all duration-300"
+                              style={{ width: `${upload.progress}%` }}
+                            />
+                          </div>
+                        ) : (
+                          <span className={cn(
+                            'text-[10px] font-medium truncate',
+                            upload.status === 'done'  ? 'text-[#00ff87]'
+                            : upload.status === 'error' ? 'text-red-400'
+                            : 'text-muted-foreground'
+                          )}>
+                            {statusLabel(upload)}
+                          </span>
+                        )}
+                      </div>
+                      {(upload.status === 'uploading' || upload.status === 'presigning') && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{statusLabel(upload)}</p>
+                      )}
+                    </div>
+                    <div className="shrink-0">
+                      {upload.status === 'done'    ? <CheckCircle2 size={14} className="text-[#00ff87]" />
+                      : upload.status === 'error'  ? <AlertCircle  size={14} className="text-red-400" />
+                      : upload.status !== 'pending' ? <Loader2     size={14} className="text-[#00ff87] animate-spin" />
+                      : (
+                        <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-red-400 transition-colors">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-1 border-t border-border">
+            <span className="text-xs text-muted-foreground">
+              {uploads.length === 0
+                ? 'No files selected'
+                : doneCount > 0 && errorCount === 0
+                ? `${doneCount}/${uploads.length} uploaded`
+                : doneCount > 0
+                ? `${doneCount} done · ${errorCount} failed`
+                : `${uploads.length} file${uploads.length !== 1 ? 's' : ''} selected`}
+            </span>
+            <div className="flex gap-2">
+              {errorCount > 0 && !isProcessing && (
+                <Button variant="outline" size="sm" onClick={retryFailed} className="gap-1.5">
+                  <RefreshCw size={12} />
+                  Retry {errorCount} failed
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClose}
+                disabled={isProcessing}
+              >
+                {doneCount > 0 && pendingCount === 0 && errorCount === 0 ? 'Close' : 'Cancel'}
+              </Button>
+              {pendingCount > 0 && (
+                <Button
+                  variant="neon"
+                  size="sm"
+                  onClick={uploadAll}
+                  disabled={isProcessing || !canUpload}
+                  className="gap-2"
+                  title={demoType !== 'self' && !opponentName.trim() ? 'Enter opponent name first' : undefined}
+                >
+                  {isProcessing ? (
+                    <><Loader2 size={14} className="animate-spin" /> Uploading…</>
+                  ) : (
+                    <><Upload size={14} /> Upload {pendingCount > 1 ? `${pendingCount} files` : 'demo'}</>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
-        )}
+        </div>
 
       </div>
     </div>

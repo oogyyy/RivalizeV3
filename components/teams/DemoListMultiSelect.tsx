@@ -355,9 +355,9 @@ export default function DemoListMultiSelect({
                 )}
               </div>
 
-              {/* Side selector — only for self-demos, only outside select mode */}
+              {/* Team selector — only for self-demos, only outside select mode */}
               {!selecting && showSideSelector && demo.status === 'completed' && (
-                <div className="pl-[22px]">
+                <div className="pl-[22px] pt-1.5 pb-0.5">
                   <SetOpponentSideButton
                     demoId={demo.id}
                     currentSide={opSide}

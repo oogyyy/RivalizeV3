@@ -50,58 +50,46 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
     }
   }
 
+  // Self variant — prominent inline two-button team picker
   if (variant === 'self') {
     return (
-      <div className={cn('relative', open && 'z-30')}>
-        <button
-          onClick={() => setOpen(v => !v)}
-          disabled={pending !== null}
-          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 group"
-          title="Change which team in this demo is your team"
-        >
-          <Users size={9} className="shrink-0" />
-          <span>My team: <span className="font-medium">{labels[userSide]}</span></span>
-          <ChevronDown size={8} className={cn('transition-transform', open && 'rotate-180')} />
-        </button>
-
-        {open && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-            <div className="absolute left-0 top-5 z-20 bg-card border border-border rounded-lg shadow-xl p-1 min-w-[160px]">
-              <p className="text-[9px] text-muted-foreground px-2 pt-1 pb-1.5 font-medium uppercase tracking-wide">
-                Which side are you?
-              </p>
-              {(['team1', 'team2'] as const).map(side => (
-                <button
-                  key={side}
-                  onClick={() => select(side)}
-                  disabled={pending !== null}
-                  className={cn(
-                    'flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs text-left transition-colors',
-                    userSide === side
-                      ? 'text-neon-green bg-neon-green/10'
-                      : 'text-foreground hover:bg-accent',
-                    'disabled:opacity-50'
-                  )}
-                >
-                  {pending === side ? (
-                    <Loader2 size={10} className="animate-spin shrink-0" />
-                  ) : userSide === side ? (
-                    <Check size={10} className="text-neon-green shrink-0" />
-                  ) : (
-                    <span className="w-2.5 shrink-0" />
-                  )}
-                  I am {labels[side]}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+          My team
+        </span>
+        <div className="flex gap-1.5">
+          {(['team1', 'team2'] as const).map(side => {
+            const isActive = userSide === side
+            return (
+              <button
+                key={side}
+                onClick={() => select(side)}
+                disabled={pending !== null}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border-2 transition-all duration-150',
+                  isActive
+                    ? 'border-neon-green bg-neon-green/10 text-neon-green'
+                    : 'border-border bg-background/40 text-muted-foreground hover:border-neon-green/40 hover:text-foreground',
+                  'disabled:opacity-40',
+                )}
+              >
+                {pending === side ? (
+                  <Loader2 size={10} className="animate-spin shrink-0" />
+                ) : isActive ? (
+                  <Check size={10} className="shrink-0" />
+                ) : (
+                  <span className="w-2 h-2 rounded-full border border-current/30 shrink-0" />
+                )}
+                {labels[side]}
+              </button>
+            )
+          })}
+        </div>
       </div>
     )
   }
 
-  // Default 'opponent' variant — unchanged behaviour
+  // Default 'opponent' variant — small dropdown (unchanged)
   return (
     <div className={cn('relative', open && 'z-30')}>
       <button
