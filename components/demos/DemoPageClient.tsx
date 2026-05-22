@@ -12,6 +12,7 @@ import { ReparseProgress } from '@/components/demos/ReparseProgress'
 import RoundTimeline from '@/components/demos/RoundTimeline'
 import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
 import ReplayCanvas from '@/components/demos/ReplayCanvas'
+import { MAP_THUMBS } from '@/lib/map-config'
 import {
   Trophy, Crosshair, Target, Shield, Zap, TrendingUp,
   BarChart3, Map, Clock, Brain, ArrowLeft, RefreshCw,
@@ -107,11 +108,22 @@ function ScoreBanner({ parsed, demo }: { parsed: ParsedDemoData; demo: Demo }) {
   const team1Won = score1 > score2
   const isDraw = score1 === score2
 
+  const thumbUrl = MAP_THUMBS[h.map]
+
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card">
+      {thumbUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={thumbUrl}
+          alt={h.map}
+          className="absolute inset-0 w-full h-full object-cover opacity-[0.12] pointer-events-none select-none"
+        />
+      )}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-1/2 h-full bg-gradient-to-r from-neon-green/5 to-transparent" />
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-red-500/5 to-transparent" />
+        <div className="absolute top-0 left-0 w-1/2 h-full bg-gradient-to-r from-neon-green/8 to-transparent" />
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-red-500/8 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-card/80 via-transparent to-card/40" />
       </div>
 
       <div className="relative p-6">

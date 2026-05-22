@@ -31,6 +31,26 @@ export const MAP_CONFIGS: Record<string, MapConfig> = {
   ar_baggage:  { imageUrl: `${RAW}/ar_baggage_radar_psd.png`,  pos_x: -1316, pos_y:  1571, scale: 3.55 },
 }
 
+// ── Map thumbnails (for page headers) ────────────────────────────────────────
+
+const THUMBS = 'https://raw.githubusercontent.com/MurkyYT/cs2-map-icons/main/images/thumbs'
+
+export const MAP_THUMBS: Record<string, string> = {
+  de_mirage:   `${THUMBS}/de_mirage_png.png`,
+  de_inferno:  `${THUMBS}/de_inferno_png.png`,
+  de_dust2:    `${THUMBS}/de_dust2_png.png`,
+  de_nuke:     `${THUMBS}/de_nuke_png.png`,
+  de_ancient:  `${THUMBS}/de_ancient_png.png`,
+  de_anubis:   `${THUMBS}/de_anubis_png.png`,
+  de_overpass: `${THUMBS}/de_overpass_png.png`,
+  de_vertigo:  `${THUMBS}/de_vertigo_png.png`,
+  de_train:    `${THUMBS}/de_train_png.png`,
+  de_cache:    `${THUMBS}/de_cache_png.png`,
+  cs_italy:    `${THUMBS}/cs_italy_png.png`,
+  cs_office:   `${THUMBS}/cs_office_png.png`,
+  ar_baggage:  `${THUMBS}/ar_baggage_png.png`,
+}
+
 // ── Image loading ─────────────────────────────────────────────────────────────
 
 const _cache = new Map<string, HTMLImageElement | null>()
