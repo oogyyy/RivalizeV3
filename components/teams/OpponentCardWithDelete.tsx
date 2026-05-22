@@ -86,12 +86,14 @@ export default function OpponentCardWithDelete({ folder, demoCount, lastActivity
         </button>
 
         <Link href={`/opponents/${folder.id}`} className="h-full block">
-          <Card className="bg-card border-border hover:border-neon-green/40 hover:shadow-[0_0_20px_rgba(0,255,135,0.06)] transition-all duration-200 cursor-pointer group h-full">
+          <Card className="relative bg-card border-border hover:border-neon-green/35 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4),0_0_20px_rgba(0,255,135,0.05)] transition-all duration-200 cursor-pointer group h-full overflow-hidden">
+            {/* Top accent line — revealed on hover */}
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-neon-green/0 to-transparent group-hover:via-neon-green/40 transition-all duration-300" />
             <CardContent className="p-5 flex flex-col h-full gap-4">
               {/* Top: avatar + name + chevron */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-neon-green/20 to-accent flex items-center justify-center shrink-0 border border-neon-green/20">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-neon-green/20 via-neon-green/10 to-accent flex items-center justify-center shrink-0 border border-neon-green/20 shadow-[0_0_10px_rgba(0,255,135,0.1)]">
                     <span className="text-base font-bold text-neon-green">
                       {folder.opponent_display_name.charAt(0).toUpperCase()}
                     </span>
@@ -117,35 +119,34 @@ export default function OpponentCardWithDelete({ folder, demoCount, lastActivity
                     </div>
                   </div>
                 </div>
-                {/* Nudge chevron left to avoid overlapping with trash icon */}
                 <ChevronRight
                   size={15}
-                  className="text-muted-foreground/50 group-hover:text-neon-green transition-colors shrink-0 mt-1 mr-6"
+                  className="text-muted-foreground/40 group-hover:text-neon-green group-hover:translate-x-0.5 transition-all shrink-0 mt-1 mr-6"
                 />
               </div>
 
               {/* Bottom: record + win rate */}
-              <div className="flex items-center justify-between border-t border-border pt-3 mt-auto">
+              <div className="flex items-center justify-between border-t border-border/70 pt-3 mt-auto">
                 {total > 0 ? (
                   <>
                     <div className="flex items-center gap-1.5">
                       <span className={cn(
-                        'text-base font-bold font-mono',
+                        'text-base font-bold font-mono tabular-nums',
                         isPositive ? 'text-neon-green' : isNegative ? 'text-red-400' : 'text-muted-foreground'
                       )}>
                         {wins}W
                       </span>
-                      <span className="text-muted-foreground text-xs">–</span>
+                      <span className="text-muted-foreground/40 text-xs">–</span>
                       <span className={cn(
-                        'text-base font-bold font-mono',
+                        'text-base font-bold font-mono tabular-nums',
                         isNegative ? 'text-red-400' : 'text-muted-foreground'
                       )}>
                         {losses}L
                       </span>
                       {draws > 0 && (
                         <>
-                          <span className="text-muted-foreground text-xs">–</span>
-                          <span className="text-base font-bold font-mono text-yellow-400">{draws}D</span>
+                          <span className="text-muted-foreground/40 text-xs">–</span>
+                          <span className="text-base font-bold font-mono tabular-nums text-yellow-400">{draws}D</span>
                         </>
                       )}
                     </div>
@@ -160,7 +161,7 @@ export default function OpponentCardWithDelete({ folder, demoCount, lastActivity
                     )}
                   </>
                 ) : (
-                  <span className="text-xs text-muted-foreground italic">No completed matches</span>
+                  <span className="text-xs text-muted-foreground/60 italic">No completed matches</span>
                 )}
               </div>
             </CardContent>

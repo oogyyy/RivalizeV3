@@ -1,24 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --background: 220 13% 5%;
-  --foreground: 0 0% 95%;
-  --card: 220 13% 8%;
-  --card-foreground: 0 0% 95%;
-  --popover: 220 13% 8%;
-  --popover-foreground: 0 0% 95%;
+  /* Deep cool-tinted dark — richer atmosphere than flat grey */
+  --background: 222 22% 4%;
+  --foreground: 210 18% 94%;
+  --card: 222 18% 7%;
+  --card-foreground: 210 18% 94%;
+  --popover: 222 18% 7%;
+  --popover-foreground: 210 18% 94%;
   --primary: 151 100% 50%;
-  --primary-foreground: 220 13% 5%;
-  --secondary: 220 13% 12%;
-  --secondary-foreground: 0 0% 85%;
-  --muted: 220 13% 12%;
-  --muted-foreground: 0 0% 55%;
-  --accent: 220 13% 15%;
-  --accent-foreground: 0 0% 95%;
+  --primary-foreground: 222 22% 4%;
+  --secondary: 222 15% 11%;
+  --secondary-foreground: 210 10% 80%;
+  --muted: 222 15% 11%;
+  --muted-foreground: 215 8% 48%;
+  --accent: 222 15% 14%;
+  --accent-foreground: 210 18% 94%;
   --destructive: 348 100% 61%;
   --destructive-foreground: 0 0% 98%;
-  --border: 220 13% 15%;
-  --input: 220 13% 12%;
+  --border: 222 15% 13%;
+  --input: 222 15% 11%;
   --ring: 151 100% 50%;
 }
 
@@ -30,22 +31,122 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: hsl(var(--background)); }
-::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: hsl(222 15% 18%); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
 
-/* Neon glow utility */
-.neon-glow { box-shadow: 0 0 10px rgba(0, 255, 135, 0.3), 0 0 20px rgba(0, 255, 135, 0.1); }
-.neon-text { text-shadow: 0 0 10px rgba(0, 255, 135, 0.5); }
-.neon-border { border-color: rgba(0, 255, 135, 0.5); }
+/* Selection */
+::selection { background-color: rgba(0, 255, 135, 0.2); color: #fff; }
 
-/* Glass card */
-.glass-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+/* ── Neon glow utilities ─────────────────────────────────────────────────────── */
+.neon-glow {
+  box-shadow:
+    0 0 12px rgba(0, 255, 135, 0.4),
+    0 0 32px rgba(0, 255, 135, 0.12),
+    0 4px 16px rgba(0, 0, 0, 0.5);
 }
+.neon-glow-sm { box-shadow: 0 0 6px rgba(0, 255, 135, 0.25), 0 0 16px rgba(0, 255, 135, 0.08); }
+.neon-text    { text-shadow: 0 0 12px rgba(0, 255, 135, 0.55), 0 0 28px rgba(0, 255, 135, 0.18); }
+.neon-border  { border-color: rgba(0, 255, 135, 0.4); }
+
+/* ── Glassmorphism ───────────────────────────────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* ── Text gradient ───────────────────────────────────────────────────────────── */
+.text-gradient {
+  background: linear-gradient(135deg, #00ff87 0%, #00d4ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Fade-in-up ──────────────────────────────────────────────────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up               { animation: fade-in-up 0.4s ease-out both; }
+.animate-fade-in-up-delay-1       { animation-delay: 75ms; }
+.animate-fade-in-up-delay-2       { animation-delay: 150ms; }
+.animate-fade-in-up-delay-3       { animation-delay: 225ms; }
+
+/* ── Skeleton shimmer ────────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(222, 15%, 17%) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+
+/* ── Reparse fill ────────────────────────────────────────────────────────────── */
+@keyframes reparse-fill {
+  0%   { width: 0%;  }
+  8%   { width: 18%; }
+  20%  { width: 38%; }
+  40%  { width: 56%; }
+  65%  { width: 72%; }
+  100% { width: 85%; }
+}
+.animate-reparse-fill { animation: reparse-fill 30s ease-out forwards; }
+
+/* ── Pulse neon ──────────────────────────────────────────────────────────────── */
+@keyframes pulse-neon {
+  0%, 100% { box-shadow: 0 0 5px #00ff87, 0 0 10px #00ff87; }
+  50%       { box-shadow: 0 0 20px #00ff87, 0 0 40px #00ff87; }
+}
+.animate-pulse-neon { animation: pulse-neon 2s ease-in-out infinite; }
+
+/* ── Slide in ────────────────────────────────────────────────────────────────── */
+@keyframes slide-in {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+.animate-slide-in { animation: slide-in 0.3s ease-out; }
+
+/* ── Fade in ─────────────────────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.2s ease-out; }
+
+/* ── Stat card accent borders ────────────────────────────────────────────────── */
+.stat-card-green  { border-top: 2px solid rgba(0, 255, 135, 0.5); }
+.stat-card-red    { border-top: 2px solid rgba(248, 113, 113, 0.5); }
+.stat-card-blue   { border-top: 2px solid rgba(96, 165, 250, 0.5); }
+.stat-card-purple { border-top: 2px solid rgba(167, 139, 250, 0.5); }
+.stat-card-amber  { border-top: 2px solid rgba(251, 191, 36, 0.5); }
+
+/* ── Card hover lift ─────────────────────────────────────────────────────────── */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Gradient accent lines ───────────────────────────────────────────────────── */
+.accent-line-green { height: 2px; background: linear-gradient(90deg, rgba(0,255,135,0.7), rgba(0,255,135,0.15) 60%, transparent); }
+.accent-line-red   { height: 2px; background: linear-gradient(90deg, rgba(248,113,113,0.7), rgba(248,113,113,0.15) 60%, transparent); }
+.accent-line-blue  { height: 2px; background: linear-gradient(90deg, rgba(96,165,250,0.7), rgba(96,165,250,0.15) 60%, transparent); }

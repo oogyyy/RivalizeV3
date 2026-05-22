@@ -38,10 +38,10 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
       {/* Floating hamburger button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-50 flex items-center justify-center w-10 h-10 rounded-lg bg-card border border-border text-muted-foreground hover:text-foreground hover:border-neon-green/50 transition-colors shadow-lg"
+        className="md:hidden fixed top-4 left-4 z-50 flex items-center justify-center w-10 h-10 rounded-xl bg-card border border-border text-muted-foreground hover:text-neon-green hover:border-neon-green/40 transition-all duration-150 shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
         aria-label="Open navigation"
       >
-        <Menu size={20} />
+        <Menu size={19} />
       </button>
 
       {/* Drawer overlay */}
@@ -49,65 +49,68 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
         <div className="fixed inset-0 z-[100] md:hidden">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setIsOpen(false)}
           />
 
           {/* Drawer panel */}
-          <div className="absolute left-0 top-0 h-full w-72 bg-zinc-950 border-r border-zinc-800 shadow-2xl flex flex-col">
+          <div className="absolute left-0 top-0 h-full w-72 bg-[hsl(222,22%,5%)] border-r border-border shadow-[4px_0_24px_rgba(0,0,0,0.5)] flex flex-col">
+            {/* Atmospheric gradient */}
+            <div className="absolute inset-0 bg-gradient-to-b from-neon-green/[0.025] via-transparent to-transparent pointer-events-none" />
+
             {/* Drawer header */}
-            <div className="flex items-center justify-between h-16 px-4 border-b border-zinc-800 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 bg-neon-green rounded flex items-center justify-center shrink-0">
+            <div className="relative flex items-center justify-between h-16 px-4 border-b border-border/80 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-neon-green rounded-lg flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(0,255,135,0.4)]">
                   <Crosshair size={16} className="text-black" />
                 </div>
-                <span className="text-base font-bold tracking-widest text-white">RIVALIZE</span>
+                <span className="text-[14px] font-black tracking-[0.18em] text-foreground">RIVALIZE</span>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all duration-150"
                 aria-label="Close menu"
               >
-                <X size={18} />
+                <X size={17} />
               </button>
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-2 py-4 overflow-y-auto">
+            <nav className="relative flex-1 px-2 py-3 overflow-y-auto">
               <SidebarNav onLinkClick={() => setIsOpen(false)} />
             </nav>
 
             {/* User section */}
-            <div className="border-t border-zinc-800 p-3 space-y-2 shrink-0">
-              <div className="flex items-center gap-3 rounded-md px-2 py-2">
+            <div className="relative border-t border-border/80 p-3 space-y-1.5 shrink-0">
+              <div className="flex items-center gap-3 rounded-lg px-2 py-2">
                 <div className="relative shrink-0">
                   {profile?.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={profile.avatar_url}
                       alt={displayName}
-                      className="w-8 h-8 rounded-full object-cover ring-1 ring-zinc-700"
+                      className="w-8 h-8 rounded-full object-cover ring-1 ring-neon-green/30"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-neon-green/25 to-neon-green/10 border border-neon-green/30 flex items-center justify-center">
                       <span className="text-xs font-bold text-neon-green">{initials}</span>
                     </div>
                   )}
-                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-neon-green border border-zinc-950" />
+                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-neon-green border-[1.5px] border-[hsl(222,22%,5%)]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{displayName}</p>
+                  <p className="text-sm font-semibold text-foreground truncate leading-tight">{displayName}</p>
                   {profile?.username && (
-                    <p className="text-xs text-zinc-400 truncate">@{profile.username}</p>
+                    <p className="text-[11px] text-muted-foreground/60 truncate">@{profile.username}</p>
                   )}
                 </div>
               </div>
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="flex items-center gap-2 w-full rounded-md px-3 py-2 text-sm font-medium text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground/60 hover:text-red-400 hover:bg-red-400/[0.07] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <LogOut size={16} className="shrink-0" />
+                <LogOut size={15} className="shrink-0" />
                 <span>{loggingOut ? 'Signing out…' : 'Sign out'}</span>
               </button>
             </div>

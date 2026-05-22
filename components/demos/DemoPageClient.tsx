@@ -42,10 +42,11 @@ function StatCard({ label, value, sub, color = 'text-foreground' }: {
   color?: string
 }) {
   return (
-    <div className="bg-muted/20 rounded-lg border border-border p-4">
-      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
-      <p className={cn('text-2xl font-bold font-mono', color)}>{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+    <div className="relative bg-card rounded-xl border border-border p-4 overflow-hidden card-hover">
+      <div className="absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
+      <p className="text-[10px] text-muted-foreground uppercase tracking-[0.14em] font-semibold mb-1.5">{label}</p>
+      <p className={cn('text-2xl font-bold font-mono tabular-nums', color)}>{value}</p>
+      {sub && <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -562,16 +563,16 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
         <>
           <ScoreBanner parsed={parsed} demo={demo} />
 
-          <div className="flex gap-1 p-1 bg-muted/30 rounded-lg border border-border w-fit">
+          <div className="flex gap-0.5 p-1 bg-muted/20 rounded-xl border border-border w-fit shadow-[0_2px_6px_rgba(0,0,0,0.2)]">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-all duration-150',
+                  'flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150',
                   activeTab === tab.id
-                    ? 'bg-card text-neon-green border border-neon-green/20 shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-card text-neon-green shadow-[0_1px_4px_rgba(0,0,0,0.3)] border border-neon-green/20'
+                    : 'text-muted-foreground/70 hover:text-foreground hover:bg-white/[0.03]'
                 )}
               >
                 {tab.icon}

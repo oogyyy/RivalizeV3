@@ -12,7 +12,8 @@ import {
   FileVideo,
 } from 'lucide-react'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import DemoListMultiSelect from '@/components/teams/DemoListMultiSelect'
+import MapFolderList, { type MapGroup } from '@/components/teams/MapFolderList'
+import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 
 export default async function MyTeamPage() {
   const supabase = await createClient()
@@ -152,6 +153,43 @@ export default async function MyTeamPage() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
 
+  // ── Map-based grouping for the demo list ─────────────────────────────────────
+  // Key = canonical map name; 'processing'/'unknown'/null all collapse to 'unknown'
+  const mapGroupMap = new Map<string, { demos: DemoRowData[]; wins: number; losses: number; draws: number; lastActivity: string }>()
+
+  for (const demo of demos) {
+    const rawMap = (demo.parsed_data?.header?.map ?? demo.map ?? 'unknown').toLowerCase()
+    const mapKey = (rawMap === 'processing' || rawMap === '') ? 'unknown' : rawMap
+
+    if (!mapGroupMap.has(mapKey)) {
+      mapGroupMap.set(mapKey, { demos: [], wins: 0, losses: 0, draws: 0, lastActivity: demo.created_at })
+    }
+    const g = mapGroupMap.get(mapKey)!
+    g.demos.push(demo as unknown as DemoRowData)
+    if (demo.created_at > g.lastActivity) g.lastActivity = demo.created_at
+
+    if (demo.status === 'completed') {
+      const h  = demo.parsed_data?.header
+      const os = demo.parsed_data?.opponentSide ?? 'team2'
+      if (h) {
+        const ours   = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
+        const theirs = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
+        if (ours > theirs)        g.wins++
+        else if (ours === theirs) g.draws++
+        else                      g.losses++
+      }
+    }
+  }
+
+  // Sort: known maps by most-recent first; 'unknown' always last
+  const mapGroups: MapGroup[] = [...mapGroupMap.entries()]
+    .map(([map, data]) => ({ map, ...data }))
+    .sort((a, b) => {
+      if (a.map === 'unknown' && b.map !== 'unknown') return 1
+      if (b.map === 'unknown' && a.map !== 'unknown') return -1
+      return b.lastActivity.localeCompare(a.lastActivity)
+    })
+
   const AI_QUICK_ACTIONS = [
     {
       href: `/ai-coach?mode=myteam&focus=weakness`,
@@ -191,17 +229,13 @@ export default async function MyTeamPage() {
   ]
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
-            <Shield size={20} className="text-neon-green" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">{teamName}</h1>
-            <p className="text-sm text-muted-foreground">Your team's performance overview</p>
-          </div>
+      <div className="flex items-center justify-between animate-fade-in-up">
+        <div>
+          <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.15em] mb-1.5">My Team</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">{teamName}</h1>
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">Your team&apos;s performance overview</p>
         </div>
         {/* Self-demo upload — marked demo_type='self' so it never leaks into Opponent folders */}
         {primaryTeamId && (
@@ -210,12 +244,13 @@ export default async function MyTeamPage() {
       </div>
 
       {/* Team Overview Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-fade-in-up animate-fade-in-up-delay-1">
         <StatCard
           label="Matches"
           value={totalMatches || '—'}
           sub={totalMatches > 0 ? `${totalWins}W ${totalLosses}L ${totalDraws}D` : 'No demos yet'}
           icon={<Trophy size={16} className="text-yellow-400" />}
+          accent="stat-card-amber"
         />
         <StatCard
           label="Win Rate"
@@ -223,72 +258,87 @@ export default async function MyTeamPage() {
           sub={totalMatches > 0 ? `${totalWins} wins from ${totalMatches}` : 'Upload demos to track'}
           icon={<TrendingUp size={16} className="text-neon-green" />}
           highlight={winRate >= 0.5}
+          accent="stat-card-green"
         />
         <StatCard
           label="Team K/D"
           value={avgKD}
           sub="Combined team ratio"
           icon={<Crosshair size={16} className="text-blue-400" />}
+          accent="stat-card-blue"
         />
         <StatCard
           label="Avg ADR"
           value={avgAdr}
           sub="Avg damage per round"
           icon={<BarChart3 size={16} className="text-purple-400" />}
+          accent="stat-card-purple"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up animate-fade-in-up-delay-2">
         {/* Left: Player stats + Map pool */}
         <div className="lg:col-span-2 space-y-5">
           {/* Top Players */}
-          <div className="bg-card border border-border rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Users size={16} className="text-neon-green" />
-              <h2 className="text-sm font-semibold text-foreground">Top Players</h2>
-            </div>
-            {topPlayers.length === 0 ? (
-              <EmptyState
-                icon={<Users size={20} className="text-muted-foreground" />}
-                text="No player data yet. Upload and parse demos to see your roster's stats."
-              />
-            ) : (
-              <div className="space-y-2">
-                {topPlayers.map((p, i) => (
-                  <div key={p.name} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
-                    <span className="text-xs text-muted-foreground w-4 shrink-0 font-mono">{i + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.games} {p.games === 1 ? 'game' : 'games'}</p>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-right shrink-0">
-                      <div>
-                        <p className="text-muted-foreground">Rating</p>
-                        <p className={cn('font-mono font-semibold', p.avgRating >= 1.1 ? 'text-neon-green' : p.avgRating >= 0.9 ? 'text-foreground' : 'text-red-400')}>
-                          {p.avgRating.toFixed(2)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">ADR</p>
-                        <p className="font-mono text-foreground">{p.avgAdr.toFixed(0)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">K/D</p>
-                        <p className="font-mono text-foreground">
-                          {p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : '—'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="h-[2px] w-full bg-gradient-to-r from-neon-green/50 via-neon-green/15 to-transparent" />
+            <div className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-6 h-6 rounded-md bg-neon-green/15 flex items-center justify-center">
+                  <Users size={13} className="text-neon-green" />
+                </div>
+                <h2 className="text-sm font-semibold text-foreground">Top Players</h2>
               </div>
-            )}
+              {topPlayers.length === 0 ? (
+                <EmptyState
+                  icon={<Users size={20} className="text-muted-foreground" />}
+                  text="No player data yet. Upload and parse demos to see your roster's stats."
+                />
+              ) : (
+                <div className="space-y-1">
+                  {topPlayers.map((p, i) => (
+                    <div key={p.name} className="flex items-center gap-3 py-2.5 border-b border-border/60 last:border-0">
+                      <span className={cn(
+                        'text-xs w-5 h-5 rounded-md flex items-center justify-center shrink-0 font-bold font-mono',
+                        i === 0 ? 'bg-yellow-400/15 text-yellow-400' :
+                        i === 1 ? 'bg-muted/80 text-muted-foreground' :
+                                  'bg-transparent text-muted-foreground/60'
+                      )}>{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.games} {p.games === 1 ? 'game' : 'games'}</p>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-right shrink-0">
+                        <div>
+                          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">Rating</p>
+                          <p className={cn('font-mono font-bold', p.avgRating >= 1.1 ? 'text-neon-green' : p.avgRating >= 0.9 ? 'text-foreground' : 'text-red-400')}>
+                            {p.avgRating.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">ADR</p>
+                          <p className="font-mono text-foreground font-medium">{p.avgAdr.toFixed(0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">K/D</p>
+                          <p className="font-mono text-foreground font-medium">
+                            {p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : '—'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Map Pool */}
           <div className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
-              <MapIcon size={16} className="text-neon-green" />
+              <div className="w-6 h-6 rounded-md bg-neon-green/15 flex items-center justify-center">
+                <MapIcon size={13} className="text-neon-green" />
+              </div>
               <h2 className="text-sm font-semibold text-foreground">Map Pool</h2>
             </div>
             {topMaps.length === 0 ? (
@@ -299,53 +349,53 @@ export default async function MyTeamPage() {
             ) : (
               <div className="flex flex-wrap gap-2">
                 {topMaps.map(([map, count]) => (
-                  <div key={map} className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-lg border border-border">
+                  <div key={map} className="flex items-center gap-2 px-3 py-1.5 bg-muted/40 hover:bg-muted/60 rounded-lg border border-border transition-colors">
                     <span className="text-sm font-medium text-foreground">{map.replace('de_', '')}</span>
-                    <Badge variant="secondary" className="text-xs">{count}x</Badge>
+                    <span className="text-xs font-mono text-neon-green bg-neon-green/10 px-1.5 py-0.5 rounded">{count}×</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* My Team's Demos */}
-          <div className="bg-card border border-border rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-4">
+          {/* My Team's Demos — grouped by map */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
               <FileVideo size={16} className="text-neon-green" />
               <h2 className="text-sm font-semibold text-foreground">My Team&apos;s Demos</h2>
               {demos.length > 0 && (
                 <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded font-mono">
-                  {demos.length}
+                  {demos.length} · {mapGroups.filter(g => g.map !== 'unknown').length} maps
                 </span>
               )}
             </div>
             {demos.length === 0 ? (
-              <EmptyState
-                icon={<FileVideo size={20} className="text-muted-foreground" />}
-                text="No team demos uploaded yet. Use the Upload button above to add your team's own demos."
-              />
+              <div className="bg-card border border-border rounded-xl">
+                <EmptyState
+                  icon={<FileVideo size={20} className="text-muted-foreground" />}
+                  text="No team demos uploaded yet. Use the Upload button above to add your team's own demos."
+                />
+              </div>
             ) : (
-              <DemoListMultiSelect
-                demos={demos}
-                demoHrefPrefix="/my-team/demos"
-                showSideSelector
-                showReparse
-                canDelete
-              />
+              <MapFolderList mapGroups={mapGroups} />
             )}
           </div>
         </div>
 
         {/* Right: AI Quick Actions */}
         <div className="space-y-4">
-          <div className="bg-card border border-border rounded-xl p-5">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="h-[2px] w-full bg-gradient-to-r from-neon-green/50 via-neon-green/15 to-transparent" />
+            <div className="p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Brain size={16} className="text-neon-green" />
+              <div className="w-6 h-6 rounded-md bg-neon-green/15 flex items-center justify-center">
+                <Brain size={13} className="text-neon-green" />
+              </div>
               <h2 className="text-sm font-semibold text-foreground">AI Analyst</h2>
-              <Badge variant="neon" className="text-xs ml-auto">GPT-4o</Badge>
+              <Badge variant="neon" className="text-xs ml-auto">Llama 3.3</Badge>
             </div>
             <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-              Analyse your team's own demos to identify weaknesses, improve executes, and build your playbook.
+              Analyse your team&apos;s demos to identify weaknesses, improve executes, and build your playbook.
             </p>
             <div className="space-y-2">
               {AI_QUICK_ACTIONS.map(action => (
@@ -367,7 +417,8 @@ export default async function MyTeamPage() {
                 </Link>
               ))}
             </div>
-          </div>
+            </div>{/* /p-5 */}
+          </div>{/* /card */}
 
           {totalMatches === 0 && primaryTeamId && (
             <div className="bg-card border border-border rounded-xl p-5 text-center">
@@ -386,22 +437,24 @@ export default async function MyTeamPage() {
 }
 
 function StatCard({
-  label, value, sub, icon, highlight,
+  label, value, sub, icon, highlight, accent,
 }: {
   label: string
   value: string | number
   sub: string
   icon: React.ReactNode
   highlight?: boolean
+  accent?: string
 }) {
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{label}</p>
+    <div className={cn('relative bg-card border border-border rounded-xl p-4 card-hover overflow-hidden', accent)}>
+      <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
+      <div className="relative flex items-center justify-between mb-2">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.12em] font-semibold">{label}</p>
         {icon}
       </div>
-      <p className={cn('text-2xl font-bold', highlight ? 'text-neon-green' : 'text-foreground')}>{value}</p>
-      <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+      <p className={cn('text-2xl font-bold tracking-tight tabular-nums', highlight ? 'text-neon-green' : 'text-foreground')}>{value}</p>
+      <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>
     </div>
   )
 }
