@@ -33,6 +33,22 @@ func tWinsGoToTeam1(roundIdx int) bool {
 	return otHalf%2 == 1
 }
 
+// ── Position sampling ─────────────────────────────────────────────────────────
+
+const posSampleInterval = 8 // sample every 8 ticks = ~8fps at 64Hz
+
+type PlayerSnapshot struct {
+	N string `json:"n"` // name
+	X int    `json:"x"` // world X (rounded to integer)
+	Y int    `json:"y"` // world Y (rounded to integer)
+	A bool   `json:"a"` // alive
+}
+
+type PositionFrame struct {
+	T float64          `json:"t"` // seconds since round start
+	P []PlayerSnapshot `json:"p"`
+}
+
 // ── Output types (match ParsedDemoData in types/database.ts) ─────────────────
 
 type ParseResult struct {
@@ -62,8 +78,9 @@ type Round struct {
 	Team2Economy int            `json:"team2_economy"`
 	BombPlanted  bool           `json:"bomb_planted"`
 	BombDefused  bool           `json:"bomb_defused"`
-	Kills        []Kill         `json:"kills"`
-	Grenades     []GrenadeEvent `json:"grenades"`
+	Kills        []Kill          `json:"kills"`
+	Grenades     []GrenadeEvent  `json:"grenades"`
+	Frames       []PositionFrame `json:"frames"`
 }
 
 type GrenadeEvent struct {
@@ -156,6 +173,7 @@ type roundState struct {
 	isKnifeRound bool
 	kills        []Kill
 	grenades     []GrenadeEvent
+	frames       []PositionFrame
 	// per-player contributions this round (for knife-round post-processing)
 	contribs map[uint64]*roundContrib
 	// KAST helpers
@@ -567,6 +585,35 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 		}
 	})
 
+	// Sample player positions every posSampleInterval ticks for smooth replay
+	p.RegisterEventHandler(func(e events.FrameDone) {
+		if cur == nil || cur.startTick <= 0 {
+			return
+		}
+		gs := p.GameState()
+		tick := gs.IngameTick()
+		if tick <= cur.startTick || (tick-cur.startTick)%posSampleInterval != 0 {
+			return
+		}
+		t := math.Round(float64(tick-cur.startTick)/64.0*8) / 8
+		var snaps []PlayerSnapshot
+		for _, pl := range gs.Participants().Playing() {
+			if pl == nil || pl.SteamID64 == 0 || !pl.IsConnected {
+				continue
+			}
+			pos := pl.Position()
+			snaps = append(snaps, PlayerSnapshot{
+				N: pl.Name,
+				X: int(math.Round(float64(pos.X))),
+				Y: int(math.Round(float64(pos.Y))),
+				A: pl.IsAlive(),
+			})
+		}
+		if len(snaps) > 0 {
+			cur.frames = append(cur.frames, PositionFrame{T: t, P: snaps})
+		}
+	})
+
 	// Primary: capture map name from the binary demo file header message
 	p.RegisterNetMessageHandler(func(m *msg.CDemoFileHeader) {
 		if n := strings.TrimSpace(m.GetMapName()); n != "" {
@@ -814,6 +861,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 				BombDefused:  rnd.bombDefused,
 				Kills:        rnd.kills,
 				Grenades:     rnd.grenades,
+				Frames:       rnd.frames,
 			})
 		}
 	}

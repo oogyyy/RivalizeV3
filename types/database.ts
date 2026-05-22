@@ -85,6 +85,18 @@ export interface DemoHeader {
   match_date?: string
 }
 
+export interface PlayerSnapshot {
+  n: string   // player name
+  x: number   // world X
+  y: number   // world Y
+  a: boolean  // alive
+}
+
+export interface PositionFrame {
+  t: number           // seconds since round start
+  p: PlayerSnapshot[]
+}
+
 export interface Round {
   number: number
   winner: string
@@ -94,6 +106,7 @@ export interface Round {
   team2_economy: number
   kills: Kill[]
   grenades?: GrenadeEvent[]
+  frames?: PositionFrame[]
   bomb_planted?: boolean
   bomb_defused?: boolean
 }

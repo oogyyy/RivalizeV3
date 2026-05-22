@@ -98,6 +98,7 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
         land_y:    g.land_y,
         land_time: g.land_time,
       })),
+      frames: (r.frames ?? []),
     })),
     players: raw.players.map(p => ({
       steam_id:           p.steam_id,
@@ -164,6 +165,18 @@ interface GoGrenadeEvent {
   land_time: number
 }
 
+interface GoPlayerSnapshot {
+  n: string
+  x: number
+  y: number
+  a: boolean
+}
+
+interface GoPositionFrame {
+  t: number
+  p: GoPlayerSnapshot[]
+}
+
 interface GoRound {
   number:        number
   winner:        string
@@ -175,6 +188,7 @@ interface GoRound {
   bomb_defused:  boolean
   kills:         GoKill[]
   grenades:      GoGrenadeEvent[]
+  frames:        GoPositionFrame[]
 }
 
 interface GoPlayer {
