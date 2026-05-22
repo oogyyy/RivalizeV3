@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { createOpenAI } from '@ai-sdk/openai'
 import { streamText } from 'ai'
@@ -49,16 +50,18 @@ export async function POST(request: Request) {
 
   if (mode === 'myteam' && teamId) {
     // My Team mode: fetch ONLY self-demos (demo_type = 'self').
-    // Opponent demos are strictly excluded — they contain the enemy team's stats,
-    // not the user's own team performance data.
-    const { data: recentDemos } = await supabase
+    // Use admin client to bypass RLS — the user has already been authenticated above.
+    const adminDb = createAdminClient()
+    console.log('[AI Coach] myteam mode — querying demos for teamId:', teamId)
+    const { data: recentDemos, error: demosError } = await adminDb
       .from('demos')
-      .select('parsed_data, map, match_date')
+      .select('parsed_data, map, match_date, opponent_name')
       .eq('team_id', teamId)
       .eq('status', 'completed')
-      .eq('demo_type', 'self')   // STRICT: only own-team demos for self-analysis
+      .eq('demo_type', 'self')
       .order('created_at', { ascending: false })
       .limit(5)
+    console.log('[AI Coach] demos fetched:', recentDemos?.length ?? 0, 'error:', demosError?.message ?? null)
 
     if (recentDemos && recentDemos.length > 0) {
       type PD = {
@@ -174,8 +177,11 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
   // Annotate context sparseness so the AI knows when it must stay conservative
   const matchCount = (contextText.match(/Match \d+:/g) || []).length
   const hasPlayerData = contextText.includes('Rating')
+  const noDataMessage = mode === 'myteam'
+    ? '\n⚠ DATA AVAILABILITY: No completed self-demos are available for this team yet. You MUST NOT invent or assume any maps, players, scores, or strategies. Tell the user warmly that you need their uploaded demos to provide specific analysis — let them know they should upload demos in My Team and wait for parsing to complete, then come back.'
+    : '\n⚠ DATA AVAILABILITY: No completed demos are available for this analysis. You MUST NOT invent or assume any maps, players, scores, or strategies. Acknowledge the lack of data and tell the user to upload demos before you can provide specific analysis.'
   const dataWarning = matchCount === 0
-    ? '\n⚠ DATA AVAILABILITY: No completed demos are available for this analysis. You MUST NOT invent or assume any maps, players, scores, or strategies. Acknowledge the lack of data and tell the user to upload demos before you can provide specific analysis.'
+    ? noDataMessage
     : matchCount < 2
       ? `\n⚠ DATA AVAILABILITY: Only ${matchCount} match is available. Base your entire analysis EXCLUSIVELY on the data shown above. Do NOT reference any maps, rounds, players, or tendencies not explicitly listed in the context. If the data is insufficient to answer confidently, say so.`
       : !hasPlayerData
@@ -203,7 +209,7 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
   const isMyTeam = mode === 'myteam'
 
   const systemPrompt = isMyTeam
-    ? `You are an elite Counter-Strike 2 performance coach specialising in team improvement and self-analysis. You analyse a team's OWN demos to help them grow, fix weaknesses, and build a stronger playbook. You communicate like a dedicated coaching staff member who genuinely wants the team to improve.
+    ? `You are an experienced CS2 coach. Analyze the provided team demo data to give honest, specific, and actionable feedback on weaknesses, strengths, and improvements. You specialise in team self-analysis — reviewing a team's OWN demos to help them grow, fix weaknesses, and build a stronger playbook. You communicate like a dedicated coaching staff member who genuinely wants the team to improve.
 
 IMPORTANT CONTEXT: The demos provided are of the USER'S OWN TEAM — not an opponent. Your analysis should always focus on what ${teamName} can do better, what patterns to build on, and how to maximise their potential.
 
