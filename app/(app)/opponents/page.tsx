@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import OpponentCardWithDelete from '@/components/teams/OpponentCardWithDelete'
-import { Target, Brain, Upload } from 'lucide-react'
+import { Target, Brain, Upload, Layers, Activity } from 'lucide-react'
 import type { AggregatedStats } from '@/types/database'
 
 export default async function OpponentsPage() {
@@ -89,21 +89,25 @@ export default async function OpponentsPage() {
   const analyzedDemos  = ((allDemos ?? []) as DemoRow[]).filter(d => d.status === 'completed').length
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-5 md:p-7 space-y-6 max-w-7xl mx-auto">
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 animate-fade-in-up">
         <div>
-          <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.15em] mb-1.5">Scouting</p>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">Opponents</h1>
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+          <p className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-[0.14em] mb-1">
+            Scouting
+          </p>
+          <h1 className="text-[22px] md:text-2xl font-bold text-foreground tracking-tight">
+            Opponents
+          </h1>
+          <p className="text-[13px] text-muted-foreground mt-1">
             Your scouting library — teams you&apos;re preparing to face
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link href="/ai-coach">
-            <Button variant="outline" className="gap-2 hover:border-neon-green/40 hover:text-neon-green hover:bg-neon-green/[0.06]">
-              <Brain size={16} />
+            <Button variant="secondary" className="gap-2">
+              <Brain size={15} />
               AI Scout
             </Button>
           </Link>
@@ -113,33 +117,53 @@ export default async function OpponentsPage() {
         </div>
       </div>
 
-      {/* ── Stats bar ── */}
+      {/* ── Stats row ── */}
       <div className="grid grid-cols-3 gap-3 animate-fade-in-up animate-fade-in-up-delay-1">
-        <div className="relative rounded-xl bg-card border border-border p-4 text-center stat-card-red card-hover overflow-hidden">
-          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-red-500/[0.04] to-transparent pointer-events-none" />
-          <p className="text-2xl font-bold tabular-nums text-red-400">{totalOpponents}</p>
-          <p className="text-[11px] font-medium text-muted-foreground mt-0.5 uppercase tracking-wide">Opponents</p>
+        <div className={cn(
+          'relative rounded-xl bg-card border border-border p-4 card-hover overflow-hidden stat-card-red'
+        )}>
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Opponents</p>
+            <div className="p-1.5 rounded-lg bg-red-500/10 shrink-0">
+              <Target size={14} className="text-red-400" />
+            </div>
+          </div>
+          <p className="text-[28px] font-bold tabular-nums text-foreground font-mono leading-none">{totalOpponents}</p>
         </div>
-        <div className="relative rounded-xl bg-card border border-border p-4 text-center stat-card-blue card-hover overflow-hidden">
-          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-blue-500/[0.04] to-transparent pointer-events-none" />
-          <p className="text-2xl font-bold tabular-nums text-foreground">{totalDemos}</p>
-          <p className="text-[11px] font-medium text-muted-foreground mt-0.5 uppercase tracking-wide">Uploaded</p>
+
+        <div className={cn(
+          'relative rounded-xl bg-card border border-border p-4 card-hover overflow-hidden stat-card-blue'
+        )}>
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Uploaded</p>
+            <div className="p-1.5 rounded-lg bg-blue-500/10 shrink-0">
+              <Layers size={14} className="text-blue-400" />
+            </div>
+          </div>
+          <p className="text-[28px] font-bold tabular-nums text-foreground font-mono leading-none">{totalDemos}</p>
         </div>
-        <div className="relative rounded-xl bg-card border border-border p-4 text-center stat-card-green card-hover overflow-hidden">
-          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-neon-green/[0.04] to-transparent pointer-events-none" />
-          <p className="text-2xl font-bold tabular-nums text-neon-green">{analyzedDemos}</p>
-          <p className="text-[11px] font-medium text-muted-foreground mt-0.5 uppercase tracking-wide">Analyzed</p>
+
+        <div className={cn(
+          'relative rounded-xl bg-card border border-border p-4 card-hover overflow-hidden stat-card-green'
+        )}>
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Analyzed</p>
+            <div className="p-1.5 rounded-lg bg-[rgba(16,217,160,0.1)] shrink-0">
+              <Activity size={14} className="text-[#10D9A0]" />
+            </div>
+          </div>
+          <p className="text-[28px] font-bold tabular-nums text-[#10D9A0] font-mono leading-none">{analyzedDemos}</p>
         </div>
       </div>
 
       {/* ── Opponent grid ── */}
       {(folders ?? []).length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in-up animate-fade-in-up-delay-2">
-          <div className="w-20 h-20 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-5">
-            <Target size={32} className="text-red-400" />
+          <div className="w-16 h-16 rounded-2xl bg-red-500/[0.08] border border-red-500/15 flex items-center justify-center mb-5">
+            <Target size={28} className="text-red-400/70" />
           </div>
-          <h2 className="text-xl font-bold text-foreground mb-2">No opponents scouted yet</h2>
-          <p className="text-muted-foreground max-w-xs mb-6 text-sm leading-relaxed">
+          <h2 className="text-[17px] font-bold text-foreground mb-2">No opponents scouted yet</h2>
+          <p className="text-[13px] text-muted-foreground max-w-xs mb-6 leading-relaxed">
             Upload your first opponent demo to start building your scouting library.
           </p>
           {primaryTeamId && (
@@ -173,16 +197,16 @@ export default async function OpponentsPage() {
           {/* Add opponent CTA card */}
           {primaryTeamId && (
             <div className="h-full">
-              <Card className="bg-card/60 border-dashed border-border hover:border-neon-green/40 hover:bg-card transition-all duration-200 group h-full card-hover">
+              <Card className="bg-card/50 border-dashed border-border hover:border-[rgba(16,217,160,0.35)] hover:bg-card transition-all duration-200 group h-full card-hover">
                 <CardContent className="p-5 flex flex-col items-center justify-center h-full min-h-[160px] text-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-neon-green/10 flex items-center justify-center group-hover:bg-neon-green/20 transition-colors border border-neon-green/20">
-                    <Upload size={18} className="text-neon-green" />
+                  <div className="w-10 h-10 rounded-xl bg-[rgba(16,217,160,0.08)] flex items-center justify-center group-hover:bg-[rgba(16,217,160,0.15)] transition-colors border border-[rgba(16,217,160,0.15)]">
+                    <Upload size={17} className="text-[#10D9A0]" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground group-hover:text-neon-green transition-colors">
+                    <p className="text-[13px] font-semibold text-foreground group-hover:text-[#10D9A0] transition-colors">
                       Scout another opponent
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Upload a demo to add them</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Upload a demo to add them</p>
                   </div>
                   <DemoUploadButton teamId={primaryTeamId} />
                 </CardContent>

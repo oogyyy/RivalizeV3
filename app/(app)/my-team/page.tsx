@@ -40,9 +40,6 @@ export default async function MyTeamPage() {
     if (team?.name) teamName = team.name
   }
 
-  // Fetch ONLY self-demos (demo_type = 'self') for the My Team page.
-  // Opponent demos (demo_type = 'opponent') are completely excluded here —
-  // they belong exclusively in the Opponents / scouting section.
   type DemoRow = {
     id: string
     status: string
@@ -77,7 +74,7 @@ export default async function MyTeamPage() {
         .from('demos')
         .select('id, status, map, match_date, created_at, opponent_slug, parsed_data, error_message')
         .eq('team_id', primaryTeamId)
-        .eq('demo_type', 'self')   // STRICT: only own-team demos shown here
+        .eq('demo_type', 'self')
         .order('created_at', { ascending: false })
         .limit(50)
     : { data: [] }
@@ -85,7 +82,6 @@ export default async function MyTeamPage() {
   const demos = (recentDemos ?? []) as DemoRow[]
   const completedDemos = demos.filter(d => d.status === 'completed')
 
-  // Aggregate my-team stats across all completed demos
   let totalMatches = 0
   let totalWins = 0
   let totalDraws = 0
@@ -115,7 +111,7 @@ export default async function MyTeamPage() {
         ? (h?.team1 ?? 'T-Side')
         : (h?.team2 ?? 'CT-Side')
       for (const p of pd.players) {
-        if (p.team === opponentLabel) continue  // skip opponent
+        if (p.team === opponentLabel) continue
         totalKills += p.kills
         totalDeaths += p.deaths
         totalAdr += p.adr
@@ -153,8 +149,6 @@ export default async function MyTeamPage() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
 
-  // ── Map-based grouping for the demo list ─────────────────────────────────────
-  // Key = canonical map name; 'processing'/'unknown'/null all collapse to 'unknown'
   const mapGroupMap = new Map<string, { demos: DemoRowData[]; wins: number; losses: number; draws: number; lastActivity: string }>()
 
   for (const demo of demos) {
@@ -181,7 +175,6 @@ export default async function MyTeamPage() {
     }
   }
 
-  // Sort: known maps by most-recent first; 'unknown' always last
   const mapGroups: MapGroup[] = [...mapGroupMap.entries()]
     .map(([map, data]) => ({ map, ...data }))
     .sort((a, b) => {
@@ -193,186 +186,197 @@ export default async function MyTeamPage() {
   const AI_QUICK_ACTIONS = [
     {
       href: `/ai-coach?mode=myteam&focus=weakness`,
-      icon: <TrendingUp size={20} className="text-red-400" />,
-      bg: 'bg-red-500/10 border-red-500/20',
+      icon: <TrendingUp size={16} className="text-red-400" />,
+      iconBg: 'bg-red-500/10 border-red-500/15',
       title: 'Weak Spots',
       description: 'Identify recurring mistakes and areas to improve',
     },
     {
       href: `/ai-coach?mode=myteam&focus=executes`,
-      icon: <Zap size={20} className="text-yellow-400" />,
-      bg: 'bg-yellow-500/10 border-yellow-500/20',
-      title: 'Executes on Map',
+      icon: <Zap size={16} className="text-amber-400" />,
+      iconBg: 'bg-amber-500/10 border-amber-500/15',
+      title: 'Executes',
       description: 'Review execute quality, utility usage, and timings',
     },
     {
       href: `/ai-coach?mode=myteam&focus=rounds`,
-      icon: <BarChart3 size={20} className="text-blue-400" />,
-      bg: 'bg-blue-500/10 border-blue-500/20',
-      title: 'Round-by-Round',
-      description: 'Analyse key rounds — clutches, eco plays, and late rounds',
+      icon: <BarChart3 size={16} className="text-blue-400" />,
+      iconBg: 'bg-blue-500/10 border-blue-500/15',
+      title: 'Round Review',
+      description: 'Analyse clutches, eco plays, and late rounds',
     },
     {
       href: `/ai-coach?mode=myteam&focus=drills`,
-      icon: <Crosshair size={20} className="text-purple-400" />,
-      bg: 'bg-purple-500/10 border-purple-500/20',
+      icon: <Crosshair size={16} className="text-violet-400" />,
+      iconBg: 'bg-violet-500/10 border-violet-500/15',
       title: 'Practice Drills',
-      description: 'Personalised drill recommendations based on your data',
+      description: 'Personalised drill recommendations',
     },
     {
       href: `/ai-coach?mode=myteam&focus=strategy`,
-      icon: <Brain size={20} className="text-neon-green" />,
-      bg: 'bg-neon-green/10 border-neon-green/20',
+      icon: <Brain size={16} className="text-[#10D9A0]" />,
+      iconBg: 'bg-[rgba(16,217,160,0.1)] border-[rgba(16,217,160,0.15)]',
       title: 'Strategy Coach',
-      description: 'Build a T-side and CT-side playbook tailored to your roster',
+      description: 'Build a playbook tailored to your roster',
     },
   ]
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-      {/* Header */}
+    <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between animate-fade-in-up">
         <div>
-          <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.15em] mb-1.5">My Team</p>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">{teamName}</h1>
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">Your team&apos;s performance overview</p>
+          <p className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-[0.14em] mb-1">
+            My Team
+          </p>
+          <h1 className="text-[22px] md:text-2xl font-bold text-foreground tracking-tight">{teamName}</h1>
+          <p className="text-[13px] text-muted-foreground mt-1">Your team&apos;s performance overview</p>
         </div>
-        {/* Self-demo upload — marked demo_type='self' so it never leaks into Opponent folders */}
         {primaryTeamId && (
           <DemoUploadButton teamId={primaryTeamId} demoType="self" />
         )}
       </div>
 
-      {/* Team Overview Stats */}
+      {/* ── Stats row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-fade-in-up animate-fade-in-up-delay-1">
         <StatCard
           label="Matches"
           value={totalMatches || '—'}
           sub={totalMatches > 0 ? `${totalWins}W ${totalLosses}L ${totalDraws}D` : 'No demos yet'}
-          icon={<Trophy size={16} className="text-yellow-400" />}
+          icon={<Trophy size={15} className="text-amber-400" />}
+          iconBg="bg-amber-500/10"
           accent="stat-card-amber"
         />
         <StatCard
           label="Win Rate"
           value={totalMatches > 0 ? `${Math.round(winRate * 100)}%` : '—'}
           sub={totalMatches > 0 ? `${totalWins} wins from ${totalMatches}` : 'Upload demos to track'}
-          icon={<TrendingUp size={16} className="text-neon-green" />}
-          highlight={winRate >= 0.5}
+          icon={<TrendingUp size={15} className="text-[#10D9A0]" />}
+          iconBg="bg-[rgba(16,217,160,0.1)]"
           accent="stat-card-green"
+          highlight={winRate >= 0.5}
         />
         <StatCard
           label="Team K/D"
           value={avgKD}
           sub="Combined team ratio"
-          icon={<Crosshair size={16} className="text-blue-400" />}
+          icon={<Crosshair size={15} className="text-blue-400" />}
+          iconBg="bg-blue-500/10"
           accent="stat-card-blue"
         />
         <StatCard
           label="Avg ADR"
           value={avgAdr}
           sub="Avg damage per round"
-          icon={<BarChart3 size={16} className="text-purple-400" />}
+          icon={<BarChart3 size={15} className="text-violet-400" />}
+          iconBg="bg-violet-500/10"
           accent="stat-card-purple"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up animate-fade-in-up-delay-2">
-        {/* Left: Player stats + Map pool */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fade-in-up animate-fade-in-up-delay-2">
+
+        {/* ── Left: Player stats + Map pool + Demos ── */}
         <div className="lg:col-span-2 space-y-5">
+
           {/* Top Players */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="h-[2px] w-full bg-gradient-to-r from-neon-green/50 via-neon-green/15 to-transparent" />
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="accent-line-green w-full" />
             <div className="p-5">
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 rounded-md bg-neon-green/15 flex items-center justify-center">
-                  <Users size={13} className="text-neon-green" />
+                <div className="w-6 h-6 rounded-md bg-[rgba(16,217,160,0.1)] flex items-center justify-center">
+                  <Users size={13} className="text-[#10D9A0]" />
                 </div>
-                <h2 className="text-sm font-semibold text-foreground">Top Players</h2>
+                <h2 className="text-[13px] font-semibold text-foreground">Top Players</h2>
               </div>
               {topPlayers.length === 0 ? (
                 <EmptyState
-                  icon={<Users size={20} className="text-muted-foreground" />}
+                  icon={<Users size={18} className="text-muted-foreground/40" />}
                   text="No player data yet. Upload and parse demos to see your roster's stats."
                 />
               ) : (
-                <div className="space-y-1">
-                  {topPlayers.map((p, i) => (
-                    <div key={p.name} className="flex items-center gap-3 py-2.5 border-b border-border/60 last:border-0">
-                      <span className={cn(
-                        'text-xs w-5 h-5 rounded-md flex items-center justify-center shrink-0 font-bold font-mono',
-                        i === 0 ? 'bg-yellow-400/15 text-yellow-400' :
-                        i === 1 ? 'bg-muted/80 text-muted-foreground' :
-                                  'bg-transparent text-muted-foreground/60'
-                      )}>{i + 1}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{p.games} {p.games === 1 ? 'game' : 'games'}</p>
+                <div>
+                  {/* Table header */}
+                  <div className="grid grid-cols-[1fr_56px_48px_48px] gap-2 px-2 pb-2 border-b border-border/50">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Player</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 text-right">Rating</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 text-right">ADR</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 text-right">K/D</p>
+                  </div>
+                  <div>
+                    {topPlayers.map((p, i) => (
+                      <div key={p.name} className="grid grid-cols-[1fr_56px_48px_48px] gap-2 px-2 py-2.5 border-b border-border/30 last:border-0 items-center hover:bg-accent/40 rounded-lg transition-colors">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={cn(
+                            'text-[10px] w-5 h-5 rounded-md flex items-center justify-center shrink-0 font-bold font-mono',
+                            i === 0 ? 'bg-amber-400/15 text-amber-400' :
+                            i === 1 ? 'bg-muted/80 text-muted-foreground' :
+                                      'text-muted-foreground/50'
+                          )}>{i + 1}</span>
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-medium text-foreground truncate">{p.name}</p>
+                            <p className="text-[10px] text-muted-foreground/50">{p.games} {p.games === 1 ? 'game' : 'games'}</p>
+                          </div>
+                        </div>
+                        <p className={cn(
+                          'font-mono text-[13px] font-bold text-right',
+                          p.avgRating >= 1.1 ? 'text-[#10D9A0]' : p.avgRating >= 0.9 ? 'text-foreground' : 'text-red-400'
+                        )}>
+                          {p.avgRating.toFixed(2)}
+                        </p>
+                        <p className="font-mono text-[12px] text-muted-foreground text-right">{p.avgAdr.toFixed(0)}</p>
+                        <p className="font-mono text-[12px] text-muted-foreground text-right">
+                          {p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : '—'}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-right shrink-0">
-                        <div>
-                          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">Rating</p>
-                          <p className={cn('font-mono font-bold', p.avgRating >= 1.1 ? 'text-neon-green' : p.avgRating >= 0.9 ? 'text-foreground' : 'text-red-400')}>
-                            {p.avgRating.toFixed(2)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">ADR</p>
-                          <p className="font-mono text-foreground font-medium">{p.avgAdr.toFixed(0)}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">K/D</p>
-                          <p className="font-mono text-foreground font-medium">
-                            {p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
           {/* Map Pool */}
-          <div className="bg-card border border-border rounded-xl p-5">
+          <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-md bg-neon-green/15 flex items-center justify-center">
-                <MapIcon size={13} className="text-neon-green" />
+              <div className="w-6 h-6 rounded-md bg-[rgba(16,217,160,0.1)] flex items-center justify-center">
+                <MapIcon size={13} className="text-[#10D9A0]" />
               </div>
-              <h2 className="text-sm font-semibold text-foreground">Map Pool</h2>
+              <h2 className="text-[13px] font-semibold text-foreground">Map Pool</h2>
             </div>
             {topMaps.length === 0 ? (
               <EmptyState
-                icon={<MapIcon size={20} className="text-muted-foreground" />}
+                icon={<MapIcon size={18} className="text-muted-foreground/40" />}
                 text="No map data yet."
               />
             ) : (
               <div className="flex flex-wrap gap-2">
                 {topMaps.map(([map, count]) => (
-                  <div key={map} className="flex items-center gap-2 px-3 py-1.5 bg-muted/40 hover:bg-muted/60 rounded-lg border border-border transition-colors">
-                    <span className="text-sm font-medium text-foreground">{map.replace('de_', '')}</span>
-                    <span className="text-xs font-mono text-neon-green bg-neon-green/10 px-1.5 py-0.5 rounded">{count}×</span>
+                  <div key={map} className="flex items-center gap-2 px-3 py-1.5 bg-accent/50 hover:bg-accent/80 rounded-lg border border-border/60 transition-colors">
+                    <span className="text-[13px] font-medium text-foreground">{map.replace('de_', '')}</span>
+                    <span className="text-[11px] font-mono text-[#10D9A0] bg-[rgba(16,217,160,0.1)] px-1.5 py-0.5 rounded">{count}×</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* My Team's Demos — grouped by map */}
+          {/* Demo list */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <FileVideo size={16} className="text-neon-green" />
-              <h2 className="text-sm font-semibold text-foreground">My Team&apos;s Demos</h2>
+              <FileVideo size={15} className="text-[#10D9A0]" />
+              <h2 className="text-[13px] font-semibold text-foreground">My Team&apos;s Demos</h2>
               {demos.length > 0 && (
-                <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded font-mono">
+                <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
                   {demos.length} · {mapGroups.filter(g => g.map !== 'unknown').length} maps
                 </span>
               )}
             </div>
             {demos.length === 0 ? (
-              <div className="bg-card border border-border rounded-xl">
+              <div className="rounded-xl border border-border bg-card">
                 <EmptyState
-                  icon={<FileVideo size={20} className="text-muted-foreground" />}
+                  icon={<FileVideo size={18} className="text-muted-foreground/40" />}
                   text="No team demos uploaded yet. Use the Upload button above to add your team's own demos."
                 />
               </div>
@@ -382,50 +386,48 @@ export default async function MyTeamPage() {
           </div>
         </div>
 
-        {/* Right: AI Quick Actions */}
+        {/* ── Right: AI Quick Actions ── */}
         <div className="space-y-4">
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="h-[2px] w-full bg-gradient-to-r from-neon-green/50 via-neon-green/15 to-transparent" />
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="accent-line-green w-full" />
             <div className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-md bg-neon-green/15 flex items-center justify-center">
-                <Brain size={13} className="text-neon-green" />
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-6 h-6 rounded-md bg-[rgba(16,217,160,0.1)] flex items-center justify-center">
+                  <Brain size={13} className="text-[#10D9A0]" />
+                </div>
+                <h2 className="text-[13px] font-semibold text-foreground">AI Analyst</h2>
+                <Badge variant="neon" className="ml-auto text-[10px]">Llama 3.3</Badge>
               </div>
-              <h2 className="text-sm font-semibold text-foreground">AI Analyst</h2>
-              <Badge variant="neon" className="text-xs ml-auto">Llama 3.3</Badge>
+              <p className="text-[12px] text-muted-foreground mb-4 leading-relaxed">
+                Analyse your demos to identify weaknesses, improve executes, and build your playbook.
+              </p>
+              <div className="space-y-1.5">
+                {AI_QUICK_ACTIONS.map(action => (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:border-border bg-transparent hover:bg-accent/50 transition-all group"
+                  >
+                    <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border', action.iconBg)}>
+                      {action.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-foreground">{action.title}</p>
+                      <p className="text-[11px] text-muted-foreground/60 leading-tight mt-0.5">{action.description}</p>
+                    </div>
+                    <ArrowRight size={13} className="text-muted-foreground/40 group-hover:text-foreground shrink-0 transition-colors" />
+                  </Link>
+                ))}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-              Analyse your team&apos;s demos to identify weaknesses, improve executes, and build your playbook.
-            </p>
-            <div className="space-y-2">
-              {AI_QUICK_ACTIONS.map(action => (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  className={cn(
-                    'flex items-center gap-3 p-3 rounded-lg border transition-all group',
-                    action.bg,
-                    'hover:brightness-110'
-                  )}
-                >
-                  <div className="shrink-0">{action.icon}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{action.title}</p>
-                    <p className="text-xs text-muted-foreground leading-tight mt-0.5">{action.description}</p>
-                  </div>
-                  <ArrowRight size={14} className="text-muted-foreground group-hover:text-foreground shrink-0 transition-colors" />
-                </Link>
-              ))}
-            </div>
-            </div>{/* /p-5 */}
-          </div>{/* /card */}
+          </div>
 
           {totalMatches === 0 && primaryTeamId && (
-            <div className="bg-card border border-border rounded-xl p-5 text-center">
-              <FileVideo size={24} className="text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground mb-1">Upload your demos</p>
-              <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-                Upload your team's own match demos to unlock performance analysis.
+            <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-center">
+              <FileVideo size={22} className="text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-[13px] font-medium text-foreground mb-1">Upload your demos</p>
+              <p className="text-[12px] text-muted-foreground mb-4 leading-relaxed">
+                Upload your team&apos;s own match demos to unlock performance analysis.
               </p>
               <DemoUploadButton teamId={primaryTeamId} demoType="self" />
             </div>
@@ -437,41 +439,42 @@ export default async function MyTeamPage() {
 }
 
 function StatCard({
-  label, value, sub, icon, highlight, accent,
+  label, value, sub, icon, iconBg, highlight, accent,
 }: {
   label: string
   value: string | number
   sub: string
   icon: React.ReactNode
+  iconBg: string
   highlight?: boolean
   accent?: string
 }) {
   return (
     <div className={cn('relative bg-card border border-border rounded-xl p-4 card-hover overflow-hidden', accent)}>
-      <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
-      <div className="relative flex items-center justify-between mb-2">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.12em] font-semibold">{label}</p>
-        {icon}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[11px] text-muted-foreground/60 uppercase tracking-[0.12em] font-semibold">{label}</p>
+        <div className={cn('p-1.5 rounded-lg shrink-0', iconBg)}>{icon}</div>
       </div>
-      <p className={cn('text-2xl font-bold tracking-tight tabular-nums', highlight ? 'text-neon-green' : 'text-foreground')}>{value}</p>
-      <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>
+      <p className={cn(
+        'text-[26px] font-bold tracking-tight tabular-nums font-mono leading-none',
+        highlight ? 'text-[#10D9A0]' : 'text-foreground'
+      )}>{value}</p>
+      <p className="text-[11px] text-muted-foreground/50 mt-1">{sub}</p>
     </div>
   )
 }
 
-function EmptyState({
-  icon, text, action,
-}: {
+function EmptyState({ icon, text, action }: {
   icon: React.ReactNode
   text: string
   action?: { href: string; label: string }
 }) {
   return (
-    <div className="flex flex-col items-center py-6 text-center">
-      <div className="mb-2 opacity-50">{icon}</div>
-      <p className="text-sm text-muted-foreground">{text}</p>
+    <div className="flex flex-col items-center py-8 text-center">
+      <div className="mb-2">{icon}</div>
+      <p className="text-[13px] text-muted-foreground max-w-xs leading-relaxed">{text}</p>
       {action && (
-        <Link href={action.href} className="mt-2 text-xs text-neon-green hover:underline">
+        <Link href={action.href} className="mt-2 text-[12px] text-[#10D9A0] hover:underline">
           {action.label}
         </Link>
       )}
