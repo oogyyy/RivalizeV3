@@ -15,6 +15,7 @@ import SetOpponentSideButton from '@/components/teams/SetOpponentSideButton'
 import ReparseButton from '@/components/teams/ReparseButton'
 import DeleteDemoButton from '@/components/teams/DeleteDemoButton'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
+import { createClient } from '@/lib/supabase/client'
 import type { DemoHeader } from '@/types/database'
 
 export interface OpponentDemo {
@@ -24,6 +25,7 @@ export interface OpponentDemo {
   match_date: string | null
   created_at: string
   file_size_bytes?: number | null
+  error_message?: string | null
   parsed_data: { header?: DemoHeader; opponentSide?: 'team1' | 'team2' } | null
 }
 
@@ -87,12 +89,28 @@ function BulkDeleteModal({
 export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdmin, opponentDisplayName }: Props) {
   const router = useRouter()
 
-  const hasProcessing = demos.some(d => d.status === 'processing')
+  const processingIds = demos.filter(d => d.status === 'processing').map(d => d.id)
+  const hasProcessing = processingIds.length > 0
+
   useEffect(() => {
     if (!hasProcessing) return
-    const id = setInterval(() => router.refresh(), 5000)
-    return () => clearInterval(id)
-  }, [hasProcessing, router])
+    const supabase = createClient()
+    const channel = supabase
+      .channel('opponent-demo-status')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'demos' }, (payload) => {
+        const updated = payload.new as { id: string; status: string }
+        if (processingIds.includes(updated.id) && updated.status !== 'processing') {
+          router.refresh()
+        }
+      })
+      .subscribe()
+    const poll = setInterval(() => router.refresh(), 8_000)
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(poll)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasProcessing])
 
   const [selecting,   setSelecting]   = useState(false)
   const [selected,    setSelected]    = useState<Set<string>>(new Set())
@@ -272,8 +290,8 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                           } : undefined}
                         />
                       )}
-                      {isOwnerOrAdmin && !selecting && (demo.status === 'completed' || demo.status === 'failed') && (
-                        <ReparseButton demoId={demo.id} />
+                      {isOwnerOrAdmin && !selecting && demo.status === 'completed' && (
+                        <ReparseButton demoId={demo.id} variant="icon" />
                       )}
                     </div>
                   </div>
@@ -295,13 +313,30 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                           </Link>
                         </>
                       )}
-                      {isOwnerOrAdmin && href && (
-                        <a href={href} className="sr-only">View</a>
-                      )}
                       {isOwnerOrAdmin && <DeleteDemoButton demoId={demo.id} />}
                     </div>
                   )}
                 </div>
+
+                {/* Stuck / failed recovery */}
+                {!selecting && isOwnerOrAdmin && (demo.status === 'processing' || demo.status === 'failed') && (
+                  <div className={cn(
+                    'mt-3 flex items-start gap-3 rounded-lg px-3 py-2 border',
+                    demo.status === 'failed' ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20',
+                  )}>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn('text-[11px] font-medium', demo.status === 'failed' ? 'text-red-400' : 'text-amber-400')}>
+                        {demo.status === 'failed' ? 'Parsing failed' : 'Stuck in processing'}
+                      </p>
+                      {demo.error_message && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 break-words" title={demo.error_message}>
+                          {demo.error_message}
+                        </p>
+                      )}
+                    </div>
+                    <ReparseButton demoId={demo.id} variant="prominent" />
+                  </div>
+                )}
               </CardContent>
             </Card>
           )

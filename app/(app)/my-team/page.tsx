@@ -74,7 +74,7 @@ export default async function MyTeamPage() {
   const { data: recentDemos } = primaryTeamId
     ? await admin
         .from('demos')
-        .select('id, status, map, match_date, created_at, opponent_slug, parsed_data')
+        .select('id, status, map, match_date, created_at, opponent_slug, parsed_data, error_message')
         .eq('team_id', primaryTeamId)
         .eq('demo_type', 'self')   // STRICT: only own-team demos shown here
         .order('created_at', { ascending: false })
