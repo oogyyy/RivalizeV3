@@ -1,6 +1,8 @@
+export const maxDuration = 300 // 5 min — allow after() callbacks to complete on Vercel
+
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { parseCS2Demo } from '@/lib/demo-parser/go-parser-client'
 import { maybeDecompress } from '@/lib/demo-parser/decompress'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
@@ -95,9 +97,10 @@ export async function POST(request: Request) {
     )
   }
 
-  // Background parse — in production replace with a proper job queue
+  // Run parsing after the response is sent — `after` is guaranteed to
+  // complete in both Vercel serverless and self-hosted standalone deployments.
   const demoId = demo.id
-  void (async () => {
+  after(async () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 1500))
 
@@ -185,7 +188,7 @@ export async function POST(request: Request) {
         .update({ status: 'failed', error_message: String(err) })
         .eq('id', demoId)
     }
-  })()
+  })
 
   return NextResponse.json(demo, { status: 201 })
 }

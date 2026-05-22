@@ -1,6 +1,8 @@
+export const maxDuration = 300
+
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { parseCS2Demo } from '@/lib/demo-parser/go-parser-client'
 import { maybeDecompress } from '@/lib/demo-parser/decompress'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
@@ -43,7 +45,7 @@ export async function POST(
 
   await admin.from('demos').update({ status: 'processing' }).eq('id', demoId)
 
-  void (async () => {
+  after(async () => {
     try {
       console.log(`[reparse] Downloading ${demoId} from R2 key: ${r2Key}`)
       const rawBuf = await downloadObject(r2Key)
@@ -120,7 +122,7 @@ export async function POST(
         .update({ status: 'failed', error_message: String(err) })
         .eq('id', demoId)
     }
-  })()
+  })
 
   return NextResponse.json({ success: true, message: 'Re-parsing started' })
 }
