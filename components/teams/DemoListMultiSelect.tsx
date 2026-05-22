@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -121,6 +121,14 @@ export default function DemoListMultiSelect({
   demoHrefSuffix = '',
 }: Props) {
   const router = useRouter()
+
+  // Auto-refresh every 5 s while any demo is still processing
+  const hasProcessing = demos.some(d => d.status === 'processing')
+  useEffect(() => {
+    if (!hasProcessing) return
+    const id = setInterval(() => router.refresh(), 5000)
+    return () => clearInterval(id)
+  }, [hasProcessing, router])
 
   const [selecting,   setSelecting]   = useState(false)
   const [selected,    setSelected]    = useState<Set<string>>(new Set())
@@ -345,7 +353,7 @@ export default function DemoListMultiSelect({
                     {demo.status === 'failed' && (
                       <Badge variant="destructive" className="text-xs shrink-0">Failed</Badge>
                     )}
-                    {showReparse && (demo.status === 'completed' || demo.status === 'failed') && (
+                    {showReparse && (demo.status === 'completed' || demo.status === 'failed' || demo.status === 'processing') && (
                       <ReparseButton demoId={demo.id} />
                     )}
                     {canDelete && (

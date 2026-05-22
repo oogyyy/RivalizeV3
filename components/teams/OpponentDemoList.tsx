@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -86,6 +86,14 @@ function BulkDeleteModal({
 
 export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdmin, opponentDisplayName }: Props) {
   const router = useRouter()
+
+  const hasProcessing = demos.some(d => d.status === 'processing')
+  useEffect(() => {
+    if (!hasProcessing) return
+    const id = setInterval(() => router.refresh(), 5000)
+    return () => clearInterval(id)
+  }, [hasProcessing, router])
+
   const [selecting,   setSelecting]   = useState(false)
   const [selected,    setSelected]    = useState<Set<string>>(new Set())
   const [showConfirm, setShowConfirm] = useState(false)

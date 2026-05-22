@@ -22,7 +22,7 @@ interface DemoUploadButtonProps {
   onSuccess?: () => void
 }
 
-type UploadStatus = 'pending' | 'presigning' | 'uploading' | 'registering' | 'done' | 'error'
+type UploadStatus = 'pending' | 'presigning' | 'uploading' | 'registering' | 'parsing' | 'done' | 'error'
 
 interface FileUpload {
   file: File
@@ -137,6 +137,16 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
       }
 
       const demo = await registerRes.json()
+      updateUpload(i, { status: 'parsing', progress: 100, demoId: demo.id })
+
+      // Parse synchronously — keeps the connection open so the job is guaranteed to finish.
+      const parseRes = await fetch(`/api/demos/${demo.id}/parse`, { method: 'POST' })
+      if (!parseRes.ok) {
+        const parseErr = await parseRes.json().catch(() => ({}))
+        // Parsing failed but the demo was created; show as done so user can retry via reparse.
+        console.warn('[upload] Parse failed:', parseErr.error)
+      }
+
       updateUpload(i, { status: 'done', progress: 100, demoId: demo.id })
       return demo.id as string
     } catch (err) {
@@ -167,6 +177,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
   const handleClose = () => {
     if (isProcessing) return
+    if (uploads.some(u => u.status === 'parsing')) return
     setOpen(false)
     setUploads([])
     setOpponentName('')
@@ -187,6 +198,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
       case 'presigning':  return 'Preparing…'
       case 'uploading':   return `Uploading… ${u.progress > 5 ? `${u.progress - 5}%` : ''}`
       case 'registering': return 'Saving…'
+      case 'parsing':     return 'Parsing demo…'
       case 'done':        return 'Done'
       case 'error':       return u.error ?? 'Failed'
       default:            return 'Ready'
@@ -328,6 +340,11 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                               style={{ width: `${upload.progress}%` }}
                             />
                           </div>
+                        ) : upload.status === 'parsing' ? (
+                          <span className="flex items-center gap-1 text-[10px] text-neon-green font-medium">
+                            <Loader2 size={9} className="animate-spin shrink-0" />
+                            Parsing demo…
+                          </span>
                         ) : (
                           <span className={cn(
                             'text-[10px] font-medium truncate',

@@ -1,13 +1,10 @@
-export const maxDuration = 300 // 5 min — allow after() callbacks to complete on Vercel
+export const maxDuration = 60
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse, after } from 'next/server'
-import { parseCS2Demo } from '@/lib/demo-parser/go-parser-client'
-import { maybeDecompress } from '@/lib/demo-parser/decompress'
-import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
+import { NextResponse } from 'next/server'
+import { getPublicUrl } from '@/lib/r2'
 import { slugify } from '@/lib/utils'
-import { getPublicUrl, downloadObject } from '@/lib/r2'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -19,13 +16,13 @@ const schema = z.object({
   matchDate: z.string().optional(),
   league: z.string().optional(),
   opponentSide: z.enum(['team1', 'team2']).default('team2'),
-  // 'opponent' = scouting upload via Opponents flow
-  // 'self'     = own-team upload via My Team flow
   demoType: z.enum(['opponent', 'self']).default('opponent'),
 })
 
-// Called by the client after a successful direct upload to R2.
-// Creates the demo DB record and kicks off background parsing.
+/**
+ * Creates the demo DB record and returns immediately.
+ * The client is responsible for calling POST /api/demos/[id]/parse next.
+ */
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -41,7 +38,6 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // Verify the caller belongs to their own team. Admin client bypasses RLS.
   const { data: member } = await admin
     .from('team_members')
     .select('role')
@@ -56,15 +52,13 @@ export async function POST(request: Request) {
   const opponentSlug = slugify(opponentName)
   const fileUrl = getPublicUrl(r2Key)
 
-  // Create the demo record — store 'processing' instead of 'unknown' for map
-  const initialMap = map !== 'unknown' ? map : 'processing'
   const { data: demo, error: demoError } = await admin
     .from('demos')
     .insert({
       team_id: teamId,
       opponent_name: opponentName,
       opponent_slug: opponentSlug,
-      map: initialMap,
+      map: map !== 'unknown' ? map : 'unknown',
       match_date: matchDate ?? null,
       league: league ?? null,
       raw_file_path: r2Key,
@@ -72,9 +66,9 @@ export async function POST(request: Request) {
       status: 'processing',
       file_size_bytes: fileSize ?? null,
       created_by: user.id,
-      // Strict separation: 'opponent' demos appear only in Opponent folders;
-      // 'self' demos appear only on the My Team page.
       demo_type: demoType,
+      // Preserve the caller's opponentSide default; the client adjusts it via the card selector.
+      parsed_data: { opponentSide },
     })
     .select()
     .single()
@@ -84,8 +78,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: demoError.message }, { status: 500 })
   }
 
-  // Only create/update a team folder for opponent demos — self-demos do NOT
-  // belong to any opponent folder and must not appear on the Opponents page.
   if (demoType === 'opponent') {
     await admin.from('team_folders').upsert(
       {
@@ -93,102 +85,9 @@ export async function POST(request: Request) {
         opponent_slug: opponentSlug,
         opponent_display_name: opponentName,
       },
-      { onConflict: 'user_team_id,opponent_slug' }
+      { onConflict: 'user_team_id,opponent_slug' },
     )
   }
-
-  // Run parsing after the response is sent — `after` is guaranteed to
-  // complete in both Vercel serverless and self-hosted standalone deployments.
-  const demoId = demo.id
-  after(async () => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
-
-      console.log(`[register] Downloading demo ${demoId} from R2 key: ${r2Key}`)
-      const rawBuf = await downloadObject(r2Key)
-      const buf = maybeDecompress(rawBuf, r2Key)
-      console.log(`[register] Downloaded ${rawBuf.length} bytes → ${buf.length} bytes after decompression, parsing...`)
-      const { parsedData: realData, warnings } = await parseCS2Demo(buf)
-      if (warnings.length > 0) console.warn('[register] Parser warnings:', warnings)
-      console.log(`[register] Parser result: ${realData.players.length} players, map=${realData.header.map}, score=${realData.header.score_team1}-${realData.header.score_team2}`)
-
-      if (realData.players.length === 0) {
-        await admin
-          .from('demos')
-          .update({ status: 'failed', error_message: 'Demo parsed but no player data could be extracted' })
-          .eq('id', demoId)
-        return
-      }
-
-      const parsedData = { ...realData, opponentSide }
-      const resolvedMap = realData.header.map !== 'unknown' ? realData.header.map : (map !== 'unknown' ? map : 'unknown')
-      await admin
-        .from('demos')
-        .update({ parsed_data: parsedData, status: 'completed', map: resolvedMap })
-        .eq('id', demoId)
-
-      // Recalculate folder aggregated stats — only opponent demos belong in folders
-      const { data: allDemos } = await admin
-        .from('demos')
-        .select('parsed_data')
-        .eq('team_id', teamId)
-        .eq('opponent_slug', opponentSlug)
-        .eq('status', 'completed')
-        .eq('demo_type', 'opponent')
-
-      if (allDemos && allDemos.length > 0) {
-        // "Win" = our team's score > opponent's score.
-        // opponentSide tells us which header team slot is the opponent:
-        //   'team2' → opponent is score_team2, we won if score_team1 > score_team2
-        //   'team1' → opponent is score_team1, we won if score_team2 > score_team1
-        type DemoRow = { header?: { score_team1?: number; score_team2?: number }; opponentSide?: string }
-        const wins = allDemos.filter(d => {
-          const pd = d.parsed_data as DemoRow | null
-          const h = pd?.header
-          if (!h) return false
-          const s1 = h.score_team1 ?? 0
-          const s2 = h.score_team2 ?? 0
-          return (pd?.opponentSide === 'team1') ? s2 > s1 : s1 > s2
-        }).length
-
-        const draws = allDemos.filter(d => {
-          const h = (d.parsed_data as DemoRow | null)?.header
-          return h && (h.score_team1 ?? 0) === (h.score_team2 ?? 0)
-        }).length
-
-        const mapsPlayed: Record<string, number> = {}
-        allDemos.forEach(d => {
-          const m = (d.parsed_data as { header?: { map?: string } } | null)?.header?.map
-          if (m) mapsPlayed[m] = (mapsPlayed[m] ?? 0) + 1
-        })
-
-        const topPlayers = computeTopPlayers(allDemos)
-
-        await admin
-          .from('team_folders')
-          .update({
-            aggregated_stats: {
-              total_matches: allDemos.length,
-              wins,
-              losses: allDemos.length - wins - draws,
-              draws,
-              win_rate: wins / allDemos.length,
-              avg_rating: topPlayers.length > 0 ? topPlayers.reduce((s, p) => s + p.rating, 0) / topPlayers.length : 1.0,
-              maps_played: mapsPlayed,
-              top_players: topPlayers,
-            },
-          })
-          .eq('user_team_id', teamId)
-          .eq('opponent_slug', opponentSlug)
-      }
-    } catch (err) {
-      console.error('[register] Background parse failed:', err)
-      await admin
-        .from('demos')
-        .update({ status: 'failed', error_message: String(err) })
-        .eq('id', demoId)
-    }
-  })
 
   return NextResponse.json(demo, { status: 201 })
 }

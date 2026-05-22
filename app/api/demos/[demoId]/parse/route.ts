@@ -5,9 +5,15 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { parseAndSaveDemo } from '@/lib/demo-parser/parse-and-save'
 
+/**
+ * POST /api/demos/[demoId]/parse
+ * Synchronous parse — keeps the HTTP connection open until the demo is fully
+ * parsed and saved. Called by the client immediately after registration so
+ * there is no reliance on background-job infrastructure.
+ */
 export async function POST(
   _req: Request,
-  { params }: { params: Promise<{ demoId: string }> }
+  { params }: { params: Promise<{ demoId: string }> },
 ) {
   const { demoId } = await params
 
@@ -16,15 +22,13 @@ export async function POST(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
-
   const { data: demo } = await admin
     .from('demos')
-    .select('team_id, raw_file_path')
+    .select('team_id, status')
     .eq('id', demoId)
     .single()
 
   if (!demo) return NextResponse.json({ error: 'Demo not found' }, { status: 404 })
-  if (!demo.raw_file_path) return NextResponse.json({ error: 'No file path on record' }, { status: 400 })
 
   const { data: member } = await admin
     .from('team_members')
@@ -35,7 +39,10 @@ export async function POST(
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  await admin.from('demos').update({ status: 'processing' }).eq('id', demoId)
+  // Mark as processing in case it was stuck in another state
+  if (demo.status !== 'processing') {
+    await admin.from('demos').update({ status: 'processing' }).eq('id', demoId)
+  }
 
   try {
     await parseAndSaveDemo(demoId)
