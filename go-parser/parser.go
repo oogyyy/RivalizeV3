@@ -54,15 +54,28 @@ type DemoHeader struct {
 }
 
 type Round struct {
-	Number       int    `json:"number"`
-	Winner       string `json:"winner"`
-	WinReason    string `json:"win_reason"`
-	Duration     int    `json:"duration"`
-	Team1Economy int    `json:"team1_economy"`
-	Team2Economy int    `json:"team2_economy"`
-	BombPlanted  bool   `json:"bomb_planted"`
-	BombDefused  bool   `json:"bomb_defused"`
-	Kills        []Kill `json:"kills"`
+	Number       int            `json:"number"`
+	Winner       string         `json:"winner"`
+	WinReason    string         `json:"win_reason"`
+	Duration     int            `json:"duration"`
+	Team1Economy int            `json:"team1_economy"`
+	Team2Economy int            `json:"team2_economy"`
+	BombPlanted  bool           `json:"bomb_planted"`
+	BombDefused  bool           `json:"bomb_defused"`
+	Kills        []Kill         `json:"kills"`
+	Grenades     []GrenadeEvent `json:"grenades"`
+}
+
+type GrenadeEvent struct {
+	Tick     int     `json:"tick"`
+	Time     float64 `json:"time"`
+	Type     string  `json:"type"` // smoke, flash, he, molotov, decoy
+	Thrower  string  `json:"thrower"`
+	ThrowX   float64 `json:"throw_x"`
+	ThrowY   float64 `json:"throw_y"`
+	LandX    float64 `json:"land_x"`
+	LandY    float64 `json:"land_y"`
+	LandTime float64 `json:"land_time"`
 }
 
 type Kill struct {
@@ -142,6 +155,7 @@ type roundState struct {
 	bombDefused  bool
 	isKnifeRound bool
 	kills        []Kill
+	grenades     []GrenadeEvent
 	// per-player contributions this round (for knife-round post-processing)
 	contribs map[uint64]*roundContrib
 	// KAST helpers
@@ -149,6 +163,14 @@ type roundState struct {
 	victims   map[uint64]bool
 	assisters map[uint64]bool
 	killedBy  map[uint64]killedByEntry
+}
+
+type grenadeInFlight struct {
+	tick    int
+	thrower string
+	gtype   string
+	throwX  float64
+	throwY  float64
 }
 
 type killedByEntry struct {
@@ -176,6 +198,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 	accums := map[uint64]*playerAccum{}
 	var completedRounds []roundState
 	var cur *roundState
+	inFlight := map[int64]*grenadeInFlight{}
 
 	// Team names — only collected from the first half so the names are anchored
 	// to the original T/CT starting sides before the halftime swap.
@@ -217,6 +240,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 
 	p.RegisterEventHandler(func(e events.RoundStart) {
 		gs := p.GameState()
+		inFlight = map[int64]*grenadeInFlight{}
 		// Warmup rounds must not create a tracked round state — kills/damage that
 		// fire during warmup are guarded individually, but we also need to ensure
 		// no warmup roundState is ever handed to RoundEnd and counted.
@@ -466,6 +490,72 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 			atk.utilDmg += dmg
 			rc.utilDmg += dmg
 		}
+	})
+
+	p.RegisterEventHandler(func(e events.GrenadeProjectileThrow) {
+		if cur == nil {
+			return
+		}
+		proj := e.Projectile
+		if proj == nil || proj.WeaponInstance == nil {
+			return
+		}
+		gt := grenadeTypeFromEq(proj.WeaponInstance.Type)
+		if gt == "" {
+			return
+		}
+		pos := proj.Position()
+		thrower := ""
+		if proj.Thrower != nil {
+			thrower = proj.Thrower.Name
+		}
+		tick := p.GameState().IngameTick()
+		inFlight[proj.UniqueID()] = &grenadeInFlight{
+			tick:    tick,
+			thrower: thrower,
+			gtype:   gt,
+			throwX:  float64(pos.X),
+			throwY:  float64(pos.Y),
+		}
+	})
+
+	p.RegisterEventHandler(func(e events.GrenadeProjectileDestroy) {
+		if cur == nil {
+			return
+		}
+		proj := e.Projectile
+		if proj == nil {
+			return
+		}
+		id := proj.UniqueID()
+		inf, ok := inFlight[id]
+		if !ok {
+			return
+		}
+		delete(inFlight, id)
+		pos := proj.Position()
+		tick := p.GameState().IngameTick()
+		throwTime := 0.0
+		landTime := 0.0
+		if cur.startTick > 0 {
+			if inf.tick > cur.startTick {
+				throwTime = float64(inf.tick-cur.startTick) / 64.0
+			}
+			if tick > cur.startTick {
+				landTime = float64(tick-cur.startTick) / 64.0
+			}
+		}
+		cur.grenades = append(cur.grenades, GrenadeEvent{
+			Tick:     inf.tick,
+			Time:     throwTime,
+			Type:     inf.gtype,
+			Thrower:  inf.thrower,
+			ThrowX:   inf.throwX,
+			ThrowY:   inf.throwY,
+			LandX:    float64(pos.X),
+			LandY:    float64(pos.Y),
+			LandTime: landTime,
+		})
 	})
 
 	p.RegisterEventHandler(func(e events.RoundMVPAnnouncement) {
@@ -723,6 +813,7 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 				BombPlanted:  rnd.bombPlanted,
 				BombDefused:  rnd.bombDefused,
 				Kills:        rnd.kills,
+				Grenades:     rnd.grenades,
 			})
 		}
 	}
@@ -788,6 +879,22 @@ func mostCommon(m map[string]int) string {
 		}
 	}
 	return best
+}
+
+func grenadeTypeFromEq(eq common.EquipmentType) string {
+	switch eq {
+	case common.EqSmoke:
+		return "smoke"
+	case common.EqFlash:
+		return "flash"
+	case common.EqHE:
+		return "he"
+	case common.EqMolotov, common.EqIncendiary:
+		return "molotov"
+	case common.EqDecoy:
+		return "decoy"
+	}
+	return ""
 }
 
 func roundReasonString(r events.RoundEndReason) string {
