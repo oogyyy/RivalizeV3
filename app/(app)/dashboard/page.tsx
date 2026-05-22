@@ -165,25 +165,28 @@ export default async function DashboardPage() {
 
       {/* ── Hero welcome ── */}
       <div className="relative rounded-2xl overflow-hidden border border-border bg-card animate-fade-in-up">
-        {/* Subtle gradient backdrop */}
-        <div className="absolute inset-0 bg-gradient-to-br from-neon-green/[0.04] via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-0 left-0 w-64 h-32 bg-neon-green/[0.04] blur-3xl pointer-events-none" />
+        {/* Top accent line */}
+        <div className="h-px w-full bg-gradient-to-r from-neon-green/60 via-neon-green/20 to-transparent" />
+        {/* Atmospheric layers */}
+        <div className="absolute inset-0 bg-gradient-to-br from-neon-green/[0.06] via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -left-10 w-80 h-56 bg-neon-green/[0.04] blur-3xl rounded-full pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.01] to-transparent pointer-events-none" />
 
-        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 md:p-6">
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 md:p-7">
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">
+            <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.15em] mb-1.5">
               Dashboard
             </p>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
               Welcome back,{' '}
               <span className="text-neon-green neon-text">{displayName}</span>
             </h1>
-            <p className="mt-1.5 text-muted-foreground text-sm">
+            <p className="mt-1.5 text-muted-foreground text-sm leading-relaxed">
               Your match-prep hub — study opponents, generate anti-strats, win.
             </p>
           </div>
           <Link href="/ai-coach" className="shrink-0">
-            <Button variant="neon" className="gap-2 shadow-lg shadow-neon-green/10">
+            <Button variant="neon" className="gap-2">
               <Brain size={16} />
               AI Scout
             </Button>
@@ -406,31 +409,32 @@ export default async function DashboardPage() {
         {/* ── Right sidebar ── */}
         <div className="space-y-4">
           {/* Quick Actions */}
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-foreground">Quick Actions</CardTitle>
+          <Card className="bg-card border-border overflow-hidden">
+            <div className="h-px w-full bg-gradient-to-r from-neon-green/40 via-neon-green/10 to-transparent" />
+            <CardHeader className="pb-3 pt-4">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.12em]">Quick Actions</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-1.5">
               <Link href="/opponents" className="block">
-                <Button variant="outline" className="w-full justify-start gap-3 h-10 text-sm hover:border-red-500/40 hover:text-red-300 hover:bg-red-500/5 transition-all">
+                <Button variant="outline" className="w-full justify-start gap-3 h-10 text-sm hover:border-red-500/40 hover:text-red-300 hover:bg-red-500/[0.07]">
                   <Target size={14} className="text-red-400" />
                   Upload Opponent Demo
                 </Button>
               </Link>
               <Link href="/my-team" className="block">
-                <Button variant="outline" className="w-full justify-start gap-3 h-10 text-sm hover:border-neon-green/40 hover:text-neon-green hover:bg-neon-green/5 transition-all">
+                <Button variant="outline" className="w-full justify-start gap-3 h-10 text-sm hover:border-neon-green/40 hover:text-neon-green hover:bg-neon-green/[0.06]">
                   <Shield size={14} className="text-neon-green" />
                   Upload Team Demo
                 </Button>
               </Link>
               <Link href="/opponents" className="block">
-                <Button variant="outline" className="w-full justify-start gap-3 h-10 text-sm hover:border-border/80 hover:bg-accent/50 transition-all">
+                <Button variant="outline" className="w-full justify-start gap-3 h-10 text-sm hover:border-border/80 hover:bg-white/[0.03]">
                   <BarChart3 size={14} className="text-muted-foreground" />
                   View All Opponents
                 </Button>
               </Link>
               <Link href="/ai-coach" className="block">
-                <Button variant="outline" className="w-full justify-start gap-3 h-10 text-sm hover:border-neon-green/40 hover:text-neon-green hover:bg-neon-green/5 transition-all">
+                <Button variant="outline" className="w-full justify-start gap-3 h-10 text-sm hover:border-neon-green/40 hover:text-neon-green hover:bg-neon-green/[0.06]">
                   <Brain size={14} className="text-neon-green" />
                   Generate Anti-Strat
                 </Button>
@@ -500,18 +504,20 @@ export default async function DashboardPage() {
 
           {/* AI CTA */}
           {totalDemos > 0 && (
-            <div className="relative rounded-xl border border-neon-green/20 bg-card overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-neon-green/[0.07] to-transparent pointer-events-none" />
-              <div className="relative p-4 text-center">
-                <div className="w-10 h-10 rounded-xl bg-neon-green/15 border border-neon-green/25 flex items-center justify-center mx-auto mb-3">
-                  <Brain size={18} className="text-neon-green" />
+            <div className="relative rounded-xl border border-neon-green/25 bg-card overflow-hidden">
+              <div className="h-px w-full bg-gradient-to-r from-neon-green/60 via-neon-green/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-br from-neon-green/[0.08] to-transparent pointer-events-none" />
+              <div className="absolute -top-6 -right-6 w-24 h-24 bg-neon-green/[0.06] blur-2xl rounded-full pointer-events-none" />
+              <div className="relative p-5 text-center">
+                <div className="w-11 h-11 rounded-xl bg-neon-green/15 border border-neon-green/30 flex items-center justify-center mx-auto mb-3 shadow-[0_0_12px_rgba(0,255,135,0.15)]">
+                  <Brain size={19} className="text-neon-green" />
                 </div>
-                <p className="text-sm font-semibold text-foreground mb-1">Ready to prep?</p>
-                <p className="text-xs text-muted-foreground mb-3">
+                <p className="text-sm font-bold text-foreground mb-1">Ready to prep?</p>
+                <p className="text-xs text-muted-foreground mb-4">
                   {analyzedDemos} demo{analyzedDemos !== 1 ? 's' : ''} analyzed
                 </p>
                 <Link href="/ai-coach">
-                  <Button variant="neon" size="sm" className="w-full gap-2 shadow-lg shadow-neon-green/10">
+                  <Button variant="neon" size="sm" className="w-full gap-2">
                     <Brain size={14} />
                     Open AI Scout
                   </Button>
@@ -534,13 +540,15 @@ function StatCard({ label, value, icon, accent }: {
   accent: string
 }) {
   return (
-    <div className={cn('bg-card border border-border rounded-xl p-4 md:p-5 card-hover', accent)}>
-      <div className="flex items-start justify-between gap-2">
+    <div className={cn('relative bg-card border border-border rounded-xl p-4 md:p-5 card-hover overflow-hidden', accent)}>
+      {/* Inner top gradient */}
+      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-white/[0.025] to-transparent pointer-events-none" />
+      <div className="relative flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs text-muted-foreground font-medium">{label}</p>
-          <p className="text-2xl md:text-3xl font-bold text-foreground mt-1 tracking-tight">{value}</p>
+          <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-[0.12em]">{label}</p>
+          <p className="text-2xl md:text-3xl font-bold text-foreground mt-1.5 tabular-nums">{value}</p>
         </div>
-        <div className="p-2 rounded-lg bg-accent/60 mt-0.5 shrink-0">
+        <div className="p-2.5 rounded-xl bg-accent/80 border border-border/60 mt-0.5 shrink-0">
           {icon}
         </div>
       </div>

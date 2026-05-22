@@ -233,9 +233,9 @@ export default async function MyTeamPage() {
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in-up">
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">My Team</p>
+          <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.15em] mb-1.5">My Team</p>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">{teamName}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Your team&apos;s performance overview</p>
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">Your team&apos;s performance overview</p>
         </div>
         {/* Self-demo upload — marked demo_type='self' so it never leaks into Opponent folders */}
         {primaryTeamId && (
@@ -447,13 +447,14 @@ function StatCard({
   accent?: string
 }) {
   return (
-    <div className={cn('bg-card border border-border rounded-xl p-4 card-hover', accent)}>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{label}</p>
+    <div className={cn('relative bg-card border border-border rounded-xl p-4 card-hover overflow-hidden', accent)}>
+      <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
+      <div className="relative flex items-center justify-between mb-2">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.12em] font-semibold">{label}</p>
         {icon}
       </div>
-      <p className={cn('text-2xl font-bold tracking-tight', highlight ? 'text-neon-green' : 'text-foreground')}>{value}</p>
-      <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+      <p className={cn('text-2xl font-bold tracking-tight tabular-nums', highlight ? 'text-neon-green' : 'text-foreground')}>{value}</p>
+      <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>
     </div>
   )
 }

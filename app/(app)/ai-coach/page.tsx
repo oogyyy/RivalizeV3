@@ -266,7 +266,7 @@ export default function AIScoutPage() {
       {/* ── Left panel: Context sidebar ── */}
       <div
         className={cn(
-          'shrink-0 border-r border-border bg-card flex flex-col h-full overflow-y-auto',
+          'shrink-0 border-r border-border bg-[hsl(222,22%,5%)] flex flex-col h-full overflow-y-auto',
           'md:w-72 md:flex',
           isContextOpen
             ? 'fixed inset-0 z-40 w-full flex flex-col md:relative md:inset-auto md:w-72'
@@ -282,11 +282,13 @@ export default function AIScoutPage() {
         </div>
 
         {/* Panel header */}
-        <div className="p-5 border-b border-border">
-          <div className="flex items-center gap-2 mb-3">
-            <Brain size={18} className="text-neon-green" />
-            <h1 className="text-lg font-bold text-foreground">AI Coach</h1>
-            <Badge variant="neon" className="text-xs ml-auto">Llama 3.3</Badge>
+        <div className="p-5 border-b border-border bg-gradient-to-b from-neon-green/[0.03] to-transparent">
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-neon-green/15 border border-neon-green/30 flex items-center justify-center">
+              <Brain size={14} className="text-neon-green" />
+            </div>
+            <h1 className="text-sm font-bold text-foreground tracking-wide">AI Scout</h1>
+            <Badge variant="neon" className="text-[10px] ml-auto">Llama 3.3</Badge>
           </div>
           {/* Mode toggle */}
           <div className="flex rounded-lg border border-border bg-background p-0.5 gap-0.5">
@@ -508,7 +510,7 @@ export default function AIScoutPage() {
       {/* ── Right panel: Chat ── */}
       <div className="flex-1 flex flex-col overflow-hidden bg-background min-w-0">
         {/* Chat header */}
-        <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b border-border bg-card shrink-0">
+        <div className="flex items-center justify-between px-4 md:px-5 py-3.5 border-b border-border bg-card/80 shrink-0 backdrop-blur-sm">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -546,15 +548,16 @@ export default function AIScoutPage() {
           {isEmpty ? (
             /* ── Welcome / empty state ── */
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <div className="w-20 h-20 rounded-full bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mb-5">
-                <Brain size={36} className="text-neon-green" />
+              <div className="relative w-20 h-20 rounded-full bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mb-5 shadow-[0_0_24px_rgba(0,255,135,0.12)]">
+                <Brain size={34} className="text-neon-green" />
+                <div className="absolute inset-0 rounded-full bg-neon-green/5 animate-ping opacity-30" />
               </div>
-              <h2 className="text-xl font-bold text-foreground mb-1">
+              <h2 className="text-xl font-bold text-foreground mb-1.5">
                 {mode === 'myteam'
                   ? 'My Team Coach Ready'
-                  : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Coach Ready'}
+                  : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Scout Ready'}
               </h2>
-              <p className="text-muted-foreground text-sm max-w-sm mb-8">
+              <p className="text-muted-foreground text-sm max-w-sm mb-8 leading-relaxed">
                 {mode === 'myteam'
                   ? "Ask anything about your team's performance — weaknesses, executes, practice plans, and strategy."
                   : selectedFolder
@@ -569,14 +572,15 @@ export default function AIScoutPage() {
                     onClick={() => sendMessage(q.prompt)}
                     disabled={isLoading}
                     className={cn(
-                      'flex items-center gap-2 p-3 text-left rounded-lg border border-border bg-card',
-                      'text-sm text-muted-foreground hover:text-foreground hover:border-neon-green/30 hover:bg-neon-green/5',
-                      'transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed'
+                      'flex items-center gap-2.5 p-3.5 text-left rounded-xl border border-border bg-card',
+                      'text-sm text-muted-foreground hover:text-foreground hover:border-neon-green/25 hover:bg-neon-green/[0.04]',
+                      'transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed',
+                      'shadow-[0_2px_6px_rgba(0,0,0,0.2)]'
                     )}
                   >
                     <Sparkles size={13} className="text-neon-green shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{q.label}</span>
-                    <ChevronRight size={13} className="text-muted-foreground group-hover:text-neon-green shrink-0" />
+                    <ChevronRight size={13} className="text-muted-foreground/50 group-hover:text-neon-green group-hover:translate-x-0.5 transition-all shrink-0" />
                   </button>
                 ))}
               </div>
@@ -619,8 +623,8 @@ export default function AIScoutPage() {
                       className={cn(
                         'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
                         msg.role === 'user'
-                          ? 'bg-neon-green/10 border border-neon-green/20 rounded-br-sm'
-                          : 'bg-card border border-border rounded-bl-sm'
+                          ? 'bg-neon-green/[0.1] border border-neon-green/20 rounded-br-sm shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
+                          : 'bg-card border border-border/80 rounded-bl-sm shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
                       )}
                     >
                       {msg.role === 'assistant' ? (
@@ -680,10 +684,10 @@ export default function AIScoutPage() {
         </div>
 
         {/* Input area */}
-        <div className="border-t border-border bg-card p-3 md:p-4 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
+        <div className="border-t border-border bg-card/80 backdrop-blur-sm p-3 md:p-4 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
           <div className={cn(
-            'flex items-end gap-3 p-2 rounded-xl border transition-colors',
-            'border-border focus-within:border-neon-green/50'
+            'flex items-end gap-3 p-2 rounded-xl border transition-all duration-150',
+            'border-border/80 focus-within:border-neon-green/40 focus-within:shadow-[0_0_0_1px_rgba(0,255,135,0.1),0_2px_8px_rgba(0,0,0,0.3)]'
           )}>
             <textarea
               ref={textareaRef}

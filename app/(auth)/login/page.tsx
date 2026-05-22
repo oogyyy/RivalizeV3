@@ -88,10 +88,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="glass-card rounded-xl border border-white/10 p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-white mb-1">Welcome back</h1>
-        <p className="text-sm text-muted-foreground">Sign in to continue your analysis</p>
+    <div className="glass-card rounded-2xl border border-white/10 p-8 shadow-[0_24px_64px_rgba(0,0,0,0.5)]">
+      <div className="mb-7">
+        <h1 className="text-2xl font-black text-white mb-1 tracking-tight">Welcome back</h1>
+        <p className="text-sm text-muted-foreground/80">Sign in to continue your analysis</p>
       </div>
 
       {/* OAuth Buttons */}
@@ -145,7 +145,7 @@ export default function LoginPage() {
               autoComplete="email"
               placeholder="you@example.com"
               disabled={loading || oauthLoading !== null}
-              className="w-full h-10 pl-10 pr-4 rounded-lg border border-white/10 bg-white/5 text-sm text-foreground placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#00ff87]/50 focus:border-[#00ff87]/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full h-11 pl-10 pr-4 rounded-xl border border-white/10 bg-white/[0.04] text-sm text-foreground placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-[#00ff87]/40 focus:border-[#00ff87]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
             />
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function LoginPage() {
               autoComplete="current-password"
               placeholder="••••••••"
               disabled={loading || oauthLoading !== null}
-              className="w-full h-10 pl-10 pr-10 rounded-lg border border-white/10 bg-white/5 text-sm text-foreground placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#00ff87]/50 focus:border-[#00ff87]/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full h-11 pl-10 pr-10 rounded-xl border border-white/10 bg-white/[0.04] text-sm text-foreground placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-[#00ff87]/40 focus:border-[#00ff87]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
             />
             <button
               type="button"
@@ -203,7 +203,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading || oauthLoading !== null || !email || !password}
-          className="w-full h-11 flex items-center justify-center gap-2 rounded-lg bg-[#00ff87] text-black font-bold text-sm hover:bg-[#00ff87]/90 transition-all neon-glow disabled:opacity-50 disabled:cursor-not-allowed disabled:neon-glow-none"
+          className="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-[#00ff87] text-black font-bold text-sm hover:bg-[#00ff87]/92 transition-all duration-150 neon-glow hover:shadow-[0_0_20px_rgba(0,255,135,0.5),0_0_48px_rgba(0,255,135,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
             <>

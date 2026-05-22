@@ -94,15 +94,15 @@ export default async function OpponentsPage() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 animate-fade-in-up">
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Scouting</p>
+          <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.15em] mb-1.5">Scouting</p>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">Opponents</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
             Your scouting library — teams you&apos;re preparing to face
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link href="/ai-coach">
-            <Button variant="outline" className="gap-2 hover:border-neon-green/40 hover:text-neon-green hover:bg-neon-green/5 transition-all">
+            <Button variant="outline" className="gap-2 hover:border-neon-green/40 hover:text-neon-green hover:bg-neon-green/[0.06]">
               <Brain size={16} />
               AI Scout
             </Button>
@@ -115,17 +115,20 @@ export default async function OpponentsPage() {
 
       {/* ── Stats bar ── */}
       <div className="grid grid-cols-3 gap-3 animate-fade-in-up animate-fade-in-up-delay-1">
-        <div className="rounded-xl bg-card border border-border p-4 text-center stat-card-red card-hover">
-          <p className="text-2xl font-bold text-red-400">{totalOpponents}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Opponents</p>
+        <div className="relative rounded-xl bg-card border border-border p-4 text-center stat-card-red card-hover overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-red-500/[0.04] to-transparent pointer-events-none" />
+          <p className="text-2xl font-bold tabular-nums text-red-400">{totalOpponents}</p>
+          <p className="text-[11px] font-medium text-muted-foreground mt-0.5 uppercase tracking-wide">Opponents</p>
         </div>
-        <div className="rounded-xl bg-card border border-border p-4 text-center stat-card-blue card-hover">
-          <p className="text-2xl font-bold text-foreground">{totalDemos}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Demos Uploaded</p>
+        <div className="relative rounded-xl bg-card border border-border p-4 text-center stat-card-blue card-hover overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-blue-500/[0.04] to-transparent pointer-events-none" />
+          <p className="text-2xl font-bold tabular-nums text-foreground">{totalDemos}</p>
+          <p className="text-[11px] font-medium text-muted-foreground mt-0.5 uppercase tracking-wide">Uploaded</p>
         </div>
-        <div className="rounded-xl bg-card border border-border p-4 text-center stat-card-green card-hover">
-          <p className="text-2xl font-bold text-neon-green">{analyzedDemos}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Analyzed</p>
+        <div className="relative rounded-xl bg-card border border-border p-4 text-center stat-card-green card-hover overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-neon-green/[0.04] to-transparent pointer-events-none" />
+          <p className="text-2xl font-bold tabular-nums text-neon-green">{analyzedDemos}</p>
+          <p className="text-[11px] font-medium text-muted-foreground mt-0.5 uppercase tracking-wide">Analyzed</p>
         </div>
       </div>
 
