@@ -52,7 +52,7 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
 
   if (variant === 'self') {
     return (
-      <div className="relative">
+      <div className={cn('relative', open && 'z-30')}>
         <button
           onClick={() => setOpen(v => !v)}
           disabled={pending !== null}
@@ -103,7 +103,7 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
 
   // Default 'opponent' variant — unchanged behaviour
   return (
-    <div className="relative">
+    <div className={cn('relative', open && 'z-30')}>
       <button
         onClick={() => setOpen(v => !v)}
         disabled={pending !== null}

@@ -80,7 +80,7 @@ export default async function MyTeamPage() {
         .eq('team_id', primaryTeamId)
         .eq('demo_type', 'self')   // STRICT: only own-team demos shown here
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(50)
     : { data: [] }
 
   const demos = (recentDemos ?? []) as DemoRow[]
@@ -310,14 +310,18 @@ export default async function MyTeamPage() {
             )}
           </div>
 
-          {/* Recent Demos */}
+          {/* My Team's Demos */}
           <div className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <FileVideo size={16} className="text-neon-green" />
-                <h2 className="text-sm font-semibold text-foreground">Recent Demos</h2>
+                <h2 className="text-sm font-semibold text-foreground">My Team&apos;s Demos</h2>
+                {demos.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded font-mono">
+                    {demos.length}
+                  </span>
+                )}
               </div>
-              {/* "All demos" here refers only to self-demos on this page */}
             </div>
             {demos.length === 0 ? (
               <EmptyState
@@ -325,8 +329,8 @@ export default async function MyTeamPage() {
                 text="No team demos uploaded yet. Use the Upload button above to add your team's own demos."
               />
             ) : (
-              <div className="space-y-2">
-                {demos.slice(0, 6).map(demo => {
+              <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1 -mr-1">
+                {demos.map(demo => {
                   const pd = demo.parsed_data
                   const h = pd?.header
                   const opponentSide = (pd?.opponentSide ?? 'team2') as 'team1' | 'team2'
