@@ -254,7 +254,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
         body: JSON.stringify({
           teamId,
           r2Key: key,
-          opponentName: opponentName.trim(),
+          opponentName: demoType === 'self' ? 'My Team' : opponentName.trim(),
           map: 'unknown',
           fileSize: file.size,
           demoType,
@@ -281,7 +281,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   }
 
   const uploadAll = async () => {
-    if (!opponentName.trim()) return
+    if (demoType !== 'self' && !opponentName.trim()) return
     setIsProcessing(true)
 
     const pending = uploads
@@ -329,7 +329,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   const pendingCount = uploads.filter(u => u.status === 'pending').length
   const errorCount   = uploads.filter(u => u.status === 'error').length
   const doneCount    = uploads.filter(u => u.status === 'done').length
-  const canUpload    = pendingCount > 0 && opponentName.trim().length > 0
+  const canUpload    = pendingCount > 0 && (demoType === 'self' || opponentName.trim().length > 0)
   const hasLargeFile = uploads.some(
     u => u.file.size > LARGE_FILE_THRESHOLD && (u.status === 'pending' || u.status === 'uploading')
   )
@@ -350,7 +350,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
     if (postUploadPhase === 'selecting') return 'Which Team Is Yours?'
     if (postUploadPhase === 'saving')    return 'Saving Selection…'
     if (postUploadPhase === 'confirmed') return 'All Done!'
-    return demoType === 'self' ? 'Upload My Team Demo' : 'Upload Opponent Demo'
+    return demoType === 'self' ? 'Upload My Team Demos' : 'Upload Opponent Demo'
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -571,47 +571,38 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
         {postUploadPhase === 'idle' && (
           <div className="p-5 space-y-5">
-            {/* Step 1 — Opponent / match context */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
-                  STEP 1
-                </span>
-                <span className="text-xs font-semibold text-foreground">
-                  {demoType === 'self' ? 'Who was your opponent?' : 'Who are you scouting?'}
-                </span>
+            {/* Step 1 — Opponent name (opponent flow only) */}
+            {demoType === 'opponent' && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
+                    STEP 1
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">Who are you scouting?</span>
+                </div>
+                <input
+                  type="text"
+                  value={opponentName}
+                  onChange={e => setOpponentName(e.target.value)}
+                  placeholder="e.g. NAVI, Astralis, Team Liquid…"
+                  disabled={isProcessing}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00ff87] disabled:opacity-50"
+                />
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Info size={10} className="shrink-0" />
+                  After upload, you&apos;ll select which team to scout as the opponent.
+                </p>
               </div>
-              <input
-                type="text"
-                value={opponentName}
-                onChange={e => setOpponentName(e.target.value)}
-                placeholder="e.g. NAVI, Astralis, Team Liquid…"
-                disabled={isProcessing}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00ff87] disabled:opacity-50"
-              />
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Info size={10} className="shrink-0" />
-                {demoType === 'self'
-                  ? "This demo will be analysed as your own team's performance — it won't appear in Opponent folders."
-                  : "After upload, you'll select which team to scout as the opponent."}
-              </p>
-            </div>
+            )}
 
-            {/* Step 2 — Files */}
+            {/* File upload area */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
-                  STEP 2
-                </span>
-                <span className="text-xs font-semibold text-foreground">Add demo files</span>
-              </div>
-
-              {hasLargeFile && (
-                <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
-                  <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-yellow-300">
-                    CS2 demos are typically 200–500 MB. Large files upload directly to cloud storage — keep this tab open.
-                  </p>
+              {demoType === 'opponent' && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
+                    STEP 2
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">Add demo files</span>
                 </div>
               )}
 
@@ -619,7 +610,16 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                 <div className="flex items-start gap-2 rounded-md border border-neon-green/20 bg-neon-green/5 px-3 py-2">
                   <Users size={12} className="text-neon-green shrink-0 mt-0.5" />
                   <p className="text-[11px] text-neon-green/80">
-                    After upload, we&apos;ll extract the real team names and let you pick which side was yours.
+                    After upload, you&apos;ll select which team was yours in each demo.
+                  </p>
+                </div>
+              )}
+
+              {hasLargeFile && (
+                <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
+                  <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-yellow-300">
+                    CS2 demos are typically 200–500 MB. Large files upload directly to cloud storage — keep this tab open.
                   </p>
                 </div>
               )}
@@ -744,7 +744,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                     onClick={uploadAll}
                     disabled={isProcessing || !canUpload}
                     className="gap-2"
-                    title={!opponentName.trim() ? 'Enter opponent name first' : undefined}
+                    title={demoType !== 'self' && !opponentName.trim() ? 'Enter opponent name first' : undefined}
                   >
                     {isProcessing ? (
                       <><Loader2 size={14} className="animate-spin" /> Uploading…</>
