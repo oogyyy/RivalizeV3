@@ -6,13 +6,35 @@ import { cn } from '@/lib/utils'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
 import type { Round, PlayerStats } from '@/types/database'
 
-const CANVAS_SIZE = 512
-const PAD = 56
-const INNER = CANVAS_SIZE - PAD * 2
-const T1_COLOR = '#00ff87'
-const T2_COLOR = '#ff3860'
-const FLASH_DUR = 1.4   // seconds a kill flash is visible
-const MAX_TRAIL = 5     // positions to keep per player
+const CANVAS_SIZE  = 512
+const PAD          = 56
+const INNER        = CANVAS_SIZE - PAD * 2
+const T1_COLOR     = '#00ff87'
+const T2_COLOR     = '#ff3860'
+const KILL_FLASH   = 1.4   // seconds a kill flash lingers
+const MAX_TRAIL    = 5     // trail ghost positions per player
+
+// Grenade effect durations (seconds after landing)
+const SMOKE_DUR   = 18
+const HE_DUR      = 1.8
+const FLASH_DUR   = 0.6
+const MOLOTOV_DUR = 7
+
+const GREN_COLORS: Record<string, string> = {
+  smoke:   '#c0c0d0',
+  flash:   '#ffff88',
+  he:      '#ff9900',
+  molotov: '#ff4400',
+  decoy:   '#8888ff',
+}
+
+const GREN_LABELS: Record<string, string> = {
+  smoke:   'SMK',
+  flash:   'FL',
+  he:      'HE',
+  molotov: 'MOL',
+  decoy:   'DEC',
+}
 
 interface Bounds { minX: number; maxX: number; minY: number; maxY: number }
 
@@ -24,7 +46,6 @@ function getBounds(rounds: Round[]): Bounds | null {
   return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }
 }
 
-// Fallback normalised coordinates (when no map calibration is available)
 function cx(v: number, b: Bounds) {
   const r = b.maxX - b.minX
   return PAD + (r === 0 ? 0.5 : (v - b.minX) / r) * INNER
@@ -56,13 +77,16 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   const rafRef    = useRef<number>(0)
   const lastTsRef = useRef<number>(0)
 
-  const [roundIdx,  setRoundIdx]  = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [time,      setTime]      = useState(0)
-  const [speed,     setSpeed]     = useState<1 | 2 | 4>(1)
-  const [bgImage,   setBgImage]   = useState<HTMLImageElement | null>(null)
+  const [roundIdx,     setRoundIdx]     = useState(0)
+  const [isPlaying,    setIsPlaying]    = useState(false)
+  const [time,         setTime]         = useState(0)
+  const [speed,        setSpeed]        = useState<1 | 2 | 4>(1)
+  const [bgImage,      setBgImage]      = useState<HTMLImageElement | null>(null)
+  const [showSmokes,   setShowSmokes]   = useState(true)
+  const [showFlashes,  setShowFlashes]  = useState(true)
+  const [showMolotovs, setShowMolotovs] = useState(true)
+  const [showHE,       setShowHE]       = useState(true)
 
-  // Load map background image
   useEffect(() => {
     setBgImage(null)
     loadMapImage(mapName).then(img => setBgImage(img))
@@ -77,7 +101,6 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   const bounds = useMemo(() => getBounds(rounds), [rounds])
   const mapCfg = MAP_CONFIGS[mapName] ?? null
 
-  // Convert world coordinates to canvas coordinates, preferring radar calibration
   const toXY = useCallback((wx: number, wy: number): [number, number] => {
     if (mapCfg) return worldToCanvas(wx, wy, mapCfg, CANVAS_SIZE)
     if (!bounds) return [CANVAS_SIZE / 2, CANVAS_SIZE / 2]
@@ -89,6 +112,20 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     if (!rnd) return []
     return [...(rnd.kills ?? [])].sort((a, b) => a.time - b.time)
   }, [rounds, roundIdx])
+
+  const grenades = useMemo(() => {
+    return rounds[roundIdx]?.grenades ?? []
+  }, [rounds, roundIdx])
+
+  const visibleGrenades = useMemo(() => {
+    return grenades.filter(g => {
+      if (g.type === 'smoke'   && !showSmokes)   return false
+      if (g.type === 'flash'   && !showFlashes)  return false
+      if (g.type === 'molotov' && !showMolotovs) return false
+      if (g.type === 'he'      && !showHE)       return false
+      return true
+    })
+  }, [grenades, showSmokes, showFlashes, showMolotovs, showHE])
 
   const maxTime = kills.length ? kills[kills.length - 1].time + 2 : rounds[roundIdx]?.duration ?? 30
 
@@ -107,7 +144,6 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     if (bgImage) {
       ctx.globalAlpha = 0.55
       ctx.drawImage(bgImage, 0, 0, W, H)
-      // Dark scrim for readability
       ctx.globalAlpha = 0.50
       ctx.fillStyle = '#080c18'
       ctx.fillRect(0, 0, W, H)
@@ -119,10 +155,90 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       for (let y = 0; y <= H; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
     }
 
-    // Header label
+    // Header
     ctx.fillStyle = 'rgba(255,255,255,0.45)'
     ctx.font = 'bold 11px monospace'
     ctx.fillText(`${mapName.toUpperCase()} · ROUND ${rounds[roundIdx]?.number ?? roundIdx + 1}`, 12, 22)
+
+    // ── Grenade effects ───────────────────────────────────────────────────────
+    visibleGrenades.forEach(g => {
+      if (g.time > t) return
+
+      const [tx, ty] = toXY(g.throw_x, g.throw_y)
+      const [lx, ly] = toXY(g.land_x, g.land_y)
+      const col      = GREN_COLORS[g.type] ?? '#ffffff'
+      const inFlight = t < g.land_time
+
+      if (inFlight) {
+        const flightDur = Math.max(0.01, g.land_time - g.time)
+        const progress  = Math.min(1, (t - g.time) / flightDur)
+        const projX     = tx + (lx - tx) * progress
+        const projY     = ty + (ly - ty) * progress
+
+        // Dotted trajectory so far
+        ctx.setLineDash([3, 5])
+        ctx.strokeStyle = col + '55'
+        ctx.lineWidth   = 1
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(projX, projY); ctx.stroke()
+        ctx.setLineDash([])
+
+        // Projectile dot
+        ctx.beginPath(); ctx.arc(projX, projY, 3.5, 0, Math.PI * 2)
+        ctx.fillStyle = col; ctx.fill()
+
+        // Throw origin marker
+        ctx.beginPath(); ctx.arc(tx, ty, 2, 0, Math.PI * 2)
+        ctx.fillStyle = col + '80'; ctx.fill()
+      } else {
+        const age = t - g.land_time
+
+        if (g.type === 'smoke' && age < SMOKE_DUR) {
+          const alpha = Math.min(1, age * 1.5) * Math.max(0, 1 - Math.max(0, age - (SMOKE_DUR - 3)) / 3)
+          ctx.globalAlpha = alpha * 0.50
+          ctx.fillStyle   = '#c0c0d8'
+          ctx.beginPath(); ctx.arc(lx, ly, 30, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = alpha * 0.70
+          ctx.strokeStyle = '#9090a8'
+          ctx.lineWidth   = 1.5
+          ctx.beginPath(); ctx.arc(lx, ly, 30, 0, Math.PI * 2); ctx.stroke()
+          ctx.globalAlpha = alpha * 0.65
+          ctx.fillStyle   = 'rgba(255,255,255,0.55)'
+          ctx.font        = 'bold 7px monospace'
+          ctx.fillText('SMOKE', lx - 11, ly + 2)
+          ctx.globalAlpha = 1
+        } else if (g.type === 'flash' && age < FLASH_DUR) {
+          const alpha = 1 - age / FLASH_DUR
+          ctx.globalAlpha = alpha * 0.85
+          const fg = ctx.createRadialGradient(lx, ly, 0, lx, ly, 22)
+          fg.addColorStop(0, '#ffffff'); fg.addColorStop(1, 'transparent')
+          ctx.fillStyle = fg
+          ctx.beginPath(); ctx.arc(lx, ly, 22, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = 1
+        } else if (g.type === 'he' && age < HE_DUR) {
+          const alpha  = Math.pow(Math.max(0, 1 - age / HE_DUR), 0.6)
+          const radius = 8 + age * 20
+          ctx.globalAlpha = alpha * 0.80
+          ctx.strokeStyle = '#ff9900'
+          ctx.lineWidth   = 2.5
+          ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.stroke()
+          const ig = ctx.createRadialGradient(lx, ly, 0, lx, ly, radius)
+          ig.addColorStop(0, '#ff990050'); ig.addColorStop(1, 'transparent')
+          ctx.fillStyle = ig
+          ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = 1
+        } else if (g.type === 'molotov' && age < MOLOTOV_DUR) {
+          const alpha = Math.min(1, age * 2) * Math.max(0, 1 - Math.max(0, age - (MOLOTOV_DUR - 2)) / 2)
+          ctx.globalAlpha = alpha * 0.60
+          ctx.fillStyle   = '#ff4400'
+          ctx.beginPath(); ctx.arc(lx, ly, 22, 0, Math.PI * 2); ctx.fill()
+          const pulse = Math.sin(t * 9) * 0.4 + 0.6
+          ctx.globalAlpha = alpha * pulse * 0.80
+          ctx.fillStyle   = '#ffaa00'
+          ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = 1
+        }
+      }
+    })
 
     // Build player states up to t
     const pos = new Map<string, PlayerState>()
@@ -135,7 +251,6 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       const [kx, ky] = toXY(k.killer_x, k.killer_y)
       const [vx, vy] = toXY(k.victim_x, k.victim_y)
 
-      // Append old position to trail before moving
       const prevKiller = pos.get(k.killer_name)
       const killerTrail: Trail = prevKiller?.known
         ? [...prevKiller.trail.slice(-(MAX_TRAIL - 1)), { x: prevKiller.x, y: prevKiller.y }]
@@ -150,16 +265,16 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     })
 
     // Active kill for flash animation
-    const active = kills.find(k => k.time <= t && k.time > t - FLASH_DUR)
+    const active = kills.find(k => k.time <= t && k.time > t - KILL_FLASH)
 
     // Kill line
     if (active) {
       const [kx, ky] = toXY(active.killer_x, active.killer_y)
       const [vx, vy] = toXY(active.victim_x, active.victim_y)
-      const fade = Math.max(0, 1 - (t - active.time) / FLASH_DUR)
+      const fade = Math.max(0, 1 - (t - active.time) / KILL_FLASH)
       ctx.globalAlpha = fade * 0.65
       ctx.strokeStyle = '#ffd700'
-      ctx.lineWidth = 1.5
+      ctx.lineWidth   = 1.5
       ctx.setLineDash([4, 4])
       ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(vx, vy); ctx.stroke()
       ctx.setLineDash([])
@@ -172,7 +287,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       const col = p.team === team1Name ? T1_COLOR : T2_COLOR
       ctx.globalAlpha = 0.35
       ctx.strokeStyle = col
-      ctx.lineWidth = 2
+      ctx.lineWidth   = 2
       ctx.beginPath()
       ctx.moveTo(p.x - 5, p.y - 5); ctx.lineTo(p.x + 5, p.y + 5)
       ctx.moveTo(p.x + 5, p.y - 5); ctx.lineTo(p.x - 5, p.y + 5)
@@ -185,23 +300,22 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       if (!p.known || !p.alive) return
       const col = p.team === team1Name ? T1_COLOR : T2_COLOR
 
-      // Movement trail (faded line)
+      // Movement trail
       if (p.trail.length > 0) {
         ctx.beginPath()
         ctx.moveTo(p.trail[0].x, p.trail[0].y)
         for (let i = 1; i < p.trail.length; i++) ctx.lineTo(p.trail[i].x, p.trail[i].y)
         ctx.lineTo(p.x, p.y)
         ctx.strokeStyle = col
-        ctx.lineWidth = 1.5
+        ctx.lineWidth   = 1.5
         ctx.globalAlpha = 0.25
         ctx.stroke()
         ctx.globalAlpha = 1
 
-        // Ghost dots along trail, fading out
         p.trail.forEach((pt, i) => {
           ctx.beginPath()
           ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI * 2)
-          ctx.fillStyle = col
+          ctx.fillStyle   = col
           ctx.globalAlpha = ((i + 1) / p.trail.length) * 0.32
           ctx.fill()
         })
@@ -219,21 +333,21 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2)
       ctx.fillStyle = col; ctx.fill()
 
-      // Kill flash on victim
+      // Kill burst on victim
       if (active && name === active.victim_name) {
-        const fade = Math.max(0, 1 - (t - active.time) / FLASH_DUR)
-        const r = 22 * fade
-        const fg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r)
+        const fade = Math.max(0, 1 - (t - active.time) / KILL_FLASH)
+        const r    = 22 * fade
+        const fg   = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r)
         fg.addColorStop(0, '#ff386088'); fg.addColorStop(1, 'transparent')
         ctx.globalAlpha = fade
-        ctx.fillStyle = fg
+        ctx.fillStyle   = fg
         ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill()
         ctx.globalAlpha = 1
       }
 
       // Name label
       ctx.fillStyle = 'rgba(255,255,255,0.55)'
-      ctx.font = '8px monospace'
+      ctx.font      = '8px monospace'
       ctx.fillText(name.slice(0, 12), p.x + 7, p.y + 3)
     })
 
@@ -244,19 +358,28 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     ctx.fillStyle = '#00ff87'
     ctx.fillRect(bx, by, bw * Math.min(1, t / maxTime), bh)
     ctx.strokeStyle = 'rgba(255,255,255,0.1)'
-    ctx.lineWidth = 1
+    ctx.lineWidth   = 1
     ctx.strokeRect(bx, by, bw, bh)
     kills.forEach(k => {
       const kx2 = bx + (k.time / maxTime) * bw
       ctx.fillStyle = '#ff3860'
       ctx.fillRect(kx2 - 0.5, by, 1.5, bh)
     })
+    // Grenade markers on timeline
+    visibleGrenades.forEach(g => {
+      if (g.land_time > 0 && g.land_time <= maxTime) {
+        const gx = bx + (g.land_time / maxTime) * bw
+        const col = GREN_COLORS[g.type] ?? '#ffffff'
+        ctx.fillStyle = col + 'aa'
+        ctx.fillRect(gx - 0.5, by, 1, bh)
+      }
+    })
 
     // Border
     ctx.strokeStyle = 'rgba(0,255,135,0.14)'
-    ctx.lineWidth = 1.5
+    ctx.lineWidth   = 1.5
     ctx.strokeRect(0.75, 0.75, W - 1.5, H - 1.5)
-  }, [bgImage, bounds, kills, mapCfg, mapName, maxTime, players, rounds, roundIdx, team1Name, teamOf, toXY])
+  }, [bgImage, bounds, kills, mapCfg, mapName, maxTime, players, rounds, roundIdx, team1Name, teamOf, toXY, visibleGrenades])
 
   // Animation loop
   useEffect(() => {
@@ -277,10 +400,8 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     return () => cancelAnimationFrame(rafRef.current)
   }, [isPlaying, speed, maxTime])
 
-  // Redraw when time or background changes
   useEffect(() => { draw(time) }, [time, draw])
 
-  // Reset when round changes
   useEffect(() => {
     setTime(0); setIsPlaying(false); draw(0)
   }, [roundIdx]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -296,6 +417,30 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   if (!bounds) {
     return <p className="text-muted-foreground text-sm">No position data in this demo.</p>
   }
+
+  const utilToggleBtn = (
+    label: string,
+    active: boolean,
+    toggle: () => void,
+    color: string,
+  ) => (
+    <button
+      onClick={toggle}
+      className={cn(
+        'flex items-center gap-1 px-2 py-0.5 text-xs rounded border transition-colors',
+        active
+          ? 'border-transparent text-foreground'
+          : 'border-border/40 text-muted-foreground opacity-50',
+      )}
+      style={active ? { background: color + '22', borderColor: color + '55', color } : undefined}
+    >
+      <span
+        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+        style={{ background: active ? color : 'currentColor' }}
+      />
+      {label}
+    </button>
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -317,6 +462,20 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         ))}
       </div>
 
+      {/* Utility toggles */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Utility:</span>
+        {utilToggleBtn('Smokes',   showSmokes,   () => setShowSmokes(v => !v),   GREN_COLORS.smoke)}
+        {utilToggleBtn('Flashes',  showFlashes,  () => setShowFlashes(v => !v),  GREN_COLORS.flash)}
+        {utilToggleBtn('Molotovs', showMolotovs, () => setShowMolotovs(v => !v), GREN_COLORS.molotov)}
+        {utilToggleBtn('HE',       showHE,       () => setShowHE(v => !v),       GREN_COLORS.he)}
+        {grenades.length > 0 && (
+          <span className="text-[10px] text-muted-foreground ml-auto">
+            {grenades.length} grenades this round
+          </span>
+        )}
+      </div>
+
       {/* Canvas + kill feed */}
       <div className="flex gap-4 flex-col lg:flex-row">
         <canvas
@@ -336,7 +495,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
               <p className="text-xs text-muted-foreground">No kills recorded this round.</p>
             ) : kills.map((k, i) => {
               const past     = k.time <= time
-              const isActive = k.time <= time && k.time > time - FLASH_DUR
+              const isActive = k.time <= time && k.time > time - KILL_FLASH
               const kTeam    = teamOf.get(k.killer_name) === team1Name
               const vTeam    = teamOf.get(k.victim_name) === team1Name
               return (

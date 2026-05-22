@@ -3,10 +3,19 @@ import { createClient } from '@/lib/supabase/server'
 
 const STEAM_ID_PATTERN = /^https:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/
 
+function getBaseUrl(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+  }
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
+  const host  = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost:3000'
+  return `${proto}://${host}`
+}
+
 // Receives Steam OpenID callback, validates it, extracts the Steam64 ID,
 // and saves it to the user's profile.
 export async function GET(req: NextRequest) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl = getBaseUrl(req)
   const url    = new URL(req.url)
   const params = url.searchParams
 

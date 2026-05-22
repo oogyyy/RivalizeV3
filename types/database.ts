@@ -93,8 +93,21 @@ export interface Round {
   team1_economy: number
   team2_economy: number
   kills: Kill[]
+  grenades?: GrenadeEvent[]
   bomb_planted?: boolean
   bomb_defused?: boolean
+}
+
+export interface GrenadeEvent {
+  tick: number
+  time: number
+  type: 'smoke' | 'flash' | 'he' | 'molotov' | 'decoy'
+  thrower: string
+  throw_x: number
+  throw_y: number
+  land_x: number
+  land_y: number
+  land_time: number
 }
 
 export interface Kill {

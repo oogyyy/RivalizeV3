@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Derives the public base URL from the request, preferring the explicit env
+// var. Falls back to x-forwarded-proto/host so Railway/Vercel deployments
+// work even when NEXT_PUBLIC_APP_URL is not configured.
+function getBaseUrl(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+  }
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
+  const host  = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost:3000'
+  return `${proto}://${host}`
+}
+
 // Initiates Steam OpenID login. Redirects the user to Steam's login page.
 // On return, Steam calls /api/auth/steam/callback with the verified identity.
 export async function GET(req: NextRequest) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl   = getBaseUrl(req)
   const returnTo = `${appUrl}/api/auth/steam/callback`
   const realm    = appUrl
 

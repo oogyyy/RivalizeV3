@@ -1,4 +1,4 @@
-import type { ParsedDemoData } from '@/types/database'
+import type { ParsedDemoData, GrenadeEvent } from '@/types/database'
 
 export interface RealParseResult {
   parsedData: ParsedDemoData
@@ -87,6 +87,17 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
         victim_x:    k.victim_x,
         victim_y:    k.victim_y,
       })),
+      grenades: (r.grenades ?? []).map(g => ({
+        tick:      g.tick,
+        time:      g.time,
+        type:      g.type as GrenadeEvent['type'],
+        thrower:   g.thrower,
+        throw_x:   g.throw_x,
+        throw_y:   g.throw_y,
+        land_x:    g.land_x,
+        land_y:    g.land_y,
+        land_time: g.land_time,
+      })),
     })),
     players: raw.players.map(p => ({
       steam_id:           p.steam_id,
@@ -141,6 +152,18 @@ interface GoKill {
   victim_y:    number
 }
 
+interface GoGrenadeEvent {
+  tick:      number
+  time:      number
+  type:      string
+  thrower:   string
+  throw_x:   number
+  throw_y:   number
+  land_x:    number
+  land_y:    number
+  land_time: number
+}
+
 interface GoRound {
   number:        number
   winner:        string
@@ -151,6 +174,7 @@ interface GoRound {
   bomb_planted:  boolean
   bomb_defused:  boolean
   kills:         GoKill[]
+  grenades:      GoGrenadeEvent[]
 }
 
 interface GoPlayer {
