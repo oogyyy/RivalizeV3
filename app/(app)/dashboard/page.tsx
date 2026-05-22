@@ -487,7 +487,7 @@ function DemoCard({
   emptyCtaVariant?: 'neon' | 'secondary'
   children?: React.ReactNode
 }) {
-  const hasContent = !!children && (children as React.ReactElement)?.props?.children !== undefined
+  const hasContent = children !== undefined && children !== false && children !== null
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className={cn(accentClass, 'w-full')} />
