@@ -55,12 +55,12 @@ const MY_TEAM_QUESTIONS = [
 function MarkdownContent({ content }: { content: string }) {
   const rendered = content.split('\n').map((line, i) => {
     if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold text-foreground mt-4 mb-2">{line.slice(4)}</h3>
-    if (line.startsWith('## '))  return <h2 key={i} className="text-lg font-bold text-neon-green mt-5 mb-2">{line.slice(3)}</h2>
+    if (line.startsWith('## '))  return <h2 key={i} className="text-base font-bold text-[#10D9A0] mt-5 mb-2">{line.slice(3)}</h2>
     if (line.startsWith('# '))   return <h1 key={i} className="text-xl font-bold text-foreground mt-5 mb-3">{line.slice(2)}</h1>
     if (line.startsWith('- ') || line.startsWith('* ')) {
       return (
         <div key={i} className="flex gap-2 my-0.5">
-          <span className="text-neon-green mt-1.5 shrink-0 text-xs">▸</span>
+          <span className="text-[#10D9A0] mt-1.5 shrink-0 text-xs">▸</span>
           <span>{renderInline(line.slice(2))}</span>
         </div>
       )
@@ -69,7 +69,7 @@ function MarkdownContent({ content }: { content: string }) {
     if (numbered) {
       return (
         <div key={i} className="flex gap-2 my-0.5">
-          <span className="text-neon-green shrink-0 font-mono text-xs min-w-[1.2rem]">{numbered[1]}.</span>
+          <span className="text-[#10D9A0] shrink-0 font-mono text-xs min-w-[1.2rem]">{numbered[1]}.</span>
           <span>{renderInline(numbered[2])}</span>
         </div>
       )
@@ -87,7 +87,7 @@ function renderInline(text: string): React.ReactNode {
     if (part.startsWith('***') && part.endsWith('***')) return <strong key={i}><em>{part.slice(3, -3)}</em></strong>
     if (part.startsWith('**') && part.endsWith('**'))   return <strong key={i} className="font-bold text-foreground">{part.slice(2, -2)}</strong>
     if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i} className="italic text-muted-foreground">{part.slice(1, -1)}</em>
-    if (part.startsWith('`') && part.endsWith('`'))     return <code key={i} className="px-1 py-0.5 bg-muted rounded text-xs font-mono text-neon-green">{part.slice(1, -1)}</code>
+    if (part.startsWith('`') && part.endsWith('`'))     return <code key={i} className="px-1 py-0.5 bg-muted rounded text-xs font-mono text-[#10D9A0]">{part.slice(1, -1)}</code>
     return part
   })
 }
@@ -95,13 +95,13 @@ function renderInline(text: string): React.ReactNode {
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-3 mb-4">
-      <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center shrink-0">
-        <Brain size={14} className="text-neon-green" />
+      <div className="w-8 h-8 rounded-xl bg-[rgba(16,217,160,0.12)] border border-[rgba(16,217,160,0.25)] flex items-center justify-center shrink-0">
+        <Brain size={14} className="text-[#10D9A0]" />
       </div>
       <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3">
         <div className="flex gap-1 items-center h-4">
           {[0, 1, 2].map(i => (
-            <div key={i} className="w-1.5 h-1.5 rounded-full bg-neon-green animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#10D9A0] animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
           ))}
         </div>
       </div>
@@ -266,7 +266,7 @@ export default function AIScoutPage() {
       {/* ── Left panel: Context sidebar ── */}
       <div
         className={cn(
-          'shrink-0 border-r border-border bg-card flex flex-col h-full overflow-y-auto',
+          'shrink-0 border-r border-border bg-[hsl(228,22%,8%)] flex flex-col h-full overflow-y-auto',
           'md:w-72 md:flex',
           isContextOpen
             ? 'fixed inset-0 z-40 w-full flex flex-col md:relative md:inset-auto md:w-72'
@@ -283,19 +283,21 @@ export default function AIScoutPage() {
 
         {/* Panel header */}
         <div className="p-5 border-b border-border">
-          <div className="flex items-center gap-2 mb-3">
-            <Brain size={18} className="text-neon-green" />
-            <h1 className="text-lg font-bold text-foreground">AI Coach</h1>
-            <Badge variant="neon" className="text-xs ml-auto">Llama 3.3</Badge>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-[rgba(16,217,160,0.12)] border border-[rgba(16,217,160,0.25)] flex items-center justify-center">
+              <Brain size={14} className="text-[#10D9A0]" />
+            </div>
+            <h1 className="text-[13px] font-bold text-foreground tracking-wide">AI Scout</h1>
+            <Badge variant="neon" className="text-[10px] ml-auto">Llama 3.3</Badge>
           </div>
           {/* Mode toggle */}
-          <div className="flex rounded-lg border border-border bg-background p-0.5 gap-0.5">
+          <div className="flex rounded-lg border border-border bg-[hsl(228,25%,6%)] p-0.5 gap-0.5">
             <button
               onClick={() => { setMode('opponent'); setFocusArea('general'); setMessages([]) }}
               className={cn(
                 'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
                 mode === 'opponent'
-                  ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
+                  ? 'bg-[rgba(16,217,160,0.1)] text-[#10D9A0] border border-[rgba(16,217,160,0.2)]'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -307,7 +309,7 @@ export default function AIScoutPage() {
               className={cn(
                 'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
                 mode === 'myteam'
-                  ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
+                  ? 'bg-[rgba(16,217,160,0.1)] text-[#10D9A0] border border-[rgba(16,217,160,0.2)]'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -345,8 +347,8 @@ export default function AIScoutPage() {
               )}
 
               {selectedFolder && (
-                <div className="mt-2 p-2.5 bg-neon-green/5 rounded-md border border-neon-green/20 text-xs">
-                  <p className="text-neon-green font-semibold">{selectedFolder.opponent_display_name}</p>
+                <div className="mt-2 p-2.5 bg-[rgba(16,217,160,0.05)] rounded-md border border-[rgba(16,217,160,0.2)] text-xs">
+                  <p className="text-[#10D9A0] font-semibold">{selectedFolder.opponent_display_name}</p>
                   <p className="text-muted-foreground mt-0.5">
                     {(selectedFolder.aggregated_stats as { total_matches?: number } | null)?.total_matches ?? 0} matches ·{' '}
                     {Math.round(((selectedFolder.aggregated_stats as { win_rate?: number } | null)?.win_rate ?? 0) * 100)}% win rate
@@ -358,8 +360,8 @@ export default function AIScoutPage() {
 
           {/* My team indicator */}
           {mode === 'myteam' && (
-            <div className="p-2.5 bg-neon-green/5 rounded-md border border-neon-green/20 text-xs">
-              <p className="text-neon-green font-semibold flex items-center gap-1.5">
+            <div className="p-2.5 bg-[rgba(16,217,160,0.05)] rounded-md border border-[rgba(16,217,160,0.2)] text-xs">
+              <p className="text-[#10D9A0] font-semibold flex items-center gap-1.5">
                 <Shield size={11} /> My Team Analysis
               </p>
               <p className="text-muted-foreground mt-0.5">
@@ -381,18 +383,18 @@ export default function AIScoutPage() {
                   className={cn(
                     'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm font-medium transition-all text-left',
                     focusArea === area.id
-                      ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
+                      ? 'bg-[rgba(16,217,160,0.08)] text-[#10D9A0] border border-[rgba(16,217,160,0.2)]'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent'
                   )}
                 >
-                  <span className={focusArea === area.id ? 'text-neon-green' : 'text-muted-foreground'}>
+                  <span className={focusArea === area.id ? 'text-[#10D9A0]' : 'text-muted-foreground'}>
                     {area.icon}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="truncate">{area.label}</p>
                     <p className="text-xs text-muted-foreground truncate font-normal">{area.description}</p>
                   </div>
-                  {focusArea === area.id && <div className="w-1.5 h-1.5 rounded-full bg-neon-green shrink-0" />}
+                  {focusArea === area.id && <div className="w-1.5 h-1.5 rounded-full bg-[#10D9A0] shrink-0" />}
                 </button>
               ))}
             </div>
@@ -508,7 +510,7 @@ export default function AIScoutPage() {
       {/* ── Right panel: Chat ── */}
       <div className="flex-1 flex flex-col overflow-hidden bg-background min-w-0">
         {/* Chat header */}
-        <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b border-border bg-card shrink-0">
+        <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b border-border bg-[hsl(229,23%,9%)] shrink-0">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -519,7 +521,7 @@ export default function AIScoutPage() {
               <SlidersHorizontal size={14} />
               Settings
             </Button>
-            <MessageSquare size={16} className="text-neon-green hidden md:block" />
+            <MessageSquare size={16} className="text-[#10D9A0] hidden md:block" />
             <div className="hidden md:flex items-baseline gap-1.5">
               <span className="text-sm font-semibold text-foreground">
                 {mode === 'myteam' ? 'My Team' : selectedFolder ? selectedFolder.opponent_display_name : 'AI Coach'}
@@ -546,15 +548,16 @@ export default function AIScoutPage() {
           {isEmpty ? (
             /* ── Welcome / empty state ── */
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <div className="w-20 h-20 rounded-full bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mb-5">
-                <Brain size={36} className="text-neon-green" />
+              <div className="relative w-16 h-16 rounded-2xl bg-[rgba(16,217,160,0.1)] border border-[rgba(16,217,160,0.2)] flex items-center justify-center mb-5 shadow-[0_0_24px_rgba(16,217,160,0.1)]">
+                <Brain size={28} className="text-[#10D9A0]" />
+                <div className="absolute inset-0 rounded-2xl bg-[rgba(16,217,160,0.05)] animate-ping opacity-20" />
               </div>
-              <h2 className="text-xl font-bold text-foreground mb-1">
+              <h2 className="text-xl font-bold text-foreground mb-1.5">
                 {mode === 'myteam'
                   ? 'My Team Coach Ready'
-                  : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Coach Ready'}
+                  : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Scout Ready'}
               </h2>
-              <p className="text-muted-foreground text-sm max-w-sm mb-8">
+              <p className="text-muted-foreground text-sm max-w-sm mb-8 leading-relaxed">
                 {mode === 'myteam'
                   ? "Ask anything about your team's performance — weaknesses, executes, practice plans, and strategy."
                   : selectedFolder
@@ -569,14 +572,14 @@ export default function AIScoutPage() {
                     onClick={() => sendMessage(q.prompt)}
                     disabled={isLoading}
                     className={cn(
-                      'flex items-center gap-2 p-3 text-left rounded-lg border border-border bg-card',
-                      'text-sm text-muted-foreground hover:text-foreground hover:border-neon-green/30 hover:bg-neon-green/5',
-                      'transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed'
+                      'flex items-center gap-2.5 p-3.5 text-left rounded-xl border border-border bg-card',
+                      'text-[13px] text-muted-foreground hover:text-foreground hover:border-[rgba(16,217,160,0.25)] hover:bg-[rgba(16,217,160,0.04)]',
+                      'transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed',
                     )}
                   >
-                    <Sparkles size={13} className="text-neon-green shrink-0" />
+                    <Sparkles size={13} className="text-[#10D9A0] shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{q.label}</span>
-                    <ChevronRight size={13} className="text-muted-foreground group-hover:text-neon-green shrink-0" />
+                    <ChevronRight size={13} className="text-muted-foreground/40 group-hover:text-[#10D9A0] group-hover:translate-x-0.5 transition-all shrink-0" />
                   </button>
                 ))}
               </div>
@@ -607,8 +610,8 @@ export default function AIScoutPage() {
                     className={cn('flex items-end gap-3 mb-4', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}
                   >
                     {msg.role === 'assistant' ? (
-                      <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center shrink-0 mb-0.5">
-                        <Brain size={14} className="text-neon-green" />
+                      <div className="w-8 h-8 rounded-xl bg-[rgba(16,217,160,0.12)] border border-[rgba(16,217,160,0.25)] flex items-center justify-center shrink-0 mb-0.5">
+                        <Brain size={14} className="text-[#10D9A0]" />
                       </div>
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 mb-0.5">
@@ -619,8 +622,8 @@ export default function AIScoutPage() {
                       className={cn(
                         'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
                         msg.role === 'user'
-                          ? 'bg-neon-green/10 border border-neon-green/20 rounded-br-sm'
-                          : 'bg-card border border-border rounded-bl-sm'
+                          ? 'bg-[rgba(16,217,160,0.08)] border border-[rgba(16,217,160,0.18)] rounded-br-sm'
+                          : 'bg-card border border-border rounded-bl-sm shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
                       )}
                     >
                       {msg.role === 'assistant' ? (
@@ -680,10 +683,10 @@ export default function AIScoutPage() {
         </div>
 
         {/* Input area */}
-        <div className="border-t border-border bg-card p-3 md:p-4 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
+        <div className="border-t border-border bg-[hsl(229,23%,9%)] p-3 md:p-4 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
           <div className={cn(
-            'flex items-end gap-3 p-2 rounded-xl border transition-colors',
-            'border-border focus-within:border-neon-green/50'
+            'flex items-end gap-3 p-2 rounded-xl border transition-all duration-150',
+            'border-border focus-within:border-[rgba(16,217,160,0.4)] focus-within:shadow-[0_0_0_3px_rgba(16,217,160,0.08)]'
           )}>
             <textarea
               ref={textareaRef}

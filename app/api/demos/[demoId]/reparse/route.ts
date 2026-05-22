@@ -19,7 +19,7 @@ export async function POST(
 
   const { data: demo } = await admin
     .from('demos')
-    .select('team_id, raw_file_path')
+    .select('team_id, raw_file_path, status')
     .eq('id', demoId)
     .single()
 
@@ -35,7 +35,12 @@ export async function POST(
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  await admin.from('demos').update({ status: 'processing' }).eq('id', demoId)
+  // Prevent duplicate concurrent reparsing
+  if (demo.status === 'processing') {
+    return NextResponse.json({ error: 'Demo is already being parsed' }, { status: 409 })
+  }
+
+  await admin.from('demos').update({ status: 'processing', error_message: null }).eq('id', demoId)
 
   try {
     await parseAndSaveDemo(demoId)

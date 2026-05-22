@@ -65,8 +65,8 @@ export default function OpponentCardWithDelete({ folder, demoCount, lastActivity
     <>
       {/* Success toast */}
       {success && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-neon-green/30 text-foreground text-sm px-4 py-3 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <CheckCircle size={16} className="text-neon-green shrink-0" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-[rgba(16,217,160,0.3)] text-foreground text-sm px-4 py-3 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <CheckCircle size={16} className="text-[#10D9A0] shrink-0" />
           Opponent folder deleted successfully.
         </div>
       )}
@@ -86,18 +86,20 @@ export default function OpponentCardWithDelete({ folder, demoCount, lastActivity
         </button>
 
         <Link href={`/opponents/${folder.id}`} className="h-full block">
-          <Card className="bg-card border-border hover:border-neon-green/40 hover:shadow-[0_0_20px_rgba(0,255,135,0.06)] transition-all duration-200 cursor-pointer group h-full">
+          <Card className="relative bg-card border-border hover:border-[rgba(16,217,160,0.3)] hover:shadow-[0_8px_28px_rgba(0,0,0,0.45)] transition-all duration-200 cursor-pointer group h-full overflow-hidden card-hover">
+            {/* Top accent line — revealed on hover */}
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-[rgba(16,217,160,0)] to-transparent group-hover:via-[rgba(16,217,160,0.4)] transition-all duration-300" />
             <CardContent className="p-5 flex flex-col h-full gap-4">
               {/* Top: avatar + name + chevron */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-neon-green/20 to-accent flex items-center justify-center shrink-0 border border-neon-green/20">
-                    <span className="text-base font-bold text-neon-green">
+                  <div className="w-10 h-10 rounded-xl bg-[rgba(16,217,160,0.1)] flex items-center justify-center shrink-0 border border-[rgba(16,217,160,0.2)]">
+                    <span className="text-[15px] font-bold text-[#10D9A0]">
                       {folder.opponent_display_name.charAt(0).toUpperCase()}
                     </span>
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-foreground truncate group-hover:text-neon-green transition-colors leading-tight">
+                    <p className="text-[14px] font-semibold text-foreground truncate group-hover:text-[#10D9A0] transition-colors leading-tight">
                       {folder.opponent_display_name}
                     </p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -117,35 +119,34 @@ export default function OpponentCardWithDelete({ folder, demoCount, lastActivity
                     </div>
                   </div>
                 </div>
-                {/* Nudge chevron left to avoid overlapping with trash icon */}
                 <ChevronRight
-                  size={15}
-                  className="text-muted-foreground/50 group-hover:text-neon-green transition-colors shrink-0 mt-1 mr-6"
+                  size={14}
+                  className="text-muted-foreground/30 group-hover:text-[#10D9A0] group-hover:translate-x-0.5 transition-all shrink-0 mt-1 mr-6"
                 />
               </div>
 
               {/* Bottom: record + win rate */}
-              <div className="flex items-center justify-between border-t border-border pt-3 mt-auto">
+              <div className="flex items-center justify-between border-t border-border/70 pt-3 mt-auto">
                 {total > 0 ? (
                   <>
                     <div className="flex items-center gap-1.5">
                       <span className={cn(
-                        'text-base font-bold font-mono',
+                        'text-base font-bold font-mono tabular-nums',
                         isPositive ? 'text-neon-green' : isNegative ? 'text-red-400' : 'text-muted-foreground'
                       )}>
                         {wins}W
                       </span>
-                      <span className="text-muted-foreground text-xs">–</span>
+                      <span className="text-muted-foreground/40 text-xs">–</span>
                       <span className={cn(
-                        'text-base font-bold font-mono',
+                        'text-base font-bold font-mono tabular-nums',
                         isNegative ? 'text-red-400' : 'text-muted-foreground'
                       )}>
                         {losses}L
                       </span>
                       {draws > 0 && (
                         <>
-                          <span className="text-muted-foreground text-xs">–</span>
-                          <span className="text-base font-bold font-mono text-yellow-400">{draws}D</span>
+                          <span className="text-muted-foreground/40 text-xs">–</span>
+                          <span className="text-base font-bold font-mono tabular-nums text-yellow-400">{draws}D</span>
                         </>
                       )}
                     </div>
@@ -160,7 +161,7 @@ export default function OpponentCardWithDelete({ folder, demoCount, lastActivity
                     )}
                   </>
                 ) : (
-                  <span className="text-xs text-muted-foreground italic">No completed matches</span>
+                  <span className="text-xs text-muted-foreground/60 italic">No completed matches</span>
                 )}
               </div>
             </CardContent>
