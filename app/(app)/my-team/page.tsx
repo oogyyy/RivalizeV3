@@ -12,7 +12,8 @@ import {
   FileVideo,
 } from 'lucide-react'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import DemoListMultiSelect from '@/components/teams/DemoListMultiSelect'
+import MapFolderList, { type MapGroup } from '@/components/teams/MapFolderList'
+import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 
 export default async function MyTeamPage() {
   const supabase = await createClient()
@@ -151,6 +152,43 @@ export default async function MyTeamPage() {
   const topMaps = Object.entries(mapCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
+
+  // ── Map-based grouping for the demo list ─────────────────────────────────────
+  // Key = canonical map name; 'processing'/'unknown'/null all collapse to 'unknown'
+  const mapGroupMap = new Map<string, { demos: DemoRowData[]; wins: number; losses: number; draws: number; lastActivity: string }>()
+
+  for (const demo of demos) {
+    const rawMap = (demo.parsed_data?.header?.map ?? demo.map ?? 'unknown').toLowerCase()
+    const mapKey = (rawMap === 'processing' || rawMap === '') ? 'unknown' : rawMap
+
+    if (!mapGroupMap.has(mapKey)) {
+      mapGroupMap.set(mapKey, { demos: [], wins: 0, losses: 0, draws: 0, lastActivity: demo.created_at })
+    }
+    const g = mapGroupMap.get(mapKey)!
+    g.demos.push(demo as unknown as DemoRowData)
+    if (demo.created_at > g.lastActivity) g.lastActivity = demo.created_at
+
+    if (demo.status === 'completed') {
+      const h  = demo.parsed_data?.header
+      const os = demo.parsed_data?.opponentSide ?? 'team2'
+      if (h) {
+        const ours   = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
+        const theirs = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
+        if (ours > theirs)        g.wins++
+        else if (ours === theirs) g.draws++
+        else                      g.losses++
+      }
+    }
+  }
+
+  // Sort: known maps by most-recent first; 'unknown' always last
+  const mapGroups: MapGroup[] = [...mapGroupMap.entries()]
+    .map(([map, data]) => ({ map, ...data }))
+    .sort((a, b) => {
+      if (a.map === 'unknown' && b.map !== 'unknown') return 1
+      if (b.map === 'unknown' && a.map !== 'unknown') return -1
+      return b.lastActivity.localeCompare(a.lastActivity)
+    })
 
   const AI_QUICK_ACTIONS = [
     {
@@ -308,30 +346,26 @@ export default async function MyTeamPage() {
             )}
           </div>
 
-          {/* My Team's Demos */}
-          <div className="bg-card border border-border rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-4">
+          {/* My Team's Demos — grouped by map */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
               <FileVideo size={16} className="text-neon-green" />
               <h2 className="text-sm font-semibold text-foreground">My Team&apos;s Demos</h2>
               {demos.length > 0 && (
                 <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded font-mono">
-                  {demos.length}
+                  {demos.length} · {mapGroups.filter(g => g.map !== 'unknown').length} maps
                 </span>
               )}
             </div>
             {demos.length === 0 ? (
-              <EmptyState
-                icon={<FileVideo size={20} className="text-muted-foreground" />}
-                text="No team demos uploaded yet. Use the Upload button above to add your team's own demos."
-              />
+              <div className="bg-card border border-border rounded-xl">
+                <EmptyState
+                  icon={<FileVideo size={20} className="text-muted-foreground" />}
+                  text="No team demos uploaded yet. Use the Upload button above to add your team's own demos."
+                />
+              </div>
             ) : (
-              <DemoListMultiSelect
-                demos={demos}
-                demoHrefPrefix="/my-team/demos"
-                showSideSelector
-                showReparse
-                canDelete
-              />
+              <MapFolderList mapGroups={mapGroups} />
             )}
           </div>
         </div>
