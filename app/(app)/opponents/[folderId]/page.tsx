@@ -4,22 +4,16 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { formatDate, formatFileSize } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import DeleteDemoButton from '@/components/teams/DeleteDemoButton'
 import DeleteFolderButton from '@/components/teams/DeleteFolderButton'
-import SetOpponentSideButton from '@/components/teams/SetOpponentSideButton'
-import ReparseButton from '@/components/teams/ReparseButton'
+import OpponentDemoList from '@/components/teams/OpponentDemoList'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
-  Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink, BarChart2,
-  HardDrive,
+  Crosshair, MapPin, TrendingUp, ExternalLink,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import type { AggregatedStats, DemoHeader, PlayerStats } from '@/types/database'
+import type { AggregatedStats, PlayerStats } from '@/types/database'
 
 export default async function OpponentPage({
   params,
@@ -71,24 +65,7 @@ export default async function OpponentPage({
   const winRate = stats?.win_rate ?? 0
   const avgRating = stats?.avg_rating ?? 0
 
-  const statusVariant = (status: string) => {
-    if (status === 'completed') return 'neon' as const
-    if (status === 'processing') return 'processing' as const
-    return 'destructive' as const
-  }
-  const statusLabel = (status: string) => {
-    if (status === 'completed') return 'Analyzed'
-    if (status === 'processing') return 'Processing'
-    return 'Failed'
-  }
-
   const isOwnerOrAdmin = membership.role === 'owner' || membership.role === 'admin'
-
-  // Normalise "T-Side"/"CT-Side" parser fallback strings to friendly labels
-  function normaliseTeamName(raw: string | undefined, fallback: string): string {
-    if (!raw || raw === 'T-Side' || raw === 'CT-Side') return fallback
-    return raw
-  }
 
   // Top players: prefer aggregated_stats, fall back to computing from raw demo data
   let topPlayers: PlayerStats[] = stats?.top_players ?? []
@@ -252,136 +229,13 @@ export default async function OpponentPage({
               Demo recordings
             </h2>
 
-            {totalDemos === 0 ? (
-              <Card className="bg-card border-border">
-                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
-                    <Upload size={22} className="text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground mb-1">No demos yet</p>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    Upload demos of {folder.opponent_display_name} to start scouting them
-                  </p>
-                  {isOwnerOrAdmin && <DemoUploadButton teamId={teamId} />}
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {(demos ?? []).map((demo) => {
-                  const pd = demo.parsed_data as { header?: DemoHeader; opponentSide?: 'team1' | 'team2' } | null
-                  const header = pd?.header
-                  const demoOpponentSide = pd?.opponentSide ?? 'team2'
-
-                  // Score from OUR perspective: we are the team that is NOT the opponent
-                  const ourScore  = header ? (demoOpponentSide === 'team1' ? (header.score_team2 ?? 0) : (header.score_team1 ?? 0)) : null
-                  const theirScore = header ? (demoOpponentSide === 'team1' ? (header.score_team1 ?? 0) : (header.score_team2 ?? 0)) : null
-                  const isWin  = ourScore !== null && theirScore !== null ? ourScore > theirScore : null
-                  const isDraw = ourScore !== null && theirScore !== null ? ourScore === theirScore : false
-                  const href = demo.status === 'completed'
-                    ? `/demos/${demo.id}?folder=${folderId}`
-                    : null
-
-                  return (
-                    <Card key={demo.id} className="bg-card border-border transition-all duration-150 hover:border-border/80">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-4">
-                          {/* Map icon */}
-                          <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0 border border-border">
-                            <MapPin size={15} className="text-muted-foreground" />
-                          </div>
-
-                          {/* Main info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-sm font-semibold text-foreground">
-                                {demo.map && demo.map !== 'unknown' ? demo.map : 'Unknown map'}
-                              </span>
-                              {ourScore !== null && theirScore !== null && (
-                                <span className={cn(
-                                  'text-xs font-bold font-mono',
-                                  isWin ? 'text-neon-green' : isDraw ? 'text-yellow-400' : 'text-red-400'
-                                )}>
-                                  {ourScore}–{theirScore}
-                                </span>
-                              )}
-                              <Badge variant={statusVariant(demo.status)} className="text-[10px] h-4 px-1.5">
-                                {statusLabel(demo.status)}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                              <span className="flex items-center gap-1">
-                                <Calendar size={10} />
-                                {demo.match_date ? formatDate(demo.match_date) : formatDate(demo.created_at)}
-                              </span>
-                              {demo.file_size_bytes && (
-                                <span className="flex items-center gap-1">
-                                  <HardDrive size={10} />
-                                  {formatFileSize(demo.file_size_bytes)}
-                                </span>
-                              )}
-                              {header && (
-                                <span className="flex items-center gap-1">
-                                  <BarChart3 size={10} />
-                                  {header.total_rounds} rounds
-                                </span>
-                              )}
-                              {isOwnerOrAdmin && demo.status === 'completed' && (
-                                <SetOpponentSideButton
-                                  demoId={demo.id}
-                                  currentSide={demoOpponentSide}
-                                  teamNames={header ? {
-                                    team1: normaliseTeamName(header.team1, 'Team 1 (T-Side)'),
-                                    team2: normaliseTeamName(header.team2, 'Team 2 (CT-Side)'),
-                                  } : undefined}
-                                />
-                              )}
-                              {isOwnerOrAdmin && (demo.status === 'completed' || demo.status === 'failed') && (
-                                <ReparseButton demoId={demo.id} />
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Right actions — explicit Links, no onClick handlers */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {demo.status === 'completed' && (
-                              <>
-                                <Link href={`/ai-coach?folder=${folderId}`}>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs gap-1 h-7 text-neon-green hover:bg-neon-green/10"
-                                  >
-                                    <Brain size={11} />
-                                    Scout
-                                  </Button>
-                                </Link>
-                                <Link href={`/demos/${demo.id}?folder=${folderId}`}>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs gap-1 h-7 text-muted-foreground hover:text-foreground"
-                                  >
-                                    <BarChart2 size={11} />
-                                    Stats
-                                  </Button>
-                                </Link>
-                              </>
-                            )}
-                            {isOwnerOrAdmin && <DeleteDemoButton demoId={demo.id} />}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-
-                {isOwnerOrAdmin && (
-                  <div className="flex justify-end pt-1">
-                    <DemoUploadButton teamId={teamId} />
-                  </div>
-                )}
-              </div>
-            )}
+            <OpponentDemoList
+              demos={demos ?? []}
+              folderId={folderId}
+              teamId={teamId}
+              isOwnerOrAdmin={isOwnerOrAdmin}
+              opponentDisplayName={folder.opponent_display_name}
+            />
           </div>
 
           {/* Right sidebar */}
