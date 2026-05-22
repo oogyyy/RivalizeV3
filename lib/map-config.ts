@@ -1,10 +1,12 @@
 // CS2 map radar calibration data + image URLs.
-// Calibration values come from the game's radar info files:
+// Images are the official game radar PNGs (1024×1024) extracted from CS2 PSD files.
+// Source: https://github.com/MurkyYT/cs2-map-icons
+//
+// Calibration formula (matches Valve's overview files):
 //   pixel_x = (world_x - pos_x) / scale
 //   pixel_y = (pos_y  - world_y) / scale
-// The radar images are 1024×1024 px.
 
-const RAW = 'https://raw.githubusercontent.com/ghostcap-gaming/cs2-map-images/main/cs2'
+const RAW = 'https://raw.githubusercontent.com/MurkyYT/cs2-map-icons/main/images/radars'
 
 export interface MapConfig {
   imageUrl: string
@@ -14,17 +16,19 @@ export interface MapConfig {
 }
 
 export const MAP_CONFIGS: Record<string, MapConfig> = {
-  de_mirage:   { imageUrl: `${RAW}/de_mirage.png`,   pos_x: -3230, pos_y:  1713, scale: 5.00 },
-  de_inferno:  { imageUrl: `${RAW}/de_inferno.png`,  pos_x: -2087, pos_y:  3870, scale: 4.90 },
-  de_dust2:    { imageUrl: `${RAW}/de_dust2.png`,    pos_x: -2476, pos_y:  3239, scale: 4.40 },
-  de_nuke:     { imageUrl: `${RAW}/de_nuke.png`,     pos_x: -3453, pos_y:  2887, scale: 7.00 },
-  de_ancient:  { imageUrl: `${RAW}/de_ancient.png`,  pos_x: -2953, pos_y:  2164, scale: 5.00 },
-  de_anubis:   { imageUrl: `${RAW}/de_anubis.png`,   pos_x: -2796, pos_y:  3328, scale: 5.22 },
-  de_overpass: { imageUrl: `${RAW}/de_overpass.png`, pos_x: -4831, pos_y:  1781, scale: 5.20 },
-  de_vertigo:  { imageUrl: `${RAW}/de_vertigo.png`,  pos_x: -3168, pos_y:  1762, scale: 4.00 },
-  de_train:    { imageUrl: `${RAW}/de_train.png`,    pos_x: -2477, pos_y:  2392, scale: 4.70 },
-  de_cache:    { imageUrl: `${RAW}/de_cache.png`,    pos_x: -2000, pos_y:  3250, scale: 5.50 },
-  de_basalt:   { imageUrl: `${RAW}/de_basalt.png`,   pos_x: -2592, pos_y:  2592, scale: 5.00 },
+  de_mirage:   { imageUrl: `${RAW}/de_mirage_radar_psd.png`,   pos_x: -3230, pos_y:  1713, scale: 5.00 },
+  de_inferno:  { imageUrl: `${RAW}/de_inferno_radar_psd.png`,  pos_x: -2087, pos_y:  3870, scale: 4.90 },
+  de_dust2:    { imageUrl: `${RAW}/de_dust2_radar_psd.png`,    pos_x: -2476, pos_y:  3239, scale: 4.40 },
+  de_nuke:     { imageUrl: `${RAW}/de_nuke_radar_psd.png`,     pos_x: -3453, pos_y:  2887, scale: 7.00 },
+  de_ancient:  { imageUrl: `${RAW}/de_ancient_radar_psd.png`,  pos_x: -2953, pos_y:  2164, scale: 5.00 },
+  de_anubis:   { imageUrl: `${RAW}/de_anubis_radar_psd.png`,   pos_x: -2796, pos_y:  3328, scale: 5.22 },
+  de_overpass: { imageUrl: `${RAW}/de_overpass_radar_psd.png`, pos_x: -4831, pos_y:  1781, scale: 5.20 },
+  de_vertigo:  { imageUrl: `${RAW}/de_vertigo_radar_psd.png`,  pos_x: -3168, pos_y:  1762, scale: 4.00 },
+  de_train:    { imageUrl: `${RAW}/de_train_radar_psd.png`,    pos_x: -2477, pos_y:  2392, scale: 4.70 },
+  de_cache:    { imageUrl: `${RAW}/de_cache_radar_psd.png`,    pos_x: -2000, pos_y:  3250, scale: 5.50 },
+  cs_italy:    { imageUrl: `${RAW}/cs_italy_radar_psd.png`,    pos_x: -2647, pos_y:  2592, scale: 4.60 },
+  cs_office:   { imageUrl: `${RAW}/cs_office_radar_psd.png`,   pos_x: -1838, pos_y:  1858, scale: 3.00 },
+  ar_baggage:  { imageUrl: `${RAW}/ar_baggage_radar_psd.png`,  pos_x: -1316, pos_y:  1571, scale: 3.55 },
 }
 
 // ── Image loading ─────────────────────────────────────────────────────────────
