@@ -1,62 +1,90 @@
 'use client'
 
-import { useCallback, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { useState } from 'react'
+import { RefreshCw, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { ReparseProgress } from '@/components/demos/ReparseProgress'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 interface Props {
   demoId: string
+  /** 'icon' = small icon-only button (default, for completed demos)
+   *  'prominent' = labelled button used on stuck/failed demos */
+  variant?: 'icon' | 'prominent'
 }
 
-export default function ReparseButton({ demoId }: Props) {
-  const [loading, setLoading]     = useState(false)
-  const [reparsing, setReparsing] = useState(false)
-  const [error, setError]         = useState(false)
+export default function ReparseButton({ demoId, variant = 'icon' }: Props) {
+  const [loading, setLoading] = useState(false)
+  const [done,    setDone]    = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
   const router = useRouter()
 
   async function handleReparse(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
     setLoading(true)
-    setError(false)
+    setError(null)
+    setDone(false)
     try {
       const res = await fetch(`/api/demos/${demoId}/reparse`, { method: 'POST' })
-      if (!res.ok) throw new Error(await res.text())
-      setReparsing(true)
-    } catch {
-      setError(true)
-      setTimeout(() => setError(false), 3000)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `HTTP ${res.status}`)
+      }
+      setDone(true)
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDone = useCallback(() => {
-    setReparsing(false)
-    router.refresh()
-  }, [router])
+  if (variant === 'prominent') {
+    return (
+      <div className="flex flex-col gap-1">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleReparse}
+          disabled={loading}
+          className={cn(
+            'h-7 gap-1.5 text-xs border-amber-500/40 text-amber-400 hover:bg-amber-400/10 hover:border-amber-400/60 hover:text-amber-300',
+            done && 'border-neon-green/40 text-neon-green hover:bg-neon-green/10',
+            'disabled:opacity-60',
+          )}
+        >
+          {loading
+            ? <><Loader2 size={11} className="animate-spin" /> Parsing…</>
+            : done
+            ? <><RefreshCw size={11} /> Done</>
+            : <><RefreshCw size={11} /> Retry parsing</>
+          }
+        </Button>
+        {error && (
+          <p className="text-[10px] text-red-400 max-w-[200px] truncate" title={error}>
+            {error}
+          </p>
+        )}
+      </div>
+    )
+  }
 
   return (
-    <span className="relative inline-flex flex-col gap-1">
-      <span className="inline-flex items-center gap-2">
-        <button
-          onClick={handleReparse}
-          disabled={loading || reparsing}
-          title="Re-parse demo"
-          className="p-1.5 rounded-md text-muted-foreground hover:text-blue-400 hover:bg-blue-400/10 transition-all duration-150 disabled:opacity-40"
-        >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-        </button>
-        {error && (
-          <span className="text-xs text-red-400 whitespace-nowrap">Failed to start</span>
-        )}
-      </span>
-
-      {reparsing && (
-        <span className="block w-48">
-          <ReparseProgress demoId={demoId} onDone={handleDone} />
-        </span>
+    <span className="inline-flex flex-col gap-1">
+      <button
+        onClick={handleReparse}
+        disabled={loading}
+        title={loading ? 'Parsing…' : 'Re-parse demo'}
+        className="p-1.5 rounded-md text-muted-foreground hover:text-blue-400 hover:bg-blue-400/10 transition-all duration-150 disabled:opacity-40"
+      >
+        {loading
+          ? <Loader2 size={13} className="animate-spin" />
+          : <RefreshCw size={13} />
+        }
+      </button>
+      {error && (
+        <span className="text-[10px] text-red-400 whitespace-nowrap">Failed</span>
       )}
     </span>
   )

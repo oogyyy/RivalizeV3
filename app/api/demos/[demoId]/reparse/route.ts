@@ -1,3 +1,5 @@
+export const maxDuration = 300
+
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
@@ -5,6 +7,25 @@ import { parseCS2Demo } from '@/lib/demo-parser/go-parser-client'
 import { maybeDecompress } from '@/lib/demo-parser/decompress'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import { downloadObject } from '@/lib/r2'
+
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3, label = 'op'): Promise<T> {
+  const delays = [2_000, 5_000, 10_000]
+  let last: unknown
+  for (let i = 0; i < attempts; i++) {
+    try { return await fn() } catch (err) {
+      last = err
+      if (i < attempts - 1) {
+        console.warn(`[reparse] ${label} failed (attempt ${i + 1}/${attempts}), retrying:`, err)
+        await sleep(delays[i] ?? 10_000)
+      }
+    }
+  }
+  throw last
+}
 
 export async function POST(
   _req: Request,
@@ -20,7 +41,7 @@ export async function POST(
 
   const { data: demo } = await admin
     .from('demos')
-    .select('id, team_id, raw_file_path, opponent_slug, parsed_data')
+    .select('id, team_id, raw_file_path, opponent_slug, status, demo_type, parsed_data')
     .eq('id', demoId)
     .single()
 
@@ -38,43 +59,61 @@ export async function POST(
   const r2Key: string = demo.raw_file_path
   if (!r2Key) return NextResponse.json({ error: 'No file path on record' }, { status: 400 })
 
+  // Prevent duplicate concurrent reparsing
+  if (demo.status === 'processing') {
+    return NextResponse.json({ error: 'Demo is already being parsed' }, { status: 409 })
+  }
+
   const existingOpponentSide =
     (demo.parsed_data as { opponentSide?: string } | null)?.opponentSide ?? 'team2'
 
-  await admin.from('demos').update({ status: 'processing' }).eq('id', demoId)
+  await admin.from('demos').update({ status: 'processing', error_message: null }).eq('id', demoId)
 
-  void (async () => {
-    try {
-      console.log(`[reparse] Downloading ${demoId} from R2 key: ${r2Key}`)
-      const rawBuf = await downloadObject(r2Key)
-      const buf = maybeDecompress(rawBuf, r2Key)
-      console.log(`[reparse] Downloaded ${rawBuf.length} bytes → ${buf.length} bytes after decompression, parsing...`)
-      const { parsedData: realData, warnings } = await parseCS2Demo(buf)
-      if (warnings.length > 0) console.warn('[reparse] warnings:', warnings)
-      console.log(`[reparse] Result: ${realData.players.length} players, map=${realData.header.map}, score=${realData.header.score_team1}-${realData.header.score_team2}`)
+  try {
+    console.log(`[reparse] Downloading ${demoId} from R2: ${r2Key}`)
+    const rawBuf = await withRetry(() => downloadObject(r2Key), 3, 'R2 download')
+    const buf = maybeDecompress(rawBuf, r2Key)
+    console.log(`[reparse] ${rawBuf.length}B raw → ${buf.length}B decompressed`)
 
-      if (realData.players.length === 0) {
-        await admin
-          .from('demos')
-          .update({ status: 'failed', error_message: 'Demo parsed but no player data could be extracted' })
-          .eq('id', demoId)
-        return
-      }
+    console.log(`[reparse] Sending to Go parser…`)
+    const { parsedData: realData, warnings } = await withRetry(
+      () => parseCS2Demo(buf),
+      3,
+      'Go parser',
+    )
+    if (warnings.length) console.warn('[reparse] parser warnings:', warnings)
+    console.log(
+      `[reparse] OK — ${realData.players.length} players, map=${realData.header.map},` +
+      ` score=${realData.header.score_team1}-${realData.header.score_team2}`,
+    )
 
-      const parsedData = { ...realData, opponentSide: existingOpponentSide }
-      const resolvedMap = realData.header.map !== 'unknown' ? realData.header.map : 'unknown'
-      await admin
-        .from('demos')
-        .update({ parsed_data: parsedData, status: 'completed', map: resolvedMap })
-        .eq('id', demoId)
+    if (realData.players.length === 0) {
+      await admin.from('demos').update({
+        status: 'failed',
+        error_message: 'Demo parsed successfully but contained no player data',
+      }).eq('id', demoId)
+      return NextResponse.json({ error: 'No player data in demo' }, { status: 422 })
+    }
 
-      // Refresh folder aggregated stats
+    const parsedData = { ...realData, opponentSide: existingOpponentSide }
+    const resolvedMap = realData.header.map !== 'unknown' ? realData.header.map : 'unknown'
+    await admin.from('demos').update({
+      parsed_data: parsedData,
+      status: 'completed',
+      map: resolvedMap,
+      error_message: null,
+    }).eq('id', demoId)
+    console.log(`[reparse] Saved ${demoId} as completed (${resolvedMap})`)
+
+    // Refresh folder aggregated stats — opponent demos only
+    if (demo.demo_type === 'opponent' && demo.opponent_slug) {
       const { data: allDemos } = await admin
         .from('demos')
         .select('parsed_data')
         .eq('team_id', demo.team_id)
         .eq('opponent_slug', demo.opponent_slug)
         .eq('status', 'completed')
+        .eq('demo_type', 'opponent')
 
       if (allDemos && allDemos.length > 0) {
         type DemoRow = { header?: { score_team1?: number; score_team2?: number }; opponentSide?: string }
@@ -105,7 +144,9 @@ export async function POST(
               losses: allDemos.length - wins - draws,
               draws,
               win_rate: wins / allDemos.length,
-              avg_rating: topPlayers.length > 0 ? topPlayers.reduce((s, p) => s + p.rating, 0) / topPlayers.length : 1.0,
+              avg_rating: topPlayers.length > 0
+                ? topPlayers.reduce((s, p) => s + p.rating, 0) / topPlayers.length
+                : 1.0,
               maps_played: mapsPlayed,
               top_players: topPlayers,
             },
@@ -113,14 +154,16 @@ export async function POST(
           .eq('user_team_id', demo.team_id)
           .eq('opponent_slug', demo.opponent_slug)
       }
-    } catch (err) {
-      console.error('[reparse] failed:', err)
-      await admin
-        .from('demos')
-        .update({ status: 'failed', error_message: String(err) })
-        .eq('id', demoId)
     }
-  })()
 
-  return NextResponse.json({ success: true, message: 'Re-parsing started' })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[reparse] All attempts failed for ${demoId}:`, msg)
+    await admin.from('demos').update({
+      status: 'failed',
+      error_message: msg,
+    }).eq('id', demoId)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }
