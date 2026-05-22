@@ -196,9 +196,9 @@ interface GoPlayer {
 }
 
 // ── Heatmap generation ────────────────────────────────────────────────────────
-// CS2 coordinates are in game units (roughly -3500 to +3500 per axis depending
-// on the map). We normalise all positions to the 0–1024 range that HeatmapCanvas
-// expects by computing min/max from the actual kill data in this match.
+// Store raw CS2 world coordinates. HeatmapCanvas applies the proper Valve
+// calibration transform (worldToCanvas) at render time so points align with
+// the radar image regardless of which kills happened in a specific match.
 
 function buildHeatmapData(
   rounds: ParsedDemoData['rounds'],
@@ -210,28 +210,17 @@ function buildHeatmapData(
   const teamOf = new Map<string, string>()
   players.forEach(p => teamOf.set(p.name, p.team))
 
-  const xs = allKills.flatMap(k => [k.killer_x, k.victim_x])
-  const ys = allKills.flatMap(k => [k.killer_y, k.victim_y])
-  const minX = Math.min(...xs), maxX = Math.max(...xs)
-  const minY = Math.min(...ys), maxY = Math.max(...ys)
-  const PAD = 60, SCALE = 1024 - PAD * 2
-
-  const norm = (v: number, min: number, max: number, flip = false) => {
-    const n = max === min ? 0.5 : (v - min) / (max - min)
-    return PAD + (flip ? 1 - n : n) * SCALE
-  }
-
   const points: NonNullable<ParsedDemoData['heatmap_data']> = []
   allKills.forEach(k => {
     points.push({
-      x: norm(k.killer_x, minX, maxX),
-      y: norm(k.killer_y, minY, maxY, true),
+      x: k.killer_x,
+      y: k.killer_y,
       type: 'kill',
       team: teamOf.get(k.killer_name) ?? '',
     })
     points.push({
-      x: norm(k.victim_x, minX, maxX),
-      y: norm(k.victim_y, minY, maxY, true),
+      x: k.victim_x,
+      y: k.victim_y,
       type: 'death',
       team: teamOf.get(k.victim_name) ?? '',
     })

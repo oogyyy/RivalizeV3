@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { MAP_CONFIGS, loadMapImage } from '@/lib/map-config'
+import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
 import type { HeatmapPoint } from '@/types/database'
 
 interface HeatmapCanvasProps {
@@ -53,6 +53,25 @@ export default function HeatmapCanvas({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    // Build coordinate transform: Valve calibration for known maps,
+    // min/max normalization as fallback for unknown maps.
+    const cfg = MAP_CONFIGS[mapName]
+    let toCanvas: (wx: number, wy: number) => [number, number]
+    if (cfg) {
+      toCanvas = (wx, wy) => worldToCanvas(wx, wy, cfg, width)
+    } else {
+      // Fallback: normalize from point extents (approximate alignment)
+      const allX = filtered.map(p => p.x)
+      const allY = filtered.map(p => p.y)
+      const minX = Math.min(...allX), maxX = Math.max(...allX)
+      const minY = Math.min(...allY), maxY = Math.max(...allY)
+      const PAD = 30, S = width - PAD * 2
+      toCanvas = (wx, wy) => [
+        PAD + (maxX === minX ? 0.5 : (wx - minX) / (maxX - minX)) * S,
+        PAD + (maxY === minY ? 0.5 : 1 - (wy - minY) / (maxY - minY)) * S,
+      ]
+    }
+
     // Dark base
     ctx.fillStyle = '#080c18'
     ctx.fillRect(0, 0, width, height)
@@ -87,8 +106,7 @@ export default function HeatmapCanvas({
 
     // Heat glow clusters
     filtered.forEach(point => {
-      const x = (point.x / 1024) * width
-      const y = (point.y / 1024) * height
+      const [x, y] = toCanvas(point.x, point.y)
       const color = POINT_COLORS[point.type] || '#ffffff'
       const g = ctx.createRadialGradient(x, y, 0, x, y, 22)
       g.addColorStop(0, color + '50')
@@ -99,8 +117,7 @@ export default function HeatmapCanvas({
 
     // Point dots
     filtered.forEach(point => {
-      const x = (point.x / 1024) * width
-      const y = (point.y / 1024) * height
+      const [x, y] = toCanvas(point.x, point.y)
       const color = POINT_COLORS[point.type] || '#ffffff'
 
       ctx.beginPath()

@@ -932,19 +932,12 @@ function buildHeatmapFromRounds(
   if (allKills.length === 0) return []
   const teamOf = new Map<string, string>()
   players.forEach(p => teamOf.set(p.name, p.team))
-  const xs = allKills.flatMap(k => [k.killer_x, k.victim_x])
-  const ys = allKills.flatMap(k => [k.killer_y, k.victim_y])
-  const minX = Math.min(...xs), maxX = Math.max(...xs)
-  const minY = Math.min(...ys), maxY = Math.max(...ys)
-  const PAD = 60, SCALE = 1024 - PAD * 2
-  const norm = (v: number, min: number, max: number, flip = false) => {
-    const n = max === min ? 0.5 : (v - min) / (max - min)
-    return PAD + (flip ? 1 - n : n) * SCALE
-  }
+  // Store raw CS2 world coordinates — HeatmapCanvas applies the proper Valve
+  // calibration transform (worldToCanvas) at render time.
   const points: NonNullable<ParsedDemoData['heatmap_data']> = []
   allKills.forEach(k => {
-    points.push({ x: norm(k.killer_x, minX, maxX), y: norm(k.killer_y, minY, maxY, true), type: 'kill',  team: teamOf.get(k.killer_name) ?? '' })
-    points.push({ x: norm(k.victim_x,  minX, maxX), y: norm(k.victim_y,  minY, maxY, true), type: 'death', team: teamOf.get(k.victim_name) ?? '' })
+    points.push({ x: k.killer_x, y: k.killer_y, type: 'kill',  team: teamOf.get(k.killer_name) ?? '' })
+    points.push({ x: k.victim_x, y: k.victim_y, type: 'death', team: teamOf.get(k.victim_name) ?? '' })
   })
   return points
 }
