@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import {
@@ -61,6 +62,8 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   const [uploads, setUploads]         = useState<FileUpload[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [opponentName, setOpponentName] = useState('')
+  const [mounted, setMounted]         = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   const updateUpload = useCallback(
     (index: number, update: Partial<FileUpload>) =>
@@ -216,7 +219,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
     )
   }
 
-  return (
+  const modal = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
 
@@ -425,4 +428,6 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
       </div>
     </div>
   )
+
+  return mounted ? createPortal(modal, document.body) : null
 }
