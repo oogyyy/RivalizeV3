@@ -203,8 +203,8 @@ export default function AIScoutPage() {
     return {
       teamId:           modeRef.current === 'myteam'
                           ? myTeamIdRef.current
-                          : (currentFolder?.user_team_id ?? null),
-      folderId:         modeRef.current === 'opponent' ? (selectedFolderIdRef.current || null) : null,
+                          : (currentFolder?.user_team_id ?? undefined),
+      folderId:         modeRef.current === 'opponent' ? (selectedFolderIdRef.current || undefined) : undefined,
       focusArea:        focusAreaRef.current,
       mode:             modeRef.current,
       playerName:       focusAreaRef.current === 'player' ? selectedPlayerRef.current : undefined,
