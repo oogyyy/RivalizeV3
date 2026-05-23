@@ -21,9 +21,7 @@ async function withRetry<T>(
     } catch (err) {
       lastErr = err
       if (i < attempts - 1) {
-        const wait = delays[i] ?? 10_000
-        console.warn(`[parse] ${label} failed (attempt ${i + 1}/${attempts}), retrying in ${wait / 1000}s:`, err)
-        await sleep(wait)
+        await sleep(delays[i] ?? 10_000)
       }
     }
   }
@@ -54,22 +52,15 @@ export async function parseAndSaveDemo(demoId: string): Promise<void> {
     (demo.parsed_data as { opponentSide?: string } | null)?.opponentSide ?? 'team2'
 
   try {
-    console.log(`[parse] Downloading ${demoId} from R2: ${r2Key}`)
     const rawBuf = await withRetry(() => downloadObject(r2Key), 3, 'R2 download')
     const buf = maybeDecompress(rawBuf, r2Key)
-    console.log(`[parse] ${rawBuf.length}B raw → ${buf.length}B decompressed`)
 
-    console.log(`[parse] Sending to Go parser…`)
     const { parsedData: realData, warnings } = await withRetry(
       () => parseCS2Demo(buf),
       3,
       'Go parser',
     )
-    if (warnings.length) console.warn('[parse] parser warnings:', warnings)
-    console.log(
-      `[parse] OK — ${realData.players.length} players, map=${realData.header.map},` +
-      ` score=${realData.header.score_team1}-${realData.header.score_team2}`,
-    )
+    if (warnings.length) console.warn(`[parse] warnings for ${demoId}:`, warnings)
 
     if (realData.players.length === 0) {
       await admin.from('demos').update({
@@ -87,7 +78,6 @@ export async function parseAndSaveDemo(demoId: string): Promise<void> {
       map: resolvedMap,
       error_message: null,
     }).eq('id', demoId)
-    console.log(`[parse] Saved ${demoId} as completed (${resolvedMap})`)
 
     // Recalculate folder stats for opponent demos only
     if (demo.demo_type === 'opponent' && demo.opponent_slug) {

@@ -71,7 +71,7 @@ export async function middleware(request: NextRequest) {
 
   // Apply CORS headers to all API responses
   if (request.nextUrl.pathname.startsWith('/api/')) {
-    withCors(supabaseResponse, origin)
+    return withCors(supabaseResponse, origin)
   }
 
   return supabaseResponse

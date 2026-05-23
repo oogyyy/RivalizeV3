@@ -128,10 +128,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     ) ?? []
   } catch (e) { warnings.push(`parseEvent(player_death): ${e}`) }
 
-  if (deathEvents.length > 0) {
-    console.log('[real-parser] player_death field names:', Object.keys(deathEvents[0]))
-  }
-
   let roundEnds: Row[] = []
   try {
     roundEnds = dp.parseEvent(
@@ -139,11 +135,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       ['tick', 'winner', 'reason', 't_score', 'ct_score'],
     ) ?? []
   } catch (e) { warnings.push(`parseEvent(round_end): ${e}`) }
-
-  if (roundEnds.length > 0) {
-    console.log('[real-parser] round_end field names:', Object.keys(roundEnds[0]))
-    console.log('[real-parser] first round_end values:', roundEnds[0])
-  }
 
   // round_freeze_end fires when the buy phase ends and players can move.
   // Deaths/damage before a round's freeze_end are carry-over from the
@@ -205,10 +196,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     ) ?? [])
   } catch (e) { warnings.push(`clan scan (mvp): ${e}`) }
 
-  if (clanNameBySid.size > 0) {
-    console.log(`[real-parser] clan tags for ${clanNameBySid.size} players:`, [...new Set(clanNameBySid.values())])
-  }
-
   // ── 2c. CCSTeam entity name scan (via parseTicks) ─────────────────────────
   //
   // FACEIT and other competitive platforms populate CCSTeam.m_szTeamname with
@@ -248,8 +235,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
         sampleTicks,
       ) ?? []
 
-      console.log('[real-parser] parseTicks raw sample (first 6 rows):', JSON.stringify(teamRows.slice(0, 6)))
-
       // Populate clanNameBySid AND parsedTickTeamObs from ALL players visible
       // at these ticks — more complete than event scans which miss players who
       // only ever appear as the attacker (attacker_team_num is often 0 in CS2).
@@ -275,12 +260,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
         if (teamNum === 3 && !ctEntityName) ctEntityName = teamName
       }
 
-      if (tEntityName || ctEntityName) {
-        console.log(`[real-parser] CCSTeam entity names: T="${tEntityName}", CT="${ctEntityName}"`)
-      }
-      if (clanNameBySid.size > 0) {
-        console.log(`[real-parser] clan tags after parseTicks (${clanNameBySid.size} players):`, [...new Set(clanNameBySid.values())])
-      }
     } catch (e) {
       warnings.push(`CCSTeam parseTicks: ${e}`)
     }
@@ -314,7 +293,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       // allKnifeOrNone is true for 0-death rounds (Array.every on empty = true)
       if (roundDeaths.every(ev => isKnifeWeapon(s(ev, 'weapon')))) {
         stripCount++
-        console.log(`[real-parser] stripping pre-match round ${ri + 1} (deaths=${roundDeaths.length}, endTick=${endTick})`)
       } else {
         break
       }
@@ -333,18 +311,14 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     ? n(competitiveRounds[halfRoundIdx], 'tick')
     : Infinity
 
-  console.log(`[real-parser] totalRounds=${totalRounds}, halfTick=${halfTick} (idx=${halfRoundIdx})`)
-
   // ── 3. Player info ────────────────────────────────────────────────────────
   let playerInfoRaw: Row[] = []
   try {
     playerInfoRaw = dp.parsePlayerInfo(buf) ?? []
   } catch (e) { warnings.push(`playerInfo: ${e}`) }
 
-  if (playerInfoRaw.length > 0) {
-    console.log('[real-parser] parsePlayerInfo field names:', Object.keys(playerInfoRaw[0]))
-  } else {
-    console.warn('[real-parser] parsePlayerInfo returned 0 rows')
+  if (playerInfoRaw.length === 0) {
+    warnings.push('parsePlayerInfo returned 0 rows')
   }
 
   const botSids  = new Set(playerInfoRaw.filter(p => p.is_bot ).map(p => s(p, 'xuid', 'steamid')))
@@ -367,8 +341,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     const atkName = s(ev, 'attacker_name')
     if (atkSid && atkName) attackerName.set(atkSid, atkName)
   }
-
-  console.log(`[real-parser] name sources: parsePlayerInfo=${infoName.size}, victim=${victimName.size}, attacker=${attackerName.size}`)
 
   // ── 4. Stat maps + two-pass team-aware stat counting ─────────────────────
   //
@@ -480,9 +452,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
 
   const postMatchDeaths = deathEvents.filter(ev => n(ev, 'tick') > matchEndTick).length
   const postMatchHurts  = hurtEvents.filter(ev => n(ev, 'tick') > matchEndTick).length
-  if (postMatchDeaths > 0 || postMatchHurts > 0) {
-    console.log(`[real-parser] post-match events: ${postMatchDeaths} deaths, ${postMatchHurts} hurt events (matchEndTick=${matchEndTick})`)
-  }
 
   // Binary-search for the competitive round index containing this tick.
   // Returns -1 if tick is after all rounds.
@@ -511,7 +480,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       const ri = findRoundIdx(ft)
       if (ri >= 0 && roundFreezeEndTick[ri] === 0) roundFreezeEndTick[ri] = ft
     }
-    console.log(`[real-parser] round_freeze_end events mapped: ${sortedFreezeEnds.length} events → ${roundFreezeEndTick.filter(t => t > 0).length} rounds`)
   }
 
   // Return the actual team_num (2=T, 3=CT) for a player at a given tick,
@@ -797,10 +765,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
       `players=0: deaths=${deathEvents.length} roundEnds=${roundEnds.length} ` +
       `hurt=${hurtEvents.length} mvp=${mvpEvents.length} sids=${allSids.size} halfTick=${halfTick}`,
     )
-    console.warn('[real-parser] 0 players extracted. Warnings:', warnings)
-  } else {
-    const fakes = players.filter(p => p.name.startsWith('Player_')).length
-    console.log(`[real-parser] ${players.length} players (${fakes} with fallback names):`, players.map(p => p.name))
   }
 
   // ── 6b. Resolve real team names ───────────────────────────────────────────
@@ -829,8 +793,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
   const ctSidePlayers = players.filter(p => p.team === 'CT-Side')
   const team1Name = deriveName('T-Side',  tSidePlayers,  tEntityName)
   const team2Name = deriveName('CT-Side', ctSidePlayers, ctEntityName)
-
-  console.log(`[real-parser] team names: "${team1Name}" vs "${team2Name}"`)
 
   if (team1Name !== 'T-Side' || team2Name !== 'CT-Side') {
     for (const p of players) {
@@ -868,8 +830,6 @@ export function parseCS2Demo(buf: Buffer): RealParseResult {
     if (tWinsGoToTeam1(i) ? tWon : !tWon) score1++
     else score2++
   }
-  console.log(`[real-parser] scores via reason strings (MR12-aware): ${score1}-${score2}`)
-
   // ── 8. Assemble ParsedDemoData ────────────────────────────────────────────
   // Build _debug object: per-player kill/death breakdown keyed by steam_id.
   // Visible in the UI debug panel — paste it to diagnose stat mismatches.

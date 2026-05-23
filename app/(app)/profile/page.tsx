@@ -16,9 +16,7 @@ import {
   Crosshair, Users, FileVideo, Unlink, X
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
-
-const CS2_MAPS = ['de_dust2', 'de_mirage', 'de_inferno', 'de_nuke', 'de_overpass', 'de_vertigo', 'de_ancient', 'de_anubis']
-const PLAYER_ROLES = ['IGL', 'AWPer', 'Entry Fragger', 'Support', 'Lurker', 'Rifler', 'Anchor']
+import { CS2_MAPS, PLAYER_ROLES } from '@/types/database'
 
 function AvatarDropzone({
   currentUrl,
@@ -105,7 +103,7 @@ function ChipSelect({
   onChange,
   color = 'neon',
 }: {
-  options: string[]
+  options: readonly string[]
   selected: string[]
   onChange: (val: string[]) => void
   color?: 'neon' | 'blue'

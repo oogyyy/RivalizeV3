@@ -12,6 +12,7 @@ import {
   SlidersHorizontal, X, ChevronDown, BarChart3, AlertCircle, RefreshCw,
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
+import { CS2_MAPS } from '@/types/database'
 
 type Mode = 'opponent' | 'myteam'
 type FocusArea = 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player' | 'executes' | 'rounds' | 'drills'
@@ -31,11 +32,6 @@ const MY_TEAM_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode
   { id: 'rounds',   label: 'Round Review',    icon: <BarChart3 size={14} />, description: 'Key rounds deep-dive' },
   { id: 'drills',   label: 'Practice Drills', icon: <Sparkles size={14} />, description: 'Tailored drill recommendations' },
   { id: 'strategy', label: 'Playbook',        icon: <Shield size={14} />,    description: 'Build your team playbook' },
-]
-
-const CS2_MAPS = [
-  'de_dust2', 'de_mirage', 'de_inferno', 'de_nuke',
-  'de_overpass', 'de_vertigo', 'de_ancient', 'de_anubis',
 ]
 
 const OPPONENT_QUESTIONS = [

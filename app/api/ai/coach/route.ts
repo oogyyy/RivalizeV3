@@ -3,6 +3,18 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { createOpenAI } from '@ai-sdk/openai'
 import { streamText } from 'ai'
+import { z } from 'zod'
+
+const bodySchema = z.object({
+  teamId:            z.string().uuid().optional(),
+  folderId:          z.string().uuid().optional(),
+  messages:          z.array(z.object({ role: z.string(), content: z.string() })).default([]),
+  focusArea:         z.string().optional(),
+  playerName:        z.string().max(64).optional(),
+  mapName:           z.string().max(32).optional(),
+  includeProDataset: z.boolean().default(false),
+  mode:              z.enum(['opponent', 'myteam']).default('opponent'),
+})
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -12,24 +24,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: {
-    teamId?: string
-    folderId?: string
-    messages?: Array<{ role: string; content: string }>
-    focusArea?: string
-    playerName?: string
-    mapName?: string
-    includeProDataset?: boolean
-    mode?: 'opponent' | 'myteam'
-  }
-
+  let rawBody: unknown
   try {
-    body = await request.json()
+    rawBody = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { teamId, folderId, messages = [], focusArea, playerName, mapName, includeProDataset, mode = 'opponent' } = body
+  const parsed = bodySchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid request body', details: parsed.error.flatten() }, { status: 400 })
+  }
+
+  const { teamId, folderId, messages = [], focusArea, playerName, mapName, includeProDataset, mode } = parsed.data
 
   // Build context from team/folder data
   let contextText = ''
@@ -48,20 +55,24 @@ export async function POST(request: Request) {
     }
   }
 
-  if (mode === 'myteam' && teamId) {
-    // My Team mode: fetch ONLY self-demos (demo_type = 'self').
-    // Use admin client to bypass RLS — the user has already been authenticated above.
+  if (mode === 'myteam') {
+    // My Team mode: fetch ONLY self-demos (demo_type = 'self') across all the user's teams.
     const adminDb = createAdminClient()
-    console.log('[AI Coach] myteam mode — querying demos for teamId:', teamId)
-    const { data: recentDemos, error: demosError } = await adminDb
-      .from('demos')
-      .select('parsed_data, map, match_date, opponent_name')
-      .eq('team_id', teamId)
-      .eq('status', 'completed')
-      .eq('demo_type', 'self')
-      .order('created_at', { ascending: false })
-      .limit(5)
-    console.log('[AI Coach] demos fetched:', recentDemos?.length ?? 0, 'error:', demosError?.message ?? null)
+    const { data: memberships } = await adminDb
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', user.id)
+    const allTeamIds = (memberships ?? []).map(m => m.team_id).filter(Boolean)
+    const { data: recentDemos } = allTeamIds.length
+      ? await adminDb
+          .from('demos')
+          .select('parsed_data, map, match_date, opponent_name')
+          .in('team_id', allTeamIds)
+          .eq('status', 'completed')
+          .eq('demo_type', 'self')
+          .order('created_at', { ascending: false })
+          .limit(5)
+      : { data: [] }
 
     if (recentDemos && recentDemos.length > 0) {
       type PD = {
@@ -292,13 +303,11 @@ CRITICAL RULES for pro dataset references:
         'X-Accel-Buffering': 'no',
       },
       getErrorMessage: (error) => {
-        console.error('[AI Coach] streaming error:', error)
         if (error instanceof Error) return error.message
         return 'AI service error'
       },
     })
   } catch (err: unknown) {
-    console.error('[AI Coach] route error:', err)
     const message = err instanceof Error ? err.message : 'AI service unavailable'
     return NextResponse.json({ error: message }, { status: 503 })
   }
