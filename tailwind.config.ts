@@ -44,36 +44,40 @@ const config: Config = {
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
 
-        /* ── Brand color tokens ──────────────────────────────────── */
+        /* ── Synthwave brand tokens ──────────────────────────────── */
         brand: {
-          DEFAULT: '#00d4ff',
-          dim:     '#00b8e0',
-          dark:    '#0099c2',
+          DEFAULT: '#ff00cc',
+          dim:     '#cc0099',
+          dark:    '#880066',
         },
         neon: {
-          green: '#00ff88',
-          blue:  '#00d4ff',
-          red:   '#ff3b3b',
+          magenta: '#ff00cc',
+          cyan:    '#00aaff',
+          purple:  '#aa00ff',
+          danger:  '#ff0066',
+          warn:    '#ffaa00',
         },
         /* CS2-specific semantic colors */
         tside:  '#F59E0B',
         ctside: '#3B82F6',
       },
       fontFamily: {
-        sans:      ['Inter', 'system-ui', 'sans-serif'],
-        mono:      ['var(--font-mono)', 'JetBrains Mono', 'Fira Code', 'monospace'],
-        barlow:    ['var(--font-barlow)', 'sans-serif'],
-        condensed: ['var(--font-barlow-condensed)', 'sans-serif'],
+        sans:    ['var(--font-sans)', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        pixel:   ['var(--font-pixel)', 'Press Start 2P', 'monospace'],
+        display: ['var(--font-display)', 'VT323', 'monospace'],
+        mono:    ['var(--font-pixel)', 'Press Start 2P', 'monospace'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       },
       boxShadow: {
-        'card':     '0 1px 2px rgba(0,0,0,0.5), 0 0 0 1px hsl(var(--border))',
-        'elevated': '0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px hsl(var(--border))',
-        'floating': '0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px hsl(221,22%,22%)',
-        'brand':    '0 0 24px rgba(16,217,160,0.15), 0 0 0 1px rgba(16,217,160,0.25)',
-        'brand-sm': '0 0 12px rgba(16,217,160,0.12)',
+        'card':     '4px 4px 0 #000',
+        'elevated': '6px 6px 0 #000',
+        'floating': '4px 0 0 #000',
+        'brand':    '0 0 20px rgba(255,0,204,0.25), 0 0 48px rgba(255,0,204,0.1)',
+        'brand-sm': '0 0 10px rgba(255,0,204,0.2)',
+        'cyan':     '0 0 20px rgba(0,170,255,0.25), 0 0 48px rgba(0,170,255,0.1)',
+        'pixel':    '4px 4px 0 #000',
       },
       animation: {
         'pulse-neon':    'pulse-neon 2s ease-in-out infinite',

@@ -2,9 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, X, Crosshair, LogOut } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { cn } from '@/lib/utils'
 import { SidebarNav } from './Sidebar'
 import type { Profile } from '@/types/database'
 
@@ -38,75 +37,244 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
       {/* Floating hamburger */}
       <button
         onClick={() => setIsOpen(true)}
-        className="md:hidden fixed top-3.5 left-3.5 z-50 flex items-center justify-center w-9 h-9 bg-card border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all duration-150 shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
+        className="md:hidden fixed top-3.5 left-3.5 z-50 flex items-center justify-center w-9 h-9"
+        style={{
+          background: '#0f0420',
+          border: '3px solid #2d0d55',
+          boxShadow: '3px 3px 0 #000',
+          color: '#9060c8',
+        }}
         aria-label="Open navigation"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#ff00cc'
+          e.currentTarget.style.color = '#ff00cc'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = '#2d0d55'
+          e.currentTarget.style.color = '#9060c8'
+        }}
       >
-        <Menu size={18} />
+        <Menu size={16} />
       </button>
 
       {/* Drawer */}
       {isOpen && (
         <div className="fixed inset-0 z-[100] md:hidden">
           <div
-            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/80"
             onClick={() => setIsOpen(false)}
           />
 
-          <div className="absolute left-0 top-0 h-full w-[200px] bg-card border-r border-border shadow-[4px_0_32px_rgba(0,0,0,0.6)] flex flex-col">
+          <div
+            className="absolute left-0 top-0 h-full w-[224px] flex flex-col"
+            style={{
+              background: '#0f0420',
+              borderRight: '3px solid #2d0d55',
+              boxShadow: '4px 0 0 #000',
+            }}
+          >
             {/* Header */}
-            <div className="flex items-center justify-between h-14 px-3 border-b border-border shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
-                  <Crosshair size={14} className="text-primary" strokeWidth={1.5} />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                height: '56px',
+                padding: '0 14px',
+                borderBottom: '3px solid #2d0d55',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    background: 'linear-gradient(90deg, #ff00cc, #00aaff)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-pixel), monospace',
+                      fontSize: '10px',
+                      color: '#000',
+                      fontWeight: 400,
+                      lineHeight: 1,
+                    }}
+                  >
+                    R
+                  </span>
                 </div>
-                <span className="text-[13px] font-black tracking-widest text-foreground">RIVALIZE</span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-pixel), monospace',
+                    fontSize: '8px',
+                    color: '#f0e0ff',
+                    letterSpacing: '0.12em',
+                    userSelect: 'none',
+                  }}
+                >
+                  RIVALIZE
+                </span>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all duration-150"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  border: '2px solid #2d0d55',
+                  background: 'transparent',
+                  color: '#9060c8',
+                  cursor: 'pointer',
+                }}
                 aria-label="Close menu"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#ff00cc'
+                  e.currentTarget.style.borderColor = '#ff00cc'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#9060c8'
+                  e.currentTarget.style.borderColor = '#2d0d55'
+                }}
               >
-                <X size={15} />
+                <X size={14} />
               </button>
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-2 py-3 overflow-y-auto">
+            <nav className="flex-1 overflow-y-auto" style={{ padding: '14px 0' }}>
               <SidebarNav onLinkClick={() => setIsOpen(false)} />
             </nav>
 
             {/* User section */}
-            <div className="border-t border-border p-2 space-y-1 shrink-0">
-              <div className="flex items-center gap-2 px-2 py-2">
-                <div className="relative shrink-0">
-                  {profile?.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={profile.avatar_url}
-                      alt={displayName}
-                      className="w-6 h-6 rounded-full object-cover ring-1 ring-primary/25"
-                    />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center">
-                      <span className="text-accent text-[10px] font-bold">{initials}</span>
-                    </div>
-                  )}
-                  <span className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-accent border border-card" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-xs font-semibold truncate">{displayName}</p>
+            <div
+              style={{
+                borderTop: '3px solid #2d0d55',
+                padding: '10px',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 4px' }}>
+                {/* Avatar */}
+                {profile?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.avatar_url}
+                    alt={displayName}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      objectFit: 'cover',
+                      border: '3px solid #00aaff',
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      background: 'rgba(0, 170, 255, 0.15)',
+                      border: '3px solid #00aaff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-pixel), monospace',
+                        fontSize: '7px',
+                        color: '#00aaff',
+                      }}
+                    >
+                      {initials}
+                    </span>
+                  </div>
+                )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-pixel), monospace',
+                      fontSize: '7px',
+                      color: '#f0e0ff',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    {displayName.toUpperCase()}
+                  </p>
                   {profile?.username && (
-                    <p className="text-[10px] text-muted-foreground truncate">@{profile.username}</p>
+                    <p
+                      style={{
+                        fontSize: '10px',
+                        color: '#5a2880',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        marginTop: '2px',
+                      }}
+                    >
+                      @{profile.username}
+                    </p>
                   )}
                 </div>
               </div>
+
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="flex items-center gap-2 w-full px-2 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  width: '100%',
+                  padding: '7px 10px',
+                  fontFamily: 'var(--font-pixel), monospace',
+                  fontSize: '7px',
+                  letterSpacing: '0.1em',
+                  color: '#9060c8',
+                  background: 'transparent',
+                  border: '3px solid #2d0d55',
+                  boxShadow: '3px 3px 0 #000',
+                  cursor: loggingOut ? 'not-allowed' : 'pointer',
+                  opacity: loggingOut ? 0.5 : 1,
+                  transition: 'color 120ms ease, border-color 120ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (!loggingOut) {
+                    e.currentTarget.style.color = '#ff0066'
+                    e.currentTarget.style.borderColor = '#ff0066'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#9060c8'
+                  e.currentTarget.style.borderColor = '#2d0d55'
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.boxShadow = '1px 1px 0 #000'
+                  e.currentTarget.style.transform = 'translate(2px, 2px)'
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.boxShadow = '3px 3px 0 #000'
+                  e.currentTarget.style.transform = 'none'
+                }}
               >
-                <LogOut size={13} className="shrink-0" strokeWidth={1.5} />
-                <span>{loggingOut ? 'Signing out…' : 'Sign out'}</span>
+                {loggingOut ? 'EXITING...' : 'EXIT'}
               </button>
             </div>
           </div>
