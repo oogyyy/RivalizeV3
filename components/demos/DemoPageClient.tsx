@@ -460,30 +460,16 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
           {demo.status === 'completed' && (
             <Badge variant="neon">Analyzed</Badge>
           )}
-          {(demo.status === 'processing' || demo.status === 'failed') && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={handleParse}
-              disabled={parsing || reparsing}
-            >
-              {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {parsing ? 'Parsing...' : 'Parse Now'}
-            </Button>
-          )}
-          {demo.status === 'completed' && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={handleParse}
-              disabled={parsing || reparsing}
-            >
-              {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {parsing ? 'Parsing...' : 'Re-parse'}
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={handleParse}
+            disabled={parsing || reparsing}
+          >
+            {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {parsing ? 'Parsing...' : demo.status === 'completed' ? 'Re-parse' : 'Parse Now'}
+          </Button>
           <Link href={aiScoutHref}>
             <Button variant="neon" size="sm" className="gap-2">
               <Brain size={14} />
