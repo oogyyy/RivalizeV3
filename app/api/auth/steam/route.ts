@@ -17,9 +17,11 @@ function getBaseUrl(req: NextRequest): string {
 
 // Initiates Steam OpenID login. Redirects the user to Steam's login page.
 // On return, Steam calls /api/auth/steam/callback with the verified identity.
+// Pass ?mode=login to initiate a sign-in/sign-up flow instead of account linking.
 export async function GET(req: NextRequest) {
   const appUrl   = getBaseUrl(req)
-  const returnTo = `${appUrl}/api/auth/steam/callback`
+  const mode     = req.nextUrl.searchParams.get('mode') ?? 'link'
+  const returnTo = `${appUrl}/api/auth/steam/callback?mode=${mode}`
   const realm    = appUrl
 
   const params = new URLSearchParams({
