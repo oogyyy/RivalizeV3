@@ -4,14 +4,13 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { formatDate } from '@/lib/utils'
-import { cn } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Target, Brain, BarChart3, TrendingUp,
   ArrowRight, ChevronRight, Shield, Layers,
-  Trophy, Activity,
+  Activity,
 } from 'lucide-react'
 import type { AggregatedStats, ParsedDemoData } from '@/types/database'
 
@@ -88,34 +87,26 @@ export default async function DashboardPage() {
     : { data: null }
   const myTeamName = (primaryTeam as { name?: string } | null)?.name ?? 'My Team'
 
-  const { data: folders } = teamIds.length
+  type FolderRow = {
+    id: string; opponent_display_name: string; opponent_slug: string
+    aggregated_stats: AggregatedStats | null; user_team_id: string
+  }
+
+  // Single query for all folders — used both for display (top 6) and demo href lookup
+  const { data: allFolders } = teamIds.length
     ? await admin
         .from('team_folders')
         .select('id, opponent_display_name, opponent_slug, aggregated_stats, user_team_id')
         .in('user_team_id', teamIds)
         .order('updated_at', { ascending: false })
-        .limit(6)
     : { data: [] }
 
-  type FolderRow = {
-    id: string; opponent_display_name: string; opponent_slug: string
-    aggregated_stats: AggregatedStats | null; user_team_id: string
-  }
+  const typedFolders = (allFolders ?? []) as FolderRow[]
+  const folders = typedFolders.slice(0, 6)
+
   const folderByKey: Record<string, string> = {}
-  for (const f of (folders ?? []) as FolderRow[]) {
+  for (const f of typedFolders) {
     folderByKey[`${f.user_team_id}:${f.opponent_slug}`] = f.id
-  }
-
-  const { data: allFolders } = teamIds.length
-    ? await admin
-        .from('team_folders')
-        .select('id, opponent_slug, user_team_id')
-        .in('user_team_id', teamIds)
-    : { data: [] }
-  type SlimFolder = { id: string; opponent_slug: string; user_team_id: string }
-  for (const f of (allFolders ?? []) as SlimFolder[]) {
-    const key = `${f.user_team_id}:${f.opponent_slug}`
-    if (!folderByKey[key]) folderByKey[key] = f.id
   }
 
   type DemoRow = {
@@ -154,7 +145,7 @@ export default async function DashboardPage() {
 
   const totalDemos     = (allDemosMeta ?? []).length
   const analyzedDemos  = (allDemosMeta ?? []).filter((d) => d.status === 'completed').length
-  const totalOpponents = (allFolders ?? []).length
+  const totalOpponents = typedFolders.length
 
   const displayName   = profile?.display_name || profile?.username || 'Player'
   const opponentDemos = (recentOpponentDemos ?? []) as DemoRow[]
@@ -339,7 +330,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* Opponent mini-list */}
-          {(folders ?? []).length > 0 && (
+          {folders.length > 0 && (
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border/50">
                 <div className="flex items-center gap-2">
@@ -349,7 +340,7 @@ export default async function DashboardPage() {
                 <span className="text-[11px] font-mono text-muted-foreground">{totalOpponents}</span>
               </div>
               <div className="p-2">
-                {(folders ?? []).slice(0, 5).map((folder) => {
+                {folders.slice(0, 5).map((folder) => {
                   const f = folder as FolderRow
                   const stats   = f.aggregated_stats as AggregatedStats | null
                   const wins    = stats?.wins   ?? 0

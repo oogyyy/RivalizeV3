@@ -5,6 +5,27 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { streamText } from 'ai'
 import { z } from 'zod'
 
+type DemoParsedData = {
+  header?: {
+    map?: string
+    team1?: string
+    team2?: string
+    score_team1?: number
+    score_team2?: number
+    total_rounds?: number
+  }
+  opponentSide?: string
+  players?: Array<{
+    name: string
+    team: string
+    kills: number
+    deaths: number
+    assists: number
+    rating: number
+    adr: number
+  }>
+}
+
 const bodySchema = z.object({
   teamId:            z.string().uuid().optional(),
   folderId:          z.string().uuid().optional(),
@@ -75,14 +96,9 @@ export async function POST(request: Request) {
       : { data: [] }
 
     if (recentDemos && recentDemos.length > 0) {
-      type PD = {
-        header?: { map?: string; score_team1?: number; score_team2?: number; total_rounds?: number; team1?: string; team2?: string }
-        opponentSide?: string
-        players?: Array<{ name: string; kills: number; deaths: number; assists: number; rating: number; adr: number; team: string }>
-      }
       contextText += `\nTeam: ${teamName}\nMatches analysed: ${recentDemos.length}\n\nRecent match details:\n`
       recentDemos.forEach((demo, i) => {
-        const pd = demo.parsed_data as PD | null
+        const pd = demo.parsed_data as DemoParsedData | null
         const h = pd?.header
         const opponentSide = pd?.opponentSide ?? 'team2'
         if (h) {
@@ -149,22 +165,7 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
         if (recentDemos && recentDemos.length > 0) {
           contextText += '\nRecent match details:\n'
           recentDemos.forEach((demo, i) => {
-            const pd = demo.parsed_data as {
-              header?: {
-                map?: string
-                score_team1?: number
-                score_team2?: number
-                total_rounds?: number
-              }
-              players?: Array<{
-                name: string
-                kills: number
-                deaths: number
-                assists: number
-                rating: number
-                adr: number
-              }>
-            } | null
+            const pd = demo.parsed_data as DemoParsedData | null
 
             if (pd?.header) {
               const h = pd.header

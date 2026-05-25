@@ -38,20 +38,9 @@ export function getRatingColor(rating: number): string {
   return 'text-red-400'
 }
 
-export function getKDColor(kd: number): string {
-  if (kd >= 1.3) return 'text-neon-green'
-  if (kd >= 1.0) return 'text-green-400'
-  if (kd >= 0.8) return 'text-yellow-400'
-  return 'text-red-400'
-}
-
 export function formatFileSize(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB']
   if (bytes === 0) return '0 B'
   const i = Math.floor(Math.log(bytes) / Math.log(1024))
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`
-}
-
-export function generateInviteCode(): string {
-  return Math.random().toString(36).substring(2, 8).toUpperCase()
 }

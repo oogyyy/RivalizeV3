@@ -4,15 +4,12 @@ import { maybeDecompress } from '@/lib/demo-parser/decompress'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import { downloadObject } from '@/lib/r2'
 
-async function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+type ParsedDataRow = {
+  header?: { map?: string; score_team1?: number; score_team2?: number }
+  opponentSide?: string
 }
 
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  attempts = 3,
-  label = 'operation',
-): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   const delays = [2_000, 5_000, 10_000]
   let lastErr: unknown
   for (let i = 0; i < attempts; i++) {
@@ -21,7 +18,7 @@ async function withRetry<T>(
     } catch (err) {
       lastErr = err
       if (i < attempts - 1) {
-        await sleep(delays[i] ?? 10_000)
+        await new Promise(resolve => setTimeout(resolve, delays[i] ?? 10_000))
       }
     }
   }
@@ -52,14 +49,10 @@ export async function parseAndSaveDemo(demoId: string): Promise<void> {
     (demo.parsed_data as { opponentSide?: string } | null)?.opponentSide ?? 'team2'
 
   try {
-    const rawBuf = await withRetry(() => downloadObject(r2Key), 3, 'R2 download')
+    const rawBuf = await withRetry(() => downloadObject(r2Key))
     const buf = maybeDecompress(rawBuf, r2Key)
 
-    const { parsedData: realData, warnings } = await withRetry(
-      () => parseCS2Demo(buf),
-      3,
-      'Go parser',
-    )
+    const { parsedData: realData, warnings } = await withRetry(() => parseCS2Demo(buf))
     if (warnings.length) console.warn(`[parse] warnings for ${demoId}:`, warnings)
 
     if (realData.players.length === 0) {
@@ -70,12 +63,10 @@ export async function parseAndSaveDemo(demoId: string): Promise<void> {
       return
     }
 
-    const parsedData = { ...realData, opponentSide: existingOpponentSide }
-    const resolvedMap = realData.header.map !== 'unknown' ? realData.header.map : 'unknown'
     await admin.from('demos').update({
-      parsed_data: parsedData,
+      parsed_data: { ...realData, opponentSide: existingOpponentSide },
       status: 'completed',
-      map: resolvedMap,
+      map: realData.header.map,
       error_message: null,
     }).eq('id', demoId)
 
@@ -90,23 +81,26 @@ export async function parseAndSaveDemo(demoId: string): Promise<void> {
         .eq('demo_type', 'opponent')
 
       if (allDemos && allDemos.length > 0) {
-        type DemoRow = { header?: { score_team1?: number; score_team2?: number }; opponentSide?: string }
         const wins = allDemos.filter(d => {
-          const pd = d.parsed_data as DemoRow | null
+          const pd = d.parsed_data as ParsedDataRow | null
           const h = pd?.header
           if (!h) return false
-          const s1 = h.score_team1 ?? 0, s2 = h.score_team2 ?? 0
+          const s1 = h.score_team1 ?? 0
+          const s2 = h.score_team2 ?? 0
           return pd?.opponentSide === 'team1' ? s2 > s1 : s1 > s2
         }).length
+
         const draws = allDemos.filter(d => {
-          const h = (d.parsed_data as DemoRow | null)?.header
+          const h = (d.parsed_data as ParsedDataRow | null)?.header
           return h && (h.score_team1 ?? 0) === (h.score_team2 ?? 0)
         }).length
+
         const mapsPlayed: Record<string, number> = {}
-        allDemos.forEach(d => {
-          const m = (d.parsed_data as { header?: { map?: string } } | null)?.header?.map
+        for (const d of allDemos) {
+          const m = (d.parsed_data as ParsedDataRow | null)?.header?.map
           if (m) mapsPlayed[m] = (mapsPlayed[m] ?? 0) + 1
-        })
+        }
+
         const topPlayers = computeTopPlayers(allDemos)
         await admin.from('team_folders').update({
           aggregated_stats: {
