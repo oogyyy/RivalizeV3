@@ -46,23 +46,24 @@ const config: Config = {
 
         /* ── Brand color tokens ──────────────────────────────────── */
         brand: {
-          DEFAULT: '#10D9A0',
-          dim:     '#0DBF8C',
-          dark:    '#0AA87A',
+          DEFAULT: '#00d4ff',
+          dim:     '#00b8e0',
+          dark:    '#0099c2',
         },
-        /* Backward-compat: neon.green now maps to brand primary */
         neon: {
-          green: '#10D9A0',
-          blue:  '#3B82F6',
-          red:   '#EF4444',
+          green: '#00ff88',
+          blue:  '#00d4ff',
+          red:   '#ff3b3b',
         },
         /* CS2-specific semantic colors */
         tside:  '#F59E0B',
         ctside: '#3B82F6',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        sans:      ['Inter', 'system-ui', 'sans-serif'],
+        mono:      ['var(--font-mono)', 'JetBrains Mono', 'Fira Code', 'monospace'],
+        barlow:    ['var(--font-barlow)', 'sans-serif'],
+        condensed: ['var(--font-barlow-condensed)', 'sans-serif'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

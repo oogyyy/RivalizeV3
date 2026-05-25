@@ -38,7 +38,7 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
       {/* Floating hamburger */}
       <button
         onClick={() => setIsOpen(true)}
-        className="md:hidden fixed top-3.5 left-3.5 z-50 flex items-center justify-center w-9 h-9 rounded-lg bg-[hsl(229,23%,10%)] border border-border text-muted-foreground hover:text-[#10D9A0] hover:border-[rgba(16,217,160,0.35)] transition-all duration-150 shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
+        className="md:hidden fixed top-3.5 left-3.5 z-50 flex items-center justify-center w-9 h-9 bg-card border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all duration-150 shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
         aria-label="Open navigation"
       >
         <Menu size={18} />
@@ -52,21 +52,21 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
             onClick={() => setIsOpen(false)}
           />
 
-          <div className="absolute left-0 top-0 h-full w-[260px] bg-[hsl(228,22%,8%)] border-r border-border shadow-[4px_0_32px_rgba(0,0,0,0.6)] flex flex-col">
+          <div className="absolute left-0 top-0 h-full w-[200px] bg-card border-r border-border shadow-[4px_0_32px_rgba(0,0,0,0.6)] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between h-[60px] px-4 border-b border-border shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 bg-[#10D9A0] rounded-lg flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,217,160,0.35)]">
-                  <Crosshair size={15} className="text-[#0B0D14]" />
+            <div className="flex items-center justify-between h-14 px-3 border-b border-border shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+                  <Crosshair size={14} className="text-primary" strokeWidth={1.5} />
                 </div>
-                <span className="text-[13px] font-black tracking-[0.2em] text-foreground">RIVALIZE</span>
+                <span className="text-[13px] font-black tracking-widest text-foreground">RIVALIZE</span>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-150"
+                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all duration-150"
                 aria-label="Close menu"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
 
@@ -76,36 +76,36 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
             </nav>
 
             {/* User section */}
-            <div className="border-t border-border p-3 space-y-1 shrink-0">
-              <div className="flex items-center gap-3 rounded-lg px-2 py-2">
+            <div className="border-t border-border p-2 space-y-1 shrink-0">
+              <div className="flex items-center gap-2 px-2 py-2">
                 <div className="relative shrink-0">
                   {profile?.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={profile.avatar_url}
                       alt={displayName}
-                      className="w-8 h-8 rounded-full object-cover ring-1 ring-[rgba(16,217,160,0.25)]"
+                      className="w-6 h-6 rounded-full object-cover ring-1 ring-primary/25"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-[rgba(16,217,160,0.12)] border border-[rgba(16,217,160,0.25)] flex items-center justify-center">
-                      <span className="text-xs font-bold text-[#10D9A0]">{initials}</span>
+                    <div className="w-6 h-6 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center">
+                      <span className="text-accent text-[10px] font-bold">{initials}</span>
                     </div>
                   )}
-                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-[#10D9A0] border-[1.5px] border-[hsl(228,22%,8%)]" />
+                  <span className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-accent border border-card" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-foreground truncate leading-tight">{displayName}</p>
+                  <p className="text-white text-xs font-semibold truncate">{displayName}</p>
                   {profile?.username && (
-                    <p className="text-[11px] text-muted-foreground/50 truncate">@{profile.username}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">@{profile.username}</p>
                   )}
                 </div>
               </div>
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground/50 hover:text-red-400 hover:bg-red-400/[0.07] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 w-full px-2 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <LogOut size={14} className="shrink-0" />
+                <LogOut size={13} className="shrink-0" strokeWidth={1.5} />
                 <span>{loggingOut ? 'Signing out…' : 'Sign out'}</span>
               </button>
             </div>
