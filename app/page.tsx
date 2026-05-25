@@ -181,7 +181,7 @@ export default function LandingPage() {
                   <div className="w-3 h-3 rounded-full bg-[#00ff87]/60" />
                 </div>
                 <div className="flex-1 flex justify-center">
-                  <div className="text-xs text-white/30 font-mono">rivalize.gg/dashboard</div>
+                  <div className="text-xs text-white/30 font-mono">rivalize.pro/dashboard</div>
                 </div>
               </div>
               {/* Mock dashboard content */}
