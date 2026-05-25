@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://rivalize.gg',
+    url: 'https://rivalize.pro',
     siteName: 'Rivalize',
     title: 'Rivalize — AI-Powered CS2 Analysis',
     description: 'Professional-grade CS2 demo analysis and AI coaching for every team.',
