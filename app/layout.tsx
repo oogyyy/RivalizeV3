@@ -1,11 +1,24 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Barlow, Barlow_Condensed, JetBrains_Mono } from 'next/font/google'
+import { Plus_Jakarta_Sans, Press_Start_2P, VT323 } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
-const barlow = Barlow({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-barlow' })
-const barlowCondensed = Barlow_Condensed({ subsets: ['latin'], weight: ['700', '800', '900'], variable: '--font-barlow-condensed' })
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-mono' })
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-sans',
+})
+
+const pressStart2P = Press_Start_2P({
+  subsets: ['latin'],
+  weight: ['400'],
+  variable: '--font-pixel',
+})
+
+const vt323 = VT323({
+  subsets: ['latin'],
+  weight: ['400'],
+  variable: '--font-display',
+})
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -29,7 +42,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.className} ${barlow.variable} ${barlowCondensed.variable} ${jetbrainsMono.variable} min-h-screen bg-background text-foreground antialiased`}>
+      <body
+        className={`${plusJakartaSans.variable} ${pressStart2P.variable} ${vt323.variable} ${plusJakartaSans.className} min-h-screen bg-background text-foreground antialiased`}
+      >
         {children}
       </body>
     </html>

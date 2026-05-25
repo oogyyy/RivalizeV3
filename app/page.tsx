@@ -1,519 +1,718 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell,
-} from 'recharts'
-import {
-  Upload, Brain, Users, Map, Activity, Crosshair, Eye,
-  ChevronRight, Star, AlertTriangle, Menu, X,
-} from 'lucide-react'
 
-const winRateData = [
-  { round: 'R1', wr: 42 }, { round: 'R5', wr: 48 }, { round: 'R10', wr: 55 },
-  { round: 'R15', wr: 61 }, { round: 'R20', wr: 58 }, { round: 'R25', wr: 67 },
-  { round: 'R30', wr: 72 },
+const HERO_CONVOS = [
+  {
+    q: "What's their B-rush frequency?",
+    a: "B-rushes account for 22% of T-rounds — usually round 3 after a pistol loss. They commit 4–5 players with no utility. Stack B early and you win it for free.",
+  },
+  {
+    q: "Where does their AWPer default?",
+    a: "CT-side, they hold aggressive mid from window 74% of rounds. Flash from jungle before crossing. On T-side the AWPer plays support — smoke CT, hold retake.",
+  },
+  {
+    q: "How do they play eco rounds?",
+    a: "68% of eco rounds: stack B with pistols, fast rush through tunnels, zero utility. Counter: single B anchor + 4-man A execute. They almost never save.",
+  },
+  {
+    q: "What's their biggest weak spot?",
+    a: "Mid control. They never contest mid early, leaving CT exposed to splits. A mid-to-B split with one smoke on doors wins the round before it starts.",
+  },
+  {
+    q: "How does their IGL react to losing sites?",
+    a: "Very reactive. After two A losses they force B the next round 80% of the time. Pre-position for the switch and you farm the mistake every time.",
+  },
 ]
 
-const playerData = [
-  { name: 's1mple', role: 'AWPer',  rating: 1.38, kd: 1.71, hs: 41, clutch: 68 },
-  { name: 'NiKo',   role: 'Rifler', rating: 1.29, kd: 1.54, hs: 55, clutch: 54 },
-  { name: 'device', role: 'AWPer',  rating: 1.21, kd: 1.45, hs: 38, clutch: 61 },
-  { name: 'ZywOo',  role: 'AWPer',  rating: 1.35, kd: 1.62, hs: 44, clutch: 71 },
-  { name: 'sh1ro',  role: 'AWPer',  rating: 1.18, kd: 1.39, hs: 36, clutch: 58 },
-]
+function HeroChatMock() {
+  const [idx] = useState(() => Math.floor(Math.random() * HERO_CONVOS.length))
+  const [displayed, setDisplayed] = useState('')
+  const [showUser, setShowUser] = useState(false)
+  const [typing, setTyping] = useState(false)
+  const convo = HERO_CONVOS[idx]
 
-const siteData = [
-  { site: 'A', attacks: 62 },
-  { site: 'B', attacks: 38 },
-]
+  useEffect(() => {
+    setDisplayed('')
+    setShowUser(false)
+    setTyping(false)
 
-const recentAnalyses = [
-  { opponent: 'Natus Vincere', map: 'Dust2',   date: '2h ago', rating: 9.2 },
-  { opponent: 'Team Vitality', map: 'Mirage',   date: '5h ago', rating: 8.7 },
-  { opponent: 'FaZe Clan',     map: 'Inferno',  date: '1d ago', rating: 9.5 },
-]
+    const t1 = setTimeout(() => setShowUser(true), 600)
+    const t2 = setTimeout(() => {
+      setTyping(true)
+      let i = 0
+      const iv = setInterval(() => {
+        i++
+        setDisplayed(convo.a.slice(0, i))
+        if (i >= convo.a.length) {
+          clearInterval(iv)
+          setTyping(false)
+        }
+      }, 22)
+      return () => clearInterval(iv)
+    }, 1400)
 
-const heatmapGrid = Array.from({ length: 120 }, (_, i) => {
-  const seed = (i * 2654435761) % 100
-  if (seed > 92) return 'danger'
-  if (seed > 82) return 'hot'
-  if (seed > 65) return 'warm'
-  if (seed > 45) return 'cool'
-  return 'empty'
-})
-
-const cellColor: Record<string, string> = {
-  danger: 'bg-red-500/80', hot: 'bg-orange-400/60',
-  warm: 'bg-yellow-400/30', cool: 'bg-primary/10', empty: 'bg-transparent',
-}
-
-const features = [
-  { icon: Upload, title: 'DEMO PARSING',        desc: 'Upload .dem files and get instant structural analysis. Supports all CS2 competitive demo formats.',                                            tag: 'INGESTION' },
-  { icon: Brain,  title: 'AI ANTI-STRATS',      desc: 'GPT-powered playbook generation. Know every execute, retake, and eco rush before round 1.',                                                    tag: 'INTELLIGENCE' },
-  { icon: Map,    title: 'POSITIONAL HEATMAPS', desc: 'Visualize where opponents cluster, peek from, and rotate — across every map in the pool.',                                                     tag: 'SPATIAL' },
-  { icon: Eye,    title: 'PATTERN DETECTION',   desc: 'Identify repeating setups, timings, and tendencies your opponents default to under pressure.',                                                  tag: 'ANALYSIS' },
-  { icon: Users,  title: 'TEAM MANAGEMENT',     desc: 'Organize rosters, assign roles, share scouting reports, and track team-wide performance trends.',                                               tag: 'OPERATIONS' },
-  { icon: Activity, title: 'ROUND-BY-ROUND REVIEW', desc: 'Drill into any round. Watch economic decisions, utility usage, and execution paths reconstructed.', tag: 'REVIEW' },
-]
-
-const steps = [
-  { num: '01', title: 'UPLOAD DEMOS',    desc: 'Drop your opponent\'s .dem files into the platform. We accept single demos or full match archives.' },
-  { num: '02', title: 'AI ANALYSIS',     desc: 'Our engine parses every tick — positions, economy, utility, rotations — and builds an intel dossier.' },
-  { num: '03', title: 'ENTER PREPARED',  desc: 'Walk into the server with a printed playbook. You know their defaults. They don\'t know you know.' },
-]
-
-const mono      = { fontFamily: 'var(--font-mono), JetBrains Mono, monospace' }
-const condensed = { fontFamily: 'var(--font-barlow-condensed), Barlow Condensed, sans-serif' }
-const barlow    = { fontFamily: 'var(--font-barlow), Barlow, sans-serif' }
-
-export default function Landing() {
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'tside' | 'ctside' | 'players'>('tside')
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [convo.a])
 
   return (
-    <div className="min-h-screen bg-background text-foreground" style={barlow}>
-
-      {/* ── NAV ─────────────────────────────────────────────────────────────── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-14">
-          <div className="flex items-center gap-2">
-            <Crosshair className="text-primary w-5 h-5" strokeWidth={1.5} />
-            <span className="text-white font-bold tracking-widest text-sm" style={condensed}>RIVALIZE</span>
-          </div>
-          <div className="hidden md:flex items-center gap-8 text-xs tracking-widest text-muted-foreground font-medium">
-            {['FEATURES', 'HOW IT WORKS', 'AI SCOUT', 'PRICING'].map((item) => (
-              <a key={item} href="#" className="hover:text-primary transition-colors duration-150">{item}</a>
-            ))}
-          </div>
-          <div className="hidden md:flex items-center gap-3">
-            <Link href="/login"    className="text-xs tracking-widest text-muted-foreground hover:text-foreground transition-colors px-4 py-2">LOG IN</Link>
-            <Link href="/signup"   className="text-xs tracking-widest bg-primary text-primary-foreground font-semibold px-5 py-2 hover:bg-primary/90 transition-colors">GET STARTED</Link>
-          </div>
-          <button className="md:hidden text-muted-foreground" onClick={() => setMobileOpen(!mobileOpen)}>
-            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-        {mobileOpen && (
-          <div className="md:hidden border-t border-border bg-background px-6 py-4 flex flex-col gap-4">
-            {['FEATURES', 'HOW IT WORKS', 'AI SCOUT', 'PRICING'].map((item) => (
-              <a key={item} href="#" className="text-xs tracking-widest text-muted-foreground hover:text-primary transition-colors">{item}</a>
-            ))}
-            <Link href="/signup" className="text-xs tracking-widest bg-primary text-primary-foreground font-semibold px-5 py-2 w-full mt-2 text-center">GET STARTED</Link>
-          </div>
-        )}
-      </nav>
-
-      {/* ── HERO ────────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-screen flex items-center pt-14 overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'linear-gradient(rgba(0,212,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,1) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 border border-primary/30 bg-primary/5 px-3 py-1 mb-8">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              <span className="text-primary text-xs tracking-widest font-semibold" style={mono}>AI-POWERED CS2 SCOUTING</span>
-            </div>
-            <h1 className="text-white leading-none mb-6" style={{ ...condensed, fontSize: 'clamp(3rem, 7vw, 6rem)', fontWeight: 900, letterSpacing: '-0.01em' }}>
-              ANALYZE.<br /><span className="text-primary">ADAPT.</span><br />DOMINATE.
-            </h1>
-            <p className="text-muted-foreground text-lg leading-relaxed mb-10 max-w-md">
-              Upload your opponent&apos;s demos. Get instant AI-generated anti-strats, positional heatmaps, and player tendency reports. Enter every server prepared.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Link href="/signup" className="flex items-center gap-2 bg-primary text-primary-foreground font-semibold px-8 py-4 text-sm tracking-widest hover:bg-primary/90 transition-all duration-150 group">
-                START FOR FREE <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-              <button className="flex items-center gap-2 border border-border text-foreground font-medium px-8 py-4 text-sm tracking-widest hover:border-primary/50 hover:text-primary transition-all duration-150">VIEW DEMO</button>
-            </div>
-            <div className="flex gap-8 mt-12">
-              {[{ val: '12K+', label: 'Demos Parsed' }, { val: '600+', label: 'Active Teams' }, { val: '98.4%', label: 'Parse Accuracy' }].map(({ val, label }) => (
-                <div key={label}>
-                  <div className="text-white font-bold text-2xl" style={condensed}>{val}</div>
-                  <div className="text-muted-foreground text-xs tracking-widest mt-0.5" style={mono}>{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Dashboard preview */}
-          <div className="relative">
-            <div className="border border-border bg-card overflow-hidden shadow-2xl">
-              <div className="border-b border-border px-4 py-3 flex items-center justify-between bg-muted/30">
-                <span className="text-xs text-muted-foreground tracking-widest" style={mono}>RIVALIZE // ANALYSIS_DASHBOARD</span>
-                <div className="flex gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-muted" />
-                  <div className="w-2 h-2 rounded-full bg-muted" />
-                  <div className="w-2 h-2 rounded-full bg-accent" />
-                </div>
-              </div>
-              <div className="p-4 grid grid-cols-3 gap-3 border-b border-border">
-                {[
-                  { label: 'ROUNDS ANALYZED', val: '1,240', color: 'text-primary' },
-                  { label: 'PATTERNS FOUND',  val: '47',    color: 'text-accent' },
-                  { label: 'THREAT LEVEL',    val: 'HIGH',  color: 'text-destructive' },
-                ].map(({ label, val, color }) => (
-                  <div key={label} className="bg-muted/30 border border-border p-3">
-                    <div className="text-muted-foreground text-[9px] tracking-widest mb-1" style={mono}>{label}</div>
-                    <div className={`${color} font-bold text-lg`} style={condensed}>{val}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 border-b border-border">
-                <div className="text-muted-foreground text-[10px] tracking-widest mb-3" style={mono}>OPPONENT WIN RATE BY ROUND // NATUS VINCERE · DUST2</div>
-                <ResponsiveContainer width="100%" height={120}>
-                  <AreaChart data={winRateData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="landingWrGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#00d4ff" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#00d4ff" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="round" tick={{ fill: '#4a6578', fontSize: 9, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: '#4a6578', fontSize: 9, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} domain={[30, 80]} />
-                    <Tooltip contentStyle={{ background: '#0c1219', border: '1px solid rgba(0,212,255,0.2)', borderRadius: 2, fontSize: 10, fontFamily: 'JetBrains Mono', color: '#c8d8e4' }} formatter={(v: number) => [`${v}%`, 'Win Rate']} />
-                    <Area type="monotone" dataKey="wr" stroke="#00d4ff" strokeWidth={1.5} fill="url(#landingWrGrad)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="p-4">
-                <div className="text-muted-foreground text-[10px] tracking-widest mb-3" style={mono}>RECENT ANALYSES</div>
-                <div className="flex flex-col gap-2">
-                  {recentAnalyses.map((a) => (
-                    <div key={a.opponent} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-3">
-                        <div className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
-                        <span className="text-foreground font-medium">{a.opponent}</span>
-                        <span className="text-muted-foreground" style={mono}>{a.map}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-muted-foreground text-[10px]" style={mono}>{a.date}</span>
-                        <span className="text-accent font-semibold" style={mono}>{a.rating}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {/* Corner brackets */}
-            <div className="absolute -top-2 -left-2 w-4 h-4 border-t border-l border-primary/50" />
-            <div className="absolute -top-2 -right-2 w-4 h-4 border-t border-r border-primary/50" />
-            <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b border-l border-primary/50" />
-            <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b border-r border-primary/50" />
-          </div>
-        </div>
-      </section>
-
-      {/* ── TICKER ──────────────────────────────────────────────────────────── */}
-      <div className="border-y border-border bg-muted/20 py-3 overflow-hidden">
-        <div className="flex gap-12 text-[10px] tracking-widest text-muted-foreground whitespace-nowrap" style={mono}>
-          {['DEMO PARSING ENGINE V3.1', 'CS2 TICK-128 SUPPORT', 'REAL-TIME ANALYSIS', 'TEAM PLAYBOOK EXPORT', 'INDIVIDUAL PLAYER PROFILES', 'ECONOMY TRACKING', 'UTILITY COVERAGE MAPS', 'ROTATION PREDICTION'].map((item, i) => (
-            <span key={`ticker-${i}`} className="flex items-center gap-2">
-              <span className="text-primary">▸</span>{item}
-            </span>
-          ))}
-        </div>
+    <div
+      style={{
+        background: '#14082a',
+        border: '3px solid #2d0d55',
+        boxShadow: '6px 6px 0 #000, 0 0 40px rgba(255,0,204,0.2)',
+        width: '100%',
+        maxWidth: '420px',
+        padding: '0',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          background: '#1a0c34',
+          borderBottom: '3px solid #2d0d55',
+          padding: '10px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+      >
+        <div
+          style={{
+            width: '8px',
+            height: '8px',
+            background: '#ff00cc',
+            boxShadow: '0 0 8px #ff00cc',
+          }}
+        />
+        <span style={{ fontFamily: 'var(--font-pixel), monospace', fontSize: '7px', color: '#9060c8', letterSpacing: '0.1em' }}>
+          AI SCOUT — NIGHTFALL ANALYSIS
+        </span>
       </div>
 
-      {/* ── FEATURES ────────────────────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-6 py-28">
-        <div className="mb-16">
-          <div className="text-primary text-xs tracking-widest mb-4 font-semibold" style={mono}>// CAPABILITIES</div>
-          <h2 className="text-white text-5xl font-black leading-none" style={condensed}>EVERY EDGE,<br /><span className="text-muted-foreground font-normal">AUTOMATED.</span></h2>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-border">
-          {features.map(({ icon: Icon, title, desc, tag }) => (
-            <div key={title} className="bg-card p-8 group hover:bg-muted/30 transition-colors duration-200 cursor-default">
-              <div className="flex items-start justify-between mb-6">
-                <div className="w-10 h-10 border border-primary/20 bg-primary/5 flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/10 transition-all duration-200">
-                  <Icon className="w-4 h-4 text-primary" strokeWidth={1.5} />
-                </div>
-                <span className="text-[9px] tracking-widest text-muted-foreground border border-border px-2 py-0.5" style={mono}>{tag}</span>
-              </div>
-              <h3 className="text-white font-bold text-lg mb-3 tracking-wide" style={condensed}>{title}</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">{desc}</p>
+      {/* Messages */}
+      <div style={{ padding: '16px', minHeight: '160px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {showUser && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              animation: 'fadeSlideUp 0.3s ease-out',
+            }}
+          >
+            <div
+              style={{
+                background: 'rgba(255,0,204,0.15)',
+                border: '2px solid rgba(255,0,204,0.4)',
+                padding: '8px 12px',
+                maxWidth: '80%',
+                fontFamily: 'var(--font-sans, "Plus Jakarta Sans"), sans-serif',
+                fontSize: '12px',
+                color: '#f0e0ff',
+                lineHeight: 1.5,
+              }}
+            >
+              {convo.q}
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── HOW IT WORKS ────────────────────────────────────────────────────── */}
-      <section className="border-y border-border bg-muted/10">
-        <div className="max-w-7xl mx-auto px-6 py-28">
-          <div className="mb-16">
-            <div className="text-primary text-xs tracking-widest mb-4 font-semibold" style={mono}>// PROCESS</div>
-            <h2 className="text-white text-5xl font-black leading-none" style={condensed}>THREE STEPS.<br /><span className="text-primary">INFINITE EDGE.</span></h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-0 relative">
-            <div className="hidden md:block absolute top-8 left-[16.67%] right-[16.67%] h-px bg-border" />
-            {steps.map(({ num, title, desc }, i) => (
-              <div key={num} className="relative flex flex-col gap-6 p-8 pl-0 md:pr-12">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 border border-primary bg-background flex items-center justify-center flex-shrink-0 relative z-10">
-                    <span className="text-primary text-xl font-black" style={condensed}>{num}</span>
-                  </div>
-                  {i < 2 && <div className="md:hidden flex-1 h-px bg-border" />}
-                </div>
-                <div>
-                  <h3 className="text-white font-bold text-xl mb-3 tracking-wide" style={condensed}>{title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">{desc}</p>
-                </div>
-              </div>
+        )}
+
+        {(displayed || typing) && (
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <div
+              style={{
+                width: '24px',
+                height: '24px',
+                background: 'rgba(0,170,255,0.15)',
+                border: '2px solid #00aaff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontFamily: 'var(--font-pixel), monospace', fontSize: '7px', color: '#00aaff' }}>AI</span>
+            </div>
+            <div
+              style={{
+                background: '#1a0c34',
+                border: '2px solid #2d0d55',
+                padding: '8px 12px',
+                fontFamily: 'var(--font-sans, "Plus Jakarta Sans"), sans-serif',
+                fontSize: '12px',
+                color: '#f0e0ff',
+                lineHeight: 1.5,
+                flex: 1,
+              }}
+            >
+              {typing && !displayed ? (
+                <span style={{ color: '#00aaff' }}>▋</span>
+              ) : (
+                <>
+                  {displayed}
+                  {typing && <span style={{ color: '#ff00cc', animation: 'blink 0.7s step-end infinite' }}>▋</span>}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const FEATURES = [
+  {
+    tag: 'INGESTION',
+    title: 'DEMO PARSING',
+    desc: 'Upload .dem files and get instant structural analysis. Supports all CS2 competitive demo formats.',
+  },
+  {
+    tag: 'INTELLIGENCE',
+    title: 'AI SCOUTING',
+    desc: 'Ask tactical questions in plain language. The AI reads your opponent\'s patterns and answers in seconds.',
+  },
+  {
+    tag: 'STRATEGY',
+    title: 'ANTI-STRAT',
+    desc: 'Get counter-strategies for every opponent. Map-specific playbooks built from their own demo data.',
+  },
+]
+
+const TICKER_ITEMS = [
+  'DEMO ANALYSIS', 'MAP CONTROL', 'AI SCOUTING', 'ANTI-STRATS',
+  'PLAYER TRACKING', 'WIN RATES', 'PATTERN RECOGNITION', 'CS2 READY',
+]
+
+export default function LandingPage() {
+  return (
+    <>
+      <style>{`
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        @keyframes ticker {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+        @keyframes scanlines {
+          from { background-position: 0 0; }
+          to   { background-position: 0 4px; }
+        }
+        .landing-nav-link {
+          font-family: var(--font-pixel), monospace;
+          font-size: 7px;
+          color: #9060c8;
+          text-decoration: none;
+          letter-spacing: 0.1em;
+          transition: color 120ms ease;
+        }
+        .landing-nav-link:hover { color: #ff00cc; }
+        .feature-card {
+          background: #14082a;
+          border: 3px solid #2d0d55;
+          box-shadow: 4px 4px 0 #000;
+          padding: 24px;
+          transition: border-color 150ms ease;
+        }
+        .feature-card:hover {
+          border-color: #ff00cc;
+        }
+        .pixel-btn-primary {
+          font-family: var(--font-pixel), monospace;
+          font-size: 9px;
+          letter-spacing: 0.08em;
+          background: #ff00cc;
+          color: #000;
+          border: 3px solid #ff66ee;
+          box-shadow: 4px 4px 0 #000;
+          padding: 12px 22px;
+          cursor: pointer;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          transition: transform 80ms ease, box-shadow 80ms ease;
+        }
+        .pixel-btn-primary:active {
+          transform: translate(3px, 3px);
+          box-shadow: 1px 1px 0 #000;
+        }
+        .pixel-btn-secondary {
+          font-family: var(--font-pixel), monospace;
+          font-size: 9px;
+          letter-spacing: 0.08em;
+          background: transparent;
+          color: #9060c8;
+          border: 3px solid #2d0d55;
+          box-shadow: 4px 4px 0 #000;
+          padding: 12px 22px;
+          cursor: pointer;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          transition: border-color 120ms ease, color 120ms ease, transform 80ms ease, box-shadow 80ms ease;
+        }
+        .pixel-btn-secondary:hover {
+          border-color: #3d1468;
+          color: #f0e0ff;
+        }
+        .pixel-btn-secondary:active {
+          transform: translate(3px, 3px);
+          box-shadow: 1px 1px 0 #000;
+        }
+      `}</style>
+
+      <div style={{ background: '#08000f', color: '#f0e0ff', minHeight: '100vh', overflowX: 'hidden' }}>
+
+        {/* ── Nav ─────────────────────────────────────────────────────── */}
+        <nav
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 48px',
+            height: '60px',
+            borderBottom: '3px solid #2d0d55',
+            background: '#08000f',
+            position: 'sticky',
+            top: 0,
+            zIndex: 50,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '28px',
+                height: '28px',
+                background: 'linear-gradient(90deg, #ff00cc, #00aaff)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontFamily: 'var(--font-pixel), monospace', fontSize: '10px', color: '#000' }}>R</span>
+            </div>
+            <span style={{ fontFamily: 'var(--font-pixel), monospace', fontSize: '9px', color: '#f0e0ff', letterSpacing: '0.12em' }}>
+              RIVALIZE
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+            <a href="#how-it-works" className="landing-nav-link">HOW IT WORKS</a>
+            <a href="#features" className="landing-nav-link">FEATURES</a>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Link href="/login" className="landing-nav-link">SIGN IN</Link>
+            <Link href="/signup" className="pixel-btn-primary" style={{ fontSize: '7px', padding: '8px 14px' }}>
+              GET STARTED
+            </Link>
+          </div>
+        </nav>
+
+        {/* ── Hero ─────────────────────────────────────────────────────── */}
+        <section
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            minHeight: '600px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '64px 48px',
+            gap: '48px',
+          }}
+        >
+          {/* Synthwave sky bg */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(180deg, #000010 0%, #0d0020 40%, #1a003a 70%, #14082a 100%)',
+              zIndex: 0,
+            }}
+          />
+
+          {/* Pixel sun */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '60px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '160px',
+              height: '80px',
+              background: 'linear-gradient(180deg, #ffaa00 0%, #ff6600 100%)',
+              boxShadow: '0 0 60px rgba(255,150,0,0.5), 0 0 120px rgba(255,100,0,0.2)',
+              zIndex: 1,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Scanline bands */}
+            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  height: '6px',
+                  background: 'rgba(0,0,0,0.5)',
+                  top: `${i * 12 + 6}px`,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Perspective grid floor */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '260px',
+              zIndex: 1,
+              overflow: 'hidden',
+            }}
+          >
+            <svg
+              width="100%"
+              height="100%"
+              viewBox="0 0 1200 260"
+              preserveAspectRatio="none"
+              style={{ display: 'block' }}
+            >
+              {/* Horizontal lines */}
+              {[0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 1.0].map((t, i) => {
+                const y = 10 + t * 240
+                return (
+                  <line key={`h${i}`} x1="0" y1={y} x2="1200" y2={y}
+                    stroke="#ff00cc" strokeWidth={i < 3 ? 1 : 2}
+                    strokeOpacity={0.3 + t * 0.4} />
+                )
+              })}
+              {/* Vertical lines converging to vanishing point */}
+              {Array.from({ length: 16 }, (_, i) => {
+                const x = (i / 15) * 1200
+                return (
+                  <line key={`v${i}`} x1="600" y1="10" x2={x} y2="260"
+                    stroke="#ff00cc" strokeWidth="1.5"
+                    strokeOpacity={0.35} />
+                )
+              })}
+              {/* Horizon glow line */}
+              <line x1="0" y1="10" x2="1200" y2="10"
+                stroke="#ff00cc" strokeWidth="3" strokeOpacity="0.8" />
+            </svg>
+          </div>
+
+          {/* CRT scanlines overlay */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 4px)',
+              zIndex: 2,
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* Left: Headline + CTAs */}
+          <div style={{ position: 'relative', zIndex: 3, maxWidth: '520px', flex: '1 1 auto' }}>
+            <div
+              style={{
+                fontFamily: 'var(--font-pixel), monospace',
+                fontSize: '8px',
+                color: '#ff00cc',
+                letterSpacing: '0.16em',
+                marginBottom: '16px',
+                textShadow: '0 0 10px rgba(255,0,204,0.6)',
+              }}
+            >
+              CS2 DEMO ANALYSIS
+            </div>
+
+            <h1
+              style={{
+                fontFamily: 'var(--font-display), "VT323", monospace',
+                fontSize: 'clamp(52px, 6vw, 80px)',
+                color: '#f0e0ff',
+                lineHeight: 1.05,
+                marginBottom: '16px',
+                textShadow: '0 0 30px rgba(255,0,204,0.4), 4px 4px 0 #000',
+              }}
+            >
+              KNOW YOUR<br />
+              <span style={{ background: 'linear-gradient(90deg, #ff00cc, #00aaff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                ENEMY.
+              </span>
+            </h1>
+
+            <p
+              style={{
+                fontFamily: 'var(--font-sans, "Plus Jakarta Sans"), sans-serif',
+                fontSize: '15px',
+                color: '#9060c8',
+                lineHeight: 1.6,
+                marginBottom: '32px',
+                maxWidth: '400px',
+              }}
+            >
+              Upload CS2 demos. Let AI build the anti-strat.
+              Study opponents, find their patterns, and walk into every match prepared.
+            </p>
+
+            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+              <Link href="/signup" className="pixel-btn-primary">
+                START FOR FREE
+              </Link>
+              <a href="#how-it-works" className="pixel-btn-secondary">
+                SEE HOW IT WORKS
+              </a>
+            </div>
+          </div>
+
+          {/* Right: Chat mock */}
+          <div style={{ position: 'relative', zIndex: 3, flexShrink: 0, width: '100%', maxWidth: '420px' }}>
+            <HeroChatMock />
+          </div>
+        </section>
+
+        {/* ── Ticker ───────────────────────────────────────────────────── */}
+        <div
+          style={{
+            borderTop: '3px solid #2d0d55',
+            borderBottom: '3px solid #2d0d55',
+            background: '#0f0420',
+            overflow: 'hidden',
+            padding: '12px 0',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              animation: 'ticker 20s linear infinite',
+              whiteSpace: 'nowrap',
+              width: 'max-content',
+            }}
+          >
+            {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-pixel), monospace',
+                    fontSize: '8px',
+                    color: '#9060c8',
+                    letterSpacing: '0.12em',
+                    padding: '0 24px',
+                  }}
+                >
+                  {item}
+                </span>
+                <span style={{ color: '#ff00cc', fontSize: '10px', textShadow: '0 0 8px #ff00cc' }}>·</span>
+              </span>
             ))}
           </div>
         </div>
-      </section>
 
-      {/* ── AI SCOUT ────────────────────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-6 py-28">
-        <div className="grid lg:grid-cols-2 gap-16 items-start">
-          <div>
-            <div className="text-primary text-xs tracking-widest mb-4 font-semibold" style={mono}>// AI INTELLIGENCE ENGINE</div>
-            <h2 className="text-white text-5xl font-black leading-none mb-6" style={condensed}>YOUR OPPONENT<br /><span className="text-destructive">HAS NO SECRETS.</span></h2>
-            <p className="text-muted-foreground leading-relaxed mb-8">The Rivalize AI engine processes every demo tick to build a complete tactical dossier on your opponents — map tendencies, player psychology, economic patterns, and clutch behavior.</p>
-            <div className="flex gap-1 mb-6 border border-border bg-muted/20 p-1">
-              {(['tside', 'ctside', 'players'] as const).map((tab) => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-2 text-xs tracking-widest font-semibold transition-all duration-150 ${activeTab === tab ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`} style={mono}>
-                  {tab === 'tside' ? 'T-SIDE' : tab === 'ctside' ? 'CT-SIDE' : 'PLAYERS'}
-                </button>
-              ))}
+        {/* ── How It Works ─────────────────────────────────────────────── */}
+        <section id="how-it-works" style={{ padding: '80px 48px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+            <div
+              style={{
+                fontFamily: 'var(--font-pixel), monospace',
+                fontSize: '7px',
+                color: '#5a2880',
+                letterSpacing: '0.14em',
+                marginBottom: '12px',
+                textTransform: 'uppercase',
+              }}
+            >
+              PLATFORM
             </div>
-
-            {activeTab === 'tside' && (
-              <div className="space-y-3">
-                {[
-                  { label: 'A-EXECUTE (BANANA PUSH)', freq: '68%', threat: 'HIGH' },
-                  { label: 'B-RUSH FIRST 10s',         freq: '22%', threat: 'MED' },
-                  { label: 'MID SPLIT',                 freq: '10%', threat: 'LOW' },
-                ].map(({ label, freq, threat }) => (
-                  <div key={label} className="border border-border bg-card p-4 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs tracking-widest text-foreground font-semibold mb-1" style={mono}>{label}</div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-1 w-32 bg-muted"><div className="h-full bg-primary" style={{ width: freq }} /></div>
-                        <span className="text-primary text-xs" style={mono}>{freq}</span>
-                      </div>
-                    </div>
-                    <span className={`text-[9px] tracking-widest px-2 py-1 border font-semibold ${threat === 'HIGH' ? 'border-destructive/40 text-destructive bg-destructive/10' : threat === 'MED' ? 'border-yellow-400/40 text-yellow-400 bg-yellow-400/10' : 'border-muted-foreground/30 text-muted-foreground'}`} style={mono}>{threat}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {activeTab === 'ctside' && (
-              <div className="space-y-3">
-                {[
-                  { label: 'AGGRESSIVE B-WINDOW PEEK', freq: '54%', threat: 'HIGH' },
-                  { label: 'PASSIVE A-SITE HOLD',       freq: '35%', threat: 'MED' },
-                  { label: 'STACK B ON PISTOL',          freq: '11%', threat: 'LOW' },
-                ].map(({ label, freq, threat }) => (
-                  <div key={label} className="border border-border bg-card p-4 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs tracking-widest text-foreground font-semibold mb-1" style={mono}>{label}</div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-1 w-32 bg-muted"><div className="h-full bg-primary" style={{ width: freq }} /></div>
-                        <span className="text-primary text-xs" style={mono}>{freq}</span>
-                      </div>
-                    </div>
-                    <span className={`text-[9px] tracking-widest px-2 py-1 border font-semibold ${threat === 'HIGH' ? 'border-destructive/40 text-destructive bg-destructive/10' : threat === 'MED' ? 'border-yellow-400/40 text-yellow-400 bg-yellow-400/10' : 'border-muted-foreground/30 text-muted-foreground'}`} style={mono}>{threat}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {activeTab === 'players' && (
-              <div className="space-y-3">
-                {playerData.slice(0, 3).map((p) => (
-                  <div key={p.name} className="border border-border bg-card p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <span className="text-white font-bold text-sm" style={condensed}>{p.name}</span>
-                        <span className="ml-2 text-muted-foreground text-[10px] tracking-widest" style={mono}>{p.role}</span>
-                      </div>
-                      <span className="text-accent font-bold text-sm" style={mono}>{p.rating}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[{ label: 'K/D', val: p.kd }, { label: 'HS%', val: `${p.hs}%` }, { label: 'CLUTCH%', val: `${p.clutch}%` }].map(({ label, val }) => (
-                        <div key={label}>
-                          <div className="text-[9px] tracking-widest text-muted-foreground mb-0.5" style={mono}>{label}</div>
-                          <div className="text-foreground text-sm font-semibold">{val}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <h2
+              style={{
+                fontFamily: 'var(--font-display), "VT323", monospace',
+                fontSize: '52px',
+                color: '#f0e0ff',
+                textShadow: '0 0 20px rgba(255,0,204,0.3)',
+                lineHeight: 1,
+              }}
+            >
+              HOW IT WORKS
+            </h2>
           </div>
 
-          {/* Heatmap */}
-          <div className="relative">
-            <div className="text-muted-foreground text-[10px] tracking-widest mb-3" style={mono}>POSITIONAL HEATMAP // MIRAGE · A-SITE · 47 DEMOS</div>
-            <div className="border border-border bg-card p-4 overflow-hidden">
-              <div className="grid gap-0.5" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
-                {heatmapGrid.map((cell, i) => (
-                  <div key={`hm-${i}`} className={`aspect-square ${cellColor[cell]}`} />
-                ))}
-              </div>
-              <div className="flex items-center gap-4 mt-4 flex-wrap">
-                {[{ label: 'CRITICAL', color: 'bg-red-500/80' }, { label: 'HIGH', color: 'bg-orange-400/60' }, { label: 'MEDIUM', color: 'bg-yellow-400/30' }, { label: 'LOW', color: 'bg-primary/10' }].map(({ label, color }) => (
-                  <div key={label} className="flex items-center gap-1.5">
-                    <div className={`w-2.5 h-2.5 ${color}`} />
-                    <span className="text-[9px] tracking-widest text-muted-foreground" style={mono}>{label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="border border-border bg-card p-4 mt-4">
-              <div className="text-muted-foreground text-[10px] tracking-widest mb-4" style={mono}>SITE ATTACK DISTRIBUTION</div>
-              <ResponsiveContainer width="100%" height={100}>
-                <BarChart data={siteData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="site" tick={{ fill: '#4a6578', fontSize: 10, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#4a6578', fontSize: 10, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: '#0c1219', border: '1px solid rgba(0,212,255,0.2)', borderRadius: 2, fontSize: 10, fontFamily: 'JetBrains Mono', color: '#c8d8e4' }} />
-                  <Bar dataKey="attacks" name="Attacks" radius={0}>
-                    {siteData.map((entry, index) => (
-                      <Cell key={`landing-site-${entry.site}`} fill={index === 0 ? '#00d4ff' : '#ff3b3b'} fillOpacity={0.8} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── ROSTER INTELLIGENCE ─────────────────────────────────────────────── */}
-      <section className="border-t border-border bg-muted/10">
-        <div className="max-w-7xl mx-auto px-6 py-28">
-          <div className="mb-12">
-            <div className="text-primary text-xs tracking-widest mb-4 font-semibold" style={mono}>// ROSTER INTELLIGENCE</div>
-            <h2 className="text-white text-5xl font-black leading-none" style={condensed}>KNOW THEIR ROSTER<br /><span className="text-muted-foreground font-normal">BETTER THAN THEY DO.</span></h2>
-          </div>
-          <div className="border border-border bg-card overflow-hidden">
-            <div className="border-b border-border px-6 py-3 flex items-center justify-between">
-              <span className="text-[10px] tracking-widest text-muted-foreground" style={mono}>PLAYER_INTELLIGENCE // NATUS_VINCERE · DUST2 · 12 DEMOS</span>
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-3 h-3 text-yellow-400" />
-                <span className="text-[10px] tracking-widest text-yellow-400" style={mono}>3 CRITICAL PATTERNS</span>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/20">
-                    {['PLAYER', 'ROLE', 'RATING', 'K/D', 'HS%', 'CLUTCH%', 'THREAT'].map((h) => (
-                      <th key={h} className="text-left px-6 py-3 text-[9px] tracking-widest text-muted-foreground font-semibold" style={mono}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {playerData.map((p, i) => (
-                    <tr key={p.name} className={`border-b border-border last:border-0 hover:bg-muted/20 transition-colors ${i === 0 ? 'bg-destructive/5' : ''}`}>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {i === 0 && <AlertTriangle className="w-3 h-3 text-destructive flex-shrink-0" />}
-                          <span className="text-white font-semibold">{p.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4"><span className="text-[10px] tracking-widest text-muted-foreground border border-border px-2 py-0.5" style={mono}>{p.role}</span></td>
-                      <td className="px-6 py-4"><span className={`font-bold ${p.rating >= 1.3 ? 'text-destructive' : p.rating >= 1.2 ? 'text-yellow-400' : 'text-accent'}`} style={mono}>{p.rating}</span></td>
-                      <td className="px-6 py-4 text-foreground font-medium" style={mono}>{p.kd}</td>
-                      <td className="px-6 py-4 text-foreground" style={mono}>{p.hs}%</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="h-1 w-20 bg-muted"><div className={`h-full ${p.clutch >= 65 ? 'bg-destructive' : p.clutch >= 55 ? 'bg-yellow-400' : 'bg-accent'}`} style={{ width: `${p.clutch}%` }} /></div>
-                          <span className="text-[10px] text-muted-foreground" style={mono}>{p.clutch}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-[9px] tracking-widest px-2 py-1 border font-semibold ${i === 0 ? 'border-destructive/40 text-destructive bg-destructive/10' : i <= 2 ? 'border-yellow-400/40 text-yellow-400 bg-yellow-400/10' : 'border-muted-foreground/30 text-muted-foreground'}`} style={mono}>
-                          {i === 0 ? 'CRITICAL' : i <= 2 ? 'HIGH' : 'MED'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── TESTIMONIALS ────────────────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="grid md:grid-cols-3 gap-px bg-border">
-          {[
-            { quote: "We uploaded NaVi's last 10 demos before ESL. Rivalize found a B-rush pattern they'd used in 7 of them. We held B with 5 that round.", author: 'IGL, Team Falcons', stars: 5 },
-            { quote: "The heatmaps are insane. Within 20 minutes of uploading I knew exactly where their AWPer defaulted on CT-side Mirage.",                author: 'Coach, MOUZ',        stars: 5 },
-            { quote: "This is the kind of tool tier-1 orgs have had internally for years. Now it's available to everyone. Game changer.",                    author: 'Analyst, OG',         stars: 5 },
-          ].map(({ quote, author, stars }) => (
-            <div key={author} className="bg-card p-8">
-              <div className="flex gap-0.5 mb-4">
-                {Array.from({ length: stars }).map((_, i) => (
-                  <Star key={`star-${author}-${i}`} className="w-3 h-3 fill-primary text-primary" />
-                ))}
-              </div>
-              <p className="text-foreground leading-relaxed text-sm mb-6">&ldquo;{quote}&rdquo;</p>
-              <span className="text-muted-foreground text-[10px] tracking-widest" style={mono}>— {author}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── CTA ─────────────────────────────────────────────────────────────── */}
-      <section className="border-t border-border bg-card relative overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(rgba(0,212,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,1) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-full bg-gradient-to-b from-transparent via-primary/20 to-transparent" />
-        <div className="relative max-w-3xl mx-auto px-6 py-28 text-center">
-          <div className="text-primary text-xs tracking-widest mb-6 font-semibold" style={mono}>// READY TO SCOUT</div>
-          <h2 className="text-white text-6xl font-black leading-none mb-6" style={condensed}>STOP WALKING IN BLIND.</h2>
-          <p className="text-muted-foreground text-lg mb-10 max-w-xl mx-auto">Join 600+ teams using Rivalize to turn opponent demos into competitive advantage. Free for the first 3 analyses.</p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Link href="/signup" className="flex items-center gap-2 bg-primary text-primary-foreground font-semibold px-10 py-4 text-sm tracking-widest hover:bg-primary/90 transition-all group">
-              CREATE FREE ACCOUNT <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-            </Link>
-            <button className="flex items-center gap-2 border border-border text-muted-foreground font-medium px-10 py-4 text-sm tracking-widest hover:border-primary/50 hover:text-primary transition-all">BOOK A DEMO</button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FOOTER ──────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-border bg-background">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="flex flex-col md:flex-row items-start justify-between gap-8 mb-12">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Crosshair className="text-primary w-4 h-4" strokeWidth={1.5} />
-                <span className="text-white font-bold tracking-widest text-sm" style={condensed}>RIVALIZE</span>
-              </div>
-              <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">AI-powered opponent analysis for competitive CS2 teams. Upload demos, get intel, win matches.</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
-              {[
-                { heading: 'PRODUCT', links: ['Features', 'How It Works', 'Pricing', 'Changelog'] },
-                { heading: 'COMPANY', links: ['About', 'Blog', 'Careers', 'Contact'] },
-                { heading: 'LEGAL',   links: ['Privacy', 'Terms', 'Cookies'] },
-              ].map(({ heading, links }) => (
-                <div key={heading}>
-                  <div className="text-[9px] tracking-widest text-muted-foreground font-semibold mb-4" style={mono}>{heading}</div>
-                  <ul className="space-y-2">
-                    {links.map((l) => (
-                      <li key={l}><a href="#" className="text-muted-foreground text-sm hover:text-primary transition-colors">{l}</a></li>
-                    ))}
-                  </ul>
+          <div
+            id="features"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '16px',
+              maxWidth: '1000px',
+              margin: '0 auto',
+            }}
+          >
+            {FEATURES.map(({ tag, title, desc }) => (
+              <div key={title} className="feature-card">
+                <div
+                  style={{
+                    fontFamily: 'var(--font-pixel), monospace',
+                    fontSize: '6px',
+                    color: '#ff00cc',
+                    letterSpacing: '0.1em',
+                    background: 'rgba(255,0,204,0.1)',
+                    border: '2px solid rgba(255,0,204,0.3)',
+                    padding: '3px 7px',
+                    display: 'inline-block',
+                    marginBottom: '14px',
+                  }}
+                >
+                  {tag}
                 </div>
-              ))}
+                <h3
+                  style={{
+                    fontFamily: 'var(--font-pixel), monospace',
+                    fontSize: '9px',
+                    color: '#f0e0ff',
+                    letterSpacing: '0.06em',
+                    marginBottom: '12px',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {title}
+                </h3>
+                <p
+                  style={{
+                    fontFamily: 'var(--font-sans, "Plus Jakarta Sans"), sans-serif',
+                    fontSize: '13px',
+                    color: '#9060c8',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── CTA ──────────────────────────────────────────────────────── */}
+        <section
+          style={{
+            padding: '80px 48px',
+            textAlign: 'center',
+            borderTop: '3px solid #2d0d55',
+            background: '#0f0420',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Radial glow */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'radial-gradient(ellipse at 50% 50%, rgba(255,0,204,0.08) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }}
+          />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <h2
+              style={{
+                fontFamily: 'var(--font-display), "VT323", monospace',
+                fontSize: '56px',
+                color: '#f0e0ff',
+                textShadow: '0 0 24px rgba(255,0,204,0.4)',
+                marginBottom: '16px',
+                lineHeight: 1,
+              }}
+            >
+              READY TO WIN?
+            </h2>
+            <p
+              style={{
+                fontFamily: 'var(--font-sans, "Plus Jakarta Sans"), sans-serif',
+                fontSize: '15px',
+                color: '#9060c8',
+                maxWidth: '480px',
+                margin: '0 auto 32px',
+                lineHeight: 1.6,
+              }}
+            >
+              Rivalize gives your team the intel to prepare smarter, react faster, and dominate every match.
+            </p>
+            <Link href="/signup" className="pixel-btn-primary" style={{ fontSize: '9px', padding: '14px 28px' }}>
+              GET STARTED FREE
+            </Link>
+          </div>
+        </section>
+
+        {/* ── Footer ───────────────────────────────────────────────────── */}
+        <footer
+          style={{
+            borderTop: '3px solid #2d0d55',
+            padding: '24px 48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '22px',
+                height: '22px',
+                background: 'linear-gradient(90deg, #ff00cc, #00aaff)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <span style={{ fontFamily: 'var(--font-pixel), monospace', fontSize: '8px', color: '#000' }}>R</span>
             </div>
+            <span style={{ fontFamily: 'var(--font-pixel), monospace', fontSize: '7px', color: '#5a2880', letterSpacing: '0.1em' }}>
+              RIVALIZE
+            </span>
           </div>
-          <div className="border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <span className="text-muted-foreground text-[10px] tracking-widest" style={mono}>© 2025 RIVALIZE. ALL RIGHTS RESERVED.</span>
-            <span className="text-muted-foreground text-[10px] tracking-widest" style={mono}>NOT AFFILIATED WITH VALVE CORPORATION.</span>
+
+          <div style={{ display: 'flex', gap: '24px' }}>
+            {['Privacy', 'Terms'].map((l) => (
+              <a
+                key={l}
+                href="#"
+                style={{
+                  fontFamily: 'var(--font-pixel), monospace',
+                  fontSize: '6px',
+                  color: '#5a2880',
+                  textDecoration: 'none',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                {l.toUpperCase()}
+              </a>
+            ))}
           </div>
-        </div>
-      </footer>
-    </div>
+
+          <span style={{ fontFamily: 'var(--font-sans, "Plus Jakarta Sans"), sans-serif', fontSize: '11px', color: '#5a2880' }}>
+            © 2026 Rivalize
+          </span>
+        </footer>
+      </div>
+    </>
   )
 }
