@@ -5,6 +5,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { streamText } from 'ai'
 import { z } from 'zod'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
+import { detectTacticalPatterns } from '@/lib/cs2-zones'
 
 type DemoParsedData = {
   header?: {
@@ -266,6 +267,8 @@ export async function POST(request: Request) {
 
     if (recentDemos && recentDemos.length > 0) {
       contextText += `\nTeam: ${teamName}\nMatches analysed: ${recentDemos.length}\n\nRecent match details:\n`
+      const selfRoundsByMap: Record<string, Round[][]> = {}
+
       recentDemos.forEach((demo, i) => {
         const pd = demo.parsed_data as DemoParsedData | null
         const h = pd?.header
@@ -284,8 +287,31 @@ export async function POST(request: Request) {
           }
           const tactics = summarizeTactics(pd?.rounds ?? [], pd?.players ?? [])
           if (tactics) contextText += `Tactical data:\n${tactics}\n`
+
+          // Collect rounds for cross-demo pattern detection
+          if (h.map && pd?.rounds && pd.rounds.length > 0) {
+            if (!selfRoundsByMap[h.map]) selfRoundsByMap[h.map] = []
+            selfRoundsByMap[h.map].push(pd.rounds)
+          }
         }
       })
+
+      // Cross-demo execute pattern detection for self-improvement
+      const selfPatternLines: string[] = []
+      for (const [map, roundSets] of Object.entries(selfRoundsByMap)) {
+        if (roundSets.length >= 2) {
+          const patterns = detectTacticalPatterns(roundSets, map)
+          if (patterns.hasData) {
+            selfPatternLines.push(`\nTeam execute patterns on ${map} (across ${roundSets.length} demos):`)
+            selfPatternLines.push(...patterns.text)
+          }
+        }
+      }
+      if (selfPatternLines.length > 0) {
+        contextText += '\n--- Cross-demo execute patterns ---'
+        contextText += selfPatternLines.join('\n')
+        contextText += '\n'
+      }
     }
   } else if (folderId) {
     const { data: folder } = await supabase
@@ -331,10 +357,12 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
           .eq('status', 'completed')
           .eq('demo_type', 'opponent')  // STRICT: only scouting demos for opponent analysis
           .order('created_at', { ascending: false })
-          .limit(3)
+          .limit(5)
 
         if (recentDemos && recentDemos.length > 0) {
           contextText += '\nRecent match details:\n'
+          const roundsByMap: Record<string, Round[][]> = {}
+
           recentDemos.forEach((demo, i) => {
             const pd = demo.parsed_data as DemoParsedData | null
 
@@ -352,8 +380,31 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
               }
               const tactics = summarizeTactics(pd?.rounds ?? [], pd?.players ?? [])
               if (tactics) contextText += `Tactical data:\n${tactics}\n`
+
+              // Collect rounds by map for cross-demo pattern detection
+              if (h.map && pd.rounds && pd.rounds.length > 0) {
+                if (!roundsByMap[h.map]) roundsByMap[h.map] = []
+                roundsByMap[h.map].push(pd.rounds)
+              }
             }
           })
+
+          // Cross-demo execute pattern detection — finds recurring smoke combos per economy type
+          const patternLines: string[] = []
+          for (const [map, roundSets] of Object.entries(roundsByMap)) {
+            if (roundSets.length >= 2) {
+              const patterns = detectTacticalPatterns(roundSets, map)
+              if (patterns.hasData) {
+                patternLines.push(`\nExecute patterns on ${map} (across ${roundSets.length} demos):`)
+                patternLines.push(...patterns.text)
+              }
+            }
+          }
+          if (patternLines.length > 0) {
+            contextText += '\n--- Cross-demo tactical tendencies ---'
+            contextText += patternLines.join('\n')
+            contextText += '\n'
+          }
         }
       }
     }

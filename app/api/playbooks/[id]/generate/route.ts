@@ -5,6 +5,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { streamText } from 'ai'
 import { z } from 'zod'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
+import { detectTacticalPatterns } from '@/lib/cs2-zones'
 
 const bodySchema = z.object({
   sectionType: z.enum(['t_side', 'ct_side', 'a_execute', 'b_execute', 'roles', 'economy']),
@@ -47,11 +48,13 @@ function buildDemoContext(
 ): string {
   const mapDemos = demos
     .filter(d => (d.parsed_data as DemoParsedData | null)?.header?.map === map)
-    .slice(0, 3)
+    .slice(0, 5)
 
   if (mapDemos.length === 0) return ''
 
   const lines: string[] = [`\n${label} demo data for ${map}:`]
+  const allRoundSets: Round[][] = []
+
   mapDemos.forEach((demo, i) => {
     const pd = demo.parsed_data as DemoParsedData | null
     if (!pd?.header) return
@@ -60,6 +63,8 @@ function buildDemoContext(
 
     const rounds = pd.rounds ?? []
     if (rounds.length > 0) {
+      allRoundSets.push(rounds)
+
       const allKills: Kill[] = rounds.flatMap(r => r.kills ?? [])
       const plants = rounds.filter(r => r.bomb_planted).length
       if (allKills.length > 0) {
@@ -85,6 +90,16 @@ function buildDemoContext(
       lines.push(`  Players: ${top.map(p => `${p.name} (Rtg ${p.rating.toFixed(2)}, ADR ${p.adr.toFixed(0)}${p.kast != null ? `, KAST ${Math.round(p.kast * 100)}%` : ''})`).join(', ')}`)
     }
   })
+
+  // Cross-demo execute patterns (only useful with 2+ demos on the same map)
+  if (allRoundSets.length >= 2) {
+    const patterns = detectTacticalPatterns(allRoundSets, map)
+    if (patterns.hasData) {
+      lines.push(`\nCross-demo execute tendencies on ${map} (${allRoundSets.length} demos):`)
+      lines.push(...patterns.text)
+    }
+  }
+
   return lines.join('\n')
 }
 
