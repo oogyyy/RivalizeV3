@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+function getAppUrl(req: NextRequest): string {
+  const explicit = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL
+  if (explicit) return explicit.replace(/\/$/, '')
+  const proto = (req.headers.get('x-forwarded-proto') ?? 'https').split(',')[0].trim()
+  const host  = (req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost:3000').split(',')[0].trim()
+  return `${proto}://${host}`
+}
+
 // Handles FACEIT OAuth2 callback: exchanges the auth code for tokens,
 // fetches the FACEIT user profile, and saves the ID + nickname to the DB.
 export async function GET(req: NextRequest) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl = getAppUrl(req)
   const url    = new URL(req.url)
   const code   = url.searchParams.get('code')
   const state  = url.searchParams.get('state')
