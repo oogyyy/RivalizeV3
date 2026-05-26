@@ -15,6 +15,9 @@ import {
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
 import { CS2_MAPS } from '@/types/database'
+import dynamic from 'next/dynamic'
+
+const ChatRoundReplay = dynamic(() => import('@/components/demos/ChatRoundReplay'), { ssr: false })
 
 type Mode = 'opponent' | 'myteam'
 type FocusArea = 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player' | 'executes' | 'rounds' | 'drills'
@@ -691,44 +694,83 @@ export default function AIScoutPage() {
                 const isLast    = i === messages.length - 1
                 const streaming = isLoading && isLast && msg.role === 'assistant'
 
+                // Extract any showRoundReplay tool invocations from this message
+                const replayInvocations = (msg.toolInvocations ?? []).filter(
+                  inv => inv.toolName === 'showRoundReplay'
+                )
+
                 return (
-                  <div
-                    key={msg.id}
-                    className={cn('flex items-end gap-3 mb-4', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}
-                  >
-                    {msg.role === 'assistant' ? (
-                      <div className="w-8 h-8 rounded-xl bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center shrink-0 mb-0.5">
-                        <Brain size={14} className="text-[#00ffc8]" />
+                  <div key={msg.id} className="mb-4">
+                    <div className={cn('flex items-end gap-3', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
+                      {msg.role === 'assistant' ? (
+                        <div className="w-8 h-8 rounded-xl bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center shrink-0 mb-0.5">
+                          <Brain size={14} className="text-[#00ffc8]" />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 mb-0.5">
+                          <span className="text-xs font-bold text-muted-foreground">You</span>
+                        </div>
+                      )}
+                      <div
+                        className={cn(
+                          'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
+                          msg.role === 'user'
+                            ? 'bg-[rgba(0,255,200,0.08)] border border-[rgba(0,255,200,0.18)] rounded-br-sm'
+                            : 'bg-card border border-border rounded-bl-sm shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
+                        )}
+                      >
+                        {msg.role === 'assistant' ? (
+                          <>
+                            <MarkdownContent content={msg.content} />
+                            {streaming && (
+                              <span className="inline-block w-2 h-4 bg-neon-green ml-0.5 animate-pulse rounded-sm" />
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm text-foreground">{msg.content}</p>
+                        )}
+                        {msg.createdAt && (
+                          <p className="text-xs text-muted-foreground mt-2 select-none">
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
                       </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 mb-0.5">
-                        <span className="text-xs font-bold text-muted-foreground">You</span>
+                    </div>
+
+                    {/* Inline round replays — shown below the message bubble, aligned with it */}
+                    {replayInvocations.length > 0 && (
+                      <div className="pl-11 mt-2 flex flex-col gap-2">
+                        {replayInvocations.map(inv => {
+                          if (inv.state === 'result') {
+                            const r = inv.result as Record<string, unknown>
+                            if (r.error) return (
+                              <p key={inv.toolCallId} className="text-xs text-muted-foreground italic">
+                                Replay unavailable: {String(r.error)}
+                              </p>
+                            )
+                            return (
+                              <ChatRoundReplay
+                                key={inv.toolCallId}
+                                round={r.round as Parameters<typeof ChatRoundReplay>[0]['round']}
+                                players={r.players as Parameters<typeof ChatRoundReplay>[0]['players']}
+                                team1Name={String(r.team1Name)}
+                                team2Name={String(r.team2Name)}
+                                mapName={String(r.mapName)}
+                                roundNumber={Number(r.roundNumber)}
+                                description={String(r.description)}
+                              />
+                            )
+                          }
+                          // Tool is being called — show a small spinner
+                          return (
+                            <div key={inv.toolCallId} className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 size={11} className="animate-spin text-[#00ffc8]" />
+                              Loading replay…
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
-                    <div
-                      className={cn(
-                        'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
-                        msg.role === 'user'
-                          ? 'bg-[rgba(0,255,200,0.08)] border border-[rgba(0,255,200,0.18)] rounded-br-sm'
-                          : 'bg-card border border-border rounded-bl-sm shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
-                      )}
-                    >
-                      {msg.role === 'assistant' ? (
-                        <>
-                          <MarkdownContent content={msg.content} />
-                          {streaming && (
-                            <span className="inline-block w-2 h-4 bg-neon-green ml-0.5 animate-pulse rounded-sm" />
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-sm text-foreground">{msg.content}</p>
-                      )}
-                      {msg.createdAt && (
-                        <p className="text-xs text-muted-foreground mt-2 select-none">
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      )}
-                    </div>
                   </div>
                 )
               })}

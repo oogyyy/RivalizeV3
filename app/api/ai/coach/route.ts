@@ -2,9 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { createOpenAI } from '@ai-sdk/openai'
-import { streamText } from 'ai'
+import { streamText, tool } from 'ai'
 import { z } from 'zod'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
+import { detectTacticalPatterns } from '@/lib/cs2-zones'
 
 type DemoParsedData = {
   header?: {
@@ -266,6 +267,8 @@ export async function POST(request: Request) {
 
     if (recentDemos && recentDemos.length > 0) {
       contextText += `\nTeam: ${teamName}\nMatches analysed: ${recentDemos.length}\n\nRecent match details:\n`
+      const selfRoundsByMap: Record<string, Round[][]> = {}
+
       recentDemos.forEach((demo, i) => {
         const pd = demo.parsed_data as DemoParsedData | null
         const h = pd?.header
@@ -284,8 +287,31 @@ export async function POST(request: Request) {
           }
           const tactics = summarizeTactics(pd?.rounds ?? [], pd?.players ?? [])
           if (tactics) contextText += `Tactical data:\n${tactics}\n`
+
+          // Collect rounds for cross-demo pattern detection
+          if (h.map && pd?.rounds && pd.rounds.length > 0) {
+            if (!selfRoundsByMap[h.map]) selfRoundsByMap[h.map] = []
+            selfRoundsByMap[h.map].push(pd.rounds)
+          }
         }
       })
+
+      // Cross-demo execute pattern detection for self-improvement
+      const selfPatternLines: string[] = []
+      for (const [map, roundSets] of Object.entries(selfRoundsByMap)) {
+        if (roundSets.length >= 2) {
+          const patterns = detectTacticalPatterns(roundSets, map)
+          if (patterns.hasData) {
+            selfPatternLines.push(`\nTeam execute patterns on ${map} (across ${roundSets.length} demos):`)
+            selfPatternLines.push(...patterns.text)
+          }
+        }
+      }
+      if (selfPatternLines.length > 0) {
+        contextText += '\n--- Cross-demo execute patterns ---'
+        contextText += selfPatternLines.join('\n')
+        contextText += '\n'
+      }
     }
   } else if (folderId) {
     const { data: folder } = await supabase
@@ -331,10 +357,12 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
           .eq('status', 'completed')
           .eq('demo_type', 'opponent')  // STRICT: only scouting demos for opponent analysis
           .order('created_at', { ascending: false })
-          .limit(3)
+          .limit(5)
 
         if (recentDemos && recentDemos.length > 0) {
           contextText += '\nRecent match details:\n'
+          const roundsByMap: Record<string, Round[][]> = {}
+
           recentDemos.forEach((demo, i) => {
             const pd = demo.parsed_data as DemoParsedData | null
 
@@ -352,8 +380,31 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
               }
               const tactics = summarizeTactics(pd?.rounds ?? [], pd?.players ?? [])
               if (tactics) contextText += `Tactical data:\n${tactics}\n`
+
+              // Collect rounds by map for cross-demo pattern detection
+              if (h.map && pd.rounds && pd.rounds.length > 0) {
+                if (!roundsByMap[h.map]) roundsByMap[h.map] = []
+                roundsByMap[h.map].push(pd.rounds)
+              }
             }
           })
+
+          // Cross-demo execute pattern detection — finds recurring smoke combos per economy type
+          const patternLines: string[] = []
+          for (const [map, roundSets] of Object.entries(roundsByMap)) {
+            if (roundSets.length >= 2) {
+              const patterns = detectTacticalPatterns(roundSets, map)
+              if (patterns.hasData) {
+                patternLines.push(`\nExecute patterns on ${map} (across ${roundSets.length} demos):`)
+                patternLines.push(...patterns.text)
+              }
+            }
+          }
+          if (patternLines.length > 0) {
+            contextText += '\n--- Cross-demo tactical tendencies ---'
+            contextText += patternLines.join('\n')
+            contextText += '\n'
+          }
         }
       }
     }
@@ -408,6 +459,7 @@ Your coaching style:
 - Use CS2 terminology correctly (executes, retakes, defaults, eco rounds, force buys, mid-round calls, lurks, entry fragging, etc.)
 - Format responses clearly with markdown headers and bullet points
 - Be honest but encouraging — highlight what's working as well as what needs fixing
+- VISUAL REPLAYS: You have a showRoundReplay tool. Use it proactively when explaining a specific round's execute, smoke setup, kill event, or tactical pattern. Pass a short description of what to look for. Don't use it for general statistics.
 ${dataWarning}
 
 ${contextText ? `My Team Performance Data:\n${contextText}` : 'No demo data available.'}
@@ -426,6 +478,7 @@ Your analysis style:
 - Deep tactical knowledge: executes, utility setups, rotations, economy, CT defaults, T-side timings
 - Use CS2 terminology correctly (executes, retakes, defaults, eco rounds, force buys, mid-round calls, etc.)
 - Format responses clearly with markdown headers and bullet points
+- VISUAL REPLAYS: You have a showRoundReplay tool. Use it proactively when illustrating a specific execute, smoke pattern, or round event — especially when the cross-demo patterns section mentions a specific tendency. Pass a short description of what to look for.
 ${dataWarning}
 
 ${contextText ? `Opponent Scout Context:\n${contextText}` : 'No demo data available.'}
@@ -456,6 +509,82 @@ CRITICAL RULES for pro dataset references:
     baseURL: 'https://api.groq.com/openai/v1',
   })
 
+  // ── showRoundReplay tool ─────────────────────────────────────────────────────
+  // Fetches a single round (kills + grenades, no frames) so the client can
+  // render an interactive 2D replay inline in the chat.
+  const showRoundReplay = tool({
+    description: 'Display an interactive 2D round replay to help the user visualise a tactical pattern, execute, or key event you are discussing. Use this proactively when explaining specific round sequences, smoke setups, execute patterns, or kill events that benefit from visual context. Do NOT use it for general statistical observations.',
+    parameters: z.object({
+      mapName:     z.string().describe('CS2 map name e.g. de_mirage'),
+      roundNumber: z.number().int().optional().describe('Specific round number (1-indexed). Omit to let the system pick a representative round.'),
+      description: z.string().max(200).describe('Short caption shown below the replay explaining what to look for — e.g. "Notice the simultaneous Stairs + Jungle smokes at 0:23."'),
+    }),
+    execute: async ({ mapName, roundNumber, description }) => {
+      try {
+        // Fetch demos — opponent or self based on request context
+        let demoParsedList: DemoParsedData[] = []
+
+        if (folderId) {
+          const { data: folder } = await supabase
+            .from('team_folders')
+            .select('opponent_slug')
+            .eq('id', folderId)
+            .single()
+
+          if (folder && teamId) {
+            const { data: demos } = await supabase
+              .from('demos')
+              .select('parsed_data')
+              .eq('team_id', teamId)
+              .eq('opponent_slug', folder.opponent_slug)
+              .eq('status', 'completed')
+              .eq('demo_type', 'opponent')
+              .order('created_at', { ascending: false })
+              .limit(5)
+            demoParsedList = (demos ?? []).map(d => d.parsed_data as DemoParsedData).filter(Boolean)
+          }
+        } else if (teamId) {
+          const admin = createAdminClient()
+          const { data: demos } = await admin
+            .from('demos')
+            .select('parsed_data')
+            .eq('team_id', teamId)
+            .eq('status', 'completed')
+            .eq('demo_type', 'self')
+            .order('created_at', { ascending: false })
+            .limit(5)
+          demoParsedList = (demos ?? []).map(d => d.parsed_data as DemoParsedData).filter(Boolean)
+        }
+
+        // Find a demo that has rounds on the requested map
+        const pd = demoParsedList.find(d => d?.header?.map === mapName && (d.rounds?.length ?? 0) > 0)
+        if (!pd?.rounds) return { error: `No round data available for ${mapName}` }
+
+        const rounds = pd.rounds
+        const round = roundNumber
+          ? (rounds.find(r => r.number === roundNumber) ?? rounds.find(r => (r.kills?.length ?? 0) > 0) ?? rounds[0])
+          : (rounds.find(r => r.bomb_planted && (r.kills?.length ?? 0) > 0) ?? rounds.find(r => (r.kills?.length ?? 0) > 0) ?? rounds[0])
+
+        if (!round) return { error: 'Round not found' }
+
+        // Strip frames (too large to transmit) — kills + grenades are enough for kill-only replay
+        const { frames: _frames, ...roundWithoutFrames } = round
+
+        return {
+          mapName,
+          roundNumber:  round.number,
+          team1Name:    pd.header?.team1 ?? 'Team 1',
+          team2Name:    pd.header?.team2 ?? 'Team 2',
+          description,
+          round:        roundWithoutFrames,
+          players:      (pd.players ?? []).slice(0, 10),
+        }
+      } catch {
+        return { error: 'Failed to load round data' }
+      }
+    },
+  })
+
   try {
     const result = streamText({
       model: groq('llama-3.3-70b-versatile'),
@@ -468,6 +597,8 @@ CRITICAL RULES for pro dataset references:
         })),
       maxTokens: 2000,
       temperature: 0.7,
+      maxSteps:    3,
+      tools: { showRoundReplay },
     })
 
     return result.toDataStreamResponse({
