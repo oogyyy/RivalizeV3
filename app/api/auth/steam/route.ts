@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Derives the public base URL from the request, preferring the explicit env
-// var. Falls back to x-forwarded-proto/host so Railway/Vercel deployments
-// work even when NEXT_PUBLIC_APP_URL is not configured.
+// Derives the public base URL from the request.
+// APP_URL (server-side only, read at runtime) takes priority over
+// NEXT_PUBLIC_APP_URL (which Next.js bakes in at build time and may be stale).
+// Falls back to x-forwarded-proto/host for zero-config deployments.
 function getBaseUrl(req: NextRequest): string {
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    const raw = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
-    // Ensure the value has a protocol — a common misconfiguration is setting
-    // the env var to "hostname" without "https://".
+  const explicit = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL
+  if (explicit) {
+    const raw = explicit.replace(/\/$/, '')
     return raw.startsWith('http') ? raw : `https://${raw}`
   }
   const proto = (req.headers.get('x-forwarded-proto') ?? 'https').split(',')[0].trim()
