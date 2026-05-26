@@ -56,6 +56,10 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
     console.warn('[go-parser] warnings:', raw.warnings)
   }
 
+  if (!raw.header) {
+    throw new Error('Go parser returned no header data')
+  }
+
   const parsedData: ParsedDemoData = {
     header: {
       map:          raw.header.map,
@@ -66,7 +70,7 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
       duration:     raw.header.duration,
       total_rounds: raw.header.total_rounds,
     },
-    rounds: raw.rounds.map((r, i) => ({
+    rounds: (raw.rounds ?? []).map((r, i) => ({
       number:        i + 1,
       winner:        r.winner,
       win_reason:    r.win_reason,
@@ -100,7 +104,7 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
       })),
       frames: (r.frames ?? []),
     })),
-    players: raw.players.map(p => ({
+    players: (raw.players ?? []).map(p => ({
       steam_id:           p.steam_id,
       name:               p.name,
       team:               p.team,
