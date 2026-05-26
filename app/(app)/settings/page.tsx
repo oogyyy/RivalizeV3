@@ -222,10 +222,21 @@ export default function SettingsPage() {
 
   const handleDeleteAccount = async () => {
     setDeleting(true)
-    const supabase = createClient()
-    // Sign out first (actual deletion requires server-side admin)
-    await supabase.auth.signOut()
-    router.push('/login')
+    try {
+      const res = await fetch('/api/auth/delete-account', { method: 'DELETE' })
+      if (!res.ok) {
+        const { error } = await res.json()
+        console.error('Failed to delete account:', error)
+        setDeleting(false)
+        return
+      }
+      // Account deleted — sign out client session and redirect
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch {
+      setDeleting(false)
+    }
   }
 
   if (loading) {
