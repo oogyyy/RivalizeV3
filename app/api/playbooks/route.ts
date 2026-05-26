@@ -4,9 +4,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 
 const createSchema = z.object({
-  teamId: z.string().uuid(),
-  map:    z.string().min(1).max(64),
-  name:   z.string().min(1).max(128).default('Untitled Playbook'),
+  teamId:       z.string().uuid(),
+  map:          z.string().min(1).max(64),
+  name:         z.string().min(1).max(128).default('Untitled Playbook'),
+  folderId:     z.string().uuid().optional(),
+  opponentName: z.string().max(128).optional(),
 })
 
 export async function GET() {
@@ -46,11 +48,19 @@ export async function POST(request: Request) {
   const parsed = createSchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body', details: parsed.error.flatten() }, { status: 400 })
 
-  const { teamId, map, name } = parsed.data
+  const { teamId, map, name, folderId, opponentName } = parsed.data
 
   const { data, error } = await supabase
     .from('playbooks')
-    .insert({ team_id: teamId, created_by: user.id, map, name, sections: {} })
+    .insert({
+      team_id:       teamId,
+      created_by:    user.id,
+      map,
+      name,
+      sections:      {},
+      folder_id:     folderId ?? null,
+      opponent_name: opponentName ?? null,
+    })
     .select('id, team_id, map, name, created_at, updated_at')
     .single()
 
