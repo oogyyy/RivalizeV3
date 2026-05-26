@@ -161,7 +161,7 @@ export default async function DashboardPage() {
             Dashboard
           </p>
           <h1 className="text-[22px] md:text-2xl font-bold text-foreground tracking-tight">
-            Welcome back, <span className="text-[#10D9A0]">{displayName}</span>
+            Welcome back, <span className="text-[#00ffc8]">{displayName}</span>
           </h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
             Your match-prep hub — study opponents, generate anti-strats, win.
@@ -169,7 +169,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link href="/ai-coach">
-            <Button variant="neon" className="gap-2 shadow-[0_0_16px_rgba(16,217,160,0.2)]">
+            <Button variant="neon" className="gap-2 shadow-[0_0_16px_rgba(0,255,200,0.2)]">
               <Brain size={15} />
               AI Scout
             </Button>
@@ -196,8 +196,8 @@ export default async function DashboardPage() {
         <StatCard
           label="Analyzed"
           value={analyzedDemos}
-          icon={<Activity size={17} className="text-[#10D9A0]" />}
-          iconBg="bg-[rgba(16,217,160,0.1)]"
+          icon={<Activity size={17} className="text-[#00ffc8]" />}
+          iconBg="bg-[rgba(0,255,200,0.1)]"
           accent="stat-card-green"
         />
       </div>
@@ -261,11 +261,11 @@ export default async function DashboardPage() {
           <DemoCard
             title="My Team Demos"
             subtitle="Your team's own match recordings"
-            icon={<Shield size={14} className="text-[#10D9A0]" />}
-            iconBg="bg-[rgba(16,217,160,0.1)]"
+            icon={<Shield size={14} className="text-[#00ffc8]" />}
+            iconBg="bg-[rgba(0,255,200,0.1)]"
             accentClass="accent-line-green"
             viewAllHref="/my-team"
-            emptyIcon={<Shield size={22} className="text-[#10D9A0]/60" />}
+            emptyIcon={<Shield size={22} className="text-[#00ffc8]/60" />}
             emptyTitle="No team demos yet"
             emptyBody="Upload your own match recordings to review performance."
             emptyCtaHref="/my-team"
@@ -282,18 +282,18 @@ export default async function DashboardPage() {
                       key={d.id}
                       href={href}
                       initial={myTeamName.charAt(0).toUpperCase()}
-                      initialBg="bg-[rgba(16,217,160,0.1)] border border-[rgba(16,217,160,0.2)]"
-                      initialColor="text-[#10D9A0]"
+                      initialBg="bg-[rgba(0,255,200,0.1)] border border-[rgba(0,255,200,0.2)]"
+                      initialColor="text-[#00ffc8]"
                       name={myTeamName}
                       meta={`${d.map && d.map !== 'unknown' ? d.map + ' · ' : ''}${d.match_date ? formatDate(d.match_date) : formatDate(d.created_at)}`}
-                      hoverColor="group-hover:text-[#10D9A0]"
-                      chevronHover="group-hover:text-[#10D9A0]"
+                      hoverColor="group-hover:text-[#00ffc8]"
+                      chevronHover="group-hover:text-[#00ffc8]"
                       badge={
                         <div className="flex items-center gap-1.5">
                           {result && (
                             <span className={cn(
                               'text-[10px] font-bold px-1.5 py-0.5 rounded-md tracking-wide',
-                              result === 'Win'  && 'text-[#10D9A0] bg-[rgba(16,217,160,0.12)]',
+                              result === 'Win'  && 'text-[#00ffc8] bg-[rgba(0,255,200,0.12)]',
                               result === 'Loss' && 'text-red-400 bg-red-400/10',
                               result === 'Draw' && 'text-amber-400 bg-amber-400/10',
                             )}>
@@ -323,9 +323,9 @@ export default async function DashboardPage() {
             </div>
             <div className="p-3 space-y-1">
               <QuickAction href="/opponents" icon={<Target size={14} className="text-red-400" />} label="Upload Opponent Demo" hoverClass="hover:border-red-500/30 hover:text-red-300 hover:bg-red-500/[0.05]" />
-              <QuickAction href="/my-team"   icon={<Shield size={14} className="text-[#10D9A0]" />} label="Upload Team Demo"    hoverClass="hover:border-[rgba(16,217,160,0.3)] hover:text-[#10D9A0] hover:bg-[rgba(16,217,160,0.05)]" />
+              <QuickAction href="/my-team"   icon={<Shield size={14} className="text-[#00ffc8]" />} label="Upload Team Demo"    hoverClass="hover:border-[rgba(0,255,200,0.3)] hover:text-[#00ffc8] hover:bg-[rgba(0,255,200,0.05)]" />
               <QuickAction href="/opponents" icon={<BarChart3 size={14} className="text-muted-foreground" />} label="View All Opponents" hoverClass="hover:text-foreground hover:bg-accent/60" />
-              <QuickAction href="/ai-coach"  icon={<Brain size={14} className="text-[#10D9A0]" />} label="Generate Anti-Strat" hoverClass="hover:border-[rgba(16,217,160,0.3)] hover:text-[#10D9A0] hover:bg-[rgba(16,217,160,0.05)]" />
+              <QuickAction href="/ai-coach"  icon={<Brain size={14} className="text-[#00ffc8]" />} label="Generate Anti-Strat" hoverClass="hover:border-[rgba(0,255,200,0.3)] hover:text-[#00ffc8] hover:bg-[rgba(0,255,200,0.05)]" />
             </div>
           </div>
 
@@ -365,7 +365,7 @@ export default async function DashboardPage() {
                         {total > 0 && (
                           <p className={cn(
                             'text-[10px] font-mono',
-                            wins > losses ? 'text-[#10D9A0]' : losses > wins ? 'text-red-400' : 'text-muted-foreground'
+                            wins > losses ? 'text-[#00ffc8]' : losses > wins ? 'text-red-400' : 'text-muted-foreground'
                           )}>
                             {wins}W–{losses}L
                             {winRate !== null && <span className="text-muted-foreground/50 ml-1">{winRate}%</span>}
@@ -389,13 +389,13 @@ export default async function DashboardPage() {
 
           {/* AI CTA card */}
           {totalDemos > 0 && (
-            <div className="relative rounded-xl border border-[rgba(16,217,160,0.2)] bg-card overflow-hidden">
+            <div className="relative rounded-xl border border-[rgba(0,255,200,0.2)] bg-card overflow-hidden">
               {/* Brand glow bg */}
-              <div className="absolute inset-0 bg-gradient-to-br from-[rgba(16,217,160,0.06)] to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-br from-[rgba(0,255,200,0.06)] to-transparent pointer-events-none" />
               <div className="accent-line-green w-full" />
               <div className="relative p-5 text-center">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(16,217,160,0.12)] border border-[rgba(16,217,160,0.25)] flex items-center justify-center mx-auto mb-3 shadow-[0_0_12px_rgba(16,217,160,0.12)]">
-                  <Brain size={18} className="text-[#10D9A0]" />
+                <div className="w-10 h-10 rounded-xl bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center mx-auto mb-3 shadow-[0_0_12px_rgba(0,255,200,0.12)]">
+                  <Brain size={18} className="text-[#00ffc8]" />
                 </div>
                 <p className="text-[13px] font-bold text-foreground mb-1">Ready to prep?</p>
                 <p className="text-[12px] text-muted-foreground mb-4">

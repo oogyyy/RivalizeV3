@@ -4,131 +4,87 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { cn } from '@/lib/utils'
+import {
+  LayoutDashboard, Target, Shield, Brain,
+  User, Settings, LogOut, ChevronLeft, ChevronRight,
+} from 'lucide-react'
 import type { Profile } from '@/types/database'
+
+const NAV_ITEMS = [
+  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { href: '/opponents', label: 'Opponents', Icon: Target },
+  { href: '/my-team',   label: 'My Team',   Icon: Shield },
+  { href: '/ai-coach',  label: 'AI Scout',  Icon: Brain },
+  { href: '/profile',   label: 'Profile',   Icon: User },
+  { href: '/settings',  label: 'Settings',  Icon: Settings },
+]
+
+interface SidebarNavProps {
+  onLinkClick?: () => void
+  collapsed?: boolean
+}
+
+export function SidebarNav({ onLinkClick, collapsed }: SidebarNavProps) {
+  const pathname = usePathname()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {NAV_ITEMS.map(({ href, label, Icon }) => {
+        const isActive = pathname === href || pathname.startsWith(href + '/')
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={onLinkClick}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: collapsed ? '10px 0' : '9px 12px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              borderRadius: 7,
+              background: isActive ? 'rgba(255,45,120,0.1)' : 'transparent',
+              borderLeft: isActive ? '3px solid #ff2d78' : '3px solid transparent',
+              color: isActive ? '#ff2d78' : 'rgba(255,255,255,0.48)',
+              textDecoration: 'none',
+              fontFamily: 'var(--font-inter, Inter), sans-serif',
+              fontSize: 13.5,
+              fontWeight: isActive ? 600 : 400,
+              transition: 'all 0.12s',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+            }}
+            onMouseEnter={e => {
+              if (!isActive) {
+                e.currentTarget.style.color = 'rgba(255,255,255,0.8)'
+                e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+              }
+            }}
+            onMouseLeave={e => {
+              if (!isActive) {
+                e.currentTarget.style.color = 'rgba(255,255,255,0.48)'
+                e.currentTarget.style.background = 'transparent'
+              }
+            }}
+          >
+            <span style={{ flexShrink: 0 }}><Icon size={17}/></span>
+            {!collapsed && label}
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
 
 interface SidebarProps {
   profile: Profile | null
   onLinkClick?: () => void
 }
 
-const navGroups = [
-  {
-    label: 'WORKSPACE',
-    items: [
-      { href: '/dashboard', label: 'DASHBOARD' },
-      { href: '/my-team',   label: 'MY TEAM' },
-    ],
-  },
-  {
-    label: 'SCOUTING',
-    items: [
-      { href: '/opponents', label: 'OPPONENTS' },
-      { href: '/ai-coach',  label: 'AI SCOUT', badge: 'AI' },
-    ],
-  },
-  {
-    label: 'ACCOUNT',
-    items: [
-      { href: '/profile',  label: 'PROFILE' },
-      { href: '/settings', label: 'SETTINGS' },
-    ],
-  },
-]
-
-export const navLinks = [
-  { href: '/dashboard', label: 'DASHBOARD' },
-  { href: '/my-team',   label: 'MY TEAM' },
-  { href: '/opponents', label: 'OPPONENTS' },
-  { href: '/ai-coach',  label: 'AI SCOUT' },
-  { href: '/profile',   label: 'PROFILE' },
-  { href: '/settings',  label: 'SETTINGS' },
-]
-
-/** Shared nav list used by MobileMenu (mobile drawer). */
-export function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
-  const pathname = usePathname()
-  return (
-    <div className="flex flex-col gap-4">
-      {navGroups.map(({ label, items }) => (
-        <div key={label}>
-          <div
-            style={{
-              fontFamily: 'var(--font-pixel), monospace',
-              fontSize: '6px',
-              letterSpacing: '0.12em',
-              color: '#5a2880',
-              padding: '0 8px 6px 8px',
-              textTransform: 'uppercase',
-            }}
-          >
-            {label}
-          </div>
-          {items.map(({ href, label: itemLabel, badge }) => {
-            const isActive = pathname === href || pathname.startsWith(href + '/')
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={onLinkClick}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 10px',
-                  fontFamily: 'var(--font-pixel), monospace',
-                  fontSize: '7px',
-                  letterSpacing: '0.08em',
-                  textDecoration: 'none',
-                  borderLeft: isActive ? '4px solid #ff00cc' : '4px solid transparent',
-                  background: isActive ? 'rgba(255, 0, 204, 0.12)' : 'transparent',
-                  color: isActive ? '#ff00cc' : '#9060c8',
-                  transition: 'background 120ms ease, color 120ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'rgba(255, 0, 204, 0.06)'
-                    e.currentTarget.style.color = '#f0e0ff'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'transparent'
-                    e.currentTarget.style.color = '#9060c8'
-                  }
-                }}
-              >
-                {isActive && (
-                  <span style={{ color: '#ff00cc', marginRight: '2px' }}>►</span>
-                )}
-                <span>{itemLabel}</span>
-                {badge && (
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-pixel), monospace',
-                      fontSize: '5px',
-                      background: 'linear-gradient(90deg, #ff00cc, #00aaff)',
-                      color: '#000',
-                      padding: '2px 4px',
-                      marginLeft: '2px',
-                      letterSpacing: '0.05em',
-                    }}
-                  >
-                    {badge}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
+export default function Sidebar({ profile }: SidebarProps) {
   const router = useRouter()
+  const [collapsed, setCollapsed] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const W = collapsed ? 62 : 200
 
   const handleLogout = async () => {
     setLoggingOut(true)
@@ -139,198 +95,127 @@ export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
   }
 
   const displayName = profile?.display_name || profile?.username || 'Player'
-  const initials = displayName
-    .split(' ')
-    .map((w: string) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+  const initials = displayName[0].toUpperCase()
 
   return (
     <aside
       className="hidden md:flex flex-col h-full shrink-0"
       style={{
-        width: '224px',
-        background: '#0f0420',
-        borderRight: '3px solid #2d0d55',
-        boxShadow: '4px 0 0 #000',
+        width: W,
+        minWidth: W,
+        background: 'rgba(6,5,18,0.97)',
+        borderRight: '1px solid rgba(255,255,255,0.07)',
+        position: 'relative',
+        zIndex: 10,
+        transition: 'width 0.22s ease, min-width 0.22s ease',
       }}
     >
       {/* Logo */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '0 14px',
-          height: '56px',
-          borderBottom: '3px solid #2d0d55',
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            width: '28px',
-            height: '28px',
-            background: 'linear-gradient(90deg, #ff00cc, #00aaff)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: 'var(--font-pixel), monospace',
-              fontSize: '10px',
-              color: '#000',
-              fontWeight: 400,
-              lineHeight: 1,
-            }}
-          >
-            R
-          </span>
-        </div>
-        <span
-          style={{
-            fontFamily: 'var(--font-pixel), monospace',
-            fontSize: '8px',
-            color: '#f0e0ff',
-            letterSpacing: '0.12em',
-            userSelect: 'none',
-          }}
-        >
-          RIVALIZE
-        </span>
+      <div style={{ padding: '18px 16px 12px' }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+            background: 'linear-gradient(135deg, #ff2d78 0%, #9b1dff 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 16px rgba(255,45,120,0.5)',
+          }}>
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none">
+              <path d="M4 3h8L9 9h7L7 18l2-6H5L4 3z" fill="white"/>
+            </svg>
+          </div>
+          {!collapsed && (
+            <span style={{
+              fontFamily: 'var(--font-sora, Sora), sans-serif',
+              fontWeight: 800, fontSize: 16, color: '#fff', letterSpacing: '0.05em',
+            }}>
+              RIVALIZE
+            </span>
+          )}
+        </Link>
       </div>
 
+      {/* Collapse toggle */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        style={{
+          position: 'absolute', top: 20, right: -11,
+          width: 22, height: 22, borderRadius: '50%',
+          background: '#14142a', border: '1px solid rgba(255,255,255,0.18)',
+          color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 20, padding: 0,
+        }}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {collapsed ? <ChevronRight size={11}/> : <ChevronLeft size={11}/>}
+      </button>
+
       {/* Navigation */}
-      <nav className="flex-1 py-4 overflow-y-auto" style={{ padding: '14px 0' }}>
-        <SidebarNav onLinkClick={onLinkClick} />
+      <nav style={{ flex: 1, padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <SidebarNav collapsed={collapsed}/>
       </nav>
 
       {/* User section */}
-      <div
-        style={{
-          borderTop: '3px solid #2d0d55',
-          padding: '10px',
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 4px' }}>
-          {/* Avatar */}
-          {profile?.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={profile.avatar_url}
-              alt={displayName}
-              style={{
-                width: '28px',
-                height: '28px',
-                objectFit: 'cover',
-                border: '3px solid #00aaff',
-                flexShrink: 0,
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: '28px',
-                height: '28px',
-                background: 'rgba(0, 170, 255, 0.15)',
-                border: '3px solid #00aaff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <span
+      <div style={{ padding: '10px 8px 14px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        {!collapsed && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 12px 8px' }}>
+            {profile?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.avatar_url}
+                alt={displayName}
                 style={{
-                  fontFamily: 'var(--font-pixel), monospace',
-                  fontSize: '7px',
-                  color: '#00aaff',
+                  width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0,
+                  border: '2px solid rgba(255,45,120,0.45)',
                 }}
-              >
+              />
+            ) : (
+              <div style={{
+                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(255,45,120,0.16)', border: '2px solid rgba(255,45,120,0.45)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-sora, Sora), sans-serif',
+                fontWeight: 700, fontSize: 13, color: '#ff2d78',
+              }}>
                 {initials}
-              </span>
-            </div>
-          )}
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <p
-              style={{
-                fontFamily: 'var(--font-pixel), monospace',
-                fontSize: '7px',
-                color: '#f0e0ff',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                letterSpacing: '0.06em',
-              }}
-            >
-              {displayName.toUpperCase()}
-            </p>
-            {profile?.username && (
-              <p
-                style={{
-                  fontSize: '10px',
-                  color: '#5a2880',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  marginTop: '2px',
-                }}
-              >
-                @{profile.username}
-              </p>
+              </div>
             )}
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontSize: 13, fontWeight: 600, color: '#fff',
+                fontFamily: 'var(--font-inter, Inter), sans-serif',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {displayName}
+              </div>
+              {profile?.username && (
+                <div style={{
+                  fontSize: 11, color: 'rgba(255,255,255,0.36)',
+                  fontFamily: 'var(--font-inter, Inter), sans-serif',
+                }}>
+                  @{profile.username}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-
+        )}
         <button
           onClick={handleLogout}
           disabled={loggingOut}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            width: '100%',
-            padding: '7px 10px',
-            fontFamily: 'var(--font-pixel), monospace',
-            fontSize: '7px',
-            letterSpacing: '0.1em',
-            color: '#9060c8',
-            background: 'transparent',
-            border: '3px solid #2d0d55',
-            boxShadow: '3px 3px 0 #000',
-            cursor: loggingOut ? 'not-allowed' : 'pointer',
-            opacity: loggingOut ? 0.5 : 1,
-            transition: 'color 120ms ease, border-color 120ms ease',
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+            padding: collapsed ? '8px 0' : '7px 12px',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            borderRadius: 7, background: 'transparent', border: 'none',
+            color: 'rgba(255,255,255,0.33)', cursor: loggingOut ? 'not-allowed' : 'pointer',
+            fontFamily: 'var(--font-inter, Inter), sans-serif', fontSize: 13,
+            outline: 'none', opacity: loggingOut ? 0.5 : 1, transition: 'color 0.12s',
           }}
-          onMouseEnter={(e) => {
-            if (!loggingOut) {
-              e.currentTarget.style.color = '#ff0066'
-              e.currentTarget.style.borderColor = '#ff0066'
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = '#9060c8'
-            e.currentTarget.style.borderColor = '#2d0d55'
-          }}
-          onMouseDown={(e) => {
-            e.currentTarget.style.boxShadow = '1px 1px 0 #000'
-            e.currentTarget.style.transform = 'translate(2px, 2px)'
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.boxShadow = '3px 3px 0 #000'
-            e.currentTarget.style.transform = 'none'
-          }}
+          onMouseEnter={e => { if (!loggingOut) e.currentTarget.style.color = 'rgba(255,255,255,0.6)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.33)' }}
         >
-          {loggingOut ? 'EXITING...' : 'EXIT'}
+          <LogOut size={16}/>
+          {!collapsed && (loggingOut ? 'Signing out…' : 'Sign out')}
         </button>
       </div>
     </aside>
