@@ -36,19 +36,35 @@ function isValidDemoFile(name: string) {
   return lower.endsWith('.dem') || lower.endsWith('.zst')
 }
 
-function uploadToR2(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
+function uploadViaServer(
+  file: File,
+  params: { teamId: string; opponentName: string; demoType: string },
+  onProgress: (pct: number) => void,
+): Promise<{ id: string }> {
   return new Promise((resolve, reject) => {
+    const url = new URL('/api/demos/upload', window.location.origin)
+    url.searchParams.set('teamId', params.teamId)
+    url.searchParams.set('filename', file.name)
+    url.searchParams.set('opponentName', params.opponentName)
+    url.searchParams.set('demoType', params.demoType)
+
     const xhr = new XMLHttpRequest()
-    xhr.open('PUT', url)
+    xhr.open('POST', url.toString())
     xhr.setRequestHeader('Content-Type', 'application/octet-stream')
     xhr.upload.addEventListener('progress', e => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
     })
     xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else reject(new Error(`R2 upload failed: HTTP ${xhr.status}`))
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)) }
+        catch { reject(new Error('Invalid server response')) }
+      } else {
+        let msg = `Upload failed (${xhr.status})`
+        try { msg = JSON.parse(xhr.responseText).error ?? msg } catch { /* ignore */ }
+        reject(new Error(msg))
+      }
     })
-    xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
+    xhr.addEventListener('error', () => reject(new Error('Network error — check your connection')))
     xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
     xhr.send(file)
   })
@@ -95,53 +111,21 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
       prev.map(u => u.status === 'error' ? { ...u, status: 'pending', progress: 0, error: undefined } : u)
     )
 
-  // ── Per-file upload (presign → R2 → register → fire-and-forget parse) ────────
+  // ── Per-file upload (server proxy → register + parse in one call) ─────────────
 
   const uploadOne = async (i: number, file: File): Promise<void> => {
     try {
-      updateUpload(i, { status: 'presigning', progress: 2 })
+      updateUpload(i, { status: 'uploading', progress: 0 })
 
-      const presignRes = await fetch('/api/demos/presign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId, filename: file.name, fileSize: file.size }),
-      })
-      if (!presignRes.ok) {
-        const err = await presignRes.json().catch(() => ({}))
-        throw new Error(err.error ?? `Presign failed (${presignRes.status})`)
-      }
-      const { key, uploadUrl } = await presignRes.json()
+      const demo = await uploadViaServer(
+        file,
+        { teamId, opponentName: demoType === 'self' ? 'My Team' : opponentName.trim(), demoType },
+        pct => updateUpload(i, { progress: pct }),
+      )
 
-      updateUpload(i, { status: 'uploading', progress: 5 })
-      await uploadToR2(uploadUrl, file, pct => {
-        // Map 0–100% upload progress to 5–90% overall
-        updateUpload(i, { progress: 5 + Math.round(pct * 0.85) })
-      })
-
-      updateUpload(i, { progress: 95, status: 'registering' })
-
-      const registerRes = await fetch('/api/demos/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teamId,
-          r2Key: key,
-          opponentName: demoType === 'self' ? 'My Team' : opponentName.trim(),
-          map: 'unknown',
-          fileSize: file.size,
-          demoType,
-          ...(demoType === 'self' && { opponentSide: 'team1' }),
-        }),
-      })
-      if (!registerRes.ok) {
-        const err = await registerRes.json().catch(() => ({}))
-        throw new Error(err.error ?? `Register failed (${registerRes.status})`)
-      }
-
-      const demo = await registerRes.json()
+      updateUpload(i, { progress: 100, status: 'registering' })
 
       // Fire-and-forget: kick off parsing without blocking the UI.
-      // Demo cards update via their own polling/realtime subscription.
       fetch(`/api/demos/${demo.id}/parse`, { method: 'POST' }).catch(() => {})
 
       updateUpload(i, { status: 'queued', progress: 100, demoId: demo.id })
@@ -197,7 +181,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   const statusLabel = (u: FileUpload) => {
     switch (u.status) {
       case 'presigning':  return 'Preparing…'
-      case 'uploading':   return `Uploading ${u.progress > 5 ? `${u.progress - 5}%` : '…'}`
+      case 'uploading':   return `Uploading ${u.progress > 0 ? `${u.progress}%` : '…'}`
       case 'registering': return 'Saving…'
       case 'queued':      return 'Queued for parsing'
       case 'error':       return u.error ?? 'Failed'
