@@ -1,14 +1,11 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
 
-// Handles both PKCE (?code=) and implicit flow (#access_token=) callbacks.
-// createBrowserClient automatically detects and processes both formats,
-// so we just wait for the session to be established then redirect.
-export default function AuthCallbackPage() {
+function AuthCallbackInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/dashboard'
@@ -27,7 +24,6 @@ export default function AuthCallbackPage() {
       }
     })
 
-    // Also check immediately in case the session was already established
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (handled.current) return
       if (session) {
@@ -37,7 +33,6 @@ export default function AuthCallbackPage() {
       }
     })
 
-    // Timeout fallback — if no session after 5 s, something went wrong
     const timeout = setTimeout(() => {
       if (!handled.current) {
         handled.current = true
@@ -52,9 +47,16 @@ export default function AuthCallbackPage() {
     }
   }, [next, router])
 
+  return null
+}
+
+export default function AuthCallbackPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Loader2 className="animate-spin text-[#00ff87]" size={32} />
+      <Suspense>
+        <AuthCallbackInner />
+      </Suspense>
     </div>
   )
 }
