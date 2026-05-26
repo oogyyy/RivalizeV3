@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useChat } from 'ai/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,6 +11,7 @@ import {
   Target, Crosshair, Shield, Users,
   Sparkles, MessageSquare, ChevronRight, ExternalLink, Database,
   SlidersHorizontal, X, ChevronDown, BarChart3, AlertCircle, RefreshCw,
+  BookOpen,
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
 import { CS2_MAPS } from '@/types/database'
@@ -164,6 +166,7 @@ function TypingIndicator() {
 }
 
 export default function AIScoutPage() {
+  const router = useRouter()
   const [mode, setMode] = useState<Mode>('opponent')
   const [opponents, setOpponents] = useState<TeamFolder[]>([])
   const [selectedFolderId, setSelectedFolderId] = useState<string>('')
@@ -499,6 +502,32 @@ export default function AIScoutPage() {
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Playbook builder CTA */}
+          {(focusArea === 'strategy' || focusArea === 'executes') && (
+            <div className="border-t border-border pt-4">
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams()
+                  if (selectedMap) params.set('map', selectedMap)
+                  if (myTeamId)    params.set('team', myTeamId)
+                  router.push(`/playbook?${params.toString()}`)
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-[rgba(0,255,200,0.25)] bg-[rgba(0,255,200,0.05)] hover:border-[rgba(0,255,200,0.45)] hover:bg-[rgba(0,255,200,0.08)] text-left transition-all group"
+              >
+                <div className="w-7 h-7 rounded flex items-center justify-center shrink-0 bg-[rgba(0,255,200,0.12)] group-hover:bg-[rgba(0,255,200,0.18)] transition-colors">
+                  <BookOpen size={13} className="text-[#00ffc8]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#00ffc8]">Build a Playbook</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {selectedMap ? `Create a saved ${selectedMap} playbook` : 'Create a structured playbook with AI'}
+                  </p>
+                </div>
+                <ChevronRight size={13} className="text-[#00ffc8]/50 group-hover:text-[#00ffc8] group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
             </div>
           )}
 
