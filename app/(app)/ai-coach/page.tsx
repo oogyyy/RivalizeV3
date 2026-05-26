@@ -48,6 +48,64 @@ const MY_TEAM_QUESTIONS = [
   { label: 'Build our playbook',     prompt: "Help us build a structured T-side and CT-side playbook with clear roles and go-to strategies." },
 ]
 
+const FOLLOW_UP_PROMPTS: Record<string, { label: string; prompt: string }[]> = {
+  'opponent/general': [
+    { label: 'Biggest weaknesses',  prompt: "What are their biggest weaknesses we can exploit in the match?" },
+    { label: 'Key threat players',  prompt: "Who are the most dangerous players on this roster and how do we neutralise them?" },
+    { label: 'Map bans advice',     prompt: "Based on this data, which maps should we ban and which should we pick?" },
+  ],
+  'opponent/weakness': [
+    { label: 'Best round to force', prompt: "Which round type do they lose most often and how do we set that situation up?" },
+    { label: 'Utility counters',    prompt: "What specific utility lineups counter their T-side entry patterns?" },
+    { label: 'CT rotation baits',   prompt: "How can we bait their CT rotations to create late-round advantages?" },
+  ],
+  'opponent/antistrat': [
+    { label: 'Counter their AWP',   prompt: "How do we play around their AWP positions — angles, timings, and smokes?" },
+    { label: 'Fake response',       prompt: "What's their likely CT response when we fake one site — how do we punish the rotate?" },
+    { label: 'Eco counter',         prompt: "What's the best way to play against their eco rounds — where do they peek and with what?" },
+  ],
+  'opponent/strategy': [
+    { label: 'Utility for this map', prompt: "What are the 3 most important utility lineups we need ready for this map?" },
+    { label: 'CT anchor positions',  prompt: "Where should our CT anchors hold to maximise time against their common executes?" },
+    { label: 'T-side timing reads',  prompt: "Based on their T-side timings, where should we be positioned at key seconds?" },
+  ],
+  'opponent/player': [
+    { label: 'Shut this player down', prompt: "Give me a specific game plan to limit this player's impact throughout the match." },
+    { label: 'Their weakest spots',   prompt: "In what situations does this player struggle most and how do we force those?" },
+    { label: 'Positioning habits',    prompt: "What are this player's most predictable positions and timings?" },
+  ],
+  'myteam/general': [
+    { label: 'This week\'s priority', prompt: "Based on our demos, what's the single most impactful thing to fix this week?" },
+    { label: 'Weakest map',           prompt: "Which map in our pool has the most issues and what are the top problems on it?" },
+    { label: 'T-side improvements',   prompt: "What specific changes would most improve our T-side consistency?" },
+  ],
+  'myteam/weakness': [
+    { label: 'Fix it with a drill',   prompt: "Create a concrete drill or scenario we can practice to fix our biggest weakness." },
+    { label: 'Economy mistakes',      prompt: "Are we making any patterns of economic mistakes — bad force buys, over-saving, mismanaged eco rounds?" },
+    { label: 'CT retake issues',      prompt: "How can we improve our CT-side retakes — positioning, utility, and communication?" },
+  ],
+  'myteam/executes': [
+    { label: 'Best execute to build',  prompt: "Which of our site executes has the highest success rate and how can we develop it further?" },
+    { label: 'Post-plant positioning', prompt: "How should we position after planting to win more post-plant rounds?" },
+    { label: 'Utility sequence',       prompt: "Walk me through the ideal utility order for our most-used execute." },
+  ],
+  'myteam/rounds': [
+    { label: 'Pistol round fixes',  prompt: "What adjustments would improve our pistol round win rate on both sides?" },
+    { label: 'Eco round wins',      prompt: "How can we win more eco rounds — what setups and plays give us the best odds?" },
+    { label: 'Clutch improvement',  prompt: "What patterns do we have in clutch situations and how do we improve our clutch win rate?" },
+  ],
+  'myteam/drills': [
+    { label: 'Warm-up routine',       prompt: "Design a 30-minute warm-up routine we should run before every scrim session." },
+    { label: 'Role-specific training', prompt: "What should each player role (entry, AWP, support, lurk) focus on individually?" },
+    { label: 'Team practice workshop', prompt: "Design a team practice session focused on our worst-performing area." },
+  ],
+  'myteam/strategy': [
+    { label: 'A site default',      prompt: "Help us build a solid A site CT default with clear responsibilities for each player." },
+    { label: 'T-side default',      prompt: "Design a structured T-side default — what's everyone's role and where do we gather info?" },
+    { label: 'Mid-round calling',   prompt: "What mid-round calling structure would help us adapt better to CT reads?" },
+  ],
+}
+
 function MarkdownContent({ content }: { content: string }) {
   const rendered = content.split('\n').map((line, i) => {
     if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold text-foreground mt-4 mb-2">{line.slice(4)}</h3>
@@ -256,6 +314,10 @@ export default function AIScoutPage() {
   // useChat streams into the last assistant message live — show cursor while loading and last msg is assistant
   const lastMsg     = messages[messages.length - 1]
   const isThinking  = isLoading && (!lastMsg || lastMsg.role === 'user')
+
+  const followUpKey    = `${mode}/${focusArea}`
+  const followUpChips  = FOLLOW_UP_PROMPTS[followUpKey] ?? []
+  const showFollowUps  = !isLoading && !error && lastMsg?.role === 'assistant' && followUpChips.length > 0
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -641,6 +703,26 @@ export default function AIScoutPage() {
                   </div>
                 )
               })}
+
+              {/* Follow-up suggestion chips */}
+              {showFollowUps && (
+                <div className="flex flex-wrap gap-2 pl-11 pb-2">
+                  {followUpChips.map(chip => (
+                    <button
+                      key={chip.label}
+                      onClick={() => sendMessage(chip.prompt)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all',
+                        'border-[rgba(0,255,200,0.2)] text-muted-foreground bg-[rgba(0,255,200,0.04)]',
+                        'hover:border-[rgba(0,255,200,0.45)] hover:text-[#00ffc8] hover:bg-[rgba(0,255,200,0.08)]',
+                      )}
+                    >
+                      <Sparkles size={10} className="text-[#00ffc8] shrink-0" />
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Typing indicator — shows while waiting for the first streaming token */}
               {isThinking && <TypingIndicator />}
