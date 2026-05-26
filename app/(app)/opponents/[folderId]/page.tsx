@@ -11,7 +11,7 @@ import DeleteFolderButton from '@/components/teams/DeleteFolderButton'
 import OpponentDemoList from '@/components/teams/OpponentDemoList'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
-  Crosshair, MapPin, TrendingUp, ExternalLink,
+  Crosshair, MapPin, TrendingUp, ExternalLink, FileText,
 } from 'lucide-react'
 import type { AggregatedStats, PlayerStats } from '@/types/database'
 
@@ -160,6 +160,13 @@ export default async function OpponentPage({
                   <span className="sm:hidden">Pro Plays</span>
                 </Button>
               </a>
+              <Link href={`/prep/${folderId}`}>
+                <Button variant="secondary" className="gap-2">
+                  <FileText size={15} />
+                  <span className="hidden sm:inline">Match Prep</span>
+                  <span className="sm:hidden">Prep</span>
+                </Button>
+              </Link>
               <Link href={`/ai-coach?team=${teamId}&folder=${folderId}`}>
                 <Button variant="neon" className="gap-2">
                   <Brain size={16} />
