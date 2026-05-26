@@ -113,11 +113,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Generate a magic link to establish a browser session, then redirect to dashboard
+  // Generate a magic link. Supabase verifies the token then redirects to redirectTo
+  // with a code param. Routing through /auth/callback lets that route exchange the
+  // code for a session cookie before the middleware checks authentication.
   const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email: userEmail,
-    options: { redirectTo: `${appUrl}/dashboard` },
+    options: { redirectTo: `${appUrl}/auth/callback?next=/dashboard` },
   })
 
   if (linkError || !linkData) {
