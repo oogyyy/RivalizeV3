@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { createOpenAI } from '@ai-sdk/openai'
 import { streamText } from 'ai'
 import { z } from 'zod'
+import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 
 type DemoParsedData = {
   header?: {
@@ -15,15 +16,131 @@ type DemoParsedData = {
     total_rounds?: number
   }
   opponentSide?: string
-  players?: Array<{
-    name: string
-    team: string
-    kills: number
-    deaths: number
-    assists: number
-    rating: number
-    adr: number
-  }>
+  players?: PlayerStats[]
+  rounds?: Round[]
+}
+
+function summarizeTactics(rounds: Round[], players: PlayerStats[]): string {
+  if (!rounds || rounds.length === 0) return ''
+
+  const lines: string[] = []
+
+  // ── Grenade usage ─────────────────────────────────────────────────────────
+  const grenadesByType: Record<string, number> = {}
+  const grenadesByPlayer: Record<string, number> = {}
+  let earlyNades = 0, midNades = 0, lateNades = 0
+
+  rounds.forEach(r => {
+    (r.grenades ?? []).forEach((g: GrenadeEvent) => {
+      grenadesByType[g.type] = (grenadesByType[g.type] ?? 0) + 1
+      grenadesByPlayer[g.thrower] = (grenadesByPlayer[g.thrower] ?? 0) + 1
+      if (g.time <= 30) earlyNades++
+      else if (g.time <= 60) midNades++
+      else lateNades++
+    })
+  })
+
+  const totalNades = Object.values(grenadesByType).reduce((a, b) => a + b, 0)
+  if (totalNades > 0) {
+    const nadeParts = (['smoke', 'flash', 'he', 'molotov', 'decoy'] as const)
+      .filter(t => grenadesByType[t])
+      .map(t => `${grenadesByType[t]} ${t}s`)
+      .join(', ')
+    lines.push(`Grenade usage: ${nadeParts}`)
+
+    const topThrowers = Object.entries(grenadesByPlayer)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, count]) => `${name} (${count})`)
+      .join(', ')
+    if (topThrowers) lines.push(`Top utility users: ${topThrowers}`)
+
+    const totalTimedNades = earlyNades + midNades + lateNades
+    if (totalTimedNades > 0) {
+      const earlyPct = Math.round((earlyNades / totalTimedNades) * 100)
+      const midPct   = Math.round((midNades   / totalTimedNades) * 100)
+      lines.push(`Grenade timing: ${earlyPct}% in first 30s, ${midPct}% mid-round, ${100 - earlyPct - midPct}% late`)
+    }
+  }
+
+  // ── Kill patterns ─────────────────────────────────────────────────────────
+  const allKills: Kill[] = rounds.flatMap(r => r.kills ?? [])
+  if (allKills.length > 0) {
+    const weaponCounts: Record<string, number> = {}
+    let headshots = 0
+    let totalFightDist = 0
+    const firstBloodTimes: number[] = []
+
+    rounds.forEach(r => {
+      if (r.kills && r.kills.length > 0) firstBloodTimes.push(r.kills[0].time)
+    })
+
+    allKills.forEach((k: Kill) => {
+      const cat = k.weapon.includes('awp') ? 'AWP'
+        : ['ak47','m4a4','m4a1','rifle','sg553','famas','galil','aug'].some(w => k.weapon.includes(w)) ? 'Rifle'
+        : ['mp9','mp5','mac10','ump','p90','mp7','bizon'].some(w => k.weapon.includes(w)) ? 'SMG'
+        : ['glock','usp','p250','deagle','cz75','r8','tec9','five7','dualies'].some(w => k.weapon.includes(w)) ? 'Pistol'
+        : 'Other'
+      weaponCounts[cat] = (weaponCounts[cat] ?? 0) + 1
+      if (k.headshot) headshots++
+      const dx = k.killer_x - k.victim_x
+      const dy = k.killer_y - k.victim_y
+      totalFightDist += Math.sqrt(dx * dx + dy * dy)
+    })
+
+    const weaponLine = ['Rifle', 'AWP', 'Pistol', 'SMG', 'Other']
+      .filter(c => weaponCounts[c])
+      .map(c => `${c} ${Math.round((weaponCounts[c] / allKills.length) * 100)}%`)
+      .join(', ')
+    lines.push(`Kill weapons: ${weaponLine}`)
+    lines.push(`Overall headshot rate: ${Math.round((headshots / allKills.length) * 100)}%`)
+
+    const avgDist = Math.round(totalFightDist / allKills.length)
+    const distLabel = avgDist < 300 ? 'close-range' : avgDist < 800 ? 'mid-range' : 'long-range'
+    lines.push(`Avg fight distance: ${avgDist} units (${distLabel})`)
+
+    if (firstBloodTimes.length > 0) {
+      const avgFB = Math.round(firstBloodTimes.reduce((a, b) => a + b, 0) / firstBloodTimes.length)
+      lines.push(`Avg first blood time: ${avgFB}s (${avgFB < 15 ? 'very aggressive early entry' : avgFB < 25 ? 'standard aggression' : 'patient/defensive play'})`)
+    }
+  }
+
+  // ── Economy ───────────────────────────────────────────────────────────────
+  const economies = rounds.flatMap(r => [r.team1_economy, r.team2_economy]).filter(e => e != null && e > 0)
+  if (economies.length > 0) {
+    const avgEcon = Math.round(economies.reduce((a, b) => a + b, 0) / economies.length)
+    const ecoRounds   = economies.filter(e => e < 2000).length
+    const forceRounds = economies.filter(e => e >= 2000 && e < 4000).length
+    const fullRounds  = economies.filter(e => e >= 4000).length
+    const total = ecoRounds + forceRounds + fullRounds
+    lines.push(`Economy: avg ${avgEcon} — Full buy ${Math.round((fullRounds / total) * 100)}% | Force ${Math.round((forceRounds / total) * 100)}% | Eco ${Math.round((ecoRounds / total) * 100)}%`)
+  }
+
+  // ── Bomb events ───────────────────────────────────────────────────────────
+  const tRounds = rounds.filter(r => r.kills && r.kills.length > 0)
+  const plants  = rounds.filter(r => r.bomb_planted).length
+  const defuses = rounds.filter(r => r.bomb_defused).length
+  if (plants > 0) {
+    lines.push(`Bomb planted: ${plants}/${tRounds.length} T-side rounds (${Math.round((plants / Math.max(tRounds.length, 1)) * 100)}%)`)
+    lines.push(`Bomb defused: ${defuses}/${plants} plants (${Math.round((defuses / plants) * 100)}% defuse rate)`)
+  }
+
+  // ── Enhanced player stats ─────────────────────────────────────────────────
+  const richStats = (players ?? []).filter(p => p.kast !== undefined || p.headshot_percentage !== undefined)
+  if (richStats.length > 0) {
+    lines.push('Player details (HS% / KAST / utility dmg):')
+    richStats
+      .sort((a, b) => b.rating - a.rating)
+      .slice(0, 5)
+      .forEach(p => {
+        const hs   = p.headshot_percentage != null ? ` HS%${Math.round(p.headshot_percentage)}` : ''
+        const kast = p.kast != null               ? ` KAST${Math.round(p.kast * 100)}%`         : ''
+        const ud   = p.utility_damage             ? ` UD${p.utility_damage}`                     : ''
+        lines.push(`  ${p.name}: ${p.kills}/${p.deaths}/${p.assists} Rtg${p.rating.toFixed(2)} ADR${p.adr.toFixed(0)}${hs}${kast}${ud}`)
+      })
+  }
+
+  return lines.join('\n')
 }
 
 const bodySchema = z.object({
@@ -113,6 +230,8 @@ export async function POST(request: Request) {
               contextText += `My team players:\n${sorted.map(p => `  ${p.name}: ${p.kills}/${p.deaths}/${p.assists}, Rating ${p.rating.toFixed(2)}, ADR ${p.adr.toFixed(1)}`).join('\n')}\n`
             }
           }
+          const tactics = summarizeTactics(pd?.rounds ?? [], pd?.players ?? [])
+          if (tactics) contextText += `Tactical data:\n${tactics}\n`
         }
       })
     }
@@ -179,6 +298,8 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
                   .join('\n')
                 contextText += `Top performers:\n${topPlayers}\n`
               }
+              const tactics = summarizeTactics(pd?.rounds ?? [], pd?.players ?? [])
+              if (tactics) contextText += `Tactical data:\n${tactics}\n`
             }
           })
         }
