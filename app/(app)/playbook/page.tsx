@@ -20,7 +20,12 @@ type PlaybookMeta = {
 }
 
 type Team     = { id: string; name: string }
-type Opponent = { id: string; opponent_display_name: string; opponent_slug: string }
+type Opponent = {
+  id: string
+  opponent_display_name: string
+  opponent_slug: string
+  aggregated_stats: { maps_played?: Record<string, number> } | null
+}
 
 function PlaybookListInner() {
   const router       = useRouter()
@@ -55,6 +60,22 @@ function PlaybookListInner() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedOpponent = opponents.find(o => o.id === selectedFolder)
+
+  // Maps with demos for the selected opponent, sorted by most played
+  const opponentMaps: string[] = selectedOpponent
+    ? Object.entries(selectedOpponent.aggregated_stats?.maps_played ?? {})
+        .sort((a, b) => b[1] - a[1])
+        .map(([map]) => map)
+    : []
+
+  // Reset map if it's not in the opponent's available maps
+  useEffect(() => {
+    if (selectedOpponent && opponentMaps.length > 0 && newMap && !opponentMaps.includes(newMap)) {
+      setNewMap(opponentMaps[0])
+    }
+  }, [selectedFolder]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const availableMaps = selectedOpponent ? opponentMaps : CS2_MAPS
 
   const handleCreate = async () => {
     if (!newMap || !selectedTeam) return
@@ -115,15 +136,34 @@ function PlaybookListInner() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Map</label>
-              <select
-                value={newMap}
-                onChange={e => setNewMap(e.target.value)}
-                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
-              >
-                <option value="">Select map…</option>
-                {CS2_MAPS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+              <label className="text-xs text-muted-foreground mb-1 block">
+                Map
+                {selectedOpponent && opponentMaps.length > 0 && (
+                  <span className="ml-1.5 text-[#00ffc8]/70">
+                    — {opponentMaps.length} map{opponentMaps.length !== 1 ? 's' : ''} with demos
+                  </span>
+                )}
+              </label>
+              {selectedOpponent && opponentMaps.length === 0 ? (
+                <div className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-muted-foreground">
+                  No demos uploaded for this opponent yet
+                </div>
+              ) : (
+                <select
+                  value={newMap}
+                  onChange={e => setNewMap(e.target.value)}
+                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
+                >
+                  <option value="">Select map…</option>
+                  {availableMaps.map(m => (
+                    <option key={m} value={m}>
+                      {m}{selectedOpponent && selectedOpponent.aggregated_stats?.maps_played?.[m]
+                        ? ` (${selectedOpponent.aggregated_stats.maps_played[m]} demo${selectedOpponent.aggregated_stats.maps_played[m] !== 1 ? 's' : ''})`
+                        : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Name (optional)</label>
@@ -185,7 +225,7 @@ function PlaybookListInner() {
           )}
 
           <div className="flex gap-2 pt-1">
-            <Button variant="neon" size="sm" onClick={handleCreate} disabled={!newMap || creating} className="gap-1.5">
+            <Button variant="neon" size="sm" onClick={handleCreate} disabled={!newMap || creating || (!!selectedOpponent && opponentMaps.length === 0)} className="gap-1.5">
               {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
               {selectedOpponent ? 'Create Anti-Strat Playbook' : 'Create & Open'}
             </Button>
