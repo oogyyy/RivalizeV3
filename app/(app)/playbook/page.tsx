@@ -2,54 +2,75 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { BookOpen, Plus, Trash2, Loader2, Map } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { BookOpen, Plus, Trash2, Loader2, Map, Target, Swords } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CS2_MAPS } from '@/types/database'
 import { cn } from '@/lib/utils'
+import { Suspense } from 'react'
 
 type PlaybookMeta = {
   id: string
   team_id: string
   map: string
   name: string
+  opponent_name?: string | null
   created_at: string
   updated_at: string
 }
 
-type Team = { id: string; name: string }
+type Team     = { id: string; name: string }
+type Opponent = { id: string; opponent_display_name: string; opponent_slug: string }
 
-export default function PlaybookListPage() {
-  const router = useRouter()
-  const [playbooks, setPlaybooks] = useState<PlaybookMeta[]>([])
-  const [teams, setTeams] = useState<Team[]>([])
-  const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
-  const [showNew, setShowNew] = useState(false)
-  const [newMap, setNewMap] = useState('')
-  const [newName, setNewName] = useState('')
-  const [selectedTeam, setSelectedTeam] = useState('')
-  const [deleting, setDeleting] = useState<string | null>(null)
+function PlaybookListInner() {
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+
+  const [playbooks, setPlaybooks]     = useState<PlaybookMeta[]>([])
+  const [teams, setTeams]             = useState<Team[]>([])
+  const [opponents, setOpponents]     = useState<Opponent[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [creating, setCreating]       = useState(false)
+  const [showNew, setShowNew]         = useState(false)
+  const [newMap, setNewMap]           = useState(searchParams.get('map') ?? '')
+  const [newName, setNewName]         = useState('')
+  const [selectedTeam, setSelectedTeam]     = useState(searchParams.get('team') ?? '')
+  const [selectedFolder, setSelectedFolder] = useState('')
+  const [deleting, setDeleting]       = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
       fetch('/api/playbooks').then(r => r.ok ? r.json() : []),
       fetch('/api/teams').then(r => r.ok ? r.json() : []),
-    ]).then(([pbs, ts]) => {
+      fetch('/api/opponents').then(r => r.ok ? r.json() : []),
+    ]).then(([pbs, ts, ops]) => {
       setPlaybooks(pbs)
       setTeams(ts)
-      if (ts.length > 0) setSelectedTeam(ts[0].id)
+      setOpponents(ops)
+      if (!selectedTeam && ts.length > 0) setSelectedTeam(ts[0].id)
     }).finally(() => setLoading(false))
-  }, [])
+
+    // Auto-open create form if arriving from AI Scout CTA
+    if (searchParams.get('map')) setShowNew(true)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedOpponent = opponents.find(o => o.id === selectedFolder)
 
   const handleCreate = async () => {
     if (!newMap || !selectedTeam) return
     setCreating(true)
-    const name = newName.trim() || `${newMap} Playbook`
+    const opponentName = selectedOpponent?.opponent_display_name ?? null
+    const name = newName.trim() || (opponentName ? `vs ${opponentName} — ${newMap}` : `${newMap} Playbook`)
     const res = await fetch('/api/playbooks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamId: selectedTeam, map: newMap, name }),
+      body: JSON.stringify({
+        teamId:       selectedTeam,
+        map:          newMap,
+        name,
+        folderId:     selectedFolder || undefined,
+        opponentName: opponentName || undefined,
+      }),
     })
     if (res.ok) {
       const pb = await res.json()
@@ -78,12 +99,7 @@ export default function PlaybookListPage() {
             Build and save tactical playbooks for your team with AI assistance.
           </p>
         </div>
-        <Button
-          variant="neon"
-          size="sm"
-          onClick={() => setShowNew(true)}
-          className="gap-1.5"
-        >
+        <Button variant="neon" size="sm" onClick={() => setShowNew(true)} className="gap-1.5">
           <Plus size={15} />
           New Playbook
         </Button>
@@ -92,8 +108,12 @@ export default function PlaybookListPage() {
       {/* New playbook form */}
       {showNew && (
         <div className="mb-6 p-5 rounded-xl border border-[rgba(0,255,200,0.25)] bg-[rgba(0,255,200,0.04)]">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Create New Playbook</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <h2 className="text-sm font-semibold text-foreground mb-1">Create New Playbook</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Optionally link an opponent to generate targeted anti-strat tactics based on their uploaded demos.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Map</label>
               <select
@@ -110,27 +130,64 @@ export default function PlaybookListPage() {
               <input
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
-                placeholder={newMap ? `${newMap} Playbook` : 'Playbook name…'}
+                placeholder={
+                  selectedOpponent && newMap ? `vs ${selectedOpponent.opponent_display_name} — ${newMap}`
+                  : newMap ? `${newMap} Playbook` : 'Playbook name…'
+                }
                 className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
               />
             </div>
-            {teams.length > 1 && (
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Team</label>
-                <select
-                  value={selectedTeam}
-                  onChange={e => setSelectedTeam(e.target.value)}
-                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
-                >
-                  {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
+          </div>
+
+          {/* Opponent selector */}
+          <div className="mb-3">
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Anti-strat opponent <span className="text-muted-foreground/60">(optional)</span>
+            </label>
+            {opponents.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">
+                No opponents yet — <a href="/opponents" className="text-[#00ffc8] hover:underline">upload demos first</a> to enable anti-strat playbooks.
+              </p>
+            ) : (
+              <select
+                value={selectedFolder}
+                onChange={e => setSelectedFolder(e.target.value)}
+                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
+              >
+                <option value="">No opponent (general playbook)</option>
+                {opponents.map(o => (
+                  <option key={o.id} value={o.id}>{o.opponent_display_name}</option>
+                ))}
+              </select>
             )}
           </div>
-          <div className="flex gap-2">
+
+          {selectedOpponent && (
+            <div className="mb-3 px-3 py-2 rounded-md bg-orange-500/10 border border-orange-500/25 flex items-center gap-2">
+              <Target size={13} className="text-orange-400 shrink-0" />
+              <p className="text-xs text-orange-300">
+                AI will generate anti-strat content specifically countering <strong>{selectedOpponent.opponent_display_name}</strong> based on their uploaded demos.
+              </p>
+            </div>
+          )}
+
+          {teams.length > 1 && (
+            <div className="mb-3">
+              <label className="text-xs text-muted-foreground mb-1 block">Team</label>
+              <select
+                value={selectedTeam}
+                onChange={e => setSelectedTeam(e.target.value)}
+                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
+              >
+                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
             <Button variant="neon" size="sm" onClick={handleCreate} disabled={!newMap || creating} className="gap-1.5">
               {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-              Create & Open
+              {selectedOpponent ? 'Create Anti-Strat Playbook' : 'Create & Open'}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowNew(false)}>Cancel</Button>
           </div>
@@ -161,18 +218,33 @@ export default function PlaybookListPage() {
             <div
               key={pb.id}
               className={cn(
-                'group relative rounded-xl border border-border bg-card p-4 hover:border-[rgba(0,255,200,0.3)]',
-                'hover:bg-[rgba(0,255,200,0.02)] transition-all duration-150'
+                'group relative rounded-xl border bg-card p-4 transition-all duration-150',
+                pb.opponent_name
+                  ? 'border-orange-500/25 hover:border-orange-500/50 hover:bg-orange-500/[0.02]'
+                  : 'border-border hover:border-[rgba(0,255,200,0.3)] hover:bg-[rgba(0,255,200,0.02)]'
               )}
             >
               <Link href={`/playbook/${pb.id}`} className="block mb-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-[rgba(0,255,200,0.1)] border border-[rgba(0,255,200,0.2)] flex items-center justify-center">
-                    <Map size={14} className="text-[#00ffc8]" />
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <div className={cn(
+                    'w-8 h-8 rounded-lg border flex items-center justify-center shrink-0',
+                    pb.opponent_name
+                      ? 'bg-orange-500/10 border-orange-500/30'
+                      : 'bg-[rgba(0,255,200,0.1)] border-[rgba(0,255,200,0.2)]'
+                  )}>
+                    {pb.opponent_name ? <Swords size={14} className="text-orange-400" /> : <Map size={14} className="text-[#00ffc8]" />}
                   </div>
-                  <span className="text-[10px] font-mono text-[#00ffc8] bg-[rgba(0,255,200,0.08)] px-2 py-0.5 rounded">
+                  <span className={cn(
+                    'text-[10px] font-mono px-2 py-0.5 rounded',
+                    pb.opponent_name ? 'text-orange-400 bg-orange-500/10' : 'text-[#00ffc8] bg-[rgba(0,255,200,0.08)]'
+                  )}>
                     {pb.map}
                   </span>
+                  {pb.opponent_name && (
+                    <span className="text-[10px] font-medium text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20 flex items-center gap-1">
+                      <Target size={9} /> vs {pb.opponent_name}
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-sm font-semibold text-foreground group-hover:text-[#00ffc8] transition-colors truncate">
                   {pb.name}
@@ -193,5 +265,13 @@ export default function PlaybookListPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function PlaybookListPage() {
+  return (
+    <Suspense>
+      <PlaybookListInner />
+    </Suspense>
   )
 }

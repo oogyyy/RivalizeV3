@@ -6,7 +6,7 @@ import { useChat } from 'ai/react'
 import {
   BookOpen, Save, ArrowLeft, Sparkles, Loader2, CheckCircle2,
   Swords, Shield, Crosshair, Users, BarChart3, Coins,
-  Brain, Send, RotateCcw, AlertCircle, RefreshCw, Map, MessageSquare,
+  Brain, Send, RotateCcw, AlertCircle, RefreshCw, Map, MessageSquare, Target,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,13 +14,13 @@ import { cn } from '@/lib/utils'
 
 type SectionId = 't_side' | 'ct_side' | 'a_execute' | 'b_execute' | 'roles' | 'economy'
 
-const SECTIONS: { id: SectionId; label: string; icon: React.ReactNode; desc: string }[] = [
-  { id: 't_side',    label: 'T-Side Default',  icon: <Swords size={14} />,    desc: 'Default routes, info positions, timings' },
-  { id: 'ct_side',   label: 'CT-Side Default',  icon: <Shield size={14} />,    desc: 'Anchors, rotations, crossfires' },
-  { id: 'a_execute', label: 'A Site Execute',   icon: <Crosshair size={14} />, desc: 'Utility order, entry, post-plant' },
-  { id: 'b_execute', label: 'B Site Execute',   icon: <Crosshair size={14} />, desc: 'Utility order, entry, post-plant' },
-  { id: 'roles',     label: 'Role Assignments', icon: <Users size={14} />,     desc: 'Entry, AWP, support, lurk, IGL' },
-  { id: 'economy',   label: 'Economy Rules',    icon: <Coins size={14} />,     desc: 'Eco thresholds, force buy, weapons' },
+const SECTIONS: { id: SectionId; label: string; antiLabel: string; icon: React.ReactNode; desc: string; antiDesc: string }[] = [
+  { id: 't_side',    label: 'T-Side Default',    antiLabel: 'Attack Their CT Setup', icon: <Swords size={14} />,    desc: 'Default routes, info positions, timings',           antiDesc: 'Exploit their CT weaknesses on T side' },
+  { id: 'ct_side',   label: 'CT-Side Default',   antiLabel: 'Counter Their T Side',  icon: <Shield size={14} />,    desc: 'Anchors, rotations, crossfires',                   antiDesc: 'Shut down their T-side tendencies' },
+  { id: 'a_execute', label: 'A Site Execute',    antiLabel: 'Beat Their A Defence',  icon: <Crosshair size={14} />, desc: 'Utility order, entry, post-plant',                 antiDesc: 'Counter their A setup and retake' },
+  { id: 'b_execute', label: 'B Site Execute',    antiLabel: 'Beat Their B Defence',  icon: <Crosshair size={14} />, desc: 'Utility order, entry, post-plant',                 antiDesc: 'Counter their B setup and retake' },
+  { id: 'roles',     label: 'Role Assignments',  antiLabel: 'Counter Their Players', icon: <Users size={14} />,     desc: 'Entry, AWP, support, lurk, IGL',                  antiDesc: 'Roles tailored to neutralise their roster' },
+  { id: 'economy',   label: 'Economy Rules',     antiLabel: 'Economy Counter-Play',  icon: <Coins size={14} />,     desc: 'Eco thresholds, force buy, weapons',               antiDesc: 'Exploit their buy patterns and eco rounds' },
 ]
 
 type Playbook = {
@@ -30,6 +30,8 @@ type Playbook = {
   name: string
   sections: Record<string, string>
   notes?: string
+  folder_id?: string | null
+  opponent_name?: string | null
   created_at: string
   updated_at: string
 }
@@ -118,12 +120,21 @@ export default function PlaybookBuilderPage() {
   const pbNameRef  = useRef('')
   useEffect(() => { if (playbook) { mapRef.current = playbook.map; pbNameRef.current = pbName } }, [playbook, pbName])
 
+  const folderIdRef      = useRef<string | null | undefined>(null)
+  const opponentNameRef  = useRef<string | null | undefined>(null)
+  useEffect(() => {
+    if (playbook) {
+      folderIdRef.current     = playbook.folder_id
+      opponentNameRef.current = playbook.opponent_name
+    }
+  }, [playbook])
+
   const buildChatBody = useCallback(() => ({
     teamId:    myTeamId ?? undefined,
-    focusArea: 'strategy',
-    mode:      modeRef.current,
+    folderId:  folderIdRef.current ?? undefined,
+    focusArea: folderIdRef.current ? 'antistrat' : 'strategy',
+    mode:      folderIdRef.current ? ('opponent' as const) : modeRef.current,
     mapName:   mapRef.current,
-    playbookContext: `I'm building a playbook called "${pbNameRef.current}" for ${mapRef.current}.`,
   }), [myTeamId])
 
   const sendChat = useCallback((msg: string) => {
@@ -191,8 +202,11 @@ export default function PlaybookBuilderPage() {
     }
   }
 
+  const isAntistrat   = !!playbook?.opponent_name
   const activeContent = sections[activeSection] ?? ''
   const activeMeta    = SECTIONS.find(s => s.id === activeSection)!
+  const sectionLabel  = isAntistrat ? activeMeta.antiLabel : activeMeta.label
+  const sectionDesc   = isAntistrat ? activeMeta.antiDesc  : activeMeta.desc
   const lastChatMsg   = messages[messages.length - 1]
   const isThinking    = chatLoading && (!lastChatMsg || lastChatMsg.role === 'user')
 
@@ -228,6 +242,12 @@ export default function PlaybookBuilderPage() {
             <Map size={11} className="text-[#00ffc8]" />
             <span className="text-xs font-mono text-[#00ffc8]">{playbook?.map}</span>
           </div>
+          {isAntistrat && playbook?.opponent_name && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-orange-500/10 border border-orange-500/25">
+              <Target size={11} className="text-orange-400" />
+              <span className="text-xs font-medium text-orange-400">vs {playbook.opponent_name}</span>
+            </div>
+          )}
           {editing ? (
             <input
               value={pbName}
@@ -293,7 +313,7 @@ export default function PlaybookBuilderPage() {
                         {s.icon}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="truncate font-medium">{s.label}</p>
+                        <p className="truncate font-medium">{isAntistrat ? s.antiLabel : s.label}</p>
                       </div>
                       {isGenerating ? (
                         <Loader2 size={10} className="animate-spin text-[#00ffc8] shrink-0" />
@@ -312,10 +332,10 @@ export default function PlaybookBuilderPage() {
             {/* Section header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2">
-                <span className="text-[#00ffc8]">{activeMeta.icon}</span>
+                <span className={isAntistrat ? 'text-orange-400' : 'text-[#00ffc8]'}>{activeMeta.icon}</span>
                 <div>
-                  <h2 className="text-sm font-semibold text-foreground">{activeMeta.label}</h2>
-                  <p className="text-xs text-muted-foreground">{activeMeta.desc}</p>
+                  <h2 className="text-sm font-semibold text-foreground">{sectionLabel}</h2>
+                  <p className="text-xs text-muted-foreground">{sectionDesc}</p>
                 </div>
               </div>
               <Button
@@ -342,13 +362,15 @@ export default function PlaybookBuilderPage() {
                   className={cn(
                     'flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs whitespace-nowrap border shrink-0',
                     activeSection === s.id
-                      ? 'border-[rgba(0,255,200,0.3)] text-[#00ffc8] bg-[rgba(0,255,200,0.08)]'
+                      ? isAntistrat
+                        ? 'border-orange-500/30 text-orange-400 bg-orange-500/10'
+                        : 'border-[rgba(0,255,200,0.3)] text-[#00ffc8] bg-[rgba(0,255,200,0.08)]'
                       : 'border-border text-muted-foreground bg-transparent'
                   )}
                 >
                   {s.icon}
-                  {s.label}
-                  {sections[s.id] && <span className="w-1 h-1 rounded-full bg-[#00ffc8] ml-0.5" />}
+                  {isAntistrat ? s.antiLabel : s.label}
+                  {sections[s.id] && <span className={cn('w-1 h-1 rounded-full ml-0.5', isAntistrat ? 'bg-orange-400' : 'bg-[#00ffc8]')} />}
                 </button>
               ))}
             </div>
@@ -373,8 +395,11 @@ export default function PlaybookBuilderPage() {
                     <span className="text-[#00ffc8]">{activeMeta.icon}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4 max-w-xs">
-                    No content yet for <strong className="text-foreground">{activeMeta.label}</strong>.
-                    Click generate to have AI build this section for {playbook?.map}.
+                    No content yet for <strong className="text-foreground">{sectionLabel}</strong>.
+                    {isAntistrat
+                      ? ` Click generate to have AI build counter-play against ${playbook?.opponent_name} on ${playbook?.map}.`
+                      : ` Click generate to have AI build this section for ${playbook?.map}.`
+                    }
                   </p>
                   <Button
                     variant="neon"
@@ -413,14 +438,21 @@ export default function PlaybookBuilderPage() {
                   <Brain size={16} className="text-[#00ffc8]" />
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Ask me anything about your {playbook?.map} strategy — I can suggest setups, refine sections, or answer tactical questions.
+                  {isAntistrat
+                    ? `Ask me anything about countering ${playbook?.opponent_name} on ${playbook?.map} — anti-strats, player shutdowns, utility counters.`
+                    : `Ask me anything about your ${playbook?.map} strategy — setups, refine sections, or tactical questions.`
+                  }
                 </p>
                 <div className="mt-4 space-y-1.5 w-full">
-                  {[
+                  {(isAntistrat ? [
+                    `What are ${playbook?.opponent_name}'s biggest weaknesses on ${playbook?.map}?`,
+                    `How do we shut down their best player?`,
+                    `What utility counters their most common execute?`,
+                  ] : [
                     `What's a strong CT setup for ${playbook?.map}?`,
                     'How should we handle eco rounds?',
                     'What utility is most important here?',
-                  ].map(q => (
+                  ]).map(q => (
                     <button
                       key={q}
                       onClick={() => sendChat(q)}
