@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from 'ai/react'
 import { Button } from '@/components/ui/button'
@@ -751,8 +751,8 @@ export default function AIScoutPage() {
                             return (
                               <ChatRoundReplay
                                 key={inv.toolCallId}
-                                round={r.round as Parameters<typeof ChatRoundReplay>[0]['round']}
-                                players={r.players as Parameters<typeof ChatRoundReplay>[0]['players']}
+                                round={r.round as React.ComponentProps<typeof ChatRoundReplay>['round']}
+                                players={r.players as React.ComponentProps<typeof ChatRoundReplay>['players']}
                                 team1Name={String(r.team1Name)}
                                 team2Name={String(r.team2Name)}
                                 mapName={String(r.mapName)}
