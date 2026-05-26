@@ -125,6 +125,58 @@ function summarizeTactics(rounds: Round[], players: PlayerStats[]): string {
     lines.push(`Bomb defused: ${defuses}/${plants} plants (${Math.round((defuses / plants) * 100)}% defuse rate)`)
   }
 
+  // ── Pistol round analysis ─────────────────────────────────────────────────
+  // Pistol rounds: both teams start at ~800 so combined economy ≤ 1800
+  const pistolRounds = rounds.filter(r =>
+    r.team1_economy != null && r.team2_economy != null &&
+    r.team1_economy <= 1000 && r.team2_economy <= 1000
+  )
+  if (pistolRounds.length > 0) {
+    // Win/loss per team side
+    const team1PistolWins = pistolRounds.filter(r => r.winner === 'team1' || r.winner === 'CT').length
+    const team2PistolWins = pistolRounds.length - team1PistolWins
+
+    lines.push(`\nPistol rounds (${pistolRounds.length} total): Team1 won ${team1PistolWins}, Team2 won ${team2PistolWins}`)
+
+    // Per-player K/D specifically in pistol rounds
+    const pistolKills: Kill[] = pistolRounds.flatMap(r => r.kills ?? [])
+    if (pistolKills.length > 0) {
+      const pistolKD: Record<string, { k: number; d: number }> = {}
+      pistolKills.forEach((kill: Kill) => {
+        if (!pistolKD[kill.killer_name]) pistolKD[kill.killer_name] = { k: 0, d: 0 }
+        if (!pistolKD[kill.victim_name]) pistolKD[kill.victim_name] = { k: 0, d: 0 }
+        pistolKD[kill.killer_name].k++
+        pistolKD[kill.victim_name].d++
+      })
+
+      const pistolPlayers = Object.entries(pistolKD)
+        .sort((a, b) => (b[1].k - b[1].d) - (a[1].k - a[1].d))
+        .slice(0, 5)
+        .map(([name, s]) => `${name} ${s.k}K/${s.d}D`)
+        .join(', ')
+      lines.push(`Pistol round K/D leaders: ${pistolPlayers}`)
+
+      const pistolHS = pistolKills.filter((k: Kill) => k.headshot).length
+      lines.push(`Pistol round HS%: ${Math.round((pistolHS / pistolKills.length) * 100)}%`)
+
+      const pistolFBTimes = pistolRounds
+        .filter(r => r.kills && r.kills.length > 0)
+        .map(r => r.kills[0].time)
+      if (pistolFBTimes.length > 0) {
+        const avgPFB = Math.round(pistolFBTimes.reduce((a, b) => a + b, 0) / pistolFBTimes.length)
+        lines.push(`Pistol round avg first blood: ${avgPFB}s`)
+      }
+    }
+
+    // Post-pistol economy impact (anti-eco rounds = round right after pistol)
+    const pistolRoundNums = new Set(pistolRounds.map(r => r.number))
+    const antiEcoRounds = rounds.filter(r => pistolRoundNums.has(r.number - 1))
+    if (antiEcoRounds.length > 0) {
+      const antiEcoWinsByTeam1 = antiEcoRounds.filter(r => r.winner === 'team1' || r.winner === 'CT').length
+      lines.push(`Anti-eco rounds following pistols: Team1 won ${antiEcoWinsByTeam1}/${antiEcoRounds.length} (${Math.round((antiEcoWinsByTeam1 / antiEcoRounds.length) * 100)}%)`)
+    }
+  }
+
   // ── Enhanced player stats ─────────────────────────────────────────────────
   const richStats = (players ?? []).filter(p => p.kast !== undefined || p.headshot_percentage !== undefined)
   if (richStats.length > 0) {
