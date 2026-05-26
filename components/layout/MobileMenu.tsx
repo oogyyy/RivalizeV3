@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { SidebarNav } from './Sidebar'
 import type { Profile } from '@/types/database'
@@ -25,12 +25,7 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
   }
 
   const displayName = profile?.display_name || profile?.username || 'Player'
-  const initials = displayName
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+  const initials = displayName[0].toUpperCase()
 
   return (
     <>
@@ -39,242 +34,132 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
         onClick={() => setIsOpen(true)}
         className="md:hidden fixed top-3.5 left-3.5 z-50 flex items-center justify-center w-9 h-9"
         style={{
-          background: '#0f0420',
-          border: '3px solid #2d0d55',
-          boxShadow: '3px 3px 0 #000',
-          color: '#9060c8',
+          background: 'rgba(6,5,18,0.97)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 8,
+          color: 'rgba(255,255,255,0.5)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
         }}
         aria-label="Open navigation"
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#ff00cc'
-          e.currentTarget.style.color = '#ff00cc'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = '#2d0d55'
-          e.currentTarget.style.color = '#9060c8'
-        }}
       >
-        <Menu size={16} />
+        <Menu size={18}/>
       </button>
 
       {/* Drawer */}
       {isOpen && (
         <div className="fixed inset-0 z-[100] md:hidden">
           <div
-            className="absolute inset-0 bg-black/80"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setIsOpen(false)}
           />
 
           <div
-            className="absolute left-0 top-0 h-full w-[224px] flex flex-col"
+            className="absolute left-0 top-0 h-full w-[220px] flex flex-col animate-slide-in"
             style={{
-              background: '#0f0420',
-              borderRight: '3px solid #2d0d55',
-              boxShadow: '4px 0 0 #000',
+              background: 'rgba(6,5,18,0.98)',
+              borderRight: '1px solid rgba(255,255,255,0.07)',
             }}
           >
             {/* Header */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                height: '56px',
-                padding: '0 14px',
-                borderBottom: '3px solid #2d0d55',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '28px',
-                    height: '28px',
-                    background: 'linear-gradient(90deg, #ff00cc, #00aaff)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-pixel), monospace',
-                      fontSize: '10px',
-                      color: '#000',
-                      fontWeight: 400,
-                      lineHeight: 1,
-                    }}
-                  >
-                    R
-                  </span>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '18px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)',
+              flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: 'linear-gradient(135deg, #ff2d78 0%, #9b1dff 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 0 16px rgba(255,45,120,0.5)',
+                }}>
+                  <svg width="17" height="17" viewBox="0 0 20 20" fill="none">
+                    <path d="M4 3h8L9 9h7L7 18l2-6H5L4 3z" fill="white"/>
+                  </svg>
                 </div>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-pixel), monospace',
-                    fontSize: '8px',
-                    color: '#f0e0ff',
-                    letterSpacing: '0.12em',
-                    userSelect: 'none',
-                  }}
-                >
+                <span style={{
+                  fontFamily: 'var(--font-sora, Sora), sans-serif',
+                  fontWeight: 800, fontSize: 15, color: '#fff', letterSpacing: '0.05em',
+                }}>
                   RIVALIZE
                 </span>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '28px',
-                  height: '28px',
-                  border: '2px solid #2d0d55',
-                  background: 'transparent',
-                  color: '#9060c8',
-                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 28, height: 28, borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
                 }}
                 aria-label="Close menu"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#ff00cc'
-                  e.currentTarget.style.borderColor = '#ff00cc'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#9060c8'
-                  e.currentTarget.style.borderColor = '#2d0d55'
-                }}
               >
-                <X size={14} />
+                <X size={14}/>
               </button>
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto" style={{ padding: '14px 0' }}>
-              <SidebarNav onLinkClick={() => setIsOpen(false)} />
+            <nav style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+              <SidebarNav onLinkClick={() => setIsOpen(false)}/>
             </nav>
 
             {/* User section */}
-            <div
-              style={{
-                borderTop: '3px solid #2d0d55',
-                padding: '10px',
-                flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 4px' }}>
-                {/* Avatar */}
+            <div style={{ padding: '10px 8px 16px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 12px 8px' }}>
                 {profile?.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={profile.avatar_url}
                     alt={displayName}
                     style={{
-                      width: '28px',
-                      height: '28px',
-                      objectFit: 'cover',
-                      border: '3px solid #00aaff',
-                      flexShrink: 0,
+                      width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0,
+                      border: '2px solid rgba(255,45,120,0.45)',
                     }}
                   />
                 ) : (
-                  <div
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      background: 'rgba(0, 170, 255, 0.15)',
-                      border: '3px solid #00aaff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-pixel), monospace',
-                        fontSize: '7px',
-                        color: '#00aaff',
-                      }}
-                    >
-                      {initials}
-                    </span>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                    background: 'rgba(255,45,120,0.16)', border: '2px solid rgba(255,45,120,0.45)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-sora, Sora), sans-serif',
+                    fontWeight: 700, fontSize: 13, color: '#ff2d78',
+                  }}>
+                    {initials}
                   </div>
                 )}
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <p
-                    style={{
-                      fontFamily: 'var(--font-pixel), monospace',
-                      fontSize: '7px',
-                      color: '#f0e0ff',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      letterSpacing: '0.06em',
-                    }}
-                  >
-                    {displayName.toUpperCase()}
-                  </p>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 600, color: '#fff',
+                    fontFamily: 'var(--font-inter, Inter), sans-serif',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {displayName}
+                  </div>
                   {profile?.username && (
-                    <p
-                      style={{
-                        fontSize: '10px',
-                        color: '#5a2880',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        marginTop: '2px',
-                      }}
-                    >
+                    <div style={{
+                      fontSize: 11, color: 'rgba(255,255,255,0.36)',
+                      fontFamily: 'var(--font-inter, Inter), sans-serif',
+                    }}>
                       @{profile.username}
-                    </p>
+                    </div>
                   )}
                 </div>
               </div>
-
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  width: '100%',
-                  padding: '7px 10px',
-                  fontFamily: 'var(--font-pixel), monospace',
-                  fontSize: '7px',
-                  letterSpacing: '0.1em',
-                  color: '#9060c8',
-                  background: 'transparent',
-                  border: '3px solid #2d0d55',
-                  boxShadow: '3px 3px 0 #000',
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '7px 12px', borderRadius: 7,
+                  background: 'transparent', border: 'none',
+                  color: 'rgba(255,255,255,0.33)',
                   cursor: loggingOut ? 'not-allowed' : 'pointer',
-                  opacity: loggingOut ? 0.5 : 1,
-                  transition: 'color 120ms ease, border-color 120ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  if (!loggingOut) {
-                    e.currentTarget.style.color = '#ff0066'
-                    e.currentTarget.style.borderColor = '#ff0066'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#9060c8'
-                  e.currentTarget.style.borderColor = '#2d0d55'
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.boxShadow = '1px 1px 0 #000'
-                  e.currentTarget.style.transform = 'translate(2px, 2px)'
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.boxShadow = '3px 3px 0 #000'
-                  e.currentTarget.style.transform = 'none'
+                  fontFamily: 'var(--font-inter, Inter), sans-serif', fontSize: 13,
+                  outline: 'none', opacity: loggingOut ? 0.5 : 1,
                 }}
               >
-                {loggingOut ? 'EXITING...' : 'EXIT'}
+                <LogOut size={16}/>
+                {loggingOut ? 'Signing out…' : 'Sign out'}
               </button>
             </div>
           </div>

@@ -1,23 +1,23 @@
 import type { Metadata, Viewport } from 'next'
-import { Plus_Jakarta_Sans, Press_Start_2P, VT323 } from 'next/font/google'
+import { Inter, Sora, Space_Grotesk } from 'next/font/google'
 import './globals.css'
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-sans',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-inter',
 })
 
-const pressStart2P = Press_Start_2P({
+const sora = Sora({
   subsets: ['latin'],
-  weight: ['400'],
-  variable: '--font-pixel',
+  weight: ['400', '600', '700', '800'],
+  variable: '--font-sora',
 })
 
-const vt323 = VT323({
+const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
-  weight: ['400'],
-  variable: '--font-display',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-space',
 })
 
 export const viewport: Viewport = {
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://rivalize.pro',
     siteName: 'Rivalize',
-    title: 'Rivalize — AI-Powered CS2 Analysis',
+    title: 'Rivalize — Know Your Enemy',
     description: 'Professional-grade CS2 demo analysis and AI coaching for every team.',
   },
 }
@@ -43,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body
-        className={`${plusJakartaSans.variable} ${pressStart2P.variable} ${vt323.variable} ${plusJakartaSans.className} min-h-screen bg-background text-foreground antialiased`}
+        className={`${inter.variable} ${sora.variable} ${spaceGrotesk.variable} ${inter.className} min-h-screen bg-background text-foreground antialiased`}
       >
         {children}
       </body>

@@ -148,11 +148,11 @@ export default async function OpponentsPage() {
         )}>
           <div className="flex items-start justify-between gap-2 mb-3">
             <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Analyzed</p>
-            <div className="p-1.5 rounded-lg bg-[rgba(16,217,160,0.1)] shrink-0">
-              <Activity size={14} className="text-[#10D9A0]" />
+            <div className="p-1.5 rounded-lg bg-[rgba(0,255,200,0.1)] shrink-0">
+              <Activity size={14} className="text-[#00ffc8]" />
             </div>
           </div>
-          <p className="text-[28px] font-bold tabular-nums text-[#10D9A0] font-mono leading-none">{analyzedDemos}</p>
+          <p className="text-[28px] font-bold tabular-nums text-[#00ffc8] font-mono leading-none">{analyzedDemos}</p>
         </div>
       </div>
 
@@ -197,13 +197,13 @@ export default async function OpponentsPage() {
           {/* Add opponent CTA card */}
           {primaryTeamId && (
             <div className="h-full">
-              <Card className="bg-card/50 border-dashed border-border hover:border-[rgba(16,217,160,0.35)] hover:bg-card transition-all duration-200 group h-full card-hover">
+              <Card className="bg-card/50 border-dashed border-border hover:border-[rgba(0,255,200,0.35)] hover:bg-card transition-all duration-200 group h-full card-hover">
                 <CardContent className="p-5 flex flex-col items-center justify-center h-full min-h-[160px] text-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[rgba(16,217,160,0.08)] flex items-center justify-center group-hover:bg-[rgba(16,217,160,0.15)] transition-colors border border-[rgba(16,217,160,0.15)]">
-                    <Upload size={17} className="text-[#10D9A0]" />
+                  <div className="w-10 h-10 rounded-xl bg-[rgba(0,255,200,0.08)] flex items-center justify-center group-hover:bg-[rgba(0,255,200,0.15)] transition-colors border border-[rgba(0,255,200,0.15)]">
+                    <Upload size={17} className="text-[#00ffc8]" />
                   </div>
                   <div>
-                    <p className="text-[13px] font-semibold text-foreground group-hover:text-[#10D9A0] transition-colors">
+                    <p className="text-[13px] font-semibold text-foreground group-hover:text-[#00ffc8] transition-colors">
                       Scout another opponent
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">Upload a demo to add them</p>

@@ -17,16 +17,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .single()
 
   return (
-    <div className="flex h-[100dvh] bg-background overflow-hidden">
-      {/* Desktop sidebar — hidden on mobile */}
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', position: 'relative', background: '#09091a' }}>
+      {/* Ambient background gradient */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
+        background: 'linear-gradient(175deg, #09091a 0%, #0d0b24 45%, #090915 100%)',
+      }}/>
+      <div style={{
+        position: 'fixed', top: '20%', left: 0, right: 0, height: 200, zIndex: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 60% 80% at 50% 50%, rgba(130,20,255,0.08) 0%, rgba(255,45,120,0.04) 60%, transparent 100%)',
+        filter: 'blur(32px)',
+      }}/>
+
+      {/* Desktop sidebar */}
       <Sidebar profile={profile} />
 
-      {/* Main content with top clearance for floating hamburger on mobile */}
-      <main className="flex-1 overflow-auto min-w-0 pt-16 md:pt-0">
+      {/* Main content */}
+      <main className="flex-1 overflow-auto min-w-0 pt-16 md:pt-0" style={{ position: 'relative', zIndex: 1 }}>
         {children}
       </main>
 
-      {/* Mobile floating hamburger + drawer — all fixed, no layout impact */}
+      {/* Mobile menu */}
       <MobileMenu profile={profile} />
     </div>
   )

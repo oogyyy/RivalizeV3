@@ -41,43 +41,39 @@ const config: Config = {
           foreground: 'hsl(var(--destructive-foreground))',
         },
         border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
+        input:  'hsl(var(--input))',
+        ring:   'hsl(var(--ring))',
 
-        /* ── Synthwave brand tokens ──────────────────────────────── */
+        /* ── Brand tokens ─────────────────────────────────────────── */
         brand: {
-          DEFAULT: '#ff00cc',
-          dim:     '#cc0099',
-          dark:    '#880066',
+          DEFAULT: '#ff2d78',
+          dim:     '#cc0060',
+          dark:    '#880040',
         },
-        neon: {
-          magenta: '#ff00cc',
-          cyan:    '#00aaff',
-          purple:  '#aa00ff',
-          danger:  '#ff0066',
-          warn:    '#ffaa00',
-        },
+        /* Accent palette */
+        pink:   '#ff2d78',
+        purple: '#9b1dff',
+        teal:   '#00ffc8',
+
         /* CS2-specific semantic colors */
         tside:  '#F59E0B',
         ctside: '#3B82F6',
       },
       fontFamily: {
-        sans:    ['var(--font-sans)', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        pixel:   ['var(--font-pixel)', 'Press Start 2P', 'monospace'],
-        display: ['var(--font-display)', 'VT323', 'monospace'],
-        mono:    ['var(--font-pixel)', 'Press Start 2P', 'monospace'],
+        sans:  ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        sora:  ['var(--font-sora)', 'Sora', 'sans-serif'],
+        space: ['var(--font-space)', 'Space Grotesk', 'sans-serif'],
+        mono:  ['ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'brand-gradient':  'linear-gradient(135deg, #ff2d78 0%, #9b1dff 100%)',
       },
       boxShadow: {
-        'card':     '4px 4px 0 #000',
-        'elevated': '6px 6px 0 #000',
-        'floating': '4px 0 0 #000',
-        'brand':    '0 0 20px rgba(255,0,204,0.25), 0 0 48px rgba(255,0,204,0.1)',
-        'brand-sm': '0 0 10px rgba(255,0,204,0.2)',
-        'cyan':     '0 0 20px rgba(0,170,255,0.25), 0 0 48px rgba(0,170,255,0.1)',
-        'pixel':    '4px 4px 0 #000',
+        'brand':    '0 0 18px rgba(255,45,120,0.32)',
+        'brand-lg': '0 0 30px rgba(255,45,120,0.4)',
+        'purple':   '0 0 18px rgba(155,29,255,0.3)',
+        'teal':     '0 0 18px rgba(0,255,200,0.25)',
       },
       animation: {
         'pulse-neon':    'pulse-neon 2s ease-in-out infinite',
@@ -86,11 +82,12 @@ const config: Config = {
         'reparse-fill':  'reparse-fill 30s ease-out forwards',
         'shimmer':       'shimmer 1.5s linear infinite',
         'fade-in-up':    'fade-in-up 0.35s ease-out both',
+        'marquee':       'marquee 28s linear infinite',
       },
       keyframes: {
         'pulse-neon': {
-          '0%, 100%': { boxShadow: '0 0 8px rgba(16,217,160,0.3)' },
-          '50%':       { boxShadow: '0 0 24px rgba(16,217,160,0.5)' },
+          '0%, 100%': { boxShadow: '0 0 8px rgba(255,45,120,0.4), 0 0 16px rgba(255,45,120,0.15)' },
+          '50%':       { boxShadow: '0 0 20px rgba(255,45,120,0.6), 0 0 40px rgba(255,45,120,0.25)' },
         },
         'slide-in': {
           from: { transform: 'translateX(-100%)' },
@@ -115,6 +112,10 @@ const config: Config = {
         'shimmer': {
           '0%':   { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        'marquee': {
+          from: { transform: 'translateX(0)' },
+          to:   { transform: 'translateX(-50%)' },
         },
       },
     },

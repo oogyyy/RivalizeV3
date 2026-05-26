@@ -214,8 +214,8 @@ export default async function MyTeamPage() {
     },
     {
       href: `/ai-coach?mode=myteam&focus=strategy`,
-      icon: <Brain size={16} className="text-[#10D9A0]" />,
-      iconBg: 'bg-[rgba(16,217,160,0.1)] border-[rgba(16,217,160,0.15)]',
+      icon: <Brain size={16} className="text-[#00ffc8]" />,
+      iconBg: 'bg-[rgba(0,255,200,0.1)] border-[rgba(0,255,200,0.15)]',
       title: 'Strategy Coach',
       description: 'Build a playbook tailored to your roster',
     },
@@ -252,8 +252,8 @@ export default async function MyTeamPage() {
           label="Win Rate"
           value={totalMatches > 0 ? `${Math.round(winRate * 100)}%` : '—'}
           sub={totalMatches > 0 ? `${totalWins} wins from ${totalMatches}` : 'Upload demos to track'}
-          icon={<TrendingUp size={15} className="text-[#10D9A0]" />}
-          iconBg="bg-[rgba(16,217,160,0.1)]"
+          icon={<TrendingUp size={15} className="text-[#00ffc8]" />}
+          iconBg="bg-[rgba(0,255,200,0.1)]"
           accent="stat-card-green"
           highlight={winRate >= 0.5}
         />
@@ -285,8 +285,8 @@ export default async function MyTeamPage() {
             <div className="accent-line-green w-full" />
             <div className="p-5">
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 rounded-md bg-[rgba(16,217,160,0.1)] flex items-center justify-center">
-                  <Users size={13} className="text-[#10D9A0]" />
+                <div className="w-6 h-6 rounded-md bg-[rgba(0,255,200,0.1)] flex items-center justify-center">
+                  <Users size={13} className="text-[#00ffc8]" />
                 </div>
                 <h2 className="text-[13px] font-semibold text-foreground">Top Players</h2>
               </div>
@@ -321,7 +321,7 @@ export default async function MyTeamPage() {
                         </div>
                         <p className={cn(
                           'font-mono text-[13px] font-bold text-right',
-                          p.avgRating >= 1.1 ? 'text-[#10D9A0]' : p.avgRating >= 0.9 ? 'text-foreground' : 'text-red-400'
+                          p.avgRating >= 1.1 ? 'text-[#00ffc8]' : p.avgRating >= 0.9 ? 'text-foreground' : 'text-red-400'
                         )}>
                           {p.avgRating.toFixed(2)}
                         </p>
@@ -340,8 +340,8 @@ export default async function MyTeamPage() {
           {/* Map Pool */}
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-md bg-[rgba(16,217,160,0.1)] flex items-center justify-center">
-                <MapIcon size={13} className="text-[#10D9A0]" />
+              <div className="w-6 h-6 rounded-md bg-[rgba(0,255,200,0.1)] flex items-center justify-center">
+                <MapIcon size={13} className="text-[#00ffc8]" />
               </div>
               <h2 className="text-[13px] font-semibold text-foreground">Map Pool</h2>
             </div>
@@ -355,7 +355,7 @@ export default async function MyTeamPage() {
                 {topMaps.map(([map, count]) => (
                   <div key={map} className="flex items-center gap-2 px-3 py-1.5 bg-accent/50 hover:bg-accent/80 rounded-lg border border-border/60 transition-colors">
                     <span className="text-[13px] font-medium text-foreground">{map.replace('de_', '')}</span>
-                    <span className="text-[11px] font-mono text-[#10D9A0] bg-[rgba(16,217,160,0.1)] px-1.5 py-0.5 rounded">{count}×</span>
+                    <span className="text-[11px] font-mono text-[#00ffc8] bg-[rgba(0,255,200,0.1)] px-1.5 py-0.5 rounded">{count}×</span>
                   </div>
                 ))}
               </div>
@@ -365,7 +365,7 @@ export default async function MyTeamPage() {
           {/* Demo list */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <FileVideo size={15} className="text-[#10D9A0]" />
+              <FileVideo size={15} className="text-[#00ffc8]" />
               <h2 className="text-[13px] font-semibold text-foreground">My Team&apos;s Demos</h2>
               {demos.length > 0 && (
                 <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
@@ -392,8 +392,8 @@ export default async function MyTeamPage() {
             <div className="accent-line-green w-full" />
             <div className="p-5">
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-6 h-6 rounded-md bg-[rgba(16,217,160,0.1)] flex items-center justify-center">
-                  <Brain size={13} className="text-[#10D9A0]" />
+                <div className="w-6 h-6 rounded-md bg-[rgba(0,255,200,0.1)] flex items-center justify-center">
+                  <Brain size={13} className="text-[#00ffc8]" />
                 </div>
                 <h2 className="text-[13px] font-semibold text-foreground">AI Analyst</h2>
                 <Badge variant="neon" className="ml-auto text-[10px]">Llama 3.3</Badge>
@@ -457,7 +457,7 @@ function StatCard({
       </div>
       <p className={cn(
         'text-[26px] font-bold tracking-tight tabular-nums font-mono leading-none',
-        highlight ? 'text-[#10D9A0]' : 'text-foreground'
+        highlight ? 'text-[#00ffc8]' : 'text-foreground'
       )}>{value}</p>
       <p className="text-[11px] text-muted-foreground/50 mt-1">{sub}</p>
     </div>
@@ -474,7 +474,7 @@ function EmptyState({ icon, text, action }: {
       <div className="mb-2">{icon}</div>
       <p className="text-[13px] text-muted-foreground max-w-xs leading-relaxed">{text}</p>
       {action && (
-        <Link href={action.href} className="mt-2 text-[12px] text-[#10D9A0] hover:underline">
+        <Link href={action.href} className="mt-2 text-[12px] text-[#00ffc8] hover:underline">
           {action.label}
         </Link>
       )}
