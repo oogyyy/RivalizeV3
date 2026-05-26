@@ -12,8 +12,9 @@ function getAppUrl(params: URLSearchParams, req: NextRequest): string {
       return `${u.protocol}//${u.host}`
     } catch { /* fall through */ }
   }
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+  const explicit = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL
+  if (explicit) {
+    return explicit.replace(/\/$/, '')
   }
   const proto = (req.headers.get('x-forwarded-proto') ?? 'https').split(',')[0].trim()
   const host  = (req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost:3000').split(',')[0].trim()
