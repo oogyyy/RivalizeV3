@@ -6,6 +6,7 @@ const POLL_INTERVAL_MS  = 2_000
 // (~24 min worst case). Set stale threshold above that so reclaimStale doesn't
 // fire mid-parse and kick off a second concurrent parse for the same demo.
 const STALE_AFTER_MS    = 30 * 60 * 1000  // reclaim jobs stuck > 30 min
+const CONCURRENCY       = 3               // parse up to 3 demos simultaneously
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,7 +37,7 @@ async function claimNext(): Promise<string | null> {
   if (!data || data.length === 0) return null
   const id = data[0].id
 
-  // Claim it — if another worker races us the IS NULL check prevents double-claiming
+  // Claim it — if another slot races us the IS NULL check prevents double-claiming
   const { data: claimed } = await supabase
     .from('demos')
     .update({ processing_started_at: new Date().toISOString() })
@@ -48,32 +49,37 @@ async function claimNext(): Promise<string | null> {
   return claimed?.id ?? null
 }
 
-async function tick(): Promise<void> {
-  await reclaimStale()
+// Each slot runs independently: poll → claim → parse → repeat.
+// Running CONCURRENCY slots in parallel means multiple demos parse at once
+// so a batch of uploads doesn't queue behind each other.
+async function runSlot(slotId: number): Promise<void> {
+  while (true) {
+    try {
+      await reclaimStale()
 
-  const demoId = await claimNext()
-  if (!demoId) return
-
-  console.log(`[worker] Processing ${demoId}`)
-  try {
-    await parseAndSaveDemo(demoId)
-    console.log(`[worker] Done      ${demoId}`)
-  } catch {
-    // parseAndSaveDemo already wrote status='failed' + error_message to DB
-    console.error(`[worker] Failed    ${demoId}`)
+      const demoId = await claimNext()
+      if (demoId) {
+        console.log(`[worker:${slotId}] Processing ${demoId}`)
+        try {
+          await parseAndSaveDemo(demoId)
+          console.log(`[worker:${slotId}] Done      ${demoId}`)
+        } catch {
+          // parseAndSaveDemo already wrote status='failed' + error_message to DB
+          console.error(`[worker:${slotId}] Failed    ${demoId}`)
+        }
+      }
+    } catch (err) {
+      console.error(`[worker:${slotId}] Unexpected poll error:`, err)
+    }
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
   }
 }
 
 async function run(): Promise<void> {
-  console.log('[worker] Demo parsing worker started')
-  while (true) {
-    try {
-      await tick()
-    } catch (err) {
-      console.error('[worker] Unexpected poll error:', err)
-    }
-    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
-  }
+  console.log(`[worker] Demo parsing worker started (concurrency=${CONCURRENCY})`)
+  await Promise.all(
+    Array.from({ length: CONCURRENCY }, (_, i) => runSlot(i + 1)),
+  )
 }
 
 run()

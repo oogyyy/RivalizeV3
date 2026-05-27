@@ -343,7 +343,7 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                             ? Date.now() - new Date(demo.created_at).getTime() < 10 * 60 * 1000
                               ? 'Queued…'
                               : 'Stuck in processing'
-                            : Date.now() - new Date(demo.processing_started_at).getTime() < 30 * 60 * 1000
+                            : Date.now() - new Date(demo.processing_started_at).getTime() < 10 * 60 * 1000
                               ? 'Parsing…'
                               : 'Stuck in processing'}
                       </p>
@@ -355,7 +355,7 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                     </div>
                     {(demo.status === 'failed' ||
                       (!demo.processing_started_at && Date.now() - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) ||
-                      (demo.processing_started_at && Date.now() - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
+                      (demo.processing_started_at && Date.now() - new Date(demo.processing_started_at).getTime() >= 10 * 60 * 1000)) && (
                       <ReparseButton demoId={demo.id} variant="prominent" />
                     )}
                   </div>
