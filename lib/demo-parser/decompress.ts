@@ -21,13 +21,27 @@ export function maybeDecompress(buf: Buffer, filename: string): Buffer {
 
   try {
     writeFileSync(inPath, buf)
+
+    // Integrity check before decompression — catches truncated/corrupted uploads early.
+    const test = spawnSync('zstd', ['--test', inPath], { stdio: 'pipe' })
+    if (test.error) throw test.error
+    if (test.status !== 0) {
+      const raw = test.stderr?.toString().trim() ?? ''
+      if (raw.includes('premature end') || raw.includes('Read error')) {
+        throw new Error(
+          `Demo file failed integrity check (zstd: ${raw}) — the file may have been truncated in transit. Retrying…`
+        )
+      }
+      throw new Error(`Demo file failed integrity check: ${raw || 'unknown error'}`)
+    }
+
     const result = spawnSync('zstd', ['-d', inPath, '-o', outPath, '--force'], {
       stdio: 'pipe',
     })
     if (result.error) throw result.error
     if (result.status !== 0) {
-      const msg = result.stderr?.toString().trim() || 'decompression failed'
-      throw new Error(`zstd: ${msg}`)
+      const raw = result.stderr?.toString().trim() ?? ''
+      throw new Error(`zstd decompression failed: ${raw || 'unknown error'}`)
     }
     return readFileSync(outPath)
   } finally {

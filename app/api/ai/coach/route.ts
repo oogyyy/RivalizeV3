@@ -2,7 +2,210 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { createOpenAI } from '@ai-sdk/openai'
-import { streamText } from 'ai'
+import { streamText, tool } from 'ai'
+import { z } from 'zod'
+import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
+import { detectTacticalPatterns } from '@/lib/cs2-zones'
+
+type DemoParsedData = {
+  header?: {
+    map?: string
+    team1?: string
+    team2?: string
+    score_team1?: number
+    score_team2?: number
+    total_rounds?: number
+  }
+  opponentSide?: string
+  players?: PlayerStats[]
+  rounds?: Round[]
+}
+
+function summarizeTactics(rounds: Round[], players: PlayerStats[]): string {
+  if (!rounds || rounds.length === 0) return ''
+
+  const lines: string[] = []
+
+  // ── Grenade usage ─────────────────────────────────────────────────────────
+  const grenadesByType: Record<string, number> = {}
+  const grenadesByPlayer: Record<string, number> = {}
+  let earlyNades = 0, midNades = 0, lateNades = 0
+
+  rounds.forEach(r => {
+    (r.grenades ?? []).forEach((g: GrenadeEvent) => {
+      grenadesByType[g.type] = (grenadesByType[g.type] ?? 0) + 1
+      grenadesByPlayer[g.thrower] = (grenadesByPlayer[g.thrower] ?? 0) + 1
+      if (g.time <= 30) earlyNades++
+      else if (g.time <= 60) midNades++
+      else lateNades++
+    })
+  })
+
+  const totalNades = Object.values(grenadesByType).reduce((a, b) => a + b, 0)
+  if (totalNades > 0) {
+    const nadeParts = (['smoke', 'flash', 'he', 'molotov', 'decoy'] as const)
+      .filter(t => grenadesByType[t])
+      .map(t => `${grenadesByType[t]} ${t}s`)
+      .join(', ')
+    lines.push(`Grenade usage: ${nadeParts}`)
+
+    const topThrowers = Object.entries(grenadesByPlayer)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, count]) => `${name} (${count})`)
+      .join(', ')
+    if (topThrowers) lines.push(`Top utility users: ${topThrowers}`)
+
+    const totalTimedNades = earlyNades + midNades + lateNades
+    if (totalTimedNades > 0) {
+      const earlyPct = Math.round((earlyNades / totalTimedNades) * 100)
+      const midPct   = Math.round((midNades   / totalTimedNades) * 100)
+      lines.push(`Grenade timing: ${earlyPct}% in first 30s, ${midPct}% mid-round, ${100 - earlyPct - midPct}% late`)
+    }
+  }
+
+  // ── Kill patterns ─────────────────────────────────────────────────────────
+  const allKills: Kill[] = rounds.flatMap(r => r.kills ?? [])
+  if (allKills.length > 0) {
+    const weaponCounts: Record<string, number> = {}
+    let headshots = 0
+    let totalFightDist = 0
+    const firstBloodTimes: number[] = []
+
+    rounds.forEach(r => {
+      if (r.kills && r.kills.length > 0) firstBloodTimes.push(r.kills[0].time)
+    })
+
+    allKills.forEach((k: Kill) => {
+      const cat = k.weapon.includes('awp') ? 'AWP'
+        : ['ak47','m4a4','m4a1','rifle','sg553','famas','galil','aug'].some(w => k.weapon.includes(w)) ? 'Rifle'
+        : ['mp9','mp5','mac10','ump','p90','mp7','bizon'].some(w => k.weapon.includes(w)) ? 'SMG'
+        : ['glock','usp','p250','deagle','cz75','r8','tec9','five7','dualies'].some(w => k.weapon.includes(w)) ? 'Pistol'
+        : 'Other'
+      weaponCounts[cat] = (weaponCounts[cat] ?? 0) + 1
+      if (k.headshot) headshots++
+      const dx = k.killer_x - k.victim_x
+      const dy = k.killer_y - k.victim_y
+      totalFightDist += Math.sqrt(dx * dx + dy * dy)
+    })
+
+    const weaponLine = ['Rifle', 'AWP', 'Pistol', 'SMG', 'Other']
+      .filter(c => weaponCounts[c])
+      .map(c => `${c} ${Math.round((weaponCounts[c] / allKills.length) * 100)}%`)
+      .join(', ')
+    lines.push(`Kill weapons: ${weaponLine}`)
+    lines.push(`Overall headshot rate: ${Math.round((headshots / allKills.length) * 100)}%`)
+
+    const avgDist = Math.round(totalFightDist / allKills.length)
+    const distLabel = avgDist < 300 ? 'close-range' : avgDist < 800 ? 'mid-range' : 'long-range'
+    lines.push(`Avg fight distance: ${avgDist} units (${distLabel})`)
+
+    if (firstBloodTimes.length > 0) {
+      const avgFB = Math.round(firstBloodTimes.reduce((a, b) => a + b, 0) / firstBloodTimes.length)
+      lines.push(`Avg first blood time: ${avgFB}s (${avgFB < 15 ? 'very aggressive early entry' : avgFB < 25 ? 'standard aggression' : 'patient/defensive play'})`)
+    }
+  }
+
+  // ── Economy ───────────────────────────────────────────────────────────────
+  const economies = rounds.flatMap(r => [r.team1_economy, r.team2_economy]).filter(e => e != null && e > 0)
+  if (economies.length > 0) {
+    const avgEcon = Math.round(economies.reduce((a, b) => a + b, 0) / economies.length)
+    const ecoRounds   = economies.filter(e => e < 2000).length
+    const forceRounds = economies.filter(e => e >= 2000 && e < 4000).length
+    const fullRounds  = economies.filter(e => e >= 4000).length
+    const total = ecoRounds + forceRounds + fullRounds
+    lines.push(`Economy: avg ${avgEcon} — Full buy ${Math.round((fullRounds / total) * 100)}% | Force ${Math.round((forceRounds / total) * 100)}% | Eco ${Math.round((ecoRounds / total) * 100)}%`)
+  }
+
+  // ── Bomb events ───────────────────────────────────────────────────────────
+  const tRounds = rounds.filter(r => r.kills && r.kills.length > 0)
+  const plants  = rounds.filter(r => r.bomb_planted).length
+  const defuses = rounds.filter(r => r.bomb_defused).length
+  if (plants > 0) {
+    lines.push(`Bomb planted: ${plants}/${tRounds.length} T-side rounds (${Math.round((plants / Math.max(tRounds.length, 1)) * 100)}%)`)
+    lines.push(`Bomb defused: ${defuses}/${plants} plants (${Math.round((defuses / plants) * 100)}% defuse rate)`)
+  }
+
+  // ── Pistol round analysis ─────────────────────────────────────────────────
+  // Pistol rounds: both teams start at ~800 so combined economy ≤ 1800
+  const pistolRounds = rounds.filter(r =>
+    r.team1_economy != null && r.team2_economy != null &&
+    r.team1_economy <= 1000 && r.team2_economy <= 1000
+  )
+  if (pistolRounds.length > 0) {
+    // Win/loss per team side
+    const team1PistolWins = pistolRounds.filter(r => r.winner === 'team1' || r.winner === 'CT').length
+    const team2PistolWins = pistolRounds.length - team1PistolWins
+
+    lines.push(`\nPistol rounds (${pistolRounds.length} total): Team1 won ${team1PistolWins}, Team2 won ${team2PistolWins}`)
+
+    // Per-player K/D specifically in pistol rounds
+    const pistolKills: Kill[] = pistolRounds.flatMap(r => r.kills ?? [])
+    if (pistolKills.length > 0) {
+      const pistolKD: Record<string, { k: number; d: number }> = {}
+      pistolKills.forEach((kill: Kill) => {
+        if (!pistolKD[kill.killer_name]) pistolKD[kill.killer_name] = { k: 0, d: 0 }
+        if (!pistolKD[kill.victim_name]) pistolKD[kill.victim_name] = { k: 0, d: 0 }
+        pistolKD[kill.killer_name].k++
+        pistolKD[kill.victim_name].d++
+      })
+
+      const pistolPlayers = Object.entries(pistolKD)
+        .sort((a, b) => (b[1].k - b[1].d) - (a[1].k - a[1].d))
+        .slice(0, 5)
+        .map(([name, s]) => `${name} ${s.k}K/${s.d}D`)
+        .join(', ')
+      lines.push(`Pistol round K/D leaders: ${pistolPlayers}`)
+
+      const pistolHS = pistolKills.filter((k: Kill) => k.headshot).length
+      lines.push(`Pistol round HS%: ${Math.round((pistolHS / pistolKills.length) * 100)}%`)
+
+      const pistolFBTimes = pistolRounds
+        .filter(r => r.kills && r.kills.length > 0)
+        .map(r => r.kills[0].time)
+      if (pistolFBTimes.length > 0) {
+        const avgPFB = Math.round(pistolFBTimes.reduce((a, b) => a + b, 0) / pistolFBTimes.length)
+        lines.push(`Pistol round avg first blood: ${avgPFB}s`)
+      }
+    }
+
+    // Post-pistol economy impact (anti-eco rounds = round right after pistol)
+    const pistolRoundNums = new Set(pistolRounds.map(r => r.number))
+    const antiEcoRounds = rounds.filter(r => pistolRoundNums.has(r.number - 1))
+    if (antiEcoRounds.length > 0) {
+      const antiEcoWinsByTeam1 = antiEcoRounds.filter(r => r.winner === 'team1' || r.winner === 'CT').length
+      lines.push(`Anti-eco rounds following pistols: Team1 won ${antiEcoWinsByTeam1}/${antiEcoRounds.length} (${Math.round((antiEcoWinsByTeam1 / antiEcoRounds.length) * 100)}%)`)
+    }
+  }
+
+  // ── Enhanced player stats ─────────────────────────────────────────────────
+  const richStats = (players ?? []).filter(p => p.kast !== undefined || p.headshot_percentage !== undefined)
+  if (richStats.length > 0) {
+    lines.push('Player details (HS% / KAST / utility dmg):')
+    richStats
+      .sort((a, b) => b.rating - a.rating)
+      .slice(0, 5)
+      .forEach(p => {
+        const hs   = p.headshot_percentage != null ? ` HS%${Math.round(p.headshot_percentage)}` : ''
+        const kast = p.kast != null               ? ` KAST${Math.round(p.kast * 100)}%`         : ''
+        const ud   = p.utility_damage             ? ` UD${p.utility_damage}`                     : ''
+        lines.push(`  ${p.name}: ${p.kills}/${p.deaths}/${p.assists} Rtg${p.rating.toFixed(2)} ADR${p.adr.toFixed(0)}${hs}${kast}${ud}`)
+      })
+  }
+
+  return lines.join('\n')
+}
+
+const bodySchema = z.object({
+  teamId:            z.string().uuid().optional(),
+  folderId:          z.string().uuid().optional(),
+  messages:          z.array(z.object({ role: z.string(), content: z.string() })).default([]),
+  focusArea:         z.string().optional(),
+  playerName:        z.string().max(64).optional(),
+  mapName:           z.string().max(32).optional(),
+  includeProDataset: z.boolean().default(false),
+  mode:              z.enum(['opponent', 'myteam']).default('opponent'),
+})
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -12,24 +215,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: {
-    teamId?: string
-    folderId?: string
-    messages?: Array<{ role: string; content: string }>
-    focusArea?: string
-    playerName?: string
-    mapName?: string
-    includeProDataset?: boolean
-    mode?: 'opponent' | 'myteam'
-  }
-
+  let rawBody: unknown
   try {
-    body = await request.json()
+    rawBody = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { teamId, folderId, messages = [], focusArea, playerName, mapName, includeProDataset, mode = 'opponent' } = body
+  const parsed = bodySchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid request body', details: parsed.error.flatten() }, { status: 400 })
+  }
+
+  const { teamId, folderId, messages = [], focusArea, playerName, mapName, includeProDataset, mode } = parsed.data
 
   // Build context from team/folder data
   let contextText = ''
@@ -48,30 +246,31 @@ export async function POST(request: Request) {
     }
   }
 
-  if (mode === 'myteam' && teamId) {
-    // My Team mode: fetch ONLY self-demos (demo_type = 'self').
-    // Use admin client to bypass RLS — the user has already been authenticated above.
+  if (mode === 'myteam') {
+    // My Team mode: fetch ONLY self-demos (demo_type = 'self') across all the user's teams.
     const adminDb = createAdminClient()
-    console.log('[AI Coach] myteam mode — querying demos for teamId:', teamId)
-    const { data: recentDemos, error: demosError } = await adminDb
-      .from('demos')
-      .select('parsed_data, map, match_date, opponent_name')
-      .eq('team_id', teamId)
-      .eq('status', 'completed')
-      .eq('demo_type', 'self')
-      .order('created_at', { ascending: false })
-      .limit(5)
-    console.log('[AI Coach] demos fetched:', recentDemos?.length ?? 0, 'error:', demosError?.message ?? null)
+    const { data: memberships } = await adminDb
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', user.id)
+    const allTeamIds = (memberships ?? []).map(m => m.team_id).filter(Boolean)
+    const { data: recentDemos } = allTeamIds.length
+      ? await adminDb
+          .from('demos')
+          .select('parsed_data, map, match_date, opponent_name')
+          .in('team_id', allTeamIds)
+          .eq('status', 'completed')
+          .eq('demo_type', 'self')
+          .order('created_at', { ascending: false })
+          .limit(5)
+      : { data: [] }
 
     if (recentDemos && recentDemos.length > 0) {
-      type PD = {
-        header?: { map?: string; score_team1?: number; score_team2?: number; total_rounds?: number; team1?: string; team2?: string }
-        opponentSide?: string
-        players?: Array<{ name: string; kills: number; deaths: number; assists: number; rating: number; adr: number; team: string }>
-      }
       contextText += `\nTeam: ${teamName}\nMatches analysed: ${recentDemos.length}\n\nRecent match details:\n`
+      const selfRoundsByMap: Record<string, Round[][]> = {}
+
       recentDemos.forEach((demo, i) => {
-        const pd = demo.parsed_data as PD | null
+        const pd = demo.parsed_data as DemoParsedData | null
         const h = pd?.header
         const opponentSide = pd?.opponentSide ?? 'team2'
         if (h) {
@@ -86,8 +285,33 @@ export async function POST(request: Request) {
               contextText += `My team players:\n${sorted.map(p => `  ${p.name}: ${p.kills}/${p.deaths}/${p.assists}, Rating ${p.rating.toFixed(2)}, ADR ${p.adr.toFixed(1)}`).join('\n')}\n`
             }
           }
+          const tactics = summarizeTactics(pd?.rounds ?? [], pd?.players ?? [])
+          if (tactics) contextText += `Tactical data:\n${tactics}\n`
+
+          // Collect rounds for cross-demo pattern detection
+          if (h.map && pd?.rounds && pd.rounds.length > 0) {
+            if (!selfRoundsByMap[h.map]) selfRoundsByMap[h.map] = []
+            selfRoundsByMap[h.map].push(pd.rounds)
+          }
         }
       })
+
+      // Cross-demo execute pattern detection for self-improvement
+      const selfPatternLines: string[] = []
+      for (const [map, roundSets] of Object.entries(selfRoundsByMap)) {
+        if (roundSets.length >= 2) {
+          const patterns = detectTacticalPatterns(roundSets, map)
+          if (patterns.hasData) {
+            selfPatternLines.push(`\nTeam execute patterns on ${map} (across ${roundSets.length} demos):`)
+            selfPatternLines.push(...patterns.text)
+          }
+        }
+      }
+      if (selfPatternLines.length > 0) {
+        contextText += '\n--- Cross-demo execute patterns ---'
+        contextText += selfPatternLines.join('\n')
+        contextText += '\n'
+      }
     }
   } else if (folderId) {
     const { data: folder } = await supabase
@@ -133,27 +357,14 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
           .eq('status', 'completed')
           .eq('demo_type', 'opponent')  // STRICT: only scouting demos for opponent analysis
           .order('created_at', { ascending: false })
-          .limit(3)
+          .limit(5)
 
         if (recentDemos && recentDemos.length > 0) {
           contextText += '\nRecent match details:\n'
+          const roundsByMap: Record<string, Round[][]> = {}
+
           recentDemos.forEach((demo, i) => {
-            const pd = demo.parsed_data as {
-              header?: {
-                map?: string
-                score_team1?: number
-                score_team2?: number
-                total_rounds?: number
-              }
-              players?: Array<{
-                name: string
-                kills: number
-                deaths: number
-                assists: number
-                rating: number
-                adr: number
-              }>
-            } | null
+            const pd = demo.parsed_data as DemoParsedData | null
 
             if (pd?.header) {
               const h = pd.header
@@ -167,8 +378,33 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
                   .join('\n')
                 contextText += `Top performers:\n${topPlayers}\n`
               }
+              const tactics = summarizeTactics(pd?.rounds ?? [], pd?.players ?? [])
+              if (tactics) contextText += `Tactical data:\n${tactics}\n`
+
+              // Collect rounds by map for cross-demo pattern detection
+              if (h.map && pd.rounds && pd.rounds.length > 0) {
+                if (!roundsByMap[h.map]) roundsByMap[h.map] = []
+                roundsByMap[h.map].push(pd.rounds)
+              }
             }
           })
+
+          // Cross-demo execute pattern detection — finds recurring smoke combos per economy type
+          const patternLines: string[] = []
+          for (const [map, roundSets] of Object.entries(roundsByMap)) {
+            if (roundSets.length >= 2) {
+              const patterns = detectTacticalPatterns(roundSets, map)
+              if (patterns.hasData) {
+                patternLines.push(`\nExecute patterns on ${map} (across ${roundSets.length} demos):`)
+                patternLines.push(...patterns.text)
+              }
+            }
+          }
+          if (patternLines.length > 0) {
+            contextText += '\n--- Cross-demo tactical tendencies ---'
+            contextText += patternLines.join('\n')
+            contextText += '\n'
+          }
         }
       }
     }
@@ -223,6 +459,7 @@ Your coaching style:
 - Use CS2 terminology correctly (executes, retakes, defaults, eco rounds, force buys, mid-round calls, lurks, entry fragging, etc.)
 - Format responses clearly with markdown headers and bullet points
 - Be honest but encouraging — highlight what's working as well as what needs fixing
+- VISUAL REPLAYS: You have a showRoundReplay tool. Use it proactively when explaining a specific round's execute, smoke setup, kill event, or tactical pattern. Pass a short description of what to look for. Don't use it for general statistics.
 ${dataWarning}
 
 ${contextText ? `My Team Performance Data:\n${contextText}` : 'No demo data available.'}
@@ -241,6 +478,7 @@ Your analysis style:
 - Deep tactical knowledge: executes, utility setups, rotations, economy, CT defaults, T-side timings
 - Use CS2 terminology correctly (executes, retakes, defaults, eco rounds, force buys, mid-round calls, etc.)
 - Format responses clearly with markdown headers and bullet points
+- VISUAL REPLAYS: You have a showRoundReplay tool. Use it proactively when illustrating a specific execute, smoke pattern, or round event — especially when the cross-demo patterns section mentions a specific tendency. Pass a short description of what to look for.
 ${dataWarning}
 
 ${contextText ? `Opponent Scout Context:\n${contextText}` : 'No demo data available.'}
@@ -271,6 +509,82 @@ CRITICAL RULES for pro dataset references:
     baseURL: 'https://api.groq.com/openai/v1',
   })
 
+  // ── showRoundReplay tool ─────────────────────────────────────────────────────
+  // Fetches a single round (kills + grenades, no frames) so the client can
+  // render an interactive 2D replay inline in the chat.
+  const showRoundReplay = tool({
+    description: 'Display an interactive 2D round replay to help the user visualise a tactical pattern, execute, or key event you are discussing. Use this proactively when explaining specific round sequences, smoke setups, execute patterns, or kill events that benefit from visual context. Do NOT use it for general statistical observations.',
+    parameters: z.object({
+      mapName:     z.string().describe('CS2 map name e.g. de_mirage'),
+      roundNumber: z.number().int().optional().describe('Specific round number (1-indexed). Omit to let the system pick a representative round.'),
+      description: z.string().max(200).describe('Short caption shown below the replay explaining what to look for — e.g. "Notice the simultaneous Stairs + Jungle smokes at 0:23."'),
+    }),
+    execute: async ({ mapName, roundNumber, description }) => {
+      try {
+        // Fetch demos — opponent or self based on request context
+        let demoParsedList: DemoParsedData[] = []
+
+        if (folderId) {
+          const { data: folder } = await supabase
+            .from('team_folders')
+            .select('opponent_slug')
+            .eq('id', folderId)
+            .single()
+
+          if (folder && teamId) {
+            const { data: demos } = await supabase
+              .from('demos')
+              .select('parsed_data')
+              .eq('team_id', teamId)
+              .eq('opponent_slug', folder.opponent_slug)
+              .eq('status', 'completed')
+              .eq('demo_type', 'opponent')
+              .order('created_at', { ascending: false })
+              .limit(5)
+            demoParsedList = (demos ?? []).map(d => d.parsed_data as DemoParsedData).filter(Boolean)
+          }
+        } else if (teamId) {
+          const admin = createAdminClient()
+          const { data: demos } = await admin
+            .from('demos')
+            .select('parsed_data')
+            .eq('team_id', teamId)
+            .eq('status', 'completed')
+            .eq('demo_type', 'self')
+            .order('created_at', { ascending: false })
+            .limit(5)
+          demoParsedList = (demos ?? []).map(d => d.parsed_data as DemoParsedData).filter(Boolean)
+        }
+
+        // Find a demo that has rounds on the requested map
+        const pd = demoParsedList.find(d => d?.header?.map === mapName && (d.rounds?.length ?? 0) > 0)
+        if (!pd?.rounds) return { error: `No round data available for ${mapName}` }
+
+        const rounds = pd.rounds
+        const round = roundNumber
+          ? (rounds.find(r => r.number === roundNumber) ?? rounds.find(r => (r.kills?.length ?? 0) > 0) ?? rounds[0])
+          : (rounds.find(r => r.bomb_planted && (r.kills?.length ?? 0) > 0) ?? rounds.find(r => (r.kills?.length ?? 0) > 0) ?? rounds[0])
+
+        if (!round) return { error: 'Round not found' }
+
+        // Strip frames (too large to transmit) — kills + grenades are enough for kill-only replay
+        const { frames: _frames, ...roundWithoutFrames } = round
+
+        return {
+          mapName,
+          roundNumber:  round.number,
+          team1Name:    pd.header?.team1 ?? 'Team 1',
+          team2Name:    pd.header?.team2 ?? 'Team 2',
+          description,
+          round:        roundWithoutFrames,
+          players:      (pd.players ?? []).slice(0, 10),
+        }
+      } catch {
+        return { error: 'Failed to load round data' }
+      }
+    },
+  })
+
   try {
     const result = streamText({
       model: groq('llama-3.3-70b-versatile'),
@@ -283,6 +597,8 @@ CRITICAL RULES for pro dataset references:
         })),
       maxTokens: 2000,
       temperature: 0.7,
+      maxSteps:    3,
+      tools: { showRoundReplay },
     })
 
     return result.toDataStreamResponse({
@@ -292,13 +608,11 @@ CRITICAL RULES for pro dataset references:
         'X-Accel-Buffering': 'no',
       },
       getErrorMessage: (error) => {
-        console.error('[AI Coach] streaming error:', error)
         if (error instanceof Error) return error.message
         return 'AI service error'
       },
     })
   } catch (err: unknown) {
-    console.error('[AI Coach] route error:', err)
     const message = err instanceof Error ? err.message : 'AI service unavailable'
     return NextResponse.json({ error: message }, { status: 503 })
   }

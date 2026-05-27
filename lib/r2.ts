@@ -1,88 +1,87 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
-function getR2Client() {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
+let _client: S3Client | null = null
 
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    const missing = ['CLOUDFLARE_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']
-      .filter(k => !process.env[k])
-      .join(', ')
-    throw new Error(`R2 not configured — missing env vars: ${missing}`)
+function getR2Client(): S3Client {
+  if (_client) return _client
+
+  const missing = ['CLOUDFLARE_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']
+    .filter(k => !process.env[k])
+  if (missing.length) {
+    throw new Error(`R2 not configured — missing env vars: ${missing.join(', ')}`)
   }
 
-  return new S3Client({
+  _client = new S3Client({
     region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId, secretAccessKey },
+    endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+    },
   })
+  return _client
 }
 
 /** Generate a presigned PUT URL for a single object upload (up to 5 GB). */
 export async function createPresignedPutUrl(key: string, expiresIn = 3600): Promise<string> {
-  const client = getR2Client()
-  const command = new PutObjectCommand({
+  return getSignedUrl(getR2Client(), new PutObjectCommand({
     Bucket: process.env.R2_BUCKET_NAME!,
     Key: key,
     ContentType: 'application/octet-stream',
-  })
-  return getSignedUrl(client, command, { expiresIn })
+  }), { expiresIn })
 }
 
 /** Build the public download URL for an R2 object key. */
 export function getPublicUrl(key: string): string {
-  const base = process.env.R2_PUBLIC_URL!.replace(/\/$/, '')
-  return `${base}/${key}`
+  return `${process.env.R2_PUBLIC_URL!.replace(/\/$/, '')}/${key}`
 }
 
 /** Delete an object from R2 storage. No-ops if the key doesn't exist. */
 export async function deleteObject(key: string): Promise<void> {
-  const client = getR2Client()
-  await client.send(new DeleteObjectCommand({
+  await getR2Client().send(new DeleteObjectCommand({
     Bucket: process.env.R2_BUCKET_NAME!,
     Key: key,
   }))
 }
 
-/**
- * Download the complete content of an R2 object as a Buffer.
- * Use for demo parsing — may be hundreds of MB, so only call from background tasks.
- */
-export async function downloadObject(key: string): Promise<Buffer> {
-  const client = getR2Client()
-  const command = new GetObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME!,
-    Key: key,
-  })
-  const response = await client.send(command)
-  const body = response.Body
-  if (!body) throw new Error('Empty response body from R2')
+async function streamToBuffer(body: AsyncIterable<Uint8Array>): Promise<Buffer> {
   const chunks: Uint8Array[] = []
-  for await (const chunk of body as AsyncIterable<Uint8Array>) {
-    chunks.push(chunk)
-  }
+  for await (const chunk of body) chunks.push(chunk)
   return Buffer.concat(chunks)
 }
 
 /**
- * Download the first `bytes` bytes of an R2 object as a Buffer.
+ * Download the complete content of an R2 object as a Buffer.
+ * Use for demo parsing — may be hundreds of MB, so only call from background tasks.
+ * Validates the downloaded byte count against ContentLength so a silently-truncated
+ * stream throws rather than returning a partial buffer that fails later in the pipeline.
+ */
+export async function downloadObject(key: string): Promise<Buffer> {
+  const response = await getR2Client().send(new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME!,
+    Key: key,
+  }))
+  if (!response.Body) throw new Error('Empty response body from R2')
+  const buf = await streamToBuffer(response.Body as AsyncIterable<Uint8Array>)
+  if (response.ContentLength !== undefined && buf.byteLength !== response.ContentLength) {
+    throw new Error(
+      `R2 download truncated: expected ${response.ContentLength} bytes, got ${buf.byteLength}`
+    )
+  }
+  return buf
+}
+
+/**
+ * Download the first `bytes` bytes of an R2 object.
  * Uses a range request so we never download the full demo file.
  */
 export async function getFirstBytes(key: string, bytes = 8192): Promise<Buffer> {
-  const client = getR2Client()
-  const command = new GetObjectCommand({
+  const response = await getR2Client().send(new GetObjectCommand({
     Bucket: process.env.R2_BUCKET_NAME!,
     Key: key,
     Range: `bytes=0-${bytes - 1}`,
-  })
-  const response = await client.send(command)
-  const body = response.Body
-  if (!body) throw new Error('Empty response body from R2')
-  const chunks: Uint8Array[] = []
-  for await (const chunk of body as AsyncIterable<Uint8Array>) {
-    chunks.push(chunk)
-  }
-  return Buffer.concat(chunks)
+  }))
+  if (!response.Body) throw new Error('Empty response body from R2')
+  return streamToBuffer(response.Body as AsyncIterable<Uint8Array>)
 }

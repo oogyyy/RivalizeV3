@@ -1,28 +1,27 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import {
-  Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle,
-  Info, RefreshCw,
+  Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info, RefreshCw,
 } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
-const LARGE_FILE_THRESHOLD = 300 * 1024 * 1024 // 300 MB
-const MAX_FILE_SIZE        = 500 * 1024 * 1024 // 500 MB
+const LARGE_FILE_THRESHOLD = 300 * 1024 * 1024
+const MAX_FILE_SIZE        = 500 * 1024 * 1024
 
 interface DemoUploadButtonProps {
   teamId: string
-  /** Controls upload context and data isolation.
-   *  'opponent' (default) → Opponents / scouting flow.
-   *  'self' → My Team / self-analysis flow. */
+  /** 'opponent' (default) → Opponents / scouting. 'self' → My Team analysis. */
   demoType?: 'opponent' | 'self'
   onSuccess?: () => void
 }
 
-type UploadStatus = 'pending' | 'presigning' | 'uploading' | 'registering' | 'parsing' | 'done' | 'error'
+// 'queued' = uploaded + parse kicked off in background (terminal success state)
+type UploadStatus = 'pending' | 'presigning' | 'uploading' | 'registering' | 'queued' | 'error'
 
 interface FileUpload {
   file: File
@@ -37,19 +36,35 @@ function isValidDemoFile(name: string) {
   return lower.endsWith('.dem') || lower.endsWith('.zst')
 }
 
-function uploadToR2(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
+function uploadViaServer(
+  file: File,
+  params: { teamId: string; opponentName: string; demoType: string },
+  onProgress: (pct: number) => void,
+): Promise<{ id: string }> {
   return new Promise((resolve, reject) => {
+    const url = new URL('/api/demos/upload', window.location.origin)
+    url.searchParams.set('teamId', params.teamId)
+    url.searchParams.set('filename', file.name)
+    url.searchParams.set('opponentName', params.opponentName)
+    url.searchParams.set('demoType', params.demoType)
+
     const xhr = new XMLHttpRequest()
-    xhr.open('PUT', url)
+    xhr.open('POST', url.toString())
     xhr.setRequestHeader('Content-Type', 'application/octet-stream')
     xhr.upload.addEventListener('progress', e => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
     })
     xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else reject(new Error(`R2 upload failed: HTTP ${xhr.status}`))
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)) }
+        catch { reject(new Error('Invalid server response')) }
+      } else {
+        let msg = `Upload failed (${xhr.status})`
+        try { msg = JSON.parse(xhr.responseText).error ?? msg } catch { /* ignore */ }
+        reject(new Error(msg))
+      }
     })
-    xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
+    xhr.addEventListener('error', () => reject(new Error('Network error — check your connection')))
     xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
     xhr.send(file)
   })
@@ -60,7 +75,10 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   const [open, setOpen]               = useState(false)
   const [uploads, setUploads]         = useState<FileUpload[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [hasStarted, setHasStarted]   = useState(false)
   const [opponentName, setOpponentName] = useState('')
+  const [mounted, setMounted]         = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   const updateUpload = useCallback(
     (index: number, update: Partial<FileUpload>) =>
@@ -93,82 +111,45 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
       prev.map(u => u.status === 'error' ? { ...u, status: 'pending', progress: 0, error: undefined } : u)
     )
 
-  // ── Upload logic ─────────────────────────────────────────────────────────────
+  // ── Per-file upload (server proxy → register + parse in one call) ─────────────
 
-  const uploadOne = async (i: number, file: File): Promise<string | null> => {
+  const uploadOne = async (i: number, file: File): Promise<void> => {
     try {
-      updateUpload(i, { status: 'presigning', progress: 2 })
+      updateUpload(i, { status: 'uploading', progress: 0 })
 
-      const presignRes = await fetch('/api/demos/presign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId, filename: file.name, fileSize: file.size }),
-      })
-      if (!presignRes.ok) {
-        const err = await presignRes.json().catch(() => ({}))
-        throw new Error(err.error ?? `Presign failed (${presignRes.status})`)
-      }
-      const { key, uploadUrl } = await presignRes.json()
+      const demo = await uploadViaServer(
+        file,
+        { teamId, opponentName: demoType === 'self' ? 'My Team' : opponentName.trim(), demoType },
+        pct => updateUpload(i, { progress: pct }),
+      )
 
-      updateUpload(i, { status: 'uploading', progress: 5 })
-      await uploadToR2(uploadUrl, file, pct => {
-        updateUpload(i, { progress: 5 + Math.round(pct * 0.83) })
-      })
+      updateUpload(i, { progress: 100, status: 'registering' })
 
-      updateUpload(i, { progress: 90, status: 'registering' })
+      // Fire-and-forget: kick off parsing without blocking the UI.
+      fetch(`/api/demos/${demo.id}/parse`, { method: 'POST' }).catch(() => {})
 
-      const registerRes = await fetch('/api/demos/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teamId,
-          r2Key: key,
-          opponentName: demoType === 'self' ? 'My Team' : opponentName.trim(),
-          map: 'unknown',
-          fileSize: file.size,
-          demoType,
-          // Self-demos default to team2 (CT-Side) as "my team"; adjust via the demo card selector.
-          ...(demoType === 'self' && { opponentSide: 'team1' }),
-        }),
-      })
-      if (!registerRes.ok) {
-        const err = await registerRes.json().catch(() => ({}))
-        throw new Error(err.error ?? `Register failed (${registerRes.status})`)
-      }
-
-      const demo = await registerRes.json()
-      updateUpload(i, { status: 'parsing', progress: 100, demoId: demo.id })
-
-      // Parse synchronously — keeps the connection open so the job is guaranteed to finish.
-      const parseRes = await fetch(`/api/demos/${demo.id}/parse`, { method: 'POST' })
-      if (!parseRes.ok) {
-        const parseErr = await parseRes.json().catch(() => ({}))
-        // Parsing failed but the demo was created; show as done so user can retry via reparse.
-        console.warn('[upload] Parse failed:', parseErr.error)
-      }
-
-      updateUpload(i, { status: 'done', progress: 100, demoId: demo.id })
-      return demo.id as string
+      updateUpload(i, { status: 'queued', progress: 100, demoId: demo.id })
     } catch (err) {
       updateUpload(i, {
         status: 'error', progress: 0,
         error: err instanceof Error ? err.message : 'Upload failed',
       })
-      return null
     }
   }
 
+  // ── Batch upload: all pending files in parallel ───────────────────────────────
+
   const uploadAll = async () => {
     if (demoType !== 'self' && !opponentName.trim()) return
+    setHasStarted(true)
     setIsProcessing(true)
 
-    const pending = uploads
-      .map((u, i) => ({ file: u.file, index: i, status: u.status }))
-      .filter(u => u.status === 'pending')
+    const pending = uploads.reduce<Array<{ file: File; index: number }>>((acc, u, i) => {
+      if (u.status === 'pending') acc.push({ file: u.file, index: i })
+      return acc
+    }, [])
 
-    for (const { file, index } of pending) {
-      await uploadOne(index, file)
-    }
+    await Promise.allSettled(pending.map(({ file, index }) => uploadOne(index, file)))
 
     setIsProcessing(false)
     onSuccess?.()
@@ -177,18 +158,22 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
   const handleClose = () => {
     if (isProcessing) return
-    if (uploads.some(u => u.status === 'parsing')) return
     setOpen(false)
     setUploads([])
     setOpponentName('')
+    setHasStarted(false)
   }
 
-  // ── Derived display values ───────────────────────────────────────────────────
+  // ── Derived values ────────────────────────────────────────────────────────────
 
   const pendingCount = uploads.filter(u => u.status === 'pending').length
   const errorCount   = uploads.filter(u => u.status === 'error').length
-  const doneCount    = uploads.filter(u => u.status === 'done').length
-  const canUpload    = pendingCount > 0 && (demoType === 'self' || opponentName.trim().length > 0)
+  const queuedCount  = uploads.filter(u => u.status === 'queued').length
+  const activeCount  = uploads.filter(u =>
+    u.status === 'presigning' || u.status === 'uploading' || u.status === 'registering'
+  ).length
+  const canUpload   = pendingCount > 0 && (demoType === 'self' || opponentName.trim().length > 0)
+  const allSettled  = hasStarted && uploads.length > 0 && activeCount === 0 && pendingCount === 0
   const hasLargeFile = uploads.some(
     u => u.file.size > LARGE_FILE_THRESHOLD && (u.status === 'pending' || u.status === 'uploading')
   )
@@ -196,16 +181,15 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   const statusLabel = (u: FileUpload) => {
     switch (u.status) {
       case 'presigning':  return 'Preparing…'
-      case 'uploading':   return `Uploading… ${u.progress > 5 ? `${u.progress - 5}%` : ''}`
+      case 'uploading':   return `Uploading ${u.progress > 0 ? `${u.progress}%` : '…'}`
       case 'registering': return 'Saving…'
-      case 'parsing':     return 'Parsing demo…'
-      case 'done':        return 'Done'
+      case 'queued':      return 'Queued for parsing'
       case 'error':       return u.error ?? 'Failed'
       default:            return 'Ready'
     }
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   if (!open) {
     return (
@@ -216,11 +200,11 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
     )
   }
 
-  return (
+  const modal = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
 
-        {/* Modal header */}
+        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card z-10">
           <div>
             <h2 className="text-lg font-bold text-foreground">
@@ -264,7 +248,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
             </div>
           )}
 
-          {/* File upload area */}
+          {/* File drop zone */}
           <div className="space-y-2">
             {demoType === 'opponent' && (
               <div className="flex items-center gap-2 mb-2">
@@ -279,7 +263,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
               <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
                 <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-yellow-300">
-                  CS2 demos are typically 200–500 MB. Large files upload directly to cloud storage — keep this tab open.
+                  Large files upload directly to cloud storage — keep this tab open until all uploads complete.
                 </p>
               </div>
             )}
@@ -308,83 +292,118 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
               )}
             </div>
 
+            {/* Per-file status rows */}
             {uploads.length > 0 && (
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {uploads.map((upload, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      'flex items-center gap-3 rounded-md border bg-background/50 px-3 py-2',
-                      upload.status === 'error' ? 'border-red-500/40' : 'border-border'
-                    )}
-                  >
-                    <FileVideo
-                      size={16}
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {uploads.map((upload, i) => {
+                  const inFlight = upload.status === 'presigning' || upload.status === 'uploading' || upload.status === 'registering'
+                  return (
+                    <div
+                      key={i}
                       className={cn(
-                        'shrink-0',
-                        upload.status === 'done'  ? 'text-[#00ff87]'
-                        : upload.status === 'error' ? 'text-red-400'
-                        : 'text-muted-foreground'
+                        'flex items-center gap-3 rounded-md border bg-background/50 px-3 py-2',
+                        upload.status === 'error' ? 'border-red-500/40' : 'border-border'
                       )}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground truncate">{upload.file.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-muted-foreground shrink-0">
-                          {formatFileSize(upload.file.size)}
-                        </span>
-                        {upload.status === 'uploading' || upload.status === 'presigning' || upload.status === 'registering' ? (
-                          <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[#00ff87] rounded-full transition-all duration-300"
-                              style={{ width: `${upload.progress}%` }}
-                            />
-                          </div>
-                        ) : upload.status === 'parsing' ? (
-                          <span className="flex items-center gap-1 text-[10px] text-neon-green font-medium">
-                            <Loader2 size={9} className="animate-spin shrink-0" />
-                            Parsing demo…
+                    >
+                      <FileVideo
+                        size={16}
+                        className={cn(
+                          'shrink-0',
+                          upload.status === 'queued' ? 'text-[#00ff87]'
+                          : upload.status === 'error' ? 'text-red-400'
+                          : 'text-muted-foreground'
+                        )}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{upload.file.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            {formatFileSize(upload.file.size)}
                           </span>
-                        ) : (
-                          <span className={cn(
-                            'text-[10px] font-medium truncate',
-                            upload.status === 'done'  ? 'text-[#00ff87]'
-                            : upload.status === 'error' ? 'text-red-400'
-                            : 'text-muted-foreground'
-                          )}>
-                            {statusLabel(upload)}
-                          </span>
+                          {inFlight ? (
+                            <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#00ff87] rounded-full transition-all duration-300"
+                                style={{ width: `${upload.progress}%` }}
+                              />
+                            </div>
+                          ) : (
+                            <span className={cn(
+                              'text-[10px] font-medium truncate',
+                              upload.status === 'queued' ? 'text-[#00ff87]'
+                              : upload.status === 'error' ? 'text-red-400'
+                              : 'text-muted-foreground'
+                            )}>
+                              {statusLabel(upload)}
+                            </span>
+                          )}
+                        </div>
+                        {inFlight && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{statusLabel(upload)}</p>
                         )}
                       </div>
-                      {(upload.status === 'uploading' || upload.status === 'presigning') && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{statusLabel(upload)}</p>
-                      )}
+                      <div className="shrink-0">
+                        {upload.status === 'queued'
+                          ? <CheckCircle2 size={14} className="text-[#00ff87]" />
+                          : upload.status === 'error'
+                          ? <AlertCircle size={14} className="text-red-400" />
+                          : inFlight
+                          ? <Loader2 size={14} className="text-[#00ff87] animate-spin" />
+                          : (
+                            <button
+                              onClick={() => removeFile(i)}
+                              className="text-muted-foreground hover:text-red-400 transition-colors"
+                            >
+                              <X size={14} />
+                            </button>
+                          )
+                        }
+                      </div>
                     </div>
-                    <div className="shrink-0">
-                      {upload.status === 'done'    ? <CheckCircle2 size={14} className="text-[#00ff87]" />
-                      : upload.status === 'error'  ? <AlertCircle  size={14} className="text-red-400" />
-                      : upload.status !== 'pending' ? <Loader2     size={14} className="text-[#00ff87] animate-spin" />
-                      : (
-                        <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-red-400 transition-colors">
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
+
+          {/* Summary banner — shown after all uploads complete */}
+          {allSettled && (
+            <div className={cn(
+              'flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm font-medium',
+              errorCount === 0
+                ? 'border-[#00ff87]/30 bg-[#00ff87]/5 text-[#00ff87]'
+                : queuedCount > 0
+                ? 'border-yellow-500/30 bg-yellow-500/5 text-yellow-300'
+                : 'border-red-500/30 bg-red-500/5 text-red-400'
+            )}>
+              {errorCount === 0 ? (
+                <>
+                  <CheckCircle2 size={14} className="shrink-0" />
+                  {queuedCount} demo{queuedCount !== 1 ? 's' : ''} uploaded — parsing in background
+                </>
+              ) : queuedCount > 0 ? (
+                <>
+                  <AlertCircle size={14} className="shrink-0" />
+                  {queuedCount} uploaded · {errorCount} failed
+                </>
+              ) : (
+                <>
+                  <AlertCircle size={14} className="shrink-0" />
+                  All uploads failed — check your connection and try again
+                </>
+              )}
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-1 border-t border-border">
             <span className="text-xs text-muted-foreground">
               {uploads.length === 0
                 ? 'No files selected'
-                : doneCount > 0 && errorCount === 0
-                ? `${doneCount}/${uploads.length} uploaded`
-                : doneCount > 0
-                ? `${doneCount} done · ${errorCount} failed`
+                : isProcessing
+                ? `Uploading ${activeCount} of ${uploads.length} file${uploads.length !== 1 ? 's' : ''}…`
+                : allSettled
+                ? `${queuedCount} queued · ${errorCount} failed`
                 : `${uploads.length} file${uploads.length !== 1 ? 's' : ''} selected`}
             </span>
             <div className="flex gap-2">
@@ -400,7 +419,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                 onClick={handleClose}
                 disabled={isProcessing}
               >
-                {doneCount > 0 && pendingCount === 0 && errorCount === 0 ? 'Close' : 'Cancel'}
+                {allSettled ? 'Done' : 'Cancel'}
               </Button>
               {pendingCount > 0 && (
                 <Button
@@ -425,4 +444,6 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
       </div>
     </div>
   )
+
+  return mounted ? createPortal(modal, document.body) : null
 }

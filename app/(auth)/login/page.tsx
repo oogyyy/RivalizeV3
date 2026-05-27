@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Loader2, AlertCircle, Mail, Lock } from 'lucide-react'
 
@@ -22,8 +22,19 @@ function DiscordIcon() {
   )
 }
 
+const STEAM_ERROR_MESSAGES: Record<string, string> = {
+  steam_cancelled: 'Steam sign-in was cancelled.',
+  steam_invalid:   'Steam could not verify your identity. Please try again.',
+  steam_parse:     'Failed to read your Steam ID. Please try again.',
+  steam_fetch:     'Could not retrieve your account. Please try again.',
+  steam_create:    'Failed to create your account. Please try again.',
+  steam_conflict:  'A sign-in conflict occurred. Please contact support.',
+  steam_session:   'Failed to create a session. Please try again.',
+}
+
 export default function LoginPage() {
-  const router = useRouter()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
@@ -33,6 +44,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
 
   const supabase = createClient()
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    if (errorParam && STEAM_ERROR_MESSAGES[errorParam]) {
+      setError(STEAM_ERROR_MESSAGES[errorParam])
+    }
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -65,6 +83,12 @@ export default function LoginPage() {
     }
   }
 
+  function handleSteamLogin() {
+    setError(null)
+    setOauthLoading('steam')
+    window.location.href = '/api/auth/steam?mode=login'
+  }
+
   async function handleOAuth(provider: 'discord') {
     setError(null)
     setOauthLoading(provider)
@@ -88,10 +112,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="glass-card rounded-xl border border-white/10 p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-white mb-1">Welcome back</h1>
-        <p className="text-sm text-muted-foreground">Sign in to continue your analysis</p>
+    <div className="glass-card rounded-2xl border border-white/10 p-8 shadow-[0_24px_64px_rgba(0,0,0,0.5)]">
+      <div className="mb-7">
+        <h1 className="text-2xl font-black text-white mb-1 tracking-tight">Welcome back</h1>
+        <p className="text-sm text-muted-foreground/80">Sign in to continue your analysis</p>
       </div>
 
       {/* OAuth Buttons */}
@@ -107,6 +131,19 @@ export default function LoginPage() {
             <DiscordIcon />
           )}
           Continue with Discord
+        </button>
+
+        <button
+          onClick={handleSteamLogin}
+          disabled={loading || oauthLoading !== null}
+          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg border border-[#4c6b8a]/50 bg-[#1b2838] hover:bg-[#2a475e] text-white font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {oauthLoading === 'steam' ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <SteamIcon />
+          )}
+          Continue with Steam
         </button>
       </div>
 
@@ -145,7 +182,7 @@ export default function LoginPage() {
               autoComplete="email"
               placeholder="you@example.com"
               disabled={loading || oauthLoading !== null}
-              className="w-full h-10 pl-10 pr-4 rounded-lg border border-white/10 bg-white/5 text-sm text-foreground placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#00ff87]/50 focus:border-[#00ff87]/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full h-11 pl-10 pr-4 rounded-xl border border-white/10 bg-white/[0.04] text-sm text-foreground placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-[#00ff87]/40 focus:border-[#00ff87]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
             />
           </div>
         </div>
@@ -173,7 +210,7 @@ export default function LoginPage() {
               autoComplete="current-password"
               placeholder="••••••••"
               disabled={loading || oauthLoading !== null}
-              className="w-full h-10 pl-10 pr-10 rounded-lg border border-white/10 bg-white/5 text-sm text-foreground placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#00ff87]/50 focus:border-[#00ff87]/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full h-11 pl-10 pr-10 rounded-xl border border-white/10 bg-white/[0.04] text-sm text-foreground placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-[#00ff87]/40 focus:border-[#00ff87]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
             />
             <button
               type="button"
@@ -203,7 +240,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading || oauthLoading !== null || !email || !password}
-          className="w-full h-11 flex items-center justify-center gap-2 rounded-lg bg-[#00ff87] text-black font-bold text-sm hover:bg-[#00ff87]/90 transition-all neon-glow disabled:opacity-50 disabled:cursor-not-allowed disabled:neon-glow-none"
+          className="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-[#00ff87] text-black font-bold text-sm hover:bg-[#00ff87]/92 transition-all duration-150 neon-glow hover:shadow-[0_0_20px_rgba(0,255,135,0.5),0_0_48px_rgba(0,255,135,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
             <>

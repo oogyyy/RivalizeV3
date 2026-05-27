@@ -4,52 +4,72 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard, Target, Brain, User, Settings,
-  LogOut, ChevronLeft, ChevronRight, Crosshair, Shield,
+  LayoutDashboard, Target, Shield, Brain,
+  User, Settings, LogOut, ChevronLeft, ChevronRight, BookOpen, Swords,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
-interface SidebarProps {
-  profile: Profile | null
-  onLinkClick?: () => void
-}
-
-export const navLinks = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/opponents', label: 'Opponents', icon: Target },
-  { href: '/my-team', label: 'My Team', icon: Shield },
-  { href: '/ai-coach', label: 'AI Scout', icon: Brain },
-  { href: '/profile', label: 'Profile', icon: User },
-  { href: '/settings', label: 'Settings', icon: Settings },
+const NAV_ITEMS = [
+  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { href: '/opponents', label: 'Opponents', Icon: Target },
+  { href: '/my-team',   label: 'My Team',   Icon: Shield },
+  { href: '/ai-coach',  label: 'AI Scout',  Icon: Brain },
+  { href: '/playbook',  label: 'Playbooks', Icon: BookOpen },
+  { href: '/veto',      label: 'Veto',      Icon: Swords },
+  { href: '/profile',   label: 'Profile',   Icon: User },
+  { href: '/settings',  label: 'Settings',  Icon: Settings },
 ]
 
-/** Shared nav list used by both Sidebar (desktop) and MobileMenu (mobile drawer). */
-export function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
+interface SidebarNavProps {
+  onLinkClick?: () => void
+  collapsed?: boolean
+}
+
+export function SidebarNav({ onLinkClick, collapsed }: SidebarNavProps) {
   const pathname = usePathname()
   return (
-    <div className="space-y-1">
-      {navLinks.map(({ href, label, icon: Icon }) => {
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {NAV_ITEMS.map(({ href, label, Icon }) => {
         const isActive = pathname === href || pathname.startsWith(href + '/')
         return (
           <Link
             key={href}
             href={href}
             onClick={onLinkClick}
-            className={cn(
-              'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-150',
-              isActive
-                ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-            )}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: collapsed ? '10px 0' : '9px 12px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              borderRadius: 7,
+              background: isActive ? 'rgba(255,45,120,0.1)' : 'transparent',
+              borderLeft: isActive ? '3px solid #ff2d78' : '3px solid transparent',
+              color: isActive ? '#ff2d78' : 'rgba(255,255,255,0.48)',
+              textDecoration: 'none',
+              fontFamily: 'var(--font-inter, Inter), sans-serif',
+              fontSize: 13.5,
+              fontWeight: isActive ? 600 : 400,
+              transition: 'all 0.12s',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+            }}
+            onMouseEnter={e => {
+              if (!isActive) {
+                e.currentTarget.style.color = 'rgba(255,255,255,0.8)'
+                e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+              }
+            }}
+            onMouseLeave={e => {
+              if (!isActive) {
+                e.currentTarget.style.color = 'rgba(255,255,255,0.48)'
+                e.currentTarget.style.background = 'transparent'
+              }
+            }}
           >
-            <Icon
-              size={18}
-              className={cn('shrink-0', isActive ? 'text-neon-green' : 'text-muted-foreground')}
-            />
-            <span>{label}</span>
-            {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-neon-green" />}
+            <span style={{ flexShrink: 0 }}><Icon size={17}/></span>
+            {!collapsed && label}
           </Link>
         )
       })}
@@ -57,12 +77,16 @@ export function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
   )
 }
 
+interface SidebarProps {
+  profile: Profile | null
+  onLinkClick?: () => void
+}
 
-export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
-  const pathname = usePathname()
+export default function Sidebar({ profile }: SidebarProps) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const W = collapsed ? 62 : 200
 
   const handleLogout = async () => {
     setLoggingOut(true)
@@ -73,129 +97,127 @@ export default function Sidebar({ profile, onLinkClick }: SidebarProps) {
   }
 
   const displayName = profile?.display_name || profile?.username || 'Player'
-  const initials = displayName
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+  const initials = displayName[0].toUpperCase()
 
   return (
     <aside
-      className={cn(
-        'hidden md:flex flex-col h-full bg-card border-r border-border transition-all duration-300 ease-in-out shrink-0 relative',
-        collapsed ? 'w-16' : 'w-60'
-      )}
+      className="hidden md:flex flex-col h-full shrink-0"
+      style={{
+        width: W,
+        minWidth: W,
+        background: 'rgba(6,5,18,0.97)',
+        borderRight: '1px solid rgba(255,255,255,0.07)',
+        position: 'relative',
+        zIndex: 10,
+        transition: 'width 0.22s ease, min-width 0.22s ease',
+      }}
     >
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className={cn(
-          'absolute -right-3 top-6 z-10 flex items-center justify-center',
-          'w-6 h-6 rounded-full bg-card border border-border',
-          'text-muted-foreground hover:text-neon-green hover:border-neon-green transition-colors'
-        )}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-      </button>
-
       {/* Logo */}
-      <div
-        className={cn(
-          'flex items-center gap-3 px-4 h-16 border-b border-border shrink-0',
-          collapsed && 'justify-center px-0'
-        )}
-      >
-        <div className="flex items-center justify-center w-8 h-8 rounded bg-neon-green shrink-0">
-          <Crosshair size={18} className="text-black" />
-        </div>
-        {!collapsed && (
-          <span className="text-lg font-bold tracking-widest text-foreground">RIVALIZE</span>
-        )}
+      <div style={{ padding: '18px 16px 12px' }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+            background: 'linear-gradient(135deg, #ff2d78 0%, #9b1dff 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 16px rgba(255,45,120,0.5)',
+          }}>
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none">
+              <path d="M4 3h8L9 9h7L7 18l2-6H5L4 3z" fill="white"/>
+            </svg>
+          </div>
+          {!collapsed && (
+            <span style={{
+              fontFamily: 'var(--font-sora, Sora), sans-serif',
+              fontWeight: 800, fontSize: 16, color: '#fff', letterSpacing: '0.05em',
+            }}>
+              RIVALIZE
+            </span>
+          )}
+        </Link>
       </div>
 
+      {/* Collapse toggle */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        style={{
+          position: 'absolute', top: 20, right: -11,
+          width: 22, height: 22, borderRadius: '50%',
+          background: '#14142a', border: '1px solid rgba(255,255,255,0.18)',
+          color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 20, padding: 0,
+        }}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {collapsed ? <ChevronRight size={11}/> : <ChevronLeft size={11}/>}
+      </button>
+
       {/* Navigation */}
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-        {navLinks.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || pathname.startsWith(href + '/')
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onLinkClick}
-              className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-150',
-                collapsed ? 'justify-center px-0 py-3' : '',
-                isActive
-                  ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-              )}
-              title={collapsed ? label : undefined}
-            >
-              <Icon
-                size={18}
-                className={cn(
-                  'shrink-0',
-                  isActive ? 'text-neon-green' : 'text-muted-foreground'
-                )}
-              />
-              {!collapsed && <span>{label}</span>}
-              {!collapsed && isActive && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-neon-green" />
-              )}
-            </Link>
-          )
-        })}
+      <nav style={{ flex: 1, padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <SidebarNav collapsed={collapsed}/>
       </nav>
 
       {/* User section */}
-      <div className={cn('border-t border-border p-3 space-y-2 shrink-0', collapsed && 'px-0')}>
-        <div
-          className={cn(
-            'flex items-center gap-3 rounded-md px-2 py-2',
-            collapsed && 'justify-center px-0'
-          )}
-        >
-          <div className="relative shrink-0">
+      <div style={{ padding: '10px 8px 14px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        {!collapsed && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 12px 8px' }}>
             {profile?.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={profile.avatar_url}
                 alt={displayName}
-                className="w-8 h-8 rounded-full object-cover ring-1 ring-border"
+                style={{
+                  width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0,
+                  border: '2px solid rgba(255,45,120,0.45)',
+                }}
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center">
-                <span className="text-xs font-bold text-neon-green">{initials}</span>
+              <div style={{
+                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(255,45,120,0.16)', border: '2px solid rgba(255,45,120,0.45)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-sora, Sora), sans-serif',
+                fontWeight: 700, fontSize: 13, color: '#ff2d78',
+              }}>
+                {initials}
               </div>
             )}
-            <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-neon-green border border-card" />
-          </div>
-
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontSize: 13, fontWeight: 600, color: '#fff',
+                fontFamily: 'var(--font-inter, Inter), sans-serif',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {displayName}
+              </div>
               {profile?.username && (
-                <p className="text-xs text-muted-foreground truncate">@{profile.username}</p>
+                <div style={{
+                  fontSize: 11, color: 'rgba(255,255,255,0.36)',
+                  fontFamily: 'var(--font-inter, Inter), sans-serif',
+                }}>
+                  @{profile.username}
+                </div>
               )}
             </div>
-          )}
-        </div>
-
+          </div>
+        )}
         <button
           onClick={handleLogout}
           disabled={loggingOut}
-          className={cn(
-            'flex items-center gap-2 w-full rounded-md px-3 py-2 text-sm font-medium',
-            'text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            collapsed && 'justify-center px-0'
-          )}
-          title={collapsed ? 'Sign out' : undefined}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+            padding: collapsed ? '8px 0' : '7px 12px',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            borderRadius: 7, background: 'transparent', border: 'none',
+            color: 'rgba(255,255,255,0.33)', cursor: loggingOut ? 'not-allowed' : 'pointer',
+            fontFamily: 'var(--font-inter, Inter), sans-serif', fontSize: 13,
+            outline: 'none', opacity: loggingOut ? 0.5 : 1, transition: 'color 0.12s',
+          }}
+          onMouseEnter={e => { if (!loggingOut) e.currentTarget.style.color = 'rgba(255,255,255,0.6)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.33)' }}
         >
-          <LogOut size={16} className="shrink-0" />
-          {!collapsed && <span>{loggingOut ? 'Signing out…' : 'Sign out'}</span>}
+          <LogOut size={16}/>
+          {!collapsed && (loggingOut ? 'Signing out…' : 'Sign out')}
         </button>
       </div>
     </aside>

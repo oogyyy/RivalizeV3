@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'FACEIT_CLIENT_ID not configured' }, { status: 500 })
   }
 
-  const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl     = (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
   const redirectUri = `${appUrl}/api/auth/faceit/callback`
 
   // PKCE: generate code verifier + challenge

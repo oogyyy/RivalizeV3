@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useChat } from 'ai/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,8 +11,13 @@ import {
   Target, Crosshair, Shield, Users,
   Sparkles, MessageSquare, ChevronRight, ExternalLink, Database,
   SlidersHorizontal, X, ChevronDown, BarChart3, AlertCircle, RefreshCw,
+  BookOpen,
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
+import { CS2_MAPS } from '@/types/database'
+import dynamic from 'next/dynamic'
+
+const ChatRoundReplay = dynamic(() => import('@/components/demos/ChatRoundReplay'), { ssr: false })
 
 type Mode = 'opponent' | 'myteam'
 type FocusArea = 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player' | 'executes' | 'rounds' | 'drills'
@@ -33,11 +39,6 @@ const MY_TEAM_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode
   { id: 'strategy', label: 'Playbook',        icon: <Shield size={14} />,    description: 'Build your team playbook' },
 ]
 
-const CS2_MAPS = [
-  'de_dust2', 'de_mirage', 'de_inferno', 'de_nuke',
-  'de_overpass', 'de_vertigo', 'de_ancient', 'de_anubis',
-]
-
 const OPPONENT_QUESTIONS = [
   { label: 'Opponent weaknesses',  prompt: "What are this opponent's biggest weaknesses we can exploit?" },
   { label: 'Full anti-strat',      prompt: "Create a detailed anti-strat — their tendencies, executes, and how we counter them." },
@@ -52,15 +53,73 @@ const MY_TEAM_QUESTIONS = [
   { label: 'Build our playbook',     prompt: "Help us build a structured T-side and CT-side playbook with clear roles and go-to strategies." },
 ]
 
+const FOLLOW_UP_PROMPTS: Record<string, { label: string; prompt: string }[]> = {
+  'opponent/general': [
+    { label: 'Biggest weaknesses',  prompt: "What are their biggest weaknesses we can exploit in the match?" },
+    { label: 'Key threat players',  prompt: "Who are the most dangerous players on this roster and how do we neutralise them?" },
+    { label: 'Map bans advice',     prompt: "Based on this data, which maps should we ban and which should we pick?" },
+  ],
+  'opponent/weakness': [
+    { label: 'Best round to force', prompt: "Which round type do they lose most often and how do we set that situation up?" },
+    { label: 'Utility counters',    prompt: "What specific utility lineups counter their T-side entry patterns?" },
+    { label: 'CT rotation baits',   prompt: "How can we bait their CT rotations to create late-round advantages?" },
+  ],
+  'opponent/antistrat': [
+    { label: 'Counter their AWP',   prompt: "How do we play around their AWP positions — angles, timings, and smokes?" },
+    { label: 'Fake response',       prompt: "What's their likely CT response when we fake one site — how do we punish the rotate?" },
+    { label: 'Eco counter',         prompt: "What's the best way to play against their eco rounds — where do they peek and with what?" },
+  ],
+  'opponent/strategy': [
+    { label: 'Utility for this map', prompt: "What are the 3 most important utility lineups we need ready for this map?" },
+    { label: 'CT anchor positions',  prompt: "Where should our CT anchors hold to maximise time against their common executes?" },
+    { label: 'T-side timing reads',  prompt: "Based on their T-side timings, where should we be positioned at key seconds?" },
+  ],
+  'opponent/player': [
+    { label: 'Shut this player down', prompt: "Give me a specific game plan to limit this player's impact throughout the match." },
+    { label: 'Their weakest spots',   prompt: "In what situations does this player struggle most and how do we force those?" },
+    { label: 'Positioning habits',    prompt: "What are this player's most predictable positions and timings?" },
+  ],
+  'myteam/general': [
+    { label: 'This week\'s priority', prompt: "Based on our demos, what's the single most impactful thing to fix this week?" },
+    { label: 'Weakest map',           prompt: "Which map in our pool has the most issues and what are the top problems on it?" },
+    { label: 'T-side improvements',   prompt: "What specific changes would most improve our T-side consistency?" },
+  ],
+  'myteam/weakness': [
+    { label: 'Fix it with a drill',   prompt: "Create a concrete drill or scenario we can practice to fix our biggest weakness." },
+    { label: 'Economy mistakes',      prompt: "Are we making any patterns of economic mistakes — bad force buys, over-saving, mismanaged eco rounds?" },
+    { label: 'CT retake issues',      prompt: "How can we improve our CT-side retakes — positioning, utility, and communication?" },
+  ],
+  'myteam/executes': [
+    { label: 'Best execute to build',  prompt: "Which of our site executes has the highest success rate and how can we develop it further?" },
+    { label: 'Post-plant positioning', prompt: "How should we position after planting to win more post-plant rounds?" },
+    { label: 'Utility sequence',       prompt: "Walk me through the ideal utility order for our most-used execute." },
+  ],
+  'myteam/rounds': [
+    { label: 'Pistol round fixes',  prompt: "What adjustments would improve our pistol round win rate on both sides?" },
+    { label: 'Eco round wins',      prompt: "How can we win more eco rounds — what setups and plays give us the best odds?" },
+    { label: 'Clutch improvement',  prompt: "What patterns do we have in clutch situations and how do we improve our clutch win rate?" },
+  ],
+  'myteam/drills': [
+    { label: 'Warm-up routine',       prompt: "Design a 30-minute warm-up routine we should run before every scrim session." },
+    { label: 'Role-specific training', prompt: "What should each player role (entry, AWP, support, lurk) focus on individually?" },
+    { label: 'Team practice workshop', prompt: "Design a team practice session focused on our worst-performing area." },
+  ],
+  'myteam/strategy': [
+    { label: 'A site default',      prompt: "Help us build a solid A site CT default with clear responsibilities for each player." },
+    { label: 'T-side default',      prompt: "Design a structured T-side default — what's everyone's role and where do we gather info?" },
+    { label: 'Mid-round calling',   prompt: "What mid-round calling structure would help us adapt better to CT reads?" },
+  ],
+}
+
 function MarkdownContent({ content }: { content: string }) {
   const rendered = content.split('\n').map((line, i) => {
     if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold text-foreground mt-4 mb-2">{line.slice(4)}</h3>
-    if (line.startsWith('## '))  return <h2 key={i} className="text-lg font-bold text-neon-green mt-5 mb-2">{line.slice(3)}</h2>
+    if (line.startsWith('## '))  return <h2 key={i} className="text-base font-bold text-[#00ffc8] mt-5 mb-2">{line.slice(3)}</h2>
     if (line.startsWith('# '))   return <h1 key={i} className="text-xl font-bold text-foreground mt-5 mb-3">{line.slice(2)}</h1>
     if (line.startsWith('- ') || line.startsWith('* ')) {
       return (
         <div key={i} className="flex gap-2 my-0.5">
-          <span className="text-neon-green mt-1.5 shrink-0 text-xs">▸</span>
+          <span className="text-[#00ffc8] mt-1.5 shrink-0 text-xs">▸</span>
           <span>{renderInline(line.slice(2))}</span>
         </div>
       )
@@ -69,7 +128,7 @@ function MarkdownContent({ content }: { content: string }) {
     if (numbered) {
       return (
         <div key={i} className="flex gap-2 my-0.5">
-          <span className="text-neon-green shrink-0 font-mono text-xs min-w-[1.2rem]">{numbered[1]}.</span>
+          <span className="text-[#00ffc8] shrink-0 font-mono text-xs min-w-[1.2rem]">{numbered[1]}.</span>
           <span>{renderInline(numbered[2])}</span>
         </div>
       )
@@ -87,7 +146,7 @@ function renderInline(text: string): React.ReactNode {
     if (part.startsWith('***') && part.endsWith('***')) return <strong key={i}><em>{part.slice(3, -3)}</em></strong>
     if (part.startsWith('**') && part.endsWith('**'))   return <strong key={i} className="font-bold text-foreground">{part.slice(2, -2)}</strong>
     if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i} className="italic text-muted-foreground">{part.slice(1, -1)}</em>
-    if (part.startsWith('`') && part.endsWith('`'))     return <code key={i} className="px-1 py-0.5 bg-muted rounded text-xs font-mono text-neon-green">{part.slice(1, -1)}</code>
+    if (part.startsWith('`') && part.endsWith('`'))     return <code key={i} className="px-1 py-0.5 bg-muted rounded text-xs font-mono text-[#00ffc8]">{part.slice(1, -1)}</code>
     return part
   })
 }
@@ -95,13 +154,13 @@ function renderInline(text: string): React.ReactNode {
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-3 mb-4">
-      <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center shrink-0">
-        <Brain size={14} className="text-neon-green" />
+      <div className="w-8 h-8 rounded-xl bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center shrink-0">
+        <Brain size={14} className="text-[#00ffc8]" />
       </div>
       <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3">
         <div className="flex gap-1 items-center h-4">
           {[0, 1, 2].map(i => (
-            <div key={i} className="w-1.5 h-1.5 rounded-full bg-neon-green animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#00ffc8] animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
           ))}
         </div>
       </div>
@@ -110,6 +169,7 @@ function TypingIndicator() {
 }
 
 export default function AIScoutPage() {
+  const router = useRouter()
   const [mode, setMode] = useState<Mode>('opponent')
   const [opponents, setOpponents] = useState<TeamFolder[]>([])
   const [selectedFolderId, setSelectedFolderId] = useState<string>('')
@@ -206,9 +266,9 @@ export default function AIScoutPage() {
     const currentFolder = opponents.find(f => f.id === selectedFolderIdRef.current)
     return {
       teamId:           modeRef.current === 'myteam'
-                          ? myTeamIdRef.current
-                          : (currentFolder?.user_team_id ?? null),
-      folderId:         modeRef.current === 'opponent' ? (selectedFolderIdRef.current || null) : null,
+                          ? (myTeamIdRef.current ?? undefined)
+                          : (currentFolder?.user_team_id ?? undefined),
+      folderId:         modeRef.current === 'opponent' ? (selectedFolderIdRef.current || undefined) : undefined,
       focusArea:        focusAreaRef.current,
       mode:             modeRef.current,
       playerName:       focusAreaRef.current === 'player' ? selectedPlayerRef.current : undefined,
@@ -261,12 +321,16 @@ export default function AIScoutPage() {
   const lastMsg     = messages[messages.length - 1]
   const isThinking  = isLoading && (!lastMsg || lastMsg.role === 'user')
 
+  const followUpKey    = `${mode}/${focusArea}`
+  const followUpChips  = FOLLOW_UP_PROMPTS[followUpKey] ?? []
+  const showFollowUps  = !isLoading && !error && lastMsg?.role === 'assistant' && followUpChips.length > 0
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* ── Left panel: Context sidebar ── */}
       <div
         className={cn(
-          'shrink-0 border-r border-border bg-card flex flex-col h-full overflow-y-auto',
+          'shrink-0 border-r border-border bg-[hsl(228,22%,8%)] flex flex-col h-full overflow-y-auto',
           'md:w-72 md:flex',
           isContextOpen
             ? 'fixed inset-0 z-40 w-full flex flex-col md:relative md:inset-auto md:w-72'
@@ -283,19 +347,21 @@ export default function AIScoutPage() {
 
         {/* Panel header */}
         <div className="p-5 border-b border-border">
-          <div className="flex items-center gap-2 mb-3">
-            <Brain size={18} className="text-neon-green" />
-            <h1 className="text-lg font-bold text-foreground">AI Coach</h1>
-            <Badge variant="neon" className="text-xs ml-auto">Llama 3.3</Badge>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center">
+              <Brain size={14} className="text-[#00ffc8]" />
+            </div>
+            <h1 className="text-[13px] font-bold text-foreground tracking-wide">AI Scout</h1>
+            <Badge variant="neon" className="text-[10px] ml-auto">Llama 3.3</Badge>
           </div>
           {/* Mode toggle */}
-          <div className="flex rounded-lg border border-border bg-background p-0.5 gap-0.5">
+          <div className="flex rounded-lg border border-border bg-[hsl(228,25%,6%)] p-0.5 gap-0.5">
             <button
               onClick={() => { setMode('opponent'); setFocusArea('general'); setMessages([]) }}
               className={cn(
                 'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
                 mode === 'opponent'
-                  ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
+                  ? 'bg-[rgba(0,255,200,0.1)] text-[#00ffc8] border border-[rgba(0,255,200,0.2)]'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -307,7 +373,7 @@ export default function AIScoutPage() {
               className={cn(
                 'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
                 mode === 'myteam'
-                  ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
+                  ? 'bg-[rgba(0,255,200,0.1)] text-[#00ffc8] border border-[rgba(0,255,200,0.2)]'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -345,8 +411,8 @@ export default function AIScoutPage() {
               )}
 
               {selectedFolder && (
-                <div className="mt-2 p-2.5 bg-neon-green/5 rounded-md border border-neon-green/20 text-xs">
-                  <p className="text-neon-green font-semibold">{selectedFolder.opponent_display_name}</p>
+                <div className="mt-2 p-2.5 bg-[rgba(0,255,200,0.05)] rounded-md border border-[rgba(0,255,200,0.2)] text-xs">
+                  <p className="text-[#00ffc8] font-semibold">{selectedFolder.opponent_display_name}</p>
                   <p className="text-muted-foreground mt-0.5">
                     {(selectedFolder.aggregated_stats as { total_matches?: number } | null)?.total_matches ?? 0} matches ·{' '}
                     {Math.round(((selectedFolder.aggregated_stats as { win_rate?: number } | null)?.win_rate ?? 0) * 100)}% win rate
@@ -358,8 +424,8 @@ export default function AIScoutPage() {
 
           {/* My team indicator */}
           {mode === 'myteam' && (
-            <div className="p-2.5 bg-neon-green/5 rounded-md border border-neon-green/20 text-xs">
-              <p className="text-neon-green font-semibold flex items-center gap-1.5">
+            <div className="p-2.5 bg-[rgba(0,255,200,0.05)] rounded-md border border-[rgba(0,255,200,0.2)] text-xs">
+              <p className="text-[#00ffc8] font-semibold flex items-center gap-1.5">
                 <Shield size={11} /> My Team Analysis
               </p>
               <p className="text-muted-foreground mt-0.5">
@@ -381,18 +447,18 @@ export default function AIScoutPage() {
                   className={cn(
                     'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm font-medium transition-all text-left',
                     focusArea === area.id
-                      ? 'bg-neon-green/10 text-neon-green border border-neon-green/20'
+                      ? 'bg-[rgba(0,255,200,0.08)] text-[#00ffc8] border border-[rgba(0,255,200,0.2)]'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent'
                   )}
                 >
-                  <span className={focusArea === area.id ? 'text-neon-green' : 'text-muted-foreground'}>
+                  <span className={focusArea === area.id ? 'text-[#00ffc8]' : 'text-muted-foreground'}>
                     {area.icon}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="truncate">{area.label}</p>
                     <p className="text-xs text-muted-foreground truncate font-normal">{area.description}</p>
                   </div>
-                  {focusArea === area.id && <div className="w-1.5 h-1.5 rounded-full bg-neon-green shrink-0" />}
+                  {focusArea === area.id && <div className="w-1.5 h-1.5 rounded-full bg-[#00ffc8] shrink-0" />}
                 </button>
               ))}
             </div>
@@ -439,6 +505,32 @@ export default function AIScoutPage() {
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Playbook builder CTA */}
+          {(focusArea === 'strategy' || focusArea === 'executes') && (
+            <div className="border-t border-border pt-4">
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams()
+                  if (selectedMap) params.set('map', selectedMap)
+                  if (myTeamId)    params.set('team', myTeamId)
+                  router.push(`/playbook?${params.toString()}`)
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-[rgba(0,255,200,0.25)] bg-[rgba(0,255,200,0.05)] hover:border-[rgba(0,255,200,0.45)] hover:bg-[rgba(0,255,200,0.08)] text-left transition-all group"
+              >
+                <div className="w-7 h-7 rounded flex items-center justify-center shrink-0 bg-[rgba(0,255,200,0.12)] group-hover:bg-[rgba(0,255,200,0.18)] transition-colors">
+                  <BookOpen size={13} className="text-[#00ffc8]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#00ffc8]">Build a Playbook</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {selectedMap ? `Create a saved ${selectedMap} playbook` : 'Create a structured playbook with AI'}
+                  </p>
+                </div>
+                <ChevronRight size={13} className="text-[#00ffc8]/50 group-hover:text-[#00ffc8] group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
             </div>
           )}
 
@@ -508,7 +600,7 @@ export default function AIScoutPage() {
       {/* ── Right panel: Chat ── */}
       <div className="flex-1 flex flex-col overflow-hidden bg-background min-w-0">
         {/* Chat header */}
-        <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b border-border bg-card shrink-0">
+        <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b border-border bg-[hsl(229,23%,9%)] shrink-0">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -519,7 +611,7 @@ export default function AIScoutPage() {
               <SlidersHorizontal size={14} />
               Settings
             </Button>
-            <MessageSquare size={16} className="text-neon-green hidden md:block" />
+            <MessageSquare size={16} className="text-[#00ffc8] hidden md:block" />
             <div className="hidden md:flex items-baseline gap-1.5">
               <span className="text-sm font-semibold text-foreground">
                 {mode === 'myteam' ? 'My Team' : selectedFolder ? selectedFolder.opponent_display_name : 'AI Coach'}
@@ -546,15 +638,16 @@ export default function AIScoutPage() {
           {isEmpty ? (
             /* ── Welcome / empty state ── */
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <div className="w-20 h-20 rounded-full bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mb-5">
-                <Brain size={36} className="text-neon-green" />
+              <div className="relative w-16 h-16 rounded-2xl bg-[rgba(0,255,200,0.1)] border border-[rgba(0,255,200,0.2)] flex items-center justify-center mb-5 shadow-[0_0_24px_rgba(0,255,200,0.1)]">
+                <Brain size={28} className="text-[#00ffc8]" />
+                <div className="absolute inset-0 rounded-2xl bg-[rgba(0,255,200,0.05)] animate-ping opacity-20" />
               </div>
-              <h2 className="text-xl font-bold text-foreground mb-1">
+              <h2 className="text-xl font-bold text-foreground mb-1.5">
                 {mode === 'myteam'
                   ? 'My Team Coach Ready'
-                  : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Coach Ready'}
+                  : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Scout Ready'}
               </h2>
-              <p className="text-muted-foreground text-sm max-w-sm mb-8">
+              <p className="text-muted-foreground text-sm max-w-sm mb-8 leading-relaxed">
                 {mode === 'myteam'
                   ? "Ask anything about your team's performance — weaknesses, executes, practice plans, and strategy."
                   : selectedFolder
@@ -569,14 +662,14 @@ export default function AIScoutPage() {
                     onClick={() => sendMessage(q.prompt)}
                     disabled={isLoading}
                     className={cn(
-                      'flex items-center gap-2 p-3 text-left rounded-lg border border-border bg-card',
-                      'text-sm text-muted-foreground hover:text-foreground hover:border-neon-green/30 hover:bg-neon-green/5',
-                      'transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed'
+                      'flex items-center gap-2.5 p-3.5 text-left rounded-xl border border-border bg-card',
+                      'text-[13px] text-muted-foreground hover:text-foreground hover:border-[rgba(0,255,200,0.25)] hover:bg-[rgba(0,255,200,0.04)]',
+                      'transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed',
                     )}
                   >
-                    <Sparkles size={13} className="text-neon-green shrink-0" />
+                    <Sparkles size={13} className="text-[#00ffc8] shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{q.label}</span>
-                    <ChevronRight size={13} className="text-muted-foreground group-hover:text-neon-green shrink-0" />
+                    <ChevronRight size={13} className="text-muted-foreground/40 group-hover:text-[#00ffc8] group-hover:translate-x-0.5 transition-all shrink-0" />
                   </button>
                 ))}
               </div>
@@ -601,47 +694,106 @@ export default function AIScoutPage() {
                 const isLast    = i === messages.length - 1
                 const streaming = isLoading && isLast && msg.role === 'assistant'
 
+                // Extract any showRoundReplay tool invocations from this message
+                const replayInvocations = (msg.toolInvocations ?? []).filter(
+                  inv => inv.toolName === 'showRoundReplay'
+                )
+
                 return (
-                  <div
-                    key={msg.id}
-                    className={cn('flex items-end gap-3 mb-4', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}
-                  >
-                    {msg.role === 'assistant' ? (
-                      <div className="w-8 h-8 rounded-full bg-neon-green/20 border border-neon-green/30 flex items-center justify-center shrink-0 mb-0.5">
-                        <Brain size={14} className="text-neon-green" />
+                  <div key={msg.id} className="mb-4">
+                    <div className={cn('flex items-end gap-3', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
+                      {msg.role === 'assistant' ? (
+                        <div className="w-8 h-8 rounded-xl bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center shrink-0 mb-0.5">
+                          <Brain size={14} className="text-[#00ffc8]" />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 mb-0.5">
+                          <span className="text-xs font-bold text-muted-foreground">You</span>
+                        </div>
+                      )}
+                      <div
+                        className={cn(
+                          'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
+                          msg.role === 'user'
+                            ? 'bg-[rgba(0,255,200,0.08)] border border-[rgba(0,255,200,0.18)] rounded-br-sm'
+                            : 'bg-card border border-border rounded-bl-sm shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
+                        )}
+                      >
+                        {msg.role === 'assistant' ? (
+                          <>
+                            <MarkdownContent content={msg.content} />
+                            {streaming && (
+                              <span className="inline-block w-2 h-4 bg-neon-green ml-0.5 animate-pulse rounded-sm" />
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm text-foreground">{msg.content}</p>
+                        )}
+                        {msg.createdAt && (
+                          <p className="text-xs text-muted-foreground mt-2 select-none">
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
                       </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 mb-0.5">
-                        <span className="text-xs font-bold text-muted-foreground">You</span>
+                    </div>
+
+                    {/* Inline round replays — shown below the message bubble, aligned with it */}
+                    {replayInvocations.length > 0 && (
+                      <div className="pl-11 mt-2 flex flex-col gap-2">
+                        {replayInvocations.map(inv => {
+                          if (inv.state === 'result') {
+                            const r = inv.result as Record<string, unknown>
+                            if (r.error) return (
+                              <p key={inv.toolCallId} className="text-xs text-muted-foreground italic">
+                                Replay unavailable: {String(r.error)}
+                              </p>
+                            )
+                            return (
+                              <ChatRoundReplay
+                                key={inv.toolCallId}
+                                round={r.round as React.ComponentProps<typeof ChatRoundReplay>['round']}
+                                players={r.players as React.ComponentProps<typeof ChatRoundReplay>['players']}
+                                team1Name={String(r.team1Name)}
+                                team2Name={String(r.team2Name)}
+                                mapName={String(r.mapName)}
+                                roundNumber={Number(r.roundNumber)}
+                                description={String(r.description)}
+                              />
+                            )
+                          }
+                          // Tool is being called — show a small spinner
+                          return (
+                            <div key={inv.toolCallId} className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 size={11} className="animate-spin text-[#00ffc8]" />
+                              Loading replay…
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
-                    <div
-                      className={cn(
-                        'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
-                        msg.role === 'user'
-                          ? 'bg-neon-green/10 border border-neon-green/20 rounded-br-sm'
-                          : 'bg-card border border-border rounded-bl-sm'
-                      )}
-                    >
-                      {msg.role === 'assistant' ? (
-                        <>
-                          <MarkdownContent content={msg.content} />
-                          {streaming && (
-                            <span className="inline-block w-2 h-4 bg-neon-green ml-0.5 animate-pulse rounded-sm" />
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-sm text-foreground">{msg.content}</p>
-                      )}
-                      {msg.createdAt && (
-                        <p className="text-xs text-muted-foreground mt-2 select-none">
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      )}
-                    </div>
                   </div>
                 )
               })}
+
+              {/* Follow-up suggestion chips */}
+              {showFollowUps && (
+                <div className="flex flex-wrap gap-2 pl-11 pb-2">
+                  {followUpChips.map(chip => (
+                    <button
+                      key={chip.label}
+                      onClick={() => sendMessage(chip.prompt)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all',
+                        'border-[rgba(0,255,200,0.2)] text-muted-foreground bg-[rgba(0,255,200,0.04)]',
+                        'hover:border-[rgba(0,255,200,0.45)] hover:text-[#00ffc8] hover:bg-[rgba(0,255,200,0.08)]',
+                      )}
+                    >
+                      <Sparkles size={10} className="text-[#00ffc8] shrink-0" />
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Typing indicator — shows while waiting for the first streaming token */}
               {isThinking && <TypingIndicator />}
@@ -680,10 +832,10 @@ export default function AIScoutPage() {
         </div>
 
         {/* Input area */}
-        <div className="border-t border-border bg-card p-3 md:p-4 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
+        <div className="border-t border-border bg-[hsl(229,23%,9%)] p-3 md:p-4 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
           <div className={cn(
-            'flex items-end gap-3 p-2 rounded-xl border transition-colors',
-            'border-border focus-within:border-neon-green/50'
+            'flex items-end gap-3 p-2 rounded-xl border transition-all duration-150',
+            'border-border focus-within:border-[rgba(0,255,200,0.4)] focus-within:shadow-[0_0_0_3px_rgba(0,255,200,0.08)]'
           )}>
             <textarea
               ref={textareaRef}

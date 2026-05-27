@@ -41,43 +41,66 @@ const config: Config = {
           foreground: 'hsl(var(--destructive-foreground))',
         },
         border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        neon: {
-          green: '#00ff87',
-          blue: '#00d4ff',
-          red: '#ff3860',
+        input:  'hsl(var(--input))',
+        ring:   'hsl(var(--ring))',
+
+        /* ── Brand tokens ─────────────────────────────────────────── */
+        brand: {
+          DEFAULT: '#ff2d78',
+          dim:     '#cc0060',
+          dark:    '#880040',
         },
+        /* Accent palette */
+        pink:   '#ff2d78',
+        purple: '#9b1dff',
+        teal:   '#00ffc8',
+
+        /* CS2-specific semantic colors */
+        tside:  '#F59E0B',
+        ctside: '#3B82F6',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        sans:  ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        sora:  ['var(--font-sora)', 'Sora', 'sans-serif'],
+        space: ['var(--font-space)', 'Space Grotesk', 'sans-serif'],
+        mono:  ['ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gamer-grid': "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2300ff87' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
+        'brand-gradient':  'linear-gradient(135deg, #ff2d78 0%, #9b1dff 100%)',
+      },
+      boxShadow: {
+        'brand':    '0 0 18px rgba(255,45,120,0.32)',
+        'brand-lg': '0 0 30px rgba(255,45,120,0.4)',
+        'purple':   '0 0 18px rgba(155,29,255,0.3)',
+        'teal':     '0 0 18px rgba(0,255,200,0.25)',
       },
       animation: {
-        'pulse-neon': 'pulse-neon 2s ease-in-out infinite',
-        'slide-in': 'slide-in 0.3s ease-out',
-        'fade-in': 'fade-in 0.2s ease-out',
-        'reparse-fill': 'reparse-fill 30s ease-out forwards',
-        'shimmer': 'shimmer 1.5s linear infinite',
+        'pulse-neon':    'pulse-neon 2s ease-in-out infinite',
+        'slide-in':      'slide-in 0.3s ease-out',
+        'fade-in':       'fade-in 0.2s ease-out',
+        'reparse-fill':  'reparse-fill 30s ease-out forwards',
+        'shimmer':       'shimmer 1.5s linear infinite',
+        'fade-in-up':    'fade-in-up 0.35s ease-out both',
+        'marquee':       'marquee 28s linear infinite',
       },
       keyframes: {
         'pulse-neon': {
-          '0%, 100%': { boxShadow: '0 0 5px #00ff87, 0 0 10px #00ff87' },
-          '50%': { boxShadow: '0 0 20px #00ff87, 0 0 40px #00ff87' },
+          '0%, 100%': { boxShadow: '0 0 8px rgba(255,45,120,0.4), 0 0 16px rgba(255,45,120,0.15)' },
+          '50%':       { boxShadow: '0 0 20px rgba(255,45,120,0.6), 0 0 40px rgba(255,45,120,0.25)' },
         },
         'slide-in': {
           from: { transform: 'translateX(-100%)' },
-          to: { transform: 'translateX(0)' },
+          to:   { transform: 'translateX(0)' },
         },
         'fade-in': {
           from: { opacity: '0', transform: 'translateY(-4px)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
+          to:   { opacity: '1', transform: 'translateY(0)' },
         },
-        // Fills 0 → 85 % over 30 s; parent snaps to 100 % on completion.
+        'fade-in-up': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to:   { opacity: '1', transform: 'translateY(0)' },
+        },
         'reparse-fill': {
           '0%':   { width: '0%' },
           '8%':   { width: '18%' },
@@ -89,6 +112,10 @@ const config: Config = {
         'shimmer': {
           '0%':   { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        'marquee': {
+          from: { transform: 'translateX(0)' },
+          to:   { transform: 'translateX(-50%)' },
         },
       },
     },

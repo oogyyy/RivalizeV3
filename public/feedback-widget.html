@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feedback Widget Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            /* ── Customize accent color here ── */
+            accent: {
+              DEFAULT: '#6366f1', /* indigo-500 */
+              hover:   '#4f46e5', /* indigo-600 */
+              light:   '#e0e7ff', /* indigo-100 */
+            },
+          },
+          keyframes: {
+            'fade-in':    { from: { opacity: '0' },                         to: { opacity: '1' } },
+            'slide-up':   { from: { opacity: '0', transform: 'translateY(16px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+            'scale-in':   { from: { opacity: '0', transform: 'scale(0.95)' },      to: { opacity: '1', transform: 'scale(1)' } },
+            'bounce-in':  { '0%': { transform: 'scale(0)' }, '60%': { transform: 'scale(1.15)' }, '100%': { transform: 'scale(1)' } },
+          },
+          animation: {
+            'fade-in':   'fade-in 0.2s ease-out',
+            'slide-up':  'slide-up 0.25s ease-out',
+            'scale-in':  'scale-in 0.2s ease-out',
+            'bounce-in': 'bounce-in 0.35s ease-out',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* Scrollbar styling for modal body */
+    .modal-scroll::-webkit-scrollbar { width: 4px; }
+    .modal-scroll::-webkit-scrollbar-track { background: transparent; }
+    .modal-scroll::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 99px; }
+
+    /* Screenshot drop zone drag-over state */
+    .drop-zone.drag-over { border-color: #6366f1; background: rgba(99,102,241,0.08); }
+  </style>
+</head>
+
+<body class="bg-gray-950 text-gray-100 min-h-screen flex items-center justify-center font-sans">
+
+  <!-- ═══════════════════════════════════════════════
+       DEMO PAGE BACKGROUND — replace with your site
+  ════════════════════════════════════════════════ -->
+  <div class="text-center select-none pointer-events-none">
+    <p class="text-gray-600 text-sm">Your site content here</p>
+    <p class="text-gray-700 text-xs mt-1">Feedback bubble is bottom-right ↘</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       FLOATING BUBBLE BUTTON
+  ════════════════════════════════════════════════ -->
+  <div id="feedback-bubble-wrap" class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+
+    <!-- Tooltip label (visible on hover) -->
+    <span
+      id="bubble-label"
+      class="px-3 py-1 rounded-full bg-gray-800 text-gray-200 text-xs font-medium shadow-lg
+             opacity-0 translate-y-1 transition-all duration-200 pointer-events-none select-none"
+    >Feedback</span>
+
+    <!-- Bubble -->
+    <button
+      id="feedback-bubble"
+      aria-label="Open feedback form"
+      aria-haspopup="dialog"
+      class="w-14 h-14 rounded-full flex items-center justify-center shadow-xl
+             bg-indigo-500 hover:bg-indigo-600 active:scale-95
+             transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950
+             animate-bounce-in"
+    >
+      <!-- Chat bubble icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M8 10h.01M12 10h.01M16 10h.01M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       BACKDROP
+  ════════════════════════════════════════════════ -->
+  <div
+    id="feedback-backdrop"
+    class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm hidden"
+    aria-hidden="true"
+  ></div>
+
+  <!-- ═══════════════════════════════════════════════
+       MODAL
+  ════════════════════════════════════════════════ -->
+  <div
+    id="feedback-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modal-title"
+    class="fixed z-50 hidden
+           bottom-24 right-6
+           sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-1/2
+           w-[calc(100vw-3rem)] max-w-md
+           bg-gray-900 border border-gray-700/60 rounded-2xl shadow-2xl
+           flex flex-col overflow-hidden"
+    style="max-height: calc(100vh - 7rem);"
+  >
+
+    <!-- ── Modal Header ── -->
+    <div class="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-700/60 shrink-0">
+      <h2 id="modal-title" class="text-base font-semibold text-white">Share your thoughts</h2>
+      <div class="flex items-center gap-1">
+        <!-- Minimize -->
+        <button
+          id="btn-minimize"
+          aria-label="Minimize"
+          class="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>
+        </button>
+        <!-- Close -->
+        <button
+          id="btn-close"
+          aria-label="Close feedback form"
+          class="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Tab Bar ── -->
+    <div class="flex gap-1 px-5 pt-4 shrink-0" role="tablist" aria-label="Submission type">
+      <button
+        id="tab-feedback"
+        role="tab"
+        aria-selected="true"
+        aria-controls="panel-feedback"
+        class="tab-btn flex-1 py-1.5 rounded-lg text-sm font-medium transition-all duration-150
+               bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/40
+               focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+      >Send Feedback</button>
+      <button
+        id="tab-bug"
+        role="tab"
+        aria-selected="false"
+        aria-controls="panel-bug"
+        class="tab-btn flex-1 py-1.5 rounded-lg text-sm font-medium transition-all duration-150
+               text-gray-400 hover:text-gray-200 hover:bg-gray-700/50
+               focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+      >Report a Bug</button>
+    </div>
+
+    <!-- ── Scrollable Form Area ── -->
+    <div class="overflow-y-auto modal-scroll px-5 py-4 flex-1">
+
+      <!-- SUCCESS STATE (hidden by default) -->
+      <div id="success-state" class="hidden flex-col items-center justify-center py-10 text-center gap-4 animate-scale-in">
+        <div class="w-16 h-16 rounded-full bg-green-500/15 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-white font-semibold text-base">Thank you!</p>
+          <p class="text-gray-400 text-sm mt-1" id="success-msg">Your submission has been received.</p>
+        </div>
+        <button
+          id="btn-submit-another"
+          class="mt-2 px-4 py-2 rounded-lg text-sm font-medium text-indigo-300 border border-indigo-500/40 hover:bg-indigo-500/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        >Submit another</button>
+      </div>
+
+      <!-- ── FEEDBACK PANEL ── -->
+      <div id="panel-feedback" role="tabpanel" aria-labelledby="tab-feedback" class="space-y-4 animate-slide-up">
+
+        <!-- Category -->
+        <div>
+          <label for="fb-category" class="block text-xs font-medium text-gray-400 mb-1.5">Category</label>
+          <select id="fb-category" class="field-base w-full">
+            <option value="">Select a category…</option>
+            <option value="ui">UI / UX</option>
+            <option value="feature">Feature Request</option>
+            <option value="performance">Performance</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <!-- Subject -->
+        <div>
+          <label for="fb-subject" class="block text-xs font-medium text-gray-400 mb-1.5">Subject <span class="text-red-400">*</span></label>
+          <input id="fb-subject" type="text" placeholder="Brief summary…" required class="field-base w-full" />
+        </div>
+
+        <!-- Message -->
+        <div>
+          <label for="fb-message" class="block text-xs font-medium text-gray-400 mb-1.5">Message <span class="text-red-400">*</span></label>
+          <textarea id="fb-message" rows="4" placeholder="Tell us what's on your mind…" required class="field-base w-full resize-none"></textarea>
+        </div>
+
+        <!-- Email -->
+        <div>
+          <label for="fb-email" class="block text-xs font-medium text-gray-400 mb-1.5">Email <span class="text-gray-600">(optional)</span></label>
+          <input id="fb-email" type="email" placeholder="you@example.com" class="field-base w-full" />
+        </div>
+
+        <!-- Screenshot upload -->
+        <div>
+          <p class="text-xs font-medium text-gray-400 mb-1.5">Screenshot <span class="text-gray-600">(optional)</span></p>
+          <div id="fb-drop-zone" class="drop-zone" role="button" tabindex="0" aria-label="Upload screenshot">
+            <input id="fb-file" type="file" accept="image/*" class="hidden" />
+            <div id="fb-drop-hint" class="flex flex-col items-center gap-2 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+              <p class="text-xs text-gray-500">Drop image here or <span class="text-indigo-400 underline cursor-pointer">browse</span></p>
+            </div>
+            <img id="fb-preview" src="" alt="Screenshot preview" class="hidden w-full rounded-lg object-cover max-h-40" />
+          </div>
+        </div>
+
+      </div><!-- /panel-feedback -->
+
+      <!-- ── BUG REPORT PANEL ── -->
+      <div id="panel-bug" role="tabpanel" aria-labelledby="tab-bug" class="space-y-4 hidden animate-slide-up">
+
+        <!-- Severity -->
+        <div>
+          <p class="text-xs font-medium text-gray-400 mb-2">Severity <span class="text-red-400">*</span></p>
+          <div class="flex gap-2" role="group" aria-label="Severity level">
+            <label class="severity-opt" data-value="low">
+              <input type="radio" name="severity" value="low" class="sr-only" />
+              <span>Low</span>
+            </label>
+            <label class="severity-opt" data-value="medium">
+              <input type="radio" name="severity" value="medium" class="sr-only" />
+              <span>Medium</span>
+            </label>
+            <label class="severity-opt" data-value="high">
+              <input type="radio" name="severity" value="high" class="sr-only" />
+              <span>High</span>
+            </label>
+            <label class="severity-opt" data-value="critical">
+              <input type="radio" name="severity" value="critical" class="sr-only" />
+              <span>Critical</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Title -->
+        <div>
+          <label for="bug-title" class="block text-xs font-medium text-gray-400 mb-1.5">Title <span class="text-red-400">*</span></label>
+          <input id="bug-title" type="text" placeholder="What went wrong?" required class="field-base w-full" />
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label for="bug-desc" class="block text-xs font-medium text-gray-400 mb-1.5">Description <span class="text-red-400">*</span></label>
+          <textarea id="bug-desc" rows="3" placeholder="Describe the bug…" required class="field-base w-full resize-none"></textarea>
+        </div>
+
+        <!-- Steps to reproduce -->
+        <div>
+          <label for="bug-steps" class="block text-xs font-medium text-gray-400 mb-1.5">Steps to reproduce</label>
+          <textarea id="bug-steps" rows="3" placeholder="1. Go to…&#10;2. Click on…&#10;3. See error" class="field-base w-full resize-none"></textarea>
+        </div>
+
+        <!-- Expected / Actual -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="bug-expected" class="block text-xs font-medium text-gray-400 mb-1.5">Expected</label>
+            <textarea id="bug-expected" rows="2" placeholder="What should happen?" class="field-base w-full resize-none"></textarea>
+          </div>
+          <div>
+            <label for="bug-actual" class="block text-xs font-medium text-gray-400 mb-1.5">Actual</label>
+            <textarea id="bug-actual" rows="2" placeholder="What happened instead?" class="field-base w-full resize-none"></textarea>
+          </div>
+        </div>
+
+        <!-- Screenshot upload -->
+        <div>
+          <p class="text-xs font-medium text-gray-400 mb-1.5">Screenshot <span class="text-gray-600">(optional)</span></p>
+          <div id="bug-drop-zone" class="drop-zone" role="button" tabindex="0" aria-label="Upload screenshot">
+            <input id="bug-file" type="file" accept="image/*" class="hidden" />
+            <div id="bug-drop-hint" class="flex flex-col items-center gap-2 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+              <p class="text-xs text-gray-500">Drop image here or <span class="text-indigo-400 underline cursor-pointer">browse</span></p>
+            </div>
+            <img id="bug-preview" src="" alt="Screenshot preview" class="hidden w-full rounded-lg object-cover max-h-40" />
+          </div>
+        </div>
+
+      </div><!-- /panel-bug -->
+
+    </div><!-- /scroll area -->
+
+    <!-- ── Modal Footer ── -->
+    <div id="modal-footer" class="px-5 pb-5 pt-3 border-t border-gray-700/60 shrink-0">
+      <button
+        id="btn-submit"
+        type="button"
+        class="w-full py-2.5 rounded-xl text-sm font-semibold text-white
+               bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98]
+               transition-all duration-150 flex items-center justify-center gap-2
+               focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900
+               disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <span id="submit-label">Submit</span>
+        <!-- Spinner (hidden by default) -->
+        <svg id="submit-spinner" class="hidden w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+        </svg>
+      </button>
+
+      <!-- Repeat-submission nudge (shown after first submit) -->
+      <p id="returning-user-note" class="hidden text-center text-xs text-gray-600 mt-2">
+        Thanks for your continued feedback — we read every submission.
+      </p>
+    </div>
+
+  </div><!-- /modal -->
+
+  <!-- ═══════════════════════════════════════════════
+       SHARED STYLES (injected via Tailwind @apply workaround)
+  ════════════════════════════════════════════════ -->
+  <style>
+    .field-base {
+      background: #1f2937;   /* gray-800 */
+      border: 1px solid #374151; /* gray-700 */
+      color: #f9fafb;        /* gray-50  */
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field-base::placeholder { color: #6b7280; }
+    .field-base:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+    }
+    select.field-base { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.75rem center; padding-right: 2rem; }
+
+    .drop-zone {
+      border: 2px dashed #374151;
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      min-height: 80px;
+    }
+    .drop-zone:hover { border-color: #6366f1; background: rgba(99,102,241,0.05); }
+
+    /* Severity radio pills */
+    .severity-opt {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.375rem 0;
+      border-radius: 0.5rem;
+      border: 1px solid #374151;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #9ca3af;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .severity-opt:hover { border-color: #6366f1; color: #a5b4fc; }
+    .severity-opt.selected { border-color: #6366f1; background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    .severity-opt[data-value="high"].selected    { border-color: #f59e0b; background: rgba(245,158,11,0.1); color: #fbbf24; }
+    .severity-opt[data-value="critical"].selected { border-color: #ef4444; background: rgba(239,68,68,0.1); color: #f87171; }
+  </style>
+
+  <!-- ═══════════════════════════════════════════════
+       JAVASCRIPT
+  ════════════════════════════════════════════════ -->
+  <script>
+  (function () {
+    'use strict';
+
+    /* ── State ─────────────────────────────────── */
+    let isOpen      = false;
+    let isMinimized = false;
+    let activeTab   = 'feedback'; /* 'feedback' | 'bug' */
+
+    const HAS_SUBMITTED_KEY = 'fw_has_submitted';
+    const hasSubmittedBefore = () => localStorage.getItem(HAS_SUBMITTED_KEY) === '1';
+    const markSubmitted      = () => localStorage.setItem(HAS_SUBMITTED_KEY, '1');
+
+    /* ── DOM refs ───────────────────────────────── */
+    const bubble       = document.getElementById('feedback-bubble');
+    const bubbleLabel  = document.getElementById('bubble-label');
+    const backdrop     = document.getElementById('feedback-backdrop');
+    const modal        = document.getElementById('feedback-modal');
+    const btnClose     = document.getElementById('btn-close');
+    const btnMinimize  = document.getElementById('btn-minimize');
+    const btnSubmit    = document.getElementById('btn-submit');
+    const submitLabel  = document.getElementById('submit-label');
+    const submitSpinner = document.getElementById('submit-spinner');
+    const successState = document.getElementById('success-state');
+    const successMsg   = document.getElementById('success-msg');
+    const btnSubmitAnother = document.getElementById('btn-submit-another');
+    const modalFooter  = document.getElementById('modal-footer');
+    const returningNote = document.getElementById('returning-user-note');
+
+    const tabFeedback  = document.getElementById('tab-feedback');
+    const tabBug       = document.getElementById('tab-bug');
+    const panelFeedback = document.getElementById('panel-feedback');
+    const panelBug     = document.getElementById('panel-bug');
+
+    /* ── Open / Close ───────────────────────────── */
+    function openModal() {
+      isOpen = true;
+      isMinimized = false;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex', 'flex-col', 'animate-scale-in');
+      backdrop.classList.remove('hidden');
+      backdrop.classList.add('animate-fade-in');
+      document.body.style.overflow = 'hidden';
+      if (hasSubmittedBefore()) returningNote.classList.remove('hidden');
+      /* Focus first focusable element */
+      setTimeout(() => {
+        const first = modal.querySelector('button, input, select, textarea');
+        if (first) first.focus();
+      }, 50);
+    }
+
+    function closeModal() {
+      isOpen = false;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex', 'flex-col', 'animate-scale-in');
+      backdrop.classList.add('hidden');
+      document.body.style.overflow = '';
+      bubble.focus();
+    }
+
+    function minimizeModal() {
+      isMinimized = true;
+      modal.classList.add('hidden');
+      backdrop.classList.add('hidden');
+      document.body.style.overflow = '';
+      bubble.focus();
+    }
+
+    /* ── Tabs ───────────────────────────────────── */
+    const activeTabCls   = ['bg-indigo-500/20', 'text-indigo-300', 'ring-1', 'ring-indigo-500/40'];
+    const inactiveTabCls = ['text-gray-400', 'hover:text-gray-200', 'hover:bg-gray-700/50'];
+
+    function switchTab(tab) {
+      activeTab = tab;
+
+      /* Reset success state */
+      showForm();
+
+      if (tab === 'feedback') {
+        tabFeedback.setAttribute('aria-selected', 'true');
+        tabBug.setAttribute('aria-selected', 'false');
+        activeTabCls.forEach(c => tabFeedback.classList.add(c));
+        inactiveTabCls.forEach(c => { tabFeedback.classList.remove(c); tabBug.classList.add(c); });
+        activeTabCls.forEach(c => tabBug.classList.remove(c));
+        panelFeedback.classList.remove('hidden');
+        panelBug.classList.add('hidden');
+        submitLabel.textContent = 'Send Feedback';
+      } else {
+        tabBug.setAttribute('aria-selected', 'true');
+        tabFeedback.setAttribute('aria-selected', 'false');
+        activeTabCls.forEach(c => tabBug.classList.add(c));
+        inactiveTabCls.forEach(c => { tabBug.classList.remove(c); tabFeedback.classList.add(c); });
+        activeTabCls.forEach(c => tabFeedback.classList.remove(c));
+        panelBug.classList.remove('hidden');
+        panelFeedback.classList.add('hidden');
+        submitLabel.textContent = 'Report Bug';
+      }
+    }
+
+    /* ── Success / Form visibility ─────────────── */
+    function showSuccess(type) {
+      panelFeedback.classList.add('hidden');
+      panelBug.classList.add('hidden');
+      tabFeedback.closest('div').classList.add('invisible'); /* hide tab bar */
+      modalFooter.classList.add('hidden');
+      successMsg.textContent = type === 'bug'
+        ? 'Your bug report has been received. We\'ll investigate promptly.'
+        : 'Your feedback has been received. We appreciate you taking the time!';
+      successState.classList.remove('hidden');
+      successState.classList.add('flex');
+    }
+
+    function showForm() {
+      successState.classList.add('hidden');
+      successState.classList.remove('flex');
+      tabFeedback.closest('div').classList.remove('invisible');
+      modalFooter.classList.remove('hidden');
+      if (activeTab === 'feedback') panelFeedback.classList.remove('hidden');
+      else panelBug.classList.remove('hidden');
+    }
+
+    /* ── Validation ─────────────────────────────── */
+    function shake(el) {
+      el.classList.add('ring-2', 'ring-red-500');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-red-500'), 1200);
+    }
+
+    function validateFeedback() {
+      const subject = document.getElementById('fb-subject');
+      const message = document.getElementById('fb-message');
+      if (!subject.value.trim()) { shake(subject); subject.focus(); return false; }
+      if (!message.value.trim()) { shake(message); message.focus(); return false; }
+      return true;
+    }
+
+    function validateBug() {
+      const title = document.getElementById('bug-title');
+      const desc  = document.getElementById('bug-desc');
+      const sev   = document.querySelector('.severity-opt.selected');
+      if (!sev) { shake(document.querySelector('[role="group"]')); return false; }
+      if (!title.value.trim()) { shake(title); title.focus(); return false; }
+      if (!desc.value.trim())  { shake(desc);  desc.focus();  return false; }
+      return true;
+    }
+
+    /* ── Submit ─────────────────────────────────── */
+    async function handleSubmit() {
+      const valid = activeTab === 'feedback' ? validateFeedback() : validateBug();
+      if (!valid) return;
+
+      /* Loading state */
+      btnSubmit.disabled = true;
+      submitLabel.textContent = 'Sending…';
+      submitSpinner.classList.remove('hidden');
+
+      /* Collect payload (wire up to your own API here) */
+      const payload = activeTab === 'feedback'
+        ? {
+            type:     'feedback',
+            category: document.getElementById('fb-category').value,
+            subject:  document.getElementById('fb-subject').value,
+            message:  document.getElementById('fb-message').value,
+            email:    document.getElementById('fb-email').value,
+          }
+        : {
+            type:     'bug',
+            severity: document.querySelector('.severity-opt.selected')?.dataset.value,
+            title:    document.getElementById('bug-title').value,
+            description: document.getElementById('bug-desc').value,
+            steps:    document.getElementById('bug-steps').value,
+            expected: document.getElementById('bug-expected').value,
+            actual:   document.getElementById('bug-actual').value,
+          };
+
+      console.log('[FeedbackWidget] Payload:', payload);
+
+      /* Simulated async call — replace with real fetch() */
+      await new Promise(r => setTimeout(r, 1200));
+
+      /* Reset loading */
+      btnSubmit.disabled = false;
+      submitSpinner.classList.add('hidden');
+      submitLabel.textContent = activeTab === 'feedback' ? 'Send Feedback' : 'Report Bug';
+
+      markSubmitted();
+      showSuccess(activeTab);
+    }
+
+    /* ── Screenshot upload helper ───────────────── */
+    function setupDropZone(zoneId, fileId, hintId, previewId) {
+      const zone    = document.getElementById(zoneId);
+      const input   = document.getElementById(fileId);
+      const hint    = document.getElementById(hintId);
+      const preview = document.getElementById(previewId);
+
+      function loadFile(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+          preview.src = e.target.result;
+          preview.classList.remove('hidden');
+          hint.classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+      }
+
+      zone.addEventListener('click', () => input.click());
+      zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') input.click(); });
+      input.addEventListener('change', () => loadFile(input.files[0]));
+
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        loadFile(e.dataTransfer.files[0]);
+      });
+    }
+
+    /* ── Severity pills ─────────────────────────── */
+    document.querySelectorAll('.severity-opt').forEach(opt => {
+      opt.addEventListener('click', () => {
+        document.querySelectorAll('.severity-opt').forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        opt.querySelector('input').checked = true;
+      });
+      opt.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opt.click(); }
+      });
+    });
+
+    /* ── Keyboard navigation (Escape to close) ──── */
+    document.addEventListener('keydown', e => {
+      if (!isOpen) return;
+      if (e.key === 'Escape') closeModal();
+      /* Tab trap */
+      if (e.key === 'Tab') {
+        const focusable = Array.from(modal.querySelectorAll(
+          'button:not([disabled]), input, select, textarea, [tabindex="0"]'
+        )).filter(el => !el.closest('.hidden'));
+        if (!focusable.length) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    });
+
+    /* ── Bubble hover label ─────────────────────── */
+    bubble.addEventListener('mouseenter', () => {
+      bubbleLabel.classList.remove('opacity-0', 'translate-y-1');
+      bubbleLabel.classList.add('opacity-100', 'translate-y-0');
+    });
+    bubble.addEventListener('mouseleave', () => {
+      bubbleLabel.classList.add('opacity-0', 'translate-y-1');
+      bubbleLabel.classList.remove('opacity-100', 'translate-y-0');
+    });
+
+    /* ── Event listeners ────────────────────────── */
+    bubble.addEventListener('click', () => isOpen || isMinimized ? (isOpen ? closeModal() : openModal()) : openModal());
+    backdrop.addEventListener('click', closeModal);
+    btnClose.addEventListener('click', closeModal);
+    btnMinimize.addEventListener('click', minimizeModal);
+    btnSubmit.addEventListener('click', handleSubmit);
+    tabFeedback.addEventListener('click', () => switchTab('feedback'));
+    tabBug.addEventListener('click', () => switchTab('bug'));
+    btnSubmitAnother.addEventListener('click', () => { showForm(); switchTab(activeTab); });
+
+    /* ── Drop zones ─────────────────────────────── */
+    setupDropZone('fb-drop-zone',  'fb-file',  'fb-drop-hint',  'fb-preview');
+    setupDropZone('bug-drop-zone', 'bug-file', 'bug-drop-hint', 'bug-preview');
+
+    /* ── Public API ─────────────────────────────── */
+    window.openFeedback = (tab) => {
+      openModal();
+      if (tab === 'bug') switchTab('bug');
+      else switchTab('feedback');
+    };
+
+    /* ── Init label ─────────────────────────────── */
+    submitLabel.textContent = 'Send Feedback';
+
+  })();
+  </script>
+
+</body>
+</html>

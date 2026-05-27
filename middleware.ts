@@ -53,9 +53,11 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const publicPaths = ['/', '/login', '/signup', '/auth/callback']
-  const isPublicPath = publicPaths.some(path =>
-    request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith('/auth/')
-  )
+  const isPublicPath =
+    request.nextUrl.pathname.startsWith('/api/') ||
+    publicPaths.some(path =>
+      request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith('/auth/')
+    )
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
@@ -71,7 +73,7 @@ export async function middleware(request: NextRequest) {
 
   // Apply CORS headers to all API responses
   if (request.nextUrl.pathname.startsWith('/api/')) {
-    withCors(supabaseResponse, origin)
+    return withCors(supabaseResponse, origin)
   }
 
   return supabaseResponse
