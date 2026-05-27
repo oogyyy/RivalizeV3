@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { parseAndSaveDemo } from '../lib/demo-parser/parse-and-save'
 
-const POLL_INTERVAL_MS  = 10_000
+const POLL_INTERVAL_MS  = 2_000
 // parseAndSaveDemo retries the Go parser up to 3× with an 8-min timeout each
 // (~24 min worst case). Set stale threshold above that so reclaimStale doesn't
 // fire mid-parse and kick off a second concurrent parse for the same demo.
