@@ -73,7 +73,7 @@ export default async function MyTeamPage() {
   const { data: recentDemos } = teamIds.length
     ? await admin
         .from('demos')
-        .select('id, status, map, match_date, created_at, opponent_slug, parsed_data, error_message')
+        .select('id, status, map, match_date, created_at, opponent_slug, parsed_data, error_message, processing_started_at')
         .in('team_id', teamIds)
         .eq('demo_type', 'self')
         .order('created_at', { ascending: false })
