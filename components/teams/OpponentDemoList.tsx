@@ -338,9 +338,11 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                       <p className={cn('text-[11px] font-medium', demo.status === 'failed' ? 'text-red-400' : 'text-amber-400')}>
                         {demo.status === 'failed'
                           ? 'Parsing failed'
-                          : Date.now() - new Date(demo.created_at).getTime() < 10 * 60 * 1000
-                            ? 'Parsing…'
-                            : 'Stuck in processing'}
+                          : !demo.processing_started_at
+                            ? 'Queued…'
+                            : Date.now() - new Date(demo.processing_started_at).getTime() < 30 * 60 * 1000
+                              ? 'Parsing…'
+                              : 'Stuck in processing'}
                       </p>
                       {demo.error_message && (
                         <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 break-words" title={demo.error_message}>
@@ -348,7 +350,7 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                         </p>
                       )}
                     </div>
-                    {(demo.status === 'failed' || Date.now() - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) && (
+                    {(demo.status === 'failed' || (demo.processing_started_at && Date.now() - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
                       <ReparseButton demoId={demo.id} variant="prominent" />
                     )}
                   </div>
