@@ -144,7 +144,6 @@ export default async function MyTeamPage() {
       games: s.games,
     }))
     .sort((a, b) => b.avgRating - a.avgRating)
-    .slice(0, 5)
 
   const topMaps = Object.entries(mapCounts)
     .sort((a, b) => b[1] - a[1])
@@ -289,7 +288,7 @@ export default async function MyTeamPage() {
                 <div className="w-6 h-6 rounded-md bg-[rgba(0,255,200,0.1)] flex items-center justify-center">
                   <Users size={13} className="text-[#00ffc8]" />
                 </div>
-                <h2 className="text-[13px] font-semibold text-foreground">Top Players</h2>
+                <h2 className="text-[13px] font-semibold text-foreground">Roster</h2>
               </div>
               {topPlayers.length === 0 ? (
                 <EmptyState
