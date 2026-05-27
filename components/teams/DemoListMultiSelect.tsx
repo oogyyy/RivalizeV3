@@ -34,6 +34,15 @@ export interface DemoRowData {
       team2?: string
     }
     opponentSide?: string
+    players?: Array<{
+      name: string
+      kills: number
+      deaths: number
+      assists: number
+      rating: number
+      adr: number
+      team: string
+    }>
   } | null
 }
 
@@ -44,6 +53,7 @@ interface Props {
   showReparse?: boolean
   canDelete?: boolean
   demoHrefSuffix?: string
+  onSideChange?: (demoId: string, opponentSide: 'team1' | 'team2') => void
 }
 
 // ── Bulk delete modal ──────────────────────────────────────────────────────────
@@ -91,6 +101,7 @@ export default function DemoListMultiSelect({
   showReparse = true,
   canDelete = true,
   demoHrefSuffix = '',
+  onSideChange,
 }: Props) {
   const router = useRouter()
 
@@ -335,6 +346,7 @@ export default function DemoListMultiSelect({
                       team1: (!h.team1 || h.team1 === 'T-Side' || h.team1 === 'CT-Side') ? 'Team 1 (T-Side)' : h.team1,
                       team2: (!h.team2 || h.team2 === 'T-Side' || h.team2 === 'CT-Side') ? 'Team 2 (CT-Side)' : h.team2,
                     } : undefined}
+                    onSideChange={onSideChange}
                   />
                 </div>
               )}

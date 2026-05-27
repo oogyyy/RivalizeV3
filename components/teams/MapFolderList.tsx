@@ -17,6 +17,7 @@ export interface MapGroup {
 
 interface Props {
   mapGroups: MapGroup[]
+  onSideChange?: (demoId: string, opponentSide: 'team1' | 'team2') => void
 }
 
 function mapDisplayName(map: string): string {
@@ -45,7 +46,7 @@ function RecordBadge({ wins, losses, draws }: { wins: number; losses: number; dr
   )
 }
 
-export default function MapFolderList({ mapGroups }: Props) {
+export default function MapFolderList({ mapGroups, onSideChange }: Props) {
   // Auto-expand the first group
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(mapGroups.length > 0 ? [mapGroups[0].map] : []),
@@ -138,6 +139,7 @@ export default function MapFolderList({ mapGroups }: Props) {
                   showSideSelector
                   showReparse
                   canDelete
+                  onSideChange={onSideChange}
                 />
               </div>
             )}
