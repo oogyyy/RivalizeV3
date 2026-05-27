@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -206,19 +206,26 @@ export default function MyTeamStatsAndDemos({
   initialDemos: DemoRowData[]
   primaryTeamId: string | null
 }) {
-  const [localDemos, setLocalDemos] = useState<DemoRowData[]>(initialDemos)
+  // Store only the user's manual overrides — resilient to router.refresh() changing initialDemos
+  const [sideOverrides, setSideOverrides] = useState<Record<string, 'team1' | 'team2'>>({})
+
+  const effectiveDemos = useMemo(() => {
+    if (Object.keys(sideOverrides).length === 0) return initialDemos
+    return initialDemos.map(d => {
+      const override = sideOverrides[d.id]
+      return override
+        ? { ...d, parsed_data: d.parsed_data ? { ...d.parsed_data, opponentSide: override } : { opponentSide: override } }
+        : d
+    })
+  }, [initialDemos, sideOverrides])
 
   function handleSideChange(demoId: string, opponentSide: 'team1' | 'team2') {
-    setLocalDemos(prev => prev.map(d =>
-      d.id === demoId
-        ? { ...d, parsed_data: d.parsed_data ? { ...d.parsed_data, opponentSide } : { opponentSide } }
-        : d
-    ))
+    setSideOverrides(prev => ({ ...prev, [demoId]: opponentSide }))
   }
 
   const { totalMatches, totalWins, totalLosses, totalDraws, winRate, avgKD, avgAdr, topPlayers, topMaps } =
-    computeStats(localDemos)
-  const mapGroups = buildMapGroups(localDemos)
+    computeStats(effectiveDemos)
+  const mapGroups = buildMapGroups(effectiveDemos)
 
   return (
     <>
@@ -350,13 +357,13 @@ export default function MyTeamStatsAndDemos({
             <div className="flex items-center gap-2 mb-3">
               <FileVideo size={15} className="text-[#00ffc8]" />
               <h2 className="text-[13px] font-semibold text-foreground">My Team&apos;s Demos</h2>
-              {localDemos.length > 0 && (
+              {effectiveDemos.length > 0 && (
                 <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
-                  {localDemos.length} · {mapGroups.filter(g => g.map !== 'unknown').length} maps
+                  {effectiveDemos.length} · {mapGroups.filter(g => g.map !== 'unknown').length} maps
                 </span>
               )}
             </div>
-            {localDemos.length === 0 ? (
+            {effectiveDemos.length === 0 ? (
               <div className="rounded-xl border border-border bg-card">
                 <EmptyState
                   icon={<FileVideo size={18} className="text-muted-foreground/40" />}
