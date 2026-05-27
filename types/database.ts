@@ -55,6 +55,9 @@ export interface Demo {
   demo_type: 'opponent' | 'self'
   created_by: string
   created_at: string
+  processing_started_at: string | null
+  error_message: string | null
+  file_size_bytes: number | null
 }
 
 export interface TeamFolder {
