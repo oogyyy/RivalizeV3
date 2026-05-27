@@ -25,6 +25,7 @@ export interface OpponentDemo {
   map: string | null
   match_date: string | null
   created_at: string
+  processing_started_at?: string | null
   file_size_bytes?: number | null
   error_message?: string | null
   parsed_data: { header?: DemoHeader; opponentSide?: 'team1' | 'team2' } | null
@@ -339,7 +340,9 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                         {demo.status === 'failed'
                           ? 'Parsing failed'
                           : !demo.processing_started_at
-                            ? 'Queued…'
+                            ? Date.now() - new Date(demo.created_at).getTime() < 10 * 60 * 1000
+                              ? 'Queued…'
+                              : 'Stuck in processing'
                             : Date.now() - new Date(demo.processing_started_at).getTime() < 30 * 60 * 1000
                               ? 'Parsing…'
                               : 'Stuck in processing'}
@@ -350,7 +353,9 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                         </p>
                       )}
                     </div>
-                    {(demo.status === 'failed' || (demo.processing_started_at && Date.now() - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
+                    {(demo.status === 'failed' ||
+                      (!demo.processing_started_at && Date.now() - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) ||
+                      (demo.processing_started_at && Date.now() - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
                       <ReparseButton demoId={demo.id} variant="prominent" />
                     )}
                   </div>
