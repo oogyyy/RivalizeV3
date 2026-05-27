@@ -171,9 +171,6 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
       updateUpload(i, { progress: 100, status: 'registering' })
 
-      // Kick off parsing immediately (fire-and-forget). Worker is the fallback.
-      fetch(`/api/demos/${demo.id}/parse`, { method: 'POST' }).catch(() => {})
-
       updateUpload(i, { status: 'queued', progress: 100, demoId: demo.id })
     } catch (err) {
       updateUpload(i, {

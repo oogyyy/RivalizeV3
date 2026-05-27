@@ -12,6 +12,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { getPublicUrl } from '@/lib/r2'
 import { slugify } from '@/lib/utils'
+import { parseAndSaveDemo } from '@/lib/demo-parser/parse-and-save'
 
 const MAX_FILE_SIZE  = 500 * 1024 * 1024
 const MAX_CHUNK_SIZE =  10 * 1024 * 1024  // stay under Railway's 10 MB proxy limit
@@ -197,6 +198,27 @@ async function handleComplete(
       { onConflict: 'user_team_id,opponent_slug' },
     )
   }
+
+  // Trigger parsing immediately server-side rather than relying on the client
+  // to fire a separate request. Atomically claim the demo so the worker doesn't
+  // race against this background task.
+  void (async () => {
+    const { data: claimed } = await admin
+      .from('demos')
+      .update({ processing_started_at: new Date().toISOString() })
+      .eq('id', demo.id)
+      .is('processing_started_at', null)
+      .select('id')
+      .single()
+
+    if (!claimed) return  // Worker claimed it first — that's fine
+
+    try {
+      await parseAndSaveDemo(demo.id)
+    } catch {
+      // parseAndSaveDemo already wrote status='failed' to the DB
+    }
+  })()
 
   return NextResponse.json(demo, { status: 201 })
 }
