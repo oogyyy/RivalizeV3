@@ -438,6 +438,11 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                   <AlertCircle size={14} className="shrink-0" />
                   {queuedCount} uploaded · {errorCount} failed
                 </>
+              ) : uploads.every(u => u.error?.includes('already has 5 demos')) ? (
+                <>
+                  <AlertCircle size={14} className="shrink-0" />
+                  Queue full — wait for current demos to finish parsing, then retry
+                </>
               ) : (
                 <>
                   <AlertCircle size={14} className="shrink-0" />

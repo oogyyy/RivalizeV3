@@ -74,6 +74,18 @@ async function handleInit(
     .eq('team_id', teamId).eq('user_id', userId).single()
   if (!member) return NextResponse.json({ error: 'Not a member of this team' }, { status: 403 })
 
+  const { count: processingCount } = await admin
+    .from('demos')
+    .select('id', { count: 'exact', head: true })
+    .eq('team_id', teamId)
+    .eq('status', 'processing')
+  if ((processingCount ?? 0) >= 5) {
+    return NextResponse.json(
+      { error: 'Your team already has 5 demos processing. Wait for some to finish before uploading more.' },
+      { status: 429 },
+    )
+  }
+
   if (!process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID) {
     return NextResponse.json({ error: 'R2 not configured' }, { status: 503 })
   }
