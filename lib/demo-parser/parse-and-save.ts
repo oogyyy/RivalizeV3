@@ -49,8 +49,10 @@ export async function parseAndSaveDemo(demoId: string): Promise<void> {
     (demo.parsed_data as { opponentSide?: string } | null)?.opponentSide ?? 'team2'
 
   try {
-    const rawBuf = await withRetry(() => downloadObject(r2Key))
-    const buf = maybeDecompress(rawBuf, r2Key)
+    const buf = await withRetry(async () => {
+      const rawBuf = await downloadObject(r2Key)
+      return maybeDecompress(rawBuf, r2Key)
+    })
 
     const { parsedData: realData, warnings } = await withRetry(() => parseCS2Demo(buf))
     if (warnings.length) console.warn(`[parse] warnings for ${demoId}:`, warnings)
@@ -121,11 +123,27 @@ export async function parseAndSaveDemo(demoId: string): Promise<void> {
       }
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[parse] All attempts failed for ${demoId}:`, msg)
+    const raw = err instanceof Error ? err.message : String(err)
+    console.error(`[parse] All attempts failed for ${demoId}:`, raw)
+
+    // Surface a user-readable message; server-side transient errors should say
+    // "try again" rather than blaming the uploaded file.
+    const isTransient =
+      raw.includes('truncated') ||
+      raw.includes('R2 download') ||
+      raw.includes('zstd decompression failed') ||
+      raw.includes('Go parser') ||
+      raw.includes('timed out') ||
+      raw.includes('ECONNRESET') ||
+      raw.includes('ETIMEDOUT')
+
+    const userMsg = isTransient
+      ? `Parsing failed due to a temporary server error — please use "Retry parsing". (${raw})`
+      : raw
+
     await admin.from('demos').update({
       status: 'failed',
-      error_message: msg,
+      error_message: userMsg,
     }).eq('id', demoId)
     throw err
   }

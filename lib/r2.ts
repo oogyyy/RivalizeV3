@@ -54,6 +54,8 @@ async function streamToBuffer(body: AsyncIterable<Uint8Array>): Promise<Buffer> 
 /**
  * Download the complete content of an R2 object as a Buffer.
  * Use for demo parsing — may be hundreds of MB, so only call from background tasks.
+ * Validates the downloaded byte count against ContentLength so a silently-truncated
+ * stream throws rather than returning a partial buffer that fails later in the pipeline.
  */
 export async function downloadObject(key: string): Promise<Buffer> {
   const response = await getR2Client().send(new GetObjectCommand({
@@ -61,7 +63,13 @@ export async function downloadObject(key: string): Promise<Buffer> {
     Key: key,
   }))
   if (!response.Body) throw new Error('Empty response body from R2')
-  return streamToBuffer(response.Body as AsyncIterable<Uint8Array>)
+  const buf = await streamToBuffer(response.Body as AsyncIterable<Uint8Array>)
+  if (response.ContentLength !== undefined && buf.byteLength !== response.ContentLength) {
+    throw new Error(
+      `R2 download truncated: expected ${response.ContentLength} bytes, got ${buf.byteLength}`
+    )
+  }
+  return buf
 }
 
 /**

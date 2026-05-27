@@ -29,8 +29,7 @@ export function maybeDecompress(buf: Buffer, filename: string): Buffer {
       const raw = test.stderr?.toString().trim() ?? ''
       if (raw.includes('premature end') || raw.includes('Read error')) {
         throw new Error(
-          'Demo file appears to be incomplete or corrupted. ' +
-          'Please re-download the demo and upload it again.'
+          `Demo file failed integrity check (zstd: ${raw}) — the file may have been truncated in transit. Retrying…`
         )
       }
       throw new Error(`Demo file failed integrity check: ${raw || 'unknown error'}`)
@@ -42,13 +41,7 @@ export function maybeDecompress(buf: Buffer, filename: string): Buffer {
     if (result.error) throw result.error
     if (result.status !== 0) {
       const raw = result.stderr?.toString().trim() ?? ''
-      if (raw.includes('premature end') || raw.includes('Read error')) {
-        throw new Error(
-          'Demo file appears to be incomplete or corrupted. ' +
-          'Please re-download the demo and upload it again.'
-        )
-      }
-      throw new Error(`zstd: ${raw || 'decompression failed'}`)
+      throw new Error(`zstd decompression failed: ${raw || 'unknown error'}`)
     }
     return readFileSync(outPath)
   } finally {
