@@ -262,7 +262,9 @@ export default function DemoListMultiSelect({
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    {demo.match_date ? new Date(demo.match_date).toLocaleDateString() : new Date(demo.created_at).toLocaleDateString()}
+                    {demo.match_date
+                      ? new Date(demo.match_date).toLocaleDateString()
+                      : `${new Date(demo.created_at).toLocaleDateString()} · ${new Date(demo.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                   </p>
                 </div>
 

@@ -268,7 +268,9 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                       <span className="flex items-center gap-1">
                         <Calendar size={10} />
-                        {demo.match_date ? formatDate(demo.match_date) : formatDate(demo.created_at)}
+                        {demo.match_date
+                          ? formatDate(demo.match_date)
+                          : `${formatDate(demo.created_at)} · ${new Date(demo.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                       </span>
                       {demo.file_size_bytes && (
                         <span className="flex items-center gap-1">
