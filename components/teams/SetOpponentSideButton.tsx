@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, Check, Loader2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -24,8 +24,14 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
   // Optimistic local state — updates instantly on click, avoids refresh race conditions
   const [optimisticSide, setOptimisticSide] = useState<'team1' | 'team2'>(currentSide)
 
-  // Keep in sync if the parent prop changes (e.g. another component refreshes the page)
-  const activeSide = pending ? optimisticSide : currentSide
+  // Sync from parent when it changes after router.refresh() — but never override while pending
+  useEffect(() => {
+    if (pending === null) setOptimisticSide(currentSide)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSide])
+
+  // Always display the optimistic value; currentSide prop may still be stale when pending clears
+  const activeSide = optimisticSide
 
   const labels = {
     team1: teamNames?.team1 || 'Team 1',
