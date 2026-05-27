@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, Check, Loader2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   demoId: string
@@ -52,17 +53,30 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
     // Notify parent immediately so stats/roster update without waiting for server refresh
     onSideChange?.(demoId, opponentSideToSave)
     try {
+      // Get the current session token from the browser client and send it explicitly.
+      // Relying solely on cookies can fail in Next.js 15 route handlers if the session
+      // was refreshed by middleware but the refreshed cookie wasn't visible server-side.
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(`/api/demos/${demoId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ opponentSide: opponentSideToSave }),
       })
-      if (!res.ok) throw new Error(`PATCH failed: ${res.status}`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        console.error('[SetOpponentSideButton] PATCH failed', res.status, body)
+        throw new Error(`PATCH failed: ${res.status}`)
+      }
       // Skip refresh when onSideChange is provided — the parent (MyTeamStatsAndDemos)
       // manages all state client-side. router.refresh() risks remounting the tree and
       // resetting localDemos back to stale server data, causing the visible revert.
       if (!onSideChange) router.refresh()
-    } catch {
+    } catch (err) {
+      console.error('[SetOpponentSideButton] team side save error:', err)
       // Revert on failure
       setOptimisticSide(prevSide)
       onSideChange?.(demoId, prevSide)

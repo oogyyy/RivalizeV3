@@ -110,7 +110,9 @@ export default function DemoListMultiSelect({
   const hasProcessing = processingIds.length > 0
 
   useEffect(() => {
-    if (!hasProcessing) return
+    // When parent manages side-change state (onSideChange provided), skip router.refresh()
+    // to avoid resetting parent's optimistic updates. Parent handles its own state.
+    if (!hasProcessing || onSideChange) return
 
     const supabase = createClient()
     const channel = supabase
@@ -135,7 +137,7 @@ export default function DemoListMultiSelect({
       clearInterval(poll)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasProcessing])
+  }, [hasProcessing, !!onSideChange])
 
   const [selecting,   setSelecting]   = useState(false)
   const [selected,    setSelected]    = useState<Set<string>>(new Set())
