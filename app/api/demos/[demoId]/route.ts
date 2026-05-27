@@ -47,11 +47,24 @@ export async function PATCH(
 ) {
   const { demoId } = await params
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  // Prefer explicit Bearer token (sent by client to avoid cookie-propagation issues),
+  // fall back to session cookies for backwards compatibility.
+  const admin = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let user: any = null
+  const authHeader = req.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const { data } = await admin.auth.getUser(authHeader.slice(7))
+    user = data.user
+  }
   if (!user) {
-    console.error('[PATCH /api/demos] Unauthorized — authError:', authError?.message)
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const supabase = await createClient()
+    const { data, error: authError } = await supabase.auth.getUser()
+    user = data.user
+    if (!user) {
+      console.error('[PATCH /api/demos] Unauthorized — authError:', authError?.message)
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
   }
 
   const body = await req.json()
@@ -59,8 +72,6 @@ export async function PATCH(
   if (opponentSide !== 'team1' && opponentSide !== 'team2') {
     return NextResponse.json({ error: 'opponentSide must be "team1" or "team2"' }, { status: 400 })
   }
-
-  const admin = createAdminClient()
 
   const { data: demo, error: demoError } = await admin
     .from('demos')
@@ -78,7 +89,7 @@ export async function PATCH(
     .select('role')
     .eq('team_id', demo.team_id)
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
   if (!member) {
     console.error('[PATCH /api/demos] Forbidden — userId:', user.id, 'teamId:', demo.team_id, 'err:', memberError?.message)
