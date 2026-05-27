@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, Check, Loader2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -25,13 +25,8 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
   // Optimistic local state — updates instantly on click, avoids refresh race conditions
   const [optimisticSide, setOptimisticSide] = useState<'team1' | 'team2'>(currentSide)
 
-  // Sync from parent when it changes after router.refresh() — but never override while pending
-  useEffect(() => {
-    if (pending === null) setOptimisticSide(currentSide)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSide])
-
-  // Always display the optimistic value; currentSide prop may still be stale when pending clears
+  // currentSide is managed by MyTeamStatsAndDemos local state (always in sync with
+  // optimisticSide via onSideChange), so no useEffect sync is needed or safe here.
   const activeSide = optimisticSide
 
   const labels = {
@@ -57,11 +52,12 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
     // Notify parent immediately so stats/roster update without waiting for server refresh
     onSideChange?.(demoId, opponentSideToSave)
     try {
-      await fetch(`/api/demos/${demoId}`, {
+      const res = await fetch(`/api/demos/${demoId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ opponentSide: opponentSideToSave }),
       })
+      if (!res.ok) throw new Error(`PATCH failed: ${res.status}`)
       router.refresh()
     } catch {
       // Revert on failure
