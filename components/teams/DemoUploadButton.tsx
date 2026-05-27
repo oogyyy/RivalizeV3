@@ -108,7 +108,8 @@ async function uploadViaServer(
   })
   if (!completeRes.ok) {
     const body = await completeRes.json().catch(() => ({}))
-    throw new Error(body.error ?? `Upload complete failed (${completeRes.status})`)
+    const detail = body.error ?? (completeRes.status === 500 ? 'Server error — try again' : `Failed (${completeRes.status})`)
+    throw new Error(detail)
   }
 
   onProgress(100)
@@ -182,7 +183,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
     }
   }
 
-  // ── Batch upload: all pending files in parallel ───────────────────────────────
+  // ── Batch upload: max 2 concurrent to avoid overwhelming Railway's proxy ────────
 
   const uploadAll = async () => {
     if (demoType !== 'self' && !opponentName.trim()) return
@@ -194,7 +195,16 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
       return acc
     }, [])
 
-    await Promise.allSettled(pending.map(({ file, index }) => uploadOne(index, file)))
+    // Run uploads with a concurrency limit of 2
+    const CONCURRENCY = 2
+    let cursor = 0
+    async function runNext(): Promise<void> {
+      const item = pending[cursor++]
+      if (!item) return
+      await uploadOne(item.index, item.file).catch(() => {})
+      return runNext()
+    }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pending.length) }, runNext))
 
     setIsProcessing(false)
     onSuccess?.()
