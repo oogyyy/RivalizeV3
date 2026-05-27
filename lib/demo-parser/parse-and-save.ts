@@ -131,7 +131,7 @@ export async function parseAndSaveDemo(demoId: string): Promise<void> {
     const isTransient =
       raw.includes('truncated') ||
       raw.includes('R2 download') ||
-      raw.includes('zstd decompression failed') ||
+      raw.includes('zstd decompression produced no output') ||
       raw.includes('Go parser') ||
       raw.includes('timed out') ||
       raw.includes('ECONNRESET') ||
