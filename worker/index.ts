@@ -12,14 +12,12 @@ const supabase = createClient(
 
 async function reclaimStale(): Promise<void> {
   const cutoff = new Date(Date.now() - STALE_AFTER_MS).toISOString()
-  const { count } = await supabase
+  await supabase
     .from('demos')
     .update({ processing_started_at: null })
     .eq('status', 'processing')
     .not('processing_started_at', 'is', null)
     .lt('processing_started_at', cutoff)
-    .select('id', { count: 'exact', head: true })
-  if (count) console.log(`[worker] Reclaimed ${count} stale job(s)`)
 }
 
 async function claimNext(): Promise<string | null> {
