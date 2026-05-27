@@ -21,6 +21,11 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState<'team1' | 'team2' | null>(null)
+  // Optimistic local state — updates instantly on click, avoids refresh race conditions
+  const [optimisticSide, setOptimisticSide] = useState<'team1' | 'team2'>(currentSide)
+
+  // Keep in sync if the parent prop changes (e.g. another component refreshes the page)
+  const activeSide = pending ? optimisticSide : currentSide
 
   const labels = {
     team1: teamNames?.team1 || 'Team 1',
@@ -28,22 +33,25 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
   }
 
   // In 'self' variant: the user's own team is the side that is NOT the opponent.
-  const userSide: 'team1' | 'team2' = currentSide === 'team1' ? 'team2' : 'team1'
+  const userSide: 'team1' | 'team2' = activeSide === 'team1' ? 'team2' : 'team1'
 
   async function select(side: 'team1' | 'team2') {
     // In self mode the caller picks their own team side; we store the opposite as opponentSide.
     const opponentSideToSave: 'team1' | 'team2' =
       variant === 'self' ? (side === 'team1' ? 'team2' : 'team1') : side
 
-    if (opponentSideToSave === currentSide) { setOpen(false); return }
+    if (opponentSideToSave === activeSide) { setOpen(false); return }
+
+    // Optimistically update the UI immediately
+    setOptimisticSide(opponentSideToSave)
     setPending(side)
+    setOpen(false)
     try {
       await fetch(`/api/demos/${demoId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ opponentSide: opponentSideToSave }),
       })
-      setOpen(false)
       router.refresh()
     } finally {
       setPending(null)
@@ -59,7 +67,7 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
         </span>
         <div className="flex gap-1.5">
           {(['team1', 'team2'] as const).map(side => {
-            const isActive = userSide === side
+            const isActive = (activeSide === 'team1' ? 'team2' : 'team1') === side
             return (
               <button
                 key={side}
@@ -99,7 +107,7 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
         title="Choose which team in this demo is the opponent"
       >
         <Users size={9} className="shrink-0" />
-        <span>Scouting: <span className="font-medium">{labels[currentSide]}</span></span>
+        <span>Scouting: <span className="font-medium">{labels[activeSide]}</span></span>
         <ChevronDown size={8} className={cn('transition-transform', open && 'rotate-180')} />
       </button>
 
@@ -117,7 +125,7 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
                 disabled={pending !== null}
                 className={cn(
                   'flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs text-left transition-colors',
-                  currentSide === side
+                  activeSide === side
                     ? 'text-neon-green bg-neon-green/10'
                     : 'text-foreground hover:bg-accent',
                   'disabled:opacity-50'
@@ -125,7 +133,7 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
               >
                 {pending === side ? (
                   <Loader2 size={10} className="animate-spin shrink-0" />
-                ) : currentSide === side ? (
+                ) : activeSide === side ? (
                   <Check size={10} className="text-neon-green shrink-0" />
                 ) : (
                   <span className="w-2.5 shrink-0" />
