@@ -338,7 +338,9 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                         </p>
                       )}
                     </div>
-                    <ReparseButton demoId={demo.id} variant="prominent" />
+                    {(demo.status === 'failed' || Date.now() - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) && (
+                      <ReparseButton demoId={demo.id} variant="prominent" />
+                    )}
                   </div>
                 )}
               </CardContent>

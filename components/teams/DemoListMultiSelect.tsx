@@ -309,7 +309,9 @@ export default function DemoListMultiSelect({
                       </p>
                     )}
                   </div>
-                  <ReparseButton demoId={demo.id} variant="prominent" />
+                  {(demo.status === 'failed' || Date.now() - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) && (
+                    <ReparseButton demoId={demo.id} variant="prominent" />
+                  )}
                 </div>
               )}
 
