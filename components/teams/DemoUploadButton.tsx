@@ -170,9 +170,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
       updateUpload(i, { progress: 100, status: 'registering' })
 
-      // Fire-and-forget: kick off parsing without blocking the UI.
-      fetch(`/api/demos/${demo.id}/parse`, { method: 'POST' }).catch(() => {})
-
+      // Worker picks this up automatically via DB polling — no explicit trigger needed.
       updateUpload(i, { status: 'queued', progress: 100, demoId: demo.id })
     } catch (err) {
       updateUpload(i, {
