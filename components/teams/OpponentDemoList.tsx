@@ -8,6 +8,7 @@ import {
   Trash2, AlertTriangle, Loader2, CheckSquare, Square, X,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
+import { MAP_THUMBS } from '@/lib/map-config'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -242,12 +243,19 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                   {/* Map icon */}
                   <div
                     className={cn(
-                      'w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0 border border-border',
+                      'w-14 h-10 rounded-lg overflow-hidden shrink-0 bg-accent border border-border relative',
                       selecting && 'cursor-pointer',
                     )}
                     onClick={selecting ? () => toggleSelect(demo.id) : undefined}
                   >
-                    <MapPin size={15} className="text-muted-foreground" />
+                    {demo.map && MAP_THUMBS[demo.map] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={MAP_THUMBS[demo.map]} alt={demo.map} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <MapPin size={14} className="text-muted-foreground" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Main info */}
