@@ -326,7 +326,11 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                   )}>
                     <div className="flex-1 min-w-0">
                       <p className={cn('text-[11px] font-medium', demo.status === 'failed' ? 'text-red-400' : 'text-amber-400')}>
-                        {demo.status === 'failed' ? 'Parsing failed' : 'Stuck in processing'}
+                        {demo.status === 'failed'
+                          ? 'Parsing failed'
+                          : Date.now() - new Date(demo.created_at).getTime() < 10 * 60 * 1000
+                            ? 'Parsing…'
+                            : 'Stuck in processing'}
                       </p>
                       {demo.error_message && (
                         <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 break-words" title={demo.error_message}>
