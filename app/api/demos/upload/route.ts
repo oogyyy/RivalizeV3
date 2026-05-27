@@ -1,5 +1,6 @@
 export const maxDuration = 300  // 5 min — large demo files can take a while
 
+import { Readable } from 'stream'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -22,11 +23,11 @@ function getR2Client(): S3Client {
 
 /**
  * POST /api/demos/upload
- * Receives the raw demo file as the request body (Content-Type: application/octet-stream)
- * and proxies it to R2 — bypassing the browser CORS restriction on direct R2 presigned uploads.
+ * Streams the raw demo file body directly to R2 without buffering it in
+ * Next.js — bypassing both the CORS restriction on direct R2 presigned
+ * uploads and the framework's in-memory body buffer limit (~10 MB).
  *
  * Query params: teamId, filename, opponentName, demoType (opponent|self)
- * Headers:      x-file-size (optional, for accurate DB record)
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -34,10 +35,10 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const q = request.nextUrl.searchParams
-  const teamId      = q.get('teamId')
-  const filename    = q.get('filename')
+  const teamId       = q.get('teamId')
+  const filename     = q.get('filename')
   const opponentName = q.get('opponentName') ?? 'Unknown'
-  const demoType    = (q.get('demoType') ?? 'opponent') as 'opponent' | 'self'
+  const demoType     = (q.get('demoType') ?? 'opponent') as 'opponent' | 'self'
 
   if (!teamId || !filename) {
     return NextResponse.json({ error: 'Missing teamId or filename' }, { status: 400 })
@@ -61,23 +62,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'R2 not configured' }, { status: 503 })
   }
 
-  // Buffer the request body
-  const buffer = await request.arrayBuffer()
-  if (buffer.byteLength > MAX_FILE_SIZE) {
+  if (!request.body) {
+    return NextResponse.json({ error: 'No file body provided' }, { status: 400 })
+  }
+
+  // Use Content-Length for size validation and DB record — avoids buffering
+  // the entire body (which would hit Next.js's ~10 MB in-memory limit).
+  const contentLengthHeader = request.headers.get('content-length')
+  const fileSize = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0
+
+  if (fileSize > MAX_FILE_SIZE) {
     return NextResponse.json({ error: 'File exceeds 500 MB limit' }, { status: 413 })
   }
 
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
   const key = `${teamId}/${Date.now()}-${safeFilename}`
 
-  // Upload to R2
+  // Stream request body directly to R2 — never materialised in memory.
+  // Readable.fromWeb converts the Web ReadableStream to a Node.js Readable
+  // so the AWS SDK can pipe it to R2.
   try {
+    const nodeStream = Readable.fromWeb(request.body as Parameters<typeof Readable.fromWeb>[0])
     await getR2Client().send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
       Key: key,
-      Body: new Uint8Array(buffer),
+      Body: nodeStream,
       ContentType: 'application/octet-stream',
-      ContentLength: buffer.byteLength,
+      ContentLength: fileSize || undefined,
     }))
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown R2 error'
@@ -100,7 +111,7 @@ export async function POST(request: NextRequest) {
       raw_file_path: key,
       file_url: fileUrl,
       status: 'processing',
-      file_size_bytes: buffer.byteLength,
+      file_size_bytes: fileSize || null,
       created_by: user.id,
       demo_type: demoType,
       parsed_data: { opponentSide: demoType === 'self' ? 'team1' : 'team2' },
