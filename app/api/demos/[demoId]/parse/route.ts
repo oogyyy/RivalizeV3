@@ -6,9 +6,8 @@ import { parseAndSaveDemo } from '@/lib/demo-parser/parse-and-save'
 /**
  * POST /api/demos/[demoId]/parse
  * Parses a demo synchronously on the Railway persistent server (no timeout).
- * Does NOT set processing_started_at — that is the worker's domain.
- * If the server process is killed mid-parse (e.g. deployment), the demo stays
- * status='processing' with processing_started_at=null so retries always work.
+ * Claims the demo by setting processing_started_at so the worker doesn't race
+ * against this route. reclaimStale recovers it after 30 min if the process dies.
  */
 export async function POST(
   _req: Request,
@@ -38,10 +37,11 @@ export async function POST(
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Reset to processing so the UI shows the right state
+  // Claim the demo so the worker doesn't race against this synchronous parse.
+  // stale reclaim recovers it after 30 min if the process dies mid-parse.
   await admin
     .from('demos')
-    .update({ status: 'processing', processing_started_at: null, error_message: null })
+    .update({ status: 'processing', processing_started_at: new Date().toISOString(), error_message: null })
     .eq('id', demoId)
 
   try {

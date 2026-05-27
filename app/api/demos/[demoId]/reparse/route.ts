@@ -35,7 +35,13 @@ export async function POST(
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  await admin.from('demos').update({ status: 'processing', error_message: null }).eq('id', demoId)
+  // Claim the demo for this synchronous parse so the worker doesn't race us,
+  // and so reclaimStale can recover if this route crashes before parseAndSaveDemo finishes.
+  await admin.from('demos').update({
+    status: 'processing',
+    error_message: null,
+    processing_started_at: new Date().toISOString(),
+  }).eq('id', demoId)
 
   try {
     await parseAndSaveDemo(demoId)
