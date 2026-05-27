@@ -5,9 +5,10 @@ import { parseAndSaveDemo } from '@/lib/demo-parser/parse-and-save'
 
 /**
  * POST /api/demos/[demoId]/parse
- * Parses a demo synchronously. On Railway (persistent server, not serverless)
- * this runs to completion even if the client disconnects — no timeout issues.
- * The worker service acts as a fallback for any demos this misses.
+ * Parses a demo synchronously on the Railway persistent server (no timeout).
+ * Does NOT set processing_started_at — that is the worker's domain.
+ * If the server process is killed mid-parse (e.g. deployment), the demo stays
+ * status='processing' with processing_started_at=null so retries always work.
  */
 export async function POST(
   _req: Request,
@@ -22,7 +23,7 @@ export async function POST(
   const admin = createAdminClient()
   const { data: demo } = await admin
     .from('demos')
-    .select('team_id, status')
+    .select('team_id')
     .eq('id', demoId)
     .single()
 
@@ -37,17 +38,11 @@ export async function POST(
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Claim the demo atomically so the worker doesn't double-process it
-  const { data: claimed } = await admin
+  // Reset to processing so the UI shows the right state
+  await admin
     .from('demos')
-    .update({ status: 'processing', processing_started_at: new Date().toISOString(), error_message: null })
+    .update({ status: 'processing', processing_started_at: null, error_message: null })
     .eq('id', demoId)
-    .is('processing_started_at', null)
-    .select('id')
-    .single()
-
-  // Worker already claimed it — let it finish
-  if (!claimed) return NextResponse.json({ queued: true })
 
   try {
     await parseAndSaveDemo(demoId)
