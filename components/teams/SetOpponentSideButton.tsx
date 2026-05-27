@@ -106,7 +106,7 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-5 z-20 bg-card border border-border rounded-lg shadow-xl p-1 min-w-[140px]">
+          <div className="absolute left-0 top-5 z-20 bg-[#13132a] border border-border rounded-lg shadow-2xl p-1 min-w-[140px]">
             <p className="text-[9px] text-muted-foreground px-2 pt-1 pb-1.5 font-medium uppercase tracking-wide">
               Scout as opponent
             </p>
