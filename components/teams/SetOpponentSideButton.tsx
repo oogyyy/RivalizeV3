@@ -15,9 +15,10 @@ interface Props {
    *   displays the user's own team (the inverse side) and lets them pick "I am Team X".
    */
   variant?: 'opponent' | 'self'
+  onSideChange?: (demoId: string, opponentSide: 'team1' | 'team2') => void
 }
 
-export default function SetOpponentSideButton({ demoId, currentSide, teamNames, variant = 'opponent' }: Props) {
+export default function SetOpponentSideButton({ demoId, currentSide, teamNames, variant = 'opponent', onSideChange }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState<'team1' | 'team2' | null>(null)
@@ -48,10 +49,13 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
 
     if (opponentSideToSave === activeSide) { setOpen(false); return }
 
+    const prevSide = activeSide
     // Optimistically update the UI immediately
     setOptimisticSide(opponentSideToSave)
     setPending(side)
     setOpen(false)
+    // Notify parent immediately so stats/roster update without waiting for server refresh
+    onSideChange?.(demoId, opponentSideToSave)
     try {
       await fetch(`/api/demos/${demoId}`, {
         method: 'PATCH',
@@ -59,6 +63,10 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
         body: JSON.stringify({ opponentSide: opponentSideToSave }),
       })
       router.refresh()
+    } catch {
+      // Revert on failure
+      setOptimisticSide(prevSide)
+      onSideChange?.(demoId, prevSide)
     } finally {
       setPending(null)
     }
