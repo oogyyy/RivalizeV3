@@ -68,7 +68,7 @@ export async function parseAndSaveDemo(demoId: string): Promise<void> {
     await admin.from('demos').update({
       parsed_data: { ...realData, opponentSide: existingOpponentSide },
       status: 'completed',
-      map: realData.header.map,
+      map: realData.header?.map ?? 'unknown',
       error_message: null,
     }).eq('id', demoId)
 
