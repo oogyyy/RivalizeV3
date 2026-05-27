@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import { Plus, Users, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -10,10 +10,7 @@ import TeamCard from '@/components/teams/TeamCard'
 import CreateTeamDialog from './CreateTeamDialog'
 
 export default async function TeamsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/login')
 
   // Use admin client to bypass RLS recursion; authorization is enforced by filtering on user.id

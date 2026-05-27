@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -16,10 +17,10 @@ import MapFolderList, { type MapGroup } from '@/components/teams/MapFolderList'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 
 export default async function MyTeamPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/login')
 
+  const supabase = await createClient()
   const admin = createAdminClient()
 
   const { data: memberships } = await admin

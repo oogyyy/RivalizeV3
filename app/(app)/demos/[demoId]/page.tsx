@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentUser } from '@/lib/auth/get-user'
 import { notFound, redirect } from 'next/navigation'
 import { AlertCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -18,10 +19,10 @@ export default async function DemoPage({ params, searchParams }: Props) {
   const { demoId } = await params
   const { folder: folderId = null } = await searchParams
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/login')
 
+  const supabase = await createClient()
   const admin = createAdminClient()
 
   const { data: demo } = await admin

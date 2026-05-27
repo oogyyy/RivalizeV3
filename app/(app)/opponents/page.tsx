@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -13,10 +14,10 @@ import { Target, Brain, Upload, Layers, Activity } from 'lucide-react'
 import type { AggregatedStats } from '@/types/database'
 
 export default async function OpponentsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/login')
 
+  const supabase = await createClient()
   const admin = createAdminClient()
 
   const { data: profile } = await supabase
