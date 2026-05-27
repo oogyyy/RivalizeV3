@@ -48,8 +48,11 @@ export async function PATCH(
   const { demoId } = await params
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (!user) {
+    console.error('[PATCH /api/demos] Unauthorized — authError:', authError?.message)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const body = await req.json()
   const { opponentSide } = body
@@ -59,22 +62,28 @@ export async function PATCH(
 
   const admin = createAdminClient()
 
-  const { data: demo } = await admin
+  const { data: demo, error: demoError } = await admin
     .from('demos')
     .select('id, team_id, parsed_data')
     .eq('id', demoId)
     .single()
 
-  if (!demo) return NextResponse.json({ error: 'Demo not found' }, { status: 404 })
+  if (!demo) {
+    console.error('[PATCH /api/demos] Demo not found:', demoId, demoError?.message)
+    return NextResponse.json({ error: 'Demo not found' }, { status: 404 })
+  }
 
-  const { data: member } = await admin
+  const { data: member, error: memberError } = await admin
     .from('team_members')
     .select('role')
     .eq('team_id', demo.team_id)
     .eq('user_id', user.id)
     .single()
 
-  if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!member) {
+    console.error('[PATCH /api/demos] Forbidden — userId:', user.id, 'teamId:', demo.team_id, 'err:', memberError?.message)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const updatedParsedData = {
     ...(typeof demo.parsed_data === 'object' && demo.parsed_data !== null ? demo.parsed_data : {}),
@@ -86,7 +95,10 @@ export async function PATCH(
     .update({ parsed_data: updatedParsedData })
     .eq('id', demoId)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('[PATCH /api/demos] DB update failed:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({ success: true })
 }

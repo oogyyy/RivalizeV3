@@ -57,12 +57,17 @@ export default function SetOpponentSideButton({ demoId, currentSide, teamNames, 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ opponentSide: opponentSideToSave }),
       })
-      if (!res.ok) throw new Error(`PATCH failed: ${res.status}`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        console.error('[SetOpponentSideButton] PATCH failed', res.status, body)
+        throw new Error(`PATCH failed: ${res.status}`)
+      }
       // Skip refresh when onSideChange is provided — the parent (MyTeamStatsAndDemos)
       // manages all state client-side. router.refresh() risks remounting the tree and
       // resetting localDemos back to stale server data, causing the visible revert.
       if (!onSideChange) router.refresh()
-    } catch {
+    } catch (err) {
+      console.error('[SetOpponentSideButton] team side save error:', err)
       // Revert on failure
       setOptimisticSide(prevSide)
       onSideChange?.(demoId, prevSide)
