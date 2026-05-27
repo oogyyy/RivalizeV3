@@ -1,15 +1,11 @@
-export const maxDuration = 300
-
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import { parseAndSaveDemo } from '@/lib/demo-parser/parse-and-save'
 
 /**
  * POST /api/demos/[demoId]/parse
- * Synchronous parse — keeps the HTTP connection open until the demo is fully
- * parsed and saved. Called by the client immediately after registration so
- * there is no reliance on background-job infrastructure.
+ * Resets a demo so the polling worker picks it up for (re-)parsing.
+ * Returns immediately — the worker processes the demo asynchronously.
  */
 export async function POST(
   _req: Request,
@@ -24,7 +20,7 @@ export async function POST(
   const admin = createAdminClient()
   const { data: demo } = await admin
     .from('demos')
-    .select('team_id, status')
+    .select('team_id')
     .eq('id', demoId)
     .single()
 
@@ -39,18 +35,11 @@ export async function POST(
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Mark as processing in case it was stuck in another state
-  if (demo.status !== 'processing') {
-    await admin.from('demos').update({ status: 'processing' }).eq('id', demoId)
-  }
+  // Reset so the worker reclaims it on the next poll
+  await admin
+    .from('demos')
+    .update({ status: 'processing', processing_started_at: null, error_message: null })
+    .eq('id', demoId)
 
-  try {
-    await parseAndSaveDemo(demoId)
-    return NextResponse.json({ success: true })
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    )
-  }
+  return NextResponse.json({ queued: true })
 }

@@ -67,12 +67,14 @@ CREATE TABLE IF NOT EXISTS demos (
   error_message TEXT,
   file_size_bytes BIGINT,
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  processing_started_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS demos_team_id_idx ON demos(team_id);
 CREATE INDEX IF NOT EXISTS demos_opponent_slug_idx ON demos(opponent_slug);
 CREATE INDEX IF NOT EXISTS demos_status_idx ON demos(status);
+CREATE INDEX IF NOT EXISTS demos_worker_queue_idx ON demos(created_at) WHERE status = 'processing' AND processing_started_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS team_folders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

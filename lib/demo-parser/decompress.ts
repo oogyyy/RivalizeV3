@@ -1,52 +1,44 @@
 import { spawnSync } from 'child_process'
-import { writeFileSync, readFileSync, unlinkSync } from 'fs'
+import { writeFileSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomBytes } from 'crypto'
 
 /**
  * If the buffer is a Zstandard-compressed demo (.dem.zst), decompress it
- * using the system zstd binary (installed via apk/apt) which supports all
- * valid zstd files including those produced by CS2.
+ * using the system zstd binary (installed via apk/apt).
  *
- * Falls back to writing a temp file so large decompressed outputs (800 MB+)
- * go through the filesystem rather than a pipe buffer.
+ * Uses stdout output (-c) rather than a named output file so that partial
+ * decompression output is captured even when zstd exits non-zero. zstd
+ * deletes named output files on any error as a safety measure, which would
+ * make the file-based approach always return nothing on failure — stdout
+ * avoids this.  This handles CS2 demos that are missing the final frame
+ * endmark: zstd decompresses all data successfully, then complains about
+ * the missing trailer, but the stdout buffer already contains everything.
  */
 export function maybeDecompress(buf: Buffer, filename: string): Buffer {
   if (!filename.toLowerCase().endsWith('.zst')) return buf
 
   const id = randomBytes(8).toString('hex')
-  const inPath  = join(tmpdir(), `${id}.dem.zst`)
-  const outPath = join(tmpdir(), `${id}.dem`)
+  const inPath = join(tmpdir(), `${id}.dem.zst`)
 
   try {
     writeFileSync(inPath, buf)
 
-    // Integrity check before decompression — catches truncated/corrupted uploads early.
-    const test = spawnSync('zstd', ['--test', inPath], { stdio: 'pipe' })
-    if (test.error) throw test.error
-    if (test.status !== 0) {
-      const raw = test.stderr?.toString().trim() ?? ''
-      if (raw.includes('premature end') || raw.includes('Read error')) {
-        throw new Error(
-          `Demo file failed integrity check (zstd: ${raw}) — the file may have been truncated in transit. Retrying…`
-        )
-      }
-      throw new Error(`Demo file failed integrity check: ${raw || 'unknown error'}`)
-    }
-
-    const result = spawnSync('zstd', ['-d', inPath, '-o', outPath, '--force'], {
+    const result = spawnSync('zstd', ['-d', '-c', inPath], {
       stdio: 'pipe',
+      maxBuffer: 2 * 1024 * 1024 * 1024, // 2 GB — large enough for any CS2 demo
     })
     if (result.error) throw result.error
-    if (result.status !== 0) {
-      const raw = result.stderr?.toString().trim() ?? ''
-      throw new Error(`zstd decompression failed: ${raw || 'unknown error'}`)
+
+    if (result.stdout && result.stdout.byteLength > 0) {
+      return result.stdout
     }
-    return readFileSync(outPath)
+
+    const raw = result.stderr?.toString().trim() ?? ''
+    throw new Error(`zstd decompression produced no output: ${raw || 'unknown error'}`)
   } finally {
-    for (const p of [inPath, outPath]) {
-      try { unlinkSync(p) } catch { /* ignore */ }
-    }
+    try { unlinkSync(inPath) } catch { /* ignore */ }
   }
 }
+

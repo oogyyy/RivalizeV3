@@ -36,38 +36,83 @@ function isValidDemoFile(name: string) {
   return lower.endsWith('.dem') || lower.endsWith('.zst')
 }
 
-function uploadViaServer(
+// 9 MB chunks — safely under Railway's ~10 MB reverse-proxy body limit.
+// R2 multipart upload requires parts ≥ 5 MB except the last one, so 9 MB works.
+const CHUNK_SIZE = 9 * 1024 * 1024
+
+async function uploadViaServer(
   file: File,
   params: { teamId: string; opponentName: string; demoType: string },
   onProgress: (pct: number) => void,
 ): Promise<{ id: string }> {
-  return new Promise((resolve, reject) => {
-    const url = new URL('/api/demos/upload', window.location.origin)
-    url.searchParams.set('teamId', params.teamId)
-    url.searchParams.set('filename', file.name)
-    url.searchParams.set('opponentName', params.opponentName)
-    url.searchParams.set('demoType', params.demoType)
-
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', url.toString())
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
-    xhr.upload.addEventListener('progress', e => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
-    })
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try { resolve(JSON.parse(xhr.responseText)) }
-        catch { reject(new Error('Invalid server response')) }
-      } else {
-        let msg = `Upload failed (${xhr.status})`
-        try { msg = JSON.parse(xhr.responseText).error ?? msg } catch { /* ignore */ }
-        reject(new Error(msg))
-      }
-    })
-    xhr.addEventListener('error', () => reject(new Error('Network error — check your connection')))
-    xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
-    xhr.send(file)
+  const base = new URL('/api/demos/upload', window.location.origin)
+  const common = new URLSearchParams({
+    teamId:       params.teamId,
+    filename:     file.name,
+    opponentName: params.opponentName,
+    demoType:     params.demoType,
   })
+
+  // 1 — init multipart upload
+  const initUrl = new URL(base)
+  initUrl.searchParams.set('action', 'init')
+  common.forEach((v, k) => initUrl.searchParams.set(k, v))
+
+  const initRes = await fetch(initUrl.toString(), { method: 'POST' })
+  if (!initRes.ok) {
+    const body = await initRes.json().catch(() => ({}))
+    throw new Error(body.error ?? `Upload init failed (${initRes.status})`)
+  }
+  const { uploadId, key } = await initRes.json() as { uploadId: string; key: string }
+
+  // 2 — upload chunks
+  const numChunks = Math.ceil(file.size / CHUNK_SIZE)
+  const parts: Array<{ partNumber: number; etag: string }> = []
+
+  for (let i = 0; i < numChunks; i++) {
+    const start = i * CHUNK_SIZE
+    const chunk = file.slice(start, start + CHUNK_SIZE)
+
+    const partUrl = new URL(base)
+    partUrl.searchParams.set('action', 'part')
+    partUrl.searchParams.set('uploadId', uploadId)
+    partUrl.searchParams.set('key', key)
+    partUrl.searchParams.set('partNumber', String(i + 1))
+
+    const partRes = await fetch(partUrl.toString(), {
+      method:  'POST',
+      body:    chunk,
+      headers: { 'Content-Type': 'application/octet-stream' },
+    })
+    if (!partRes.ok) {
+      const body = await partRes.json().catch(() => ({}))
+      throw new Error(body.error ?? `Chunk ${i + 1} upload failed (${partRes.status})`)
+    }
+    const { etag } = await partRes.json() as { etag: string }
+    parts.push({ partNumber: i + 1, etag })
+    onProgress(Math.round(((i + 1) / numChunks) * 90)) // reserve last 10% for complete step
+  }
+
+  // 3 — complete upload and register demo
+  const completeUrl = new URL(base)
+  completeUrl.searchParams.set('action', 'complete')
+  completeUrl.searchParams.set('uploadId', uploadId)
+  completeUrl.searchParams.set('key', key)
+  completeUrl.searchParams.set('fileSize', String(file.size))
+  common.forEach((v, k) => completeUrl.searchParams.set(k, v))
+
+  const completeRes = await fetch(completeUrl.toString(), {
+    method:  'POST',
+    body:    JSON.stringify({ parts }),
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!completeRes.ok) {
+    const body = await completeRes.json().catch(() => ({}))
+    throw new Error(body.error ?? `Upload complete failed (${completeRes.status})`)
+  }
+
+  onProgress(100)
+  return completeRes.json()
 }
 
 export default function DemoUploadButton({ teamId, demoType = 'opponent', onSuccess }: DemoUploadButtonProps) {
@@ -125,9 +170,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
       updateUpload(i, { progress: 100, status: 'registering' })
 
-      // Fire-and-forget: kick off parsing without blocking the UI.
-      fetch(`/api/demos/${demo.id}/parse`, { method: 'POST' }).catch(() => {})
-
+      // Worker picks this up automatically via DB polling — no explicit trigger needed.
       updateUpload(i, { status: 'queued', progress: 100, demoId: demo.id })
     } catch (err) {
       updateUpload(i, {
