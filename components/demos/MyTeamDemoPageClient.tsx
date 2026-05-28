@@ -11,6 +11,13 @@ import { ReparseProgress } from '@/components/demos/ReparseProgress'
 import RoundTimeline from '@/components/demos/RoundTimeline'
 import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
 import ReplayCanvas from '@/components/demos/ReplayCanvas'
+import dynamic from 'next/dynamic'
+import DemoInlineChat from '@/components/demos/DemoInlineChat'
+
+const Replay3DCanvas = dynamic(
+  () => import('@/components/demos/Replay3DCanvas'),
+  { ssr: false, loading: () => <div className="h-[460px] flex items-center justify-center bg-[#070a16] rounded-lg"><Loader2 size={24} className="text-neon-green animate-spin" /></div> }
+)
 import { MAP_THUMBS } from '@/lib/map-config'
 import {
   Trophy, Crosshair, Target, Shield, Zap, TrendingUp,
@@ -619,8 +626,8 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main content */}
-            <div className="lg:col-span-2 space-y-4">
+            {/* Main content — full-width on 3D tab to accommodate the inline chat split */}
+            <div className={cn(activeTab === '3d' ? 'lg:col-span-3' : 'lg:col-span-2', 'space-y-4')}>
               {/* Tabs */}
               <div className="flex gap-1 p-1 bg-muted/30 rounded-lg border border-border flex-wrap">
                 {TABS.map(tab => (
@@ -751,30 +758,30 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                   </Card>
                 )}
 
-                {activeTab === '3d' && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Box size={16} className="text-neon-green" />
-                        3D Replay
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                        <Box size={40} className="text-muted-foreground/40" />
-                        <p className="font-semibold text-foreground">3D Replay — Coming Soon</p>
-                        <p className="text-sm text-muted-foreground max-w-sm">
-                          Interactive 3D map replay with player movement paths and utility trajectories is in development.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                {activeTab === '3d' && parsed && (
+                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                    <div className="w-full lg:flex-1 min-w-0">
+                      <Replay3DCanvas
+                        mapName={parsed.header.map}
+                        parsed={parsed}
+                        team1={parsed.header.team1}
+                        team2={parsed.header.team2}
+                      />
+                    </div>
+                    <div className="w-full lg:w-[340px] lg:shrink-0 h-[548px]">
+                      <DemoInlineChat
+                        mode="myteam"
+                        teamId={demo.team_id}
+                        mapName={parsed.header.map}
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Right sidebar: AI Analyst */}
-            <div className="space-y-4">
+            {/* Right sidebar: hidden when 3D tab is active (chat is inline there) */}
+            <div className={cn('space-y-4', activeTab === '3d' && 'hidden')}>
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">

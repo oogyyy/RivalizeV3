@@ -13,6 +13,7 @@ import { ReparseProgress } from '@/components/demos/ReparseProgress'
 import RoundTimeline from '@/components/demos/RoundTimeline'
 import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
 import ReplayCanvas from '@/components/demos/ReplayCanvas'
+import DemoInlineChat from '@/components/demos/DemoInlineChat'
 import { MAP_THUMBS } from '@/lib/map-config'
 
 const Replay3DCanvas = dynamic(
@@ -664,12 +665,23 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
             )}
 
             {activeTab === '3d' && parsed && (
-              <Replay3DCanvas
-                mapName={parsed.header.map}
-                parsed={parsed}
-                team1={parsed.header.team1}
-                team2={parsed.header.team2}
-              />
+              <div className="flex flex-col lg:flex-row gap-4 items-start">
+                <div className="w-full lg:flex-1 min-w-0">
+                  <Replay3DCanvas
+                    mapName={parsed.header.map}
+                    parsed={parsed}
+                    team1={parsed.header.team1}
+                    team2={parsed.header.team2}
+                  />
+                </div>
+                <div className="w-full lg:w-[340px] lg:shrink-0 h-[548px]">
+                  <DemoInlineChat
+                    mode="opponent"
+                    folderId={folderId ?? undefined}
+                    mapName={parsed.header.map}
+                  />
+                </div>
+              </div>
             )}
           </div>
         </>
