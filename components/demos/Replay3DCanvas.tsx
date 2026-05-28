@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { Loader2, RotateCcw, Play, Pause } from 'lucide-react'
+import { Loader2, RotateCcw, Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { MAP_CONFIGS, loadMapImage, worldToCanvas, type MapConfig } from '@/lib/map-config'
 import type { ParsedDemoData, PositionFrame, Round, GrenadeEvent, GameEvent, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
@@ -106,6 +106,9 @@ interface PB {
   playing: boolean; speed: number
   time: number; duration: number; roundIdx: number
 }
+
+type SoundEventType = 'kill' | 'he' | 'smoke' | 'flash' | 'molotov' | 'bomb_plant' | 'bomb_defuse' | 'round_end_win' | 'round_end_loss'
+interface SoundEvent { time: number; type: SoundEventType; fired: boolean }
 
 // ── Pure helpers ───────────────────────────────────────────────────────────────
 
@@ -640,6 +643,88 @@ function makeSiteMarker(x3d: number, z3d: number, label: string, scene: THREE.Sc
   scene.add(sprite)
 }
 
+// ── Web Audio synthesis ────────────────────────────────────────────────────────
+
+function sndKill(ctx: AudioContext) {
+  const dur = 0.12
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate)
+  const d = buf.getChannelData(0)
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (d.length * 0.25))
+  const src = ctx.createBufferSource(); src.buffer = buf
+  const filt = ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.value = 2400; filt.Q.value = 0.8
+  const gain = ctx.createGain(); gain.gain.value = 0.18
+  src.connect(filt); filt.connect(gain); gain.connect(ctx.destination)
+  src.start(); src.stop(ctx.currentTime + dur)
+}
+
+function sndExplosion(ctx: AudioContext) {
+  const dur = 0.45
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate)
+  const d = buf.getChannelData(0)
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (d.length * 0.35))
+  const src = ctx.createBufferSource(); src.buffer = buf
+  const filt = ctx.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 220
+  const gain = ctx.createGain(); gain.gain.value = 0.28
+  src.connect(filt); filt.connect(gain); gain.connect(ctx.destination)
+  src.start(); src.stop(ctx.currentTime + dur)
+}
+
+function sndSmoke(ctx: AudioContext) {
+  const dur = 0.18
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate)
+  const d = buf.getChannelData(0)
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (d.length * 0.4))
+  const src = ctx.createBufferSource(); src.buffer = buf
+  const filt = ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.value = 2800; filt.Q.value = 1.2
+  const gain = ctx.createGain(); gain.gain.value = 0.10
+  src.connect(filt); filt.connect(gain); gain.connect(ctx.destination)
+  src.start(); src.stop(ctx.currentTime + dur)
+}
+
+function sndFlash(ctx: AudioContext) {
+  const osc = ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 1900
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0.14, ctx.currentTime)
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15)
+  osc.connect(gain); gain.connect(ctx.destination)
+  osc.start(); osc.stop(ctx.currentTime + 0.15)
+}
+
+function sndBombBeep(ctx: AudioContext) {
+  const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = 880
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0.10, ctx.currentTime)
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.10)
+  osc.connect(gain); gain.connect(ctx.destination)
+  osc.start(); osc.stop(ctx.currentTime + 0.10)
+}
+
+function sndBombDefuse(ctx: AudioContext) {
+  for (let i = 0; i < 3; i++) {
+    const osc = ctx.createOscillator(); osc.type = 'sine'
+    osc.frequency.value = [660, 880, 1100][i]
+    const gain = ctx.createGain()
+    const t = ctx.currentTime + i * 0.12
+    gain.gain.setValueAtTime(0.12, t)
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.10)
+    osc.connect(gain); gain.connect(ctx.destination)
+    osc.start(t); osc.stop(t + 0.10)
+  }
+}
+
+function sndRoundEnd(ctx: AudioContext, win: boolean) {
+  const freqs = win ? [523, 659, 784, 1047] : [523, 440, 392, 330]
+  for (let i = 0; i < 4; i++) {
+    const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freqs[i]
+    const gain = ctx.createGain()
+    const t = ctx.currentTime + i * 0.15
+    gain.gain.setValueAtTime(0.13, t)
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.13)
+    osc.connect(gain); gain.connect(ctx.destination)
+    osc.start(t); osc.stop(t + 0.13)
+  }
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay3DProps) {
@@ -659,6 +744,9 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
   const utilTogglesRef   = useRef<UtilToggle>({ smoke: true, flash: true, he: true, molotov: true })
   const roundEndShownRef = useRef(false)
   const followPlayerRef  = useRef<string | null>(null)
+  const soundCtxRef      = useRef<AudioContext | null>(null)
+  const soundEnabledRef  = useRef(true)
+  const soundEventsRef   = useRef<SoundEvent[]>([])
 
   const [loaded,       setLoaded]       = useState(false)
   const [uiPlaying,    setUiPlaying]    = useState(false)
@@ -671,11 +759,19 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
   const [roundOutcome,    setRoundOutcome]    = useState<RoundOutcome | null>(null)
   const [bombStatus,      setBombStatus]      = useState<'planted' | 'defused' | null>(null)
   const [followingPlayer, setFollowingPlayer] = useState<string | null>(null)
+  const [soundEnabled,    setSoundEnabled]    = useState(true)
 
   const togglePlay = useCallback(() => {
     const pb = pbRef.current
     if (!pb.playing && pb.duration > 0 && pb.time >= pb.duration) pb.time = 0
     pb.playing = !pb.playing; setUiPlaying(pb.playing)
+    if (pb.playing) {
+      if (!soundCtxRef.current) {
+        soundCtxRef.current = new AudioContext()
+      } else if (soundCtxRef.current.state === 'suspended') {
+        soundCtxRef.current.resume()
+      }
+    }
   }, [])
 
   const handleSpeed = useCallback((s: 1 | 2 | 4) => {
@@ -685,6 +781,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
   const handleScrub = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const t = parseFloat(e.target.value)
     pbRef.current.time = t; setUiTime(t)
+    for (const ev of soundEventsRef.current) { if (ev.time > t) ev.fired = false }
   }, [])
 
   const selectRound = useCallback((idx: number) => {
@@ -709,6 +806,11 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       ctrl.enabled = true
       ctrl.update()
     }
+  }, [])
+
+  const handleSoundToggle = useCallback(() => {
+    soundEnabledRef.current = !soundEnabledRef.current
+    setSoundEnabled(soundEnabledRef.current)
   }, [])
 
   useEffect(() => {
@@ -911,6 +1013,25 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       }
 
       roundEndShownRef.current = false
+
+      // Build sound event timeline for this round
+      const soundEvs: SoundEvent[] = []
+      if (rnd) {
+        for (const k of rnd.kills)
+          soundEvs.push({ time: k.time, type: 'kill', fired: false })
+        for (const g of (rnd.grenades ?? [])) {
+          if (g.type === 'decoy') continue
+          const sType: SoundEventType = g.type === 'he' ? 'he' : g.type === 'smoke' ? 'smoke' : g.type === 'flash' ? 'flash' : 'molotov'
+          soundEvs.push({ time: g.land_time, type: sType, fired: false })
+        }
+        if (rnd.bomb_planted) {
+          soundEvs.push({ time: Math.max(0, (rnd.duration ?? 0) - BOMB_TIMER), type: 'bomb_plant', fired: false })
+          if (rnd.bomb_defused) soundEvs.push({ time: rnd.duration ?? 0, type: 'bomb_defuse', fired: false })
+        }
+        soundEvs.push({ time: rnd.duration ?? 0, type: rnd.winner === myTeamName ? 'round_end_win' : 'round_end_loss', fired: false })
+      }
+      soundEventsRef.current = soundEvs
+
       setUiTime(0); setUiDuration(dur); setUiRound(idx); setUiPlaying(false)
       setKillFeed([]); setRoundOutcome(null); setBombStatus(null)
 
@@ -1099,6 +1220,27 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
         }
       }
 
+      // Fire sound events
+      if (soundCtxRef.current && soundEnabledRef.current && pb.playing) {
+        const prevT = pb.time - delta * pb.speed
+        for (const ev of soundEventsRef.current) {
+          if (!ev.fired && ev.time > prevT && ev.time <= pb.time) {
+            ev.fired = true
+            switch (ev.type) {
+              case 'kill':           sndKill(soundCtxRef.current); break
+              case 'he':             sndExplosion(soundCtxRef.current); break
+              case 'smoke':          sndSmoke(soundCtxRef.current); break
+              case 'flash':          sndFlash(soundCtxRef.current); break
+              case 'molotov':        sndExplosion(soundCtxRef.current); break
+              case 'bomb_plant':     sndBombBeep(soundCtxRef.current); break
+              case 'bomb_defuse':    sndBombDefuse(soundCtxRef.current); break
+              case 'round_end_win':  sndRoundEnd(soundCtxRef.current, true); break
+              case 'round_end_loss': sndRoundEnd(soundCtxRef.current, false); break
+            }
+          }
+        }
+      }
+
       // Follow camera — third-person over-the-shoulder
       const followName = followPlayerRef.current
       if (followName) {
@@ -1134,6 +1276,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       cancelled = true; cancelAnimationFrame(animId)
       renderer.domElement.removeEventListener('click', onCanvasClick)
       ro.disconnect(); controls.dispose(); renderer.dispose()
+      soundCtxRef.current?.close(); soundCtxRef.current = null
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
       for (const po of players.values()) {
         po.hpBarMat.dispose(); po.hpBarBgMat.dispose()
@@ -1326,6 +1469,19 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
                 >{s}×</button>
               ))}
             </div>
+
+            <button
+              onClick={handleSoundToggle}
+              className={cn(
+                'w-8 h-8 flex items-center justify-center rounded-md border transition-colors shrink-0',
+                soundEnabled
+                  ? 'bg-neon-green/10 border-neon-green/30 text-neon-green hover:bg-neon-green/20'
+                  : 'bg-zinc-800/50 border-border/30 text-muted-foreground hover:border-neon-green/30',
+              )}
+              title={soundEnabled ? 'Mute sounds' : 'Unmute sounds'}
+            >
+              {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            </button>
 
             <span className="text-[11px] font-mono text-muted-foreground shrink-0 tabular-nums">
               {fmtTime(uiTime)} / {fmtTime(uiDuration)}
