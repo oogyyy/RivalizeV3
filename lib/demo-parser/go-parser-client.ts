@@ -5,8 +5,38 @@ export interface RealParseResult {
   warnings: string[]
 }
 
-// 8-minute timeout — generous enough for 500 MB demos while still detecting hangs
-const PARSER_TIMEOUT_MS = 8 * 60 * 1000
+// Per-request timeout for the actual parse call (large demo files can be slow)
+const PARSER_TIMEOUT_MS = 6 * 60 * 1000
+
+// How long to wait for the parser to become healthy before giving up
+const WARMUP_MAX_MS      = 75_000
+const WARMUP_INTERVAL_MS = 4_000
+
+/**
+ * Pings /health until the parser responds OK or the deadline is reached.
+ * This handles Railway cold starts where the service needs up to ~60s to wake.
+ */
+async function waitForParser(baseUrl: string): Promise<void> {
+  const deadline = Date.now() + WARMUP_MAX_MS
+  let attempt = 0
+  while (Date.now() < deadline) {
+    attempt++
+    try {
+      const ctrl = new AbortController()
+      const tid  = setTimeout(() => ctrl.abort(), 5_000)
+      const res  = await fetch(`${baseUrl}/health`, { signal: ctrl.signal })
+      clearTimeout(tid)
+      if (res.ok) {
+        if (attempt > 1) console.log(`[go-parser] healthy after ${attempt} warmup attempts`)
+        return
+      }
+    } catch {
+      // not yet up — keep polling
+    }
+    await new Promise(r => setTimeout(r, WARMUP_INTERVAL_MS))
+  }
+  throw new Error(`Go parser unreachable (${baseUrl}): did not become healthy within ${WARMUP_MAX_MS / 1000}s`)
+}
 
 /**
  * Sends a demo buffer to the Go parser service and returns structured data.
@@ -18,6 +48,12 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
     throw new Error('PARSER_URL environment variable is not set. Deploy the go-parser service and set PARSER_URL.')
   }
 
+  const base = parserUrl.replace(/\/$/, '')
+
+  // Ensure the service is up before uploading the (potentially large) demo file.
+  // This gracefully handles Railway cold starts without burning a full retry attempt.
+  await waitForParser(base)
+
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), PARSER_TIMEOUT_MS)
 
@@ -26,7 +62,7 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
 
   let res: Response
   try {
-    res = await fetch(`${parserUrl.replace(/\/$/, '')}/parse`, {
+    res = await fetch(`${base}/parse`, {
       method: 'POST',
       body: form,
       signal: controller.signal,
@@ -42,7 +78,9 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`Go parser returned HTTP ${res.status}: ${text}`)
+    // HTTP 422 means the demo file itself is bad — mark it non-retryable
+    const prefix = res.status === 422 ? 'Go parser demo error' : 'Go parser returned HTTP'
+    throw new Error(`${prefix} ${res.status}: ${text}`)
   }
 
   const raw = await res.json() as {

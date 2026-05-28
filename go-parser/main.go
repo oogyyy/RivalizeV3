@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 func main() {
@@ -15,11 +16,24 @@ func main() {
 		port = "8080"
 	}
 
-	http.HandleFunc("/health", handleHealth)
-	http.HandleFunc("/parse", handleParse)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", handleHealth)
+	mux.HandleFunc("/parse", handleParse)
+
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: mux,
+		// Prevent slow clients from holding connections open indefinitely.
+		// ReadHeaderTimeout guards against Slowloris; ReadTimeout covers body upload.
+		// WriteTimeout covers the parse + response write phase.
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       10 * time.Minute, // large demos can take time to upload
+		WriteTimeout:      10 * time.Minute, // parsing a 500 MB demo can be slow
+		IdleTimeout:       30 * time.Second,
+	}
 
 	log.Printf("go-parser listening on :%s", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }

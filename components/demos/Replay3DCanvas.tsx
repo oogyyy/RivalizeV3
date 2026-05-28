@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Loader2, RotateCcw, Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { MAP_CONFIGS, loadMapImage, worldToCanvas, type MapConfig } from '@/lib/map-config'
+import { MAP_GEO_DATA, getMapFloorHeight } from '@/lib/map-geometries'
 import type { ParsedDemoData, PositionFrame, Round, GrenadeEvent, GameEvent, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
 
@@ -38,139 +39,25 @@ const BOMB_TIMER     = 40   // CS2 default bomb timer
 const GRENADE_LIFT   = 1.5  // parabola peak height multiplier
 
 // ── 3D Map Geometry ────────────────────────────────────────────────────────────
-// Regions defined in normalised UV coords [0–1] matching the radar image.
-// u/v (0,0) = top-left, (1,1) = bottom-right.
-// y  = floor surface height in scene units (players walk here).
-// h  = visual height of the geometry box in scene units.
-// 'platform' boxes extend downward from y; 'wall' boxes extend upward from y.
-
-interface GeoRegion {
-  u0: number; v0: number; u1: number; v1: number
-  y:  number   // floor surface height (scene units)
-  h:  number   // box visual height (scene units)
-  type: 'platform' | 'wall'
-}
-
-const MAP_3D_GEO: Record<string, GeoRegion[]> = {
-  de_dust2: [
-    // platforms
-    { u0: 0.50, v0: 0.26, u1: 0.66, v1: 0.52, y: 0.55, h: 0.10, type: 'platform' }, // catwalk / short-A
-    { u0: 0.60, v0: 0.05, u1: 0.85, v1: 0.44, y: 0.32, h: 0.10, type: 'platform' }, // A site
-    { u0: 0.72, v0: 0.42, u1: 0.96, v1: 0.66, y: 0.30, h: 0.10, type: 'platform' }, // CT spawn
-    { u0: 0.38, v0: 0.32, u1: 0.56, v1: 0.58, y: 0.14, h: 0.08, type: 'platform' }, // mid lower
-    { u0: 0.06, v0: 0.42, u1: 0.36, v1: 0.70, y: 0.18, h: 0.08, type: 'platform' }, // B site
-    // walls
-    { u0: 0.10, v0: 0.04, u1: 0.58, v1: 0.13, y: 0,    h: 1.40, type: 'wall' }, // long-A top wall
-    { u0: 0.82, v0: 0.04, u1: 0.90, v1: 0.45, y: 0,    h: 1.40, type: 'wall' }, // A-site right wall
-    { u0: 0.44, v0: 0.40, u1: 0.55, v1: 0.50, y: 0.14, h: 0.75, type: 'wall' }, // mid box
-    { u0: 0.28, v0: 0.60, u1: 0.44, v1: 0.69, y: 0,    h: 0.95, type: 'wall' }, // B-tunnels passage
-  ],
-  de_mirage: [
-    { u0: 0.04, v0: 0.25, u1: 0.34, v1: 0.60, y: 0.38, h: 0.10, type: 'platform' }, // A site
-    { u0: 0.04, v0: 0.58, u1: 0.28, v1: 0.80, y: 0.26, h: 0.10, type: 'platform' }, // ramp / palace
-    { u0: 0.30, v0: 0.36, u1: 0.60, v1: 0.56, y: 0.14, h: 0.08, type: 'platform' }, // mid connector
-    { u0: 0.65, v0: 0.45, u1: 0.90, v1: 0.74, y: 0.08, h: 0.08, type: 'platform' }, // B site
-    { u0: 0.46, v0: 0.60, u1: 0.67, v1: 0.82, y: 0.22, h: 0.08, type: 'platform' }, // CT spawn
-    { u0: 0.03, v0: 0.24, u1: 0.10, v1: 0.62, y: 0,    h: 1.80, type: 'wall' }, // A-site left building
-    { u0: 0.28, v0: 0.40, u1: 0.37, v1: 0.54, y: 0,    h: 1.20, type: 'wall' }, // jungle / connector wall
-    { u0: 0.64, v0: 0.74, u1: 0.90, v1: 0.80, y: 0,    h: 1.50, type: 'wall' }, // B-site building
-  ],
-  de_inferno: [
-    { u0: 0.60, v0: 0.10, u1: 0.88, v1: 0.46, y: 0.42, h: 0.10, type: 'platform' }, // A site
-    { u0: 0.24, v0: 0.55, u1: 0.64, v1: 0.76, y: 0.05, h: 0.08, type: 'platform' }, // banana
-    { u0: 0.10, v0: 0.34, u1: 0.38, v1: 0.60, y: 0.22, h: 0.08, type: 'platform' }, // B site
-    { u0: 0.44, v0: 0.20, u1: 0.64, v1: 0.46, y: 0.28, h: 0.08, type: 'platform' }, // CT spawn / arch
-    { u0: 0.12, v0: 0.70, u1: 0.50, v1: 0.92, y: 0.10, h: 0.08, type: 'platform' }, // T spawn
-    { u0: 0.72, v0: 0.10, u1: 0.88, v1: 0.20, y: 0,    h: 2.00, type: 'wall' }, // A construction building
-    { u0: 0.58, v0: 0.40, u1: 0.68, v1: 0.50, y: 0.42, h: 1.00, type: 'wall' }, // A balcony
-    { u0: 0.10, v0: 0.34, u1: 0.20, v1: 0.48, y: 0,    h: 1.80, type: 'wall' }, // B-site building
-  ],
-  de_nuke: [
-    { u0: 0.16, v0: 0.12, u1: 0.50, v1: 0.44, y:  0.65,  h: 0.10, type: 'platform' }, // upper / outer
-    { u0: 0.16, v0: 0.44, u1: 0.50, v1: 0.75, y: -0.38,  h: 0.10, type: 'platform' }, // lower site
-    { u0: 0.50, v0: 0.15, u1: 0.86, v1: 0.60, y:  0.22,  h: 0.08, type: 'platform' }, // outside / lobby
-    { u0: 0.52, v0: 0.60, u1: 0.82, v1: 0.82, y:  0.42,  h: 0.08, type: 'platform' }, // CT / ramp
-    { u0: 0.38, v0: 0.10, u1: 0.60, v1: 0.52, y:  0,     h: 2.50, type: 'wall' }, // silo
-    { u0: 0.15, v0: 0.10, u1: 0.20, v1: 0.78, y:  0,     h: 1.80, type: 'wall' }, // reactor left wall
-  ],
-  de_ancient: [
-    { u0: 0.60, v0: 0.15, u1: 0.85, v1: 0.46, y: 0.32, h: 0.10, type: 'platform' }, // A site
-    { u0: 0.10, v0: 0.46, u1: 0.40, v1: 0.72, y: 0.26, h: 0.10, type: 'platform' }, // B site
-    { u0: 0.35, v0: 0.30, u1: 0.62, v1: 0.54, y: 0.12, h: 0.08, type: 'platform' }, // mid
-    { u0: 0.48, v0: 0.50, u1: 0.72, v1: 0.76, y: 0.22, h: 0.08, type: 'platform' }, // CT spawn
-    { u0: 0.58, v0: 0.12, u1: 0.68, v1: 0.48, y: 0,    h: 1.50, type: 'wall' }, // A-site ruins wall
-    { u0: 0.30, v0: 0.32, u1: 0.42, v1: 0.50, y: 0,    h: 1.20, type: 'wall' }, // mid ruins
-  ],
-  de_anubis: [
-    { u0: 0.58, v0: 0.10, u1: 0.85, v1: 0.46, y:  0.32,  h: 0.10, type: 'platform' }, // A site
-    { u0: 0.12, v0: 0.50, u1: 0.40, v1: 0.78, y:  0.22,  h: 0.10, type: 'platform' }, // B site
-    { u0: 0.35, v0: 0.32, u1: 0.60, v1: 0.54, y:  0.10,  h: 0.08, type: 'platform' }, // mid
-    { u0: 0.38, v0: 0.52, u1: 0.62, v1: 0.70, y: -0.18,  h: 0.08, type: 'platform' }, // water crossing
-    { u0: 0.55, v0: 0.08, u1: 0.65, v1: 0.48, y:  0,     h: 1.40, type: 'wall' }, // temple walls
-  ],
-  de_overpass: [
-    { u0: 0.14, v0: 0.56, u1: 0.44, v1: 0.82, y: -0.24, h: 0.10, type: 'platform' }, // A site (under bridge)
-    { u0: 0.56, v0: 0.14, u1: 0.86, v1: 0.48, y:  0.62, h: 0.10, type: 'platform' }, // B site elevated
-    { u0: 0.28, v0: 0.25, u1: 0.58, v1: 0.55, y: -0.14, h: 0.08, type: 'platform' }, // mid / water
-    { u0: 0.12, v0: 0.08, u1: 0.50, v1: 0.28, y:  0.42, h: 0.08, type: 'platform' }, // T spawn upper
-    { u0: 0.35, v0: 0.40, u1: 0.54, v1: 0.62, y:  0,    h: 2.00, type: 'wall' }, // bridge support
-    { u0: 0.12, v0: 0.28, u1: 0.20, v1: 0.60, y:  0,    h: 1.60, type: 'wall' }, // A-site wall
-  ],
-  de_vertigo: [
-    { u0: 0.55, v0: 0.14, u1: 0.88, v1: 0.50, y: 0.82, h: 0.10, type: 'platform' }, // A site
-    { u0: 0.10, v0: 0.46, u1: 0.44, v1: 0.78, y: 0.80, h: 0.10, type: 'platform' }, // B site
-    { u0: 0.38, v0: 0.32, u1: 0.60, v1: 0.52, y: 0.65, h: 0.08, type: 'platform' }, // mid scaffold
-    { u0: 0.52, v0: 0.52, u1: 0.72, v1: 0.70, y: 0.52, h: 0.08, type: 'platform' }, // CT stairs
-    { u0: 0.05, v0: 0.42, u1: 0.12, v1: 0.82, y: 0,    h: 2.00, type: 'wall' }, // left edge
-    { u0: 0.86, v0: 0.12, u1: 0.96, v1: 0.54, y: 0,    h: 2.00, type: 'wall' }, // right edge
-  ],
-  de_train: [
-    { u0: 0.55, v0: 0.10, u1: 0.85, v1: 0.45, y: 0.28, h: 0.10, type: 'platform' }, // A site
-    { u0: 0.12, v0: 0.48, u1: 0.42, v1: 0.75, y: 0.22, h: 0.10, type: 'platform' }, // B site
-    { u0: 0.35, v0: 0.28, u1: 0.60, v1: 0.52, y: 0.10, h: 0.08, type: 'platform' }, // mid / train yard
-    { u0: 0.48, v0: 0.50, u1: 0.68, v1: 0.72, y: 0.20, h: 0.08, type: 'platform' }, // CT approach
-    { u0: 0.10, v0: 0.28, u1: 0.38, v1: 0.40, y: 0,    h: 1.60, type: 'wall' }, // train cars row 1
-    { u0: 0.55, v0: 0.48, u1: 0.82, v1: 0.58, y: 0,    h: 1.60, type: 'wall' }, // train cars row 2
-  ],
-}
-
-// Returns the approximate floor height (scene Y) for a given 3D map position.
-// Falls back to 0 for unmapped maps or positions outside any defined region.
-function getMapFloorHeight(x3d: number, z3d: number, mapName: string): number {
-  const regions = MAP_3D_GEO[mapName]
-  if (!regions) return 0
-  const u = x3d / MAP_PLANE + 0.5
-  const v = z3d / MAP_PLANE + 0.5
-  // Pick the smallest (most specific) platform region that contains this UV point
-  let bestY = 0, bestArea = Infinity
-  for (const r of regions) {
-    if (r.type === 'wall') continue
-    if (u >= r.u0 && u <= r.u1 && v >= r.v0 && v <= r.v1) {
-      const area = (r.u1 - r.u0) * (r.v1 - r.v0)
-      if (area < bestArea) { bestArea = area; bestY = r.y }
-    }
-  }
-  return bestY
-}
-
-// Builds simplified 3D map structures into the scene.
+// Builds simplified 3D map structures (platforms + walls) into the scene.
+// Data comes from lib/map-geometries.ts; rendering logic lives here.
 // Returns all created objects so they can be disposed on cleanup.
 function buildMapGeometry(mapName: string, scene: THREE.Scene): THREE.Object3D[] {
-  const regions = MAP_3D_GEO[mapName] ?? []
+  const regions = MAP_GEO_DATA[mapName] ?? []
   const objs: THREE.Object3D[] = []
 
-  const platMat = new THREE.MeshStandardMaterial({
-    color: 0x1c3d5e, emissive: new THREE.Color(0x0a1a2e), emissiveIntensity: 0.28,
-    roughness: 0.88, transparent: true, opacity: 0.38,
-    side: THREE.DoubleSide,
+  // Shared materials — disposed once each at cleanup (Three.js ignores duplicate dispose calls)
+  const platFillMat = new THREE.MeshStandardMaterial({
+    color: 0x0d2030, transparent: true, opacity: 0.07,
+    roughness: 0.92, depthWrite: false, side: THREE.DoubleSide,
   })
-  const wallMat = new THREE.MeshStandardMaterial({
-    color: 0x0a1520, emissive: new THREE.Color(NEON), emissiveIntensity: 0.035,
-    roughness: 0.92, transparent: true, opacity: 0.15,
-    side: THREE.DoubleSide, depthWrite: false,
+  const platEdgeMat = new THREE.LineBasicMaterial({ color: NEON, transparent: true, opacity: 0.58 })
+  const pillarMat   = new THREE.LineBasicMaterial({ color: NEON, transparent: true, opacity: 0.26 })
+  const wallFillMat = new THREE.MeshStandardMaterial({
+    color: 0x080e1a, transparent: true, opacity: 0.09,
+    roughness: 0.95, depthWrite: false, side: THREE.DoubleSide,
   })
-  const platEdgeMat = new THREE.LineBasicMaterial({ color: NEON, transparent: true, opacity: 0.42 })
-  const wallEdgeMat = new THREE.LineBasicMaterial({ color: NEON, transparent: true, opacity: 0.18 })
+  const wallEdgeMat = new THREE.LineBasicMaterial({ color: NEON, transparent: true, opacity: 0.16 })
 
   for (const r of regions) {
     const sx0 = (r.u0 - 0.5) * MAP_PLANE
@@ -182,25 +69,50 @@ function buildMapGeometry(mapName: string, scene: THREE.Scene): THREE.Object3D[]
     const w   = sx1 - sx0
     const d   = sz1 - sz0
 
-    const geo = new THREE.BoxGeometry(w, r.h, d)
-
     if (r.type === 'platform') {
-      // Box top face sits at y; center is at y - h/2
-      const mat  = platMat.clone()
-      const mesh = new THREE.Mesh(geo, mat)
-      mesh.position.set(cx, r.y - r.h / 2, cz)
-      mesh.receiveShadow = true
+      // Extend box from slightly below the ground plane up to r.y so it looks grounded.
+      const FLOOR = -0.06
+      const h = r.y - FLOOR
+      if (h <= 0) continue
+      const geo  = new THREE.BoxGeometry(w, h, d)
+      const mesh = new THREE.Mesh(geo, platFillMat)
+      mesh.position.set(cx, FLOOR + h / 2, cz)
       scene.add(mesh); objs.push(mesh)
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), platEdgeMat.clone())
-      edges.position.copy(mesh.position)
-      scene.add(edges); objs.push(edges)
+
+      // Neon top-face border only — a closed rectangle at y = r.y
+      const top    = r.y
+      const border = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(sx0, top, sz0),
+          new THREE.Vector3(sx1, top, sz0),
+          new THREE.Vector3(sx1, top, sz1),
+          new THREE.Vector3(sx0, top, sz1),
+          new THREE.Vector3(sx0, top, sz0),
+        ]),
+        platEdgeMat,
+      )
+      scene.add(border); objs.push(border)
+
+      // Corner pillars for platforms with significant elevation or depth
+      if (Math.abs(r.y) > 0.10) {
+        for (const [px, pz] of [[sx0,sz0],[sx1,sz0],[sx1,sz1],[sx0,sz1]] as [number,number][]) {
+          const pillar = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([
+              new THREE.Vector3(px, 0, pz),
+              new THREE.Vector3(px, r.y, pz),
+            ]),
+            pillarMat,
+          )
+          scene.add(pillar); objs.push(pillar)
+        }
+      }
     } else {
-      // Box bottom at y, top at y + h; center at y + h/2
-      const mat  = wallMat.clone()
-      const mesh = new THREE.Mesh(geo, mat)
-      mesh.position.set(cx, r.y + r.h / 2, cz)
+      const wallH = r.wallH ?? 1.5
+      const geo   = new THREE.BoxGeometry(w, wallH, d)
+      const mesh  = new THREE.Mesh(geo, wallFillMat)
+      mesh.position.set(cx, wallH / 2, cz)
       scene.add(mesh); objs.push(mesh)
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), wallEdgeMat.clone())
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), wallEdgeMat)
       edges.position.copy(mesh.position)
       scene.add(edges); objs.push(edges)
     }

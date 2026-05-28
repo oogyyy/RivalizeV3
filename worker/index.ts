@@ -2,10 +2,10 @@ import { createClient } from '@supabase/supabase-js'
 import { parseAndSaveDemo } from '../lib/demo-parser/parse-and-save'
 
 const POLL_INTERVAL_MS  = 2_000
-// parseAndSaveDemo retries the Go parser up to 3× with an 8-min timeout each
-// (~24 min worst case). Set stale threshold above that so reclaimStale doesn't
-// fire mid-parse and kick off a second concurrent parse for the same demo.
-const STALE_AFTER_MS    = 30 * 60 * 1000  // reclaim jobs stuck > 30 min
+// Worst-case: 4 attempts × (75s warmup + 6min parse) + (8s + 20s + 40s delays) ≈ 48 min.
+// Set the stale threshold above that so reclaimStale doesn't fire during a slow cold-start
+// and kick off a concurrent duplicate parse.
+const STALE_AFTER_MS    = 55 * 60 * 1000  // reclaim jobs stuck > 55 min
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
