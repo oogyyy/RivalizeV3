@@ -92,6 +92,7 @@ export interface PlayerSnapshot {
   n: string    // player name
   x: number    // world X
   y: number    // world Y
+  z?: number   // world Z / height (available in parser v2+)
   a: boolean   // alive
   h?: number   // health (0-100)
   w?: number   // yaw angle in degrees (-180 to 180)
