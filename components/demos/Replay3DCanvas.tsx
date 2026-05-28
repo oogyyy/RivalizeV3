@@ -227,13 +227,11 @@ function makeNameSprite(name: string, teamColor: number): THREE.Sprite {
   const mat = new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true })
   const sprite = new THREE.Sprite(mat)
   sprite.scale.set(2.1, 0.38, 1)
-  sprite.position.y = P_TOTAL_H / 2 + 0.52
   return sprite
 }
 
 function makePlayer(
   name: string, isMyTeam: boolean,
-  capsuleGeo: THREE.CapsuleGeometry, ringGeo: THREE.TorusGeometry,
   scene: THREE.Scene,
 ): PlayerObj {
   const teamHex = isMyTeam ? NEON : RED
@@ -243,37 +241,49 @@ function makePlayer(
     color: teamHex, roughness: 0.35, metalness: 0.3,
     emissive: new THREE.Color(teamHex), emissiveIntensity: 0.25,
   })
-  const body = new THREE.Mesh(capsuleGeo, bodyMat)
-  body.castShadow = true; body.position.y = P_TOTAL_H / 2
+
+  // Low-poly character: head, shoulders, torso, hips, two legs — all share bodyMat
+  const part = (geo: THREE.BufferGeometry, y: number, x = 0, z = 0) => {
+    const m = new THREE.Mesh(geo, bodyMat)
+    m.position.set(x, y, z); m.castShadow = true; return m
+  }
+  const head      = part(new THREE.SphereGeometry(0.135, 6, 5),             0.88)
+  const shoulders = part(new THREE.BoxGeometry(0.44, 0.09, 0.24),           0.73)
+  const torso     = part(new THREE.CylinderGeometry(0.17, 0.14, 0.42, 6),   0.50)
+  const hips      = part(new THREE.CylinderGeometry(0.14, 0.11, 0.16, 5),   0.27)
+  const legL      = part(new THREE.CylinderGeometry(0.075, 0.065, 0.24, 4), 0.12, -0.08)
+  const legR      = part(new THREE.CylinderGeometry(0.075, 0.065, 0.24, 4), 0.12,  0.08)
 
   const ringMat = new THREE.MeshStandardMaterial({
     color: teamHex, roughness: 0.3, metalness: 0.5,
     emissive: new THREE.Color(teamHex), emissiveIntensity: 0.6,
     transparent: true, opacity: 0.85,
   })
-  const ring = new THREE.Mesh(ringGeo, ringMat)
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.40, 0.035, 8, 24), ringMat)
   ring.rotation.x = Math.PI / 2; ring.position.y = 0.04
 
   const sprite = makeNameSprite(name, teamHex)
+  sprite.position.y = 1.28  // above model top (~1.015)
 
-  // Facing direction arrow — ConeGeometry defaults to pointing +Y, rotate to +Z
+  // Facing arrow — cone pointing +Z (rotated from default +Y)
   const arrowMat = new THREE.MeshBasicMaterial({ color: teamHex, transparent: true, opacity: 0.72 })
   const dirArrow = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.18, 5), arrowMat)
   dirArrow.rotation.x = Math.PI / 2
-  dirArrow.position.set(0, P_RADIUS + 0.04, P_RADIUS + 0.20)
+  dirArrow.position.set(0, 0.50, 0.30)
 
-  // Health bar — flat in the XZ plane, visible from top-down camera
+  // Health bar — floats above head, lies flat in XZ plane
   const HP_W = 0.62
   const hpBarBgMat = new THREE.MeshBasicMaterial({ color: 0x0c0e1c })
   const hpBarBg = new THREE.Mesh(new THREE.BoxGeometry(HP_W + 0.06, 0.025, 0.092), hpBarBgMat)
-  hpBarBg.position.set(0, 0.14, 0)
+  hpBarBg.position.set(0, 1.08, 0)
 
   const hpBarMat = new THREE.MeshBasicMaterial({ color: 0x00dd66 })
   const hpBarFg = new THREE.Mesh(new THREE.BoxGeometry(HP_W, 0.032, 0.072), hpBarMat)
-  hpBarFg.position.set(0, 0.145, 0)
+  hpBarFg.position.set(0, 1.085, 0)
 
   const group = new THREE.Group()
-  group.add(body, ring, sprite, dirArrow, hpBarBg, hpBarFg); scene.add(group)
+  group.add(head, shoulders, torso, hips, legL, legR, ring, sprite, dirArrow, hpBarBg, hpBarFg)
+  scene.add(group)
 
   const trailPosArr = new Float32Array(MAX_TRAIL * 3)
   const trailColArr = new Float32Array(MAX_TRAIL * 3)
@@ -684,8 +694,6 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     }
 
     // ── Players ────────────────────────────────────────────────────────────────
-    const capsuleGeo = new THREE.CapsuleGeometry(P_RADIUS, P_LENGTH, 6, 12)
-    const ringGeo    = new THREE.TorusGeometry(P_RADIUS + 0.12, 0.035, 8, 24)
     const rounds = parsed?.rounds ?? []
     roundsRef.current = rounds
 
@@ -706,7 +714,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
 
     for (const name of allNames) {
       const isMyTeam = myTeamSet.size > 0 ? myTeamSet.has(name) : true
-      const po = makePlayer(name, isMyTeam, capsuleGeo, ringGeo, scene)
+      const po = makePlayer(name, isMyTeam, scene)
       po.group.visible = false
       players.set(name, po)
     }
