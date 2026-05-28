@@ -575,6 +575,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
   const bombObjRef       = useRef<BombObj | null>(null)
   const utilTogglesRef   = useRef<UtilToggle>({ smoke: true, flash: true, he: true, molotov: true })
   const roundEndShownRef = useRef(false)
+  const followPlayerRef  = useRef<string | null>(null)
 
   const [loaded,       setLoaded]       = useState(false)
   const [uiPlaying,    setUiPlaying]    = useState(false)
@@ -584,8 +585,9 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
   const [uiRound,      setUiRound]      = useState(0)
   const [killFeed,     setKillFeed]     = useState<{ killer: string; victim: string; weapon: string; hs: boolean }[]>([])
   const [utilToggles,  setUtilToggles]  = useState<UtilToggle>({ smoke: true, flash: true, he: true, molotov: true })
-  const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null)
-  const [bombStatus,   setBombStatus]   = useState<'planted' | 'defused' | null>(null)
+  const [roundOutcome,    setRoundOutcome]    = useState<RoundOutcome | null>(null)
+  const [bombStatus,      setBombStatus]      = useState<'planted' | 'defused' | null>(null)
+  const [followingPlayer, setFollowingPlayer] = useState<string | null>(null)
 
   const togglePlay = useCallback(() => {
     const pb = pbRef.current
@@ -612,6 +614,18 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       utilTogglesRef.current = next
       return next
     })
+  }, [])
+
+  const exitFollow = useCallback(() => {
+    followPlayerRef.current = null
+    setFollowingPlayer(null)
+    const ctrl = controlsRef.current, cam = cameraRef.current
+    if (ctrl && cam) {
+      cam.position.set(0, 22, 13)
+      ctrl.target.set(0, 0, 0)
+      ctrl.enabled = true
+      ctrl.update()
+    }
   }, [])
 
   useEffect(() => {
@@ -730,6 +744,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     for (const name of allNames) {
       const isMyTeam = myTeamSet.size > 0 ? myTeamSet.has(name) : true
       const po = makePlayer(name, isMyTeam, scene)
+      po.group.traverse(o => { o.userData.playerName = name })
       po.group.visible = false
       players.set(name, po)
     }
@@ -804,7 +819,35 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     controls.rotateSpeed = 0.55; controls.panSpeed = 0.6; controls.zoomSpeed = 1.2
     controls.update(); controlsRef.current = controls
 
+    // ── Click-to-follow raycasting ─────────────────────────────────────────────
+    const raycaster = new THREE.Raycaster()
+    const mouse     = new THREE.Vector2()
+    const onCanvasClick = (e: MouseEvent) => {
+      const rect = el.getBoundingClientRect()
+      mouse.x = ((e.clientX - rect.left) / rect.width)  * 2 - 1
+      mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1
+      raycaster.setFromCamera(mouse, cam)
+      const meshes: THREE.Object3D[] = []
+      for (const po of players.values()) {
+        if (po.group.visible && po.alive) po.group.traverse(o => { if ((o as THREE.Mesh).isMesh) meshes.push(o) })
+      }
+      const hit = raycaster.intersectObjects(meshes, false)[0]
+      const name = hit?.object.userData.playerName as string | undefined
+      if (name) {
+        if (followPlayerRef.current === name) {
+          // Click same player → exit follow
+          followPlayerRef.current = null; setFollowingPlayer(null)
+          controls.enabled = true; controls.update()
+        } else {
+          followPlayerRef.current = name; setFollowingPlayer(name)
+          controls.enabled = false
+        }
+      }
+    }
+    renderer.domElement.addEventListener('click', onCanvasClick)
+
     // ── rAF loop ───────────────────────────────────────────────────────────────
+    const followCamPos = new THREE.Vector3()
     const tick = (ts: number) => {
       animId = requestAnimationFrame(tick)
       const delta = Math.min((ts - lastTS) / 1000, 0.1)
@@ -844,10 +887,10 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
             const [x3d, z3d] = worldTo3D(sn.x, sn.y, cfg)
             po.group.visible = true
             po.group.position.set(x3d, 0, z3d)
-            // Apply yaw: CS2 yaw 0=east(+X), 90=north(+Y→Three.js -Z)
-            // Three.js: rotation.y=0 faces +Z, -π/2 faces +X
+            // CS2 yaw: 0=east(+X), 90=south(+Y source→Three.js +Z)
+            // Three.js rotation.y=π/2 faces +X → formula: π/2 - yaw*(π/180)
             if (sn.w !== undefined) {
-              po.group.rotation.y = -sn.w * (Math.PI / 180) - Math.PI / 2
+              po.group.rotation.y = -sn.w * (Math.PI / 180) + Math.PI / 2
             }
             const deadT = deadAtRef.current[sn.n]
             const alive = deadT === undefined || pb.time < deadT
@@ -918,6 +961,24 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
         }
       }
 
+      // Follow camera — third-person over-the-shoulder
+      const followName = followPlayerRef.current
+      if (followName) {
+        const po = players.get(followName)
+        if (po && po.group.visible && po.alive) {
+          const px = po.group.position.x, pz = po.group.position.z
+          const ry = po.group.rotation.y
+          const fwdX = Math.sin(ry), fwdZ = Math.cos(ry)
+          followCamPos.set(px - fwdX * 3.2, 2.6, pz - fwdZ * 3.2)
+          cam.position.lerp(followCamPos, 0.14)
+          cam.lookAt(px + fwdX * 2.5, 0.5, pz + fwdZ * 2.5)
+        } else if (po && !po.alive) {
+          followPlayerRef.current = null
+          setFollowingPlayer(null)
+          controls.enabled = true; controls.update()
+        }
+      }
+
       controls.update()
       renderer.render(scene, cam)
     }
@@ -933,6 +994,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
 
     return () => {
       cancelled = true; cancelAnimationFrame(animId)
+      renderer.domElement.removeEventListener('click', onCanvasClick)
       ro.disconnect(); controls.dispose(); renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
       for (const po of players.values()) {
@@ -1010,6 +1072,22 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
                   <span className={cn('w-2 h-2 rounded-full', bombStatus === 'planted' ? 'bg-orange-400' : 'bg-emerald-400')} />
                   {bombStatus === 'planted' ? 'BOMB PLANTED' : 'BOMB DEFUSED'}
                 </span>
+              </div>
+            )}
+
+            {/* Follow badge */}
+            {followingPlayer && (
+              <div className="absolute top-12 right-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm border border-neon-green/30 rounded-md px-2.5 py-1 select-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse shrink-0" />
+                <span className="text-[10px] font-mono text-neon-green font-semibold truncate max-w-[120px]">{followingPlayer}</span>
+                <button onClick={exitFollow} className="text-muted-foreground hover:text-white ml-0.5 leading-none" title="Exit follow">✕</button>
+              </div>
+            )}
+
+            {/* Click hint when no one is followed */}
+            {!followingPlayer && loaded && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none select-none">
+                <span className="text-[9px] font-mono text-muted-foreground/40">Click a player to follow</span>
               </div>
             )}
 
