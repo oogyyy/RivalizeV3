@@ -139,6 +139,10 @@ export default function DemoListMultiSelect({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasProcessing, !!onSideChange])
 
+  // null on server/hydration to avoid Date.now() mismatch (React error #418)
+  const [now, setNow] = useState<number | null>(null)
+  useEffect(() => { setNow(Date.now()) }, [])
+
   const [selecting,   setSelecting]   = useState(false)
   const [selected,    setSelected]    = useState<Set<string>>(new Set())
   const [showConfirm, setShowConfirm] = useState(false)
@@ -316,10 +320,10 @@ export default function DemoListMultiSelect({
                       {demo.status === 'failed'
                         ? 'Parsing failed'
                         : !demo.processing_started_at
-                          ? Date.now() - new Date(demo.created_at).getTime() < 10 * 60 * 1000
+                          ? !now || now - new Date(demo.created_at).getTime() < 10 * 60 * 1000
                             ? 'Queued…'
                             : 'Stuck in processing'
-                          : Date.now() - new Date(demo.processing_started_at).getTime() < 30 * 60 * 1000
+                          : !now || now - new Date(demo.processing_started_at).getTime() < 30 * 60 * 1000
                             ? 'Parsing…'
                             : 'Stuck in processing'}
                     </p>
@@ -329,9 +333,9 @@ export default function DemoListMultiSelect({
                       </p>
                     )}
                   </div>
-                  {(demo.status === 'failed' ||
-                    (!demo.processing_started_at && Date.now() - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) ||
-                    (demo.processing_started_at && Date.now() - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
+                  {now && (demo.status === 'failed' ||
+                    (!demo.processing_started_at && now - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) ||
+                    (demo.processing_started_at && now - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
                     <ReparseButton demoId={demo.id} variant="prominent" />
                   )}
                 </div>
