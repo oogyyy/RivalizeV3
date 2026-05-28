@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, formatDuration, formatPercent, getRatingColor } from '@/lib/utils'
@@ -13,6 +14,11 @@ import RoundTimeline from '@/components/demos/RoundTimeline'
 import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
 import ReplayCanvas from '@/components/demos/ReplayCanvas'
 import { MAP_THUMBS } from '@/lib/map-config'
+
+const Replay3DCanvas = dynamic(
+  () => import('@/components/demos/Replay3DCanvas'),
+  { ssr: false, loading: () => <div className="h-[560px] flex items-center justify-center bg-[#070a16] rounded-lg"><Loader2 size={24} className="text-neon-green animate-spin" /></div> }
+)
 import {
   Trophy, Crosshair, Target, Shield, Zap, TrendingUp,
   BarChart3, Map, Clock, Brain, ArrowLeft, RefreshCw,
@@ -657,24 +663,13 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
               </Card>
             )}
 
-            {activeTab === '3d' && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Box size={16} className="text-neon-green" />
-                    3D Replay
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                    <Box size={40} className="text-muted-foreground/40" />
-                    <p className="font-semibold text-foreground">3D Replay — Coming Soon</p>
-                    <p className="text-sm text-muted-foreground max-w-sm">
-                      Interactive 3D map replay with player movement paths and utility trajectories is in development.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+            {activeTab === '3d' && parsed && (
+              <Replay3DCanvas
+                mapName={parsed.header.map}
+                parsed={parsed}
+                team1={parsed.header.team1}
+                team2={parsed.header.team2}
+              />
             )}
           </div>
         </>
