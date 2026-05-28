@@ -12,6 +12,7 @@ import DeleteFolderButton from '@/components/teams/DeleteFolderButton'
 import OpponentDemoList from '@/components/teams/OpponentDemoList'
 import TeamNotes from '@/components/teams/TeamNotes'
 import RoundSearchPanel from '@/components/demos/RoundSearchPanel'
+import RoutinesPanel from '@/components/demos/RoutinesPanel'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
   Crosshair, MapPin, TrendingUp, ExternalLink, FileText,
@@ -251,6 +252,14 @@ export default async function OpponentPage({
             {/* Cross-demo round search */}
             {(demos ?? []).some(d => d.status === 'completed') && (
               <RoundSearchPanel
+                folderId={folderId}
+                opponentName={folder.opponent_display_name}
+              />
+            )}
+
+            {/* Routine detection */}
+            {(demos ?? []).some(d => d.status === 'completed') && (
+              <RoutinesPanel
                 folderId={folderId}
                 opponentName={folder.opponent_display_name}
               />

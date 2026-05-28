@@ -16,6 +16,8 @@ import TimingHeatmap from '@/components/demos/TimingHeatmap'
 import ReplayCanvas from '@/components/demos/ReplayCanvas'
 import DemoInlineChat from '@/components/demos/DemoInlineChat'
 import StrategyBoard from '@/components/demos/StrategyBoard'
+import VoiceCommsPlayer from '@/components/demos/VoiceCommsPlayer'
+import RoutinesPanel from '@/components/demos/RoutinesPanel'
 import { MAP_THUMBS } from '@/lib/map-config'
 
 const Replay3DCanvas = dynamic(
@@ -484,6 +486,8 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [debugOpen, setDebugOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [replayTime, setReplayTime] = useState(0)
+  const [replayPlaying, setReplayPlaying] = useState(false)
 
   const fetchDemo = useCallback(async () => {
     const supabase = createClient()
@@ -685,23 +689,37 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
             {activeTab === 'economy' && <EconomyTab parsed={parsed} />}
 
             {activeTab === 'replay' && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Play size={16} className="text-neon-green" />
-                    2D Kill Replay
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ReplayCanvas
-                    rounds={parsed.rounds ?? []}
-                    players={parsed.players ?? []}
-                    team1Name={parsed.header.team1}
-                    team2Name={parsed.header.team2}
-                    mapName={parsed.header.map}
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Play size={16} className="text-neon-green" />
+                      2D Kill Replay
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ReplayCanvas
+                      rounds={parsed.rounds ?? []}
+                      players={parsed.players ?? []}
+                      team1Name={parsed.header.team1}
+                      team2Name={parsed.header.team2}
+                      mapName={parsed.header.map}
+                      onPlaybackChange={(t, playing) => { setReplayTime(t); setReplayPlaying(playing) }}
+                    />
+                  </CardContent>
+                </Card>
+                <VoiceCommsPlayer
+                  demoId={demo.id}
+                  roundTime={replayTime}
+                  isPlaying={replayPlaying}
+                />
+                {folderId && (
+                  <RoutinesPanel
+                    folderId={folderId}
+                    opponentName={demo.opponent_name}
                   />
-                </CardContent>
-              </Card>
+                )}
+              </div>
             )}
 
             {activeTab === '3d' && parsed && (
