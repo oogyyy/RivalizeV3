@@ -73,9 +73,10 @@ export async function PATCH(
     return NextResponse.json({ error: 'opponentSide must be "team1" or "team2"' }, { status: 400 })
   }
 
+  // Only fetch team_id — avoids transferring large parsed_data JSONB which caused timeouts.
   const { data: demo, error: demoError } = await admin
     .from('demos')
-    .select('id, team_id, parsed_data')
+    .select('id, team_id')
     .eq('id', demoId)
     .single()
 
@@ -96,15 +97,11 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const updatedParsedData = {
-    ...(typeof demo.parsed_data === 'object' && demo.parsed_data !== null ? demo.parsed_data : {}),
-    opponentSide,
-  }
-
-  const { error } = await admin
-    .from('demos')
-    .update({ parsed_data: updatedParsedData })
-    .eq('id', demoId)
+  // Use a DB-side JSONB merge so we never fetch or re-send the large parsed_data blob.
+  const { error } = await admin.rpc('set_demo_opponent_side', {
+    p_demo_id: demoId,
+    p_opponent_side: opponentSide,
+  })
 
   if (error) {
     console.error('[PATCH /api/demos] DB update failed:', error.message)
