@@ -9,16 +9,40 @@ type ParsedDataRow = {
   opponentSide?: string
 }
 
-async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
-  const delays = [2_000, 5_000, 10_000]
+// Errors that are worth retrying (service hiccups, cold starts, network blips)
+function isRetryable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  // Non-retryable: bad demo file (422), no player data, explicit demo errors
+  if (msg.includes('Go parser demo error')) return false
+  // Retryable: network issues, timeouts, service restarts
+  return (
+    msg.includes('Go parser unreachable') ||
+    msg.includes('Go parser timed out')   ||
+    msg.includes('Go parser returned HTTP') ||
+    msg.includes('truncated')             ||
+    msg.includes('R2 download')           ||
+    msg.includes('ECONNRESET')            ||
+    msg.includes('ETIMEDOUT')             ||
+    msg.includes('fetch failed')
+  )
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
+  // Longer delays: the parser may need 20–60 s to cold-start on Railway
+  const delays = [8_000, 20_000, 40_000]
   let lastErr: unknown
   for (let i = 0; i < attempts; i++) {
     try {
       return await fn()
     } catch (err) {
       lastErr = err
-      if (i < attempts - 1) {
-        await new Promise(resolve => setTimeout(resolve, delays[i] ?? 10_000))
+      if (i < attempts - 1 && isRetryable(err)) {
+        const wait = delays[i] ?? 40_000
+        console.warn(`[parse] attempt ${i + 1} failed (retryable), waiting ${wait / 1000}s — ${(err as Error).message}`)
+        await new Promise(resolve => setTimeout(resolve, wait))
+      } else if (!isRetryable(err)) {
+        // Non-retryable — fail fast
+        throw err
       }
     }
   }
