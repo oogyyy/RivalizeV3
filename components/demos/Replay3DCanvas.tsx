@@ -846,7 +846,9 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     const sc = sun.shadow.camera as THREE.OrthographicCamera
     sc.near = 1; sc.far = 80; sc.left = -18; sc.right = 18; sc.top = 18; sc.bottom = -18
     scene.add(sun)
-    scene.add(Object.assign(new THREE.DirectionalLight(0x1a2a44, 0.55), { position: new THREE.Vector3(-6, 8, -8) }))
+    const fillLight = new THREE.DirectionalLight(0x1a2a44, 0.55)
+    fillLight.position.set(-6, 8, -8)
+    scene.add(fillLight)
 
     for (const [cx, cz] of [[-MAP_PLANE/2,-MAP_PLANE/2],[MAP_PLANE/2,-MAP_PLANE/2],[-MAP_PLANE/2,MAP_PLANE/2],[MAP_PLANE/2,MAP_PLANE/2]] as [number,number][]) {
       const pt = new THREE.PointLight(NEON, 0.55, MAP_PLANE * 1.5, 2)
