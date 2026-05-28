@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import OpponentCardWithDelete from '@/components/teams/OpponentCardWithDelete'
-import { Target, Brain, Upload, Layers, Activity } from 'lucide-react'
+import { Target, Brain, Upload, Layers, Activity, Zap } from 'lucide-react'
 import type { AggregatedStats } from '@/types/database'
 
 export default async function OpponentsPage() {
@@ -105,11 +105,17 @@ export default async function OpponentsPage() {
             Your scouting library — teams you&apos;re preparing to face
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <Link href="/ai-coach">
             <Button variant="secondary" className="gap-2">
               <Brain size={15} />
               AI Scout
+            </Button>
+          </Link>
+          <Link href="/opponents/import">
+            <Button variant="secondary" className="gap-2">
+              <Zap size={15} className="text-orange-400" />
+              Import FaceIt
             </Button>
           </Link>
           {primaryTeamId && (

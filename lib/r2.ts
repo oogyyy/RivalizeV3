@@ -73,6 +73,27 @@ export async function downloadObject(key: string): Promise<Buffer> {
 }
 
 /**
+ * Upload a ReadableStream directly to R2 (used for FaceIt demo streaming).
+ * Buffers the stream in memory — suitable for demos up to a few hundred MB.
+ */
+export async function uploadStream(key: string, stream: ReadableStream): Promise<void> {
+  const reader = stream.getReader()
+  const chunks: Uint8Array[] = []
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (value) chunks.push(value)
+  }
+  const body = Buffer.concat(chunks)
+  await getR2Client().send(new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME!,
+    Key: key,
+    Body: body,
+    ContentType: 'application/octet-stream',
+  }))
+}
+
+/**
  * Download the first `bytes` bytes of an R2 object.
  * Uses a range request so we never download the full demo file.
  */

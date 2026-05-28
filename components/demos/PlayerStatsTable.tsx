@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { cn, formatPercent, getRatingColor } from '@/lib/utils'
+import { getPlayerRoleInfo } from '@/lib/roles'
 import type { PlayerStats } from '@/types/database'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
@@ -110,9 +111,19 @@ function TeamTable({
                   )}>
                     {player.name.charAt(0).toUpperCase()}
                   </div>
-                  <p className={cn('font-medium', isHighlighted ? 'text-neon-green' : 'text-foreground')}>
-                    {player.name}
-                  </p>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className={cn('font-medium truncate', isHighlighted ? 'text-neon-green' : 'text-foreground')}>
+                      {player.name}
+                    </p>
+                    {(() => {
+                      const ri = getPlayerRoleInfo(player)
+                      return (
+                        <span className={cn('text-[9px] font-bold px-1 py-0.5 rounded shrink-0', ri.color, ri.bg)}>
+                          {ri.label}
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </div>
               </td>
               {/* K */}
@@ -227,7 +238,17 @@ export default function PlayerStatsTable({ players, highlightTeam }: PlayerStats
                         {player.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className={cn('font-medium', isHighlighted ? 'text-neon-green' : 'text-foreground')}>{player.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className={cn('font-medium', isHighlighted ? 'text-neon-green' : 'text-foreground')}>{player.name}</p>
+                          {(() => {
+                            const ri = getPlayerRoleInfo(player)
+                            return (
+                              <span className={cn('text-[9px] font-bold px-1 py-0.5 rounded shrink-0', ri.color, ri.bg)}>
+                                {ri.label}
+                              </span>
+                            )
+                          })()}
+                        </div>
                         <p className="text-xs text-muted-foreground">{player.team}</p>
                       </div>
                     </div>
