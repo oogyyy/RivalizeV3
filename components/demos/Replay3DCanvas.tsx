@@ -5,33 +5,36 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Loader2, RotateCcw, Play, Pause } from 'lucide-react'
 import { MAP_CONFIGS, loadMapImage, worldToCanvas, type MapConfig } from '@/lib/map-config'
-import type { ParsedDemoData, PositionFrame, Round, GrenadeEvent } from '@/types/database'
+import type { ParsedDemoData, PositionFrame, Round, GrenadeEvent, GameEvent, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const MAP_PLANE   = 20
-const NEON        = 0x00ff87
-const RED         = 0xff3355
-const DEAD_COLOR  = 0x3a3a4a
-const P_RADIUS    = 0.22
-const P_LENGTH    = 0.40
-const P_TOTAL_H   = P_LENGTH + 2 * P_RADIUS
+const MAP_PLANE      = 20
+const NEON           = 0x00ff87
+const RED            = 0xff3355
+const DEAD_COLOR     = 0x3a3a4a
+const P_RADIUS       = 0.22
+const P_LENGTH       = 0.40
+const P_TOTAL_H      = P_LENGTH + 2 * P_RADIUS
 
-const TRAIL_SECS  = 2.5
-const TRAIL_STEP  = 0.06
-const MAX_TRAIL   = 80
+const TRAIL_SECS     = 2.5
+const TRAIL_STEP     = 0.06
+const MAX_TRAIL      = 80
 
-const SMOKE_COL   = 0x7799dd
-const FLASH_COL   = 0xffff88
-const HE_COL      = 0xff8822
-const MOLOTOV_COL = 0xff4411
-const KILL_COL    = 0xff2244
+const SMOKE_COL      = 0x7799dd
+const FLASH_COL      = 0xffff88
+const HE_COL         = 0xff8822
+const MOLOTOV_COL    = 0xff4411
+const KILL_COL       = 0xff2244
+const BOMB_COL       = 0xff5500
+const BOMB_DEFUSE_COL = 0x00dd88
 
-const SMOKE_DUR   = 18
-const FLASH_DUR   = 2.5
-const HE_DUR      = 1.8
-const MOLOTOV_DUR = 7
-const KILL_SECS   = 2.5
+const SMOKE_DUR      = 18
+const FLASH_DUR      = 2.5
+const HE_DUR         = 1.8
+const MOLOTOV_DUR    = 7
+const KILL_SECS      = 2.5
+const BOMB_TIMER     = 40   // CS2 default bomb timer
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface Replay3DProps {
@@ -73,6 +76,21 @@ interface KillObj {
   mat:     THREE.LineBasicMaterial
   ringMat: THREE.MeshStandardMaterial
   killT:   number
+}
+
+interface BombObj {
+  group:     THREE.Group
+  mat:       THREE.MeshStandardMaterial
+  ringMat:   THREE.MeshStandardMaterial
+  plantTime: number
+  defuseTime: number | null
+  defused:   boolean
+}
+
+interface RoundOutcome {
+  result:   'win' | 'loss' | 'draw'
+  reason:   string
+  roundNum: number
 }
 
 interface PB {
@@ -126,19 +144,37 @@ function fmtTime(s: number) {
 }
 
 function utilDuration(type: UtilKey): number {
-  if (type === 'smoke')   return SMOKE_DUR
-  if (type === 'flash')   return FLASH_DUR
-  if (type === 'he')      return HE_DUR
-  if (type === 'molotov') return MOLOTOV_DUR
-  return 4
+  if (type === 'smoke') return SMOKE_DUR; if (type === 'flash') return FLASH_DUR
+  if (type === 'he') return HE_DUR; return MOLOTOV_DUR
 }
 
 function utilHexColor(type: UtilKey): number {
-  if (type === 'smoke')   return SMOKE_COL
-  if (type === 'flash')   return FLASH_COL
-  if (type === 'he')      return HE_COL
-  if (type === 'molotov') return MOLOTOV_COL
-  return 0x888888
+  if (type === 'smoke') return SMOKE_COL; if (type === 'flash') return FLASH_COL
+  if (type === 'he') return HE_COL; return MOLOTOV_COL
+}
+
+function formatWinReason(r: string): string {
+  return ({
+    bomb_exploded: 'Bomb exploded', bomb_defused: 'Bomb defused',
+    ct_win: 'All eliminated', t_win: 'All eliminated',
+    terrorists_win: 'All eliminated', round_draw: 'Draw',
+  } as Record<string, string>)[r] ?? r.replace(/_/g, ' ')
+}
+
+function extractJsonCoords(data: Json): { x: number; y: number } | null {
+  if (typeof data !== 'object' || !data || Array.isArray(data)) return null
+  const d = data as Record<string, Json>
+  return typeof d.x === 'number' && typeof d.y === 'number' ? { x: d.x, y: d.y } : null
+}
+
+function getBombCoords(
+  events: GameEvent[], rounds: Round[], roundIdx: number,
+): { x: number; y: number } | null {
+  // Count how many previous rounds had a bomb plant to find the matching event
+  const plantsBefore = rounds.slice(0, roundIdx).filter(r => r.bomb_planted).length
+  const plantEvents  = events.filter(e => e.type === 'bomb_planted')
+  const ev = plantEvents[plantsBefore] ?? null
+  return ev ? extractJsonCoords(ev.data) : null
 }
 
 // ── Three.js object helpers ────────────────────────────────────────────────────
@@ -206,7 +242,7 @@ function makePlayer(
   ring.rotation.x = Math.PI / 2; ring.position.y = 0.04
 
   const sprite = makeNameSprite(name, teamHex)
-  const group = new THREE.Group()
+  const group  = new THREE.Group()
   group.add(body, ring, sprite); scene.add(group)
 
   const trailPosArr = new Float32Array(MAX_TRAIL * 3)
@@ -232,11 +268,9 @@ function setAlive(p: PlayerObj, alive: boolean) {
   if (p.alive === alive) return
   p.alive = alive
   const c = alive ? (p.isMyTeam ? NEON : RED) : DEAD_COLOR
-  p.bodyMat.color.setHex(c)
-  p.bodyMat.emissive.setHex(alive ? c : 0x000000)
+  p.bodyMat.color.setHex(c);  p.bodyMat.emissive.setHex(alive ? c : 0x000000)
   p.bodyMat.emissiveIntensity = alive ? 0.25 : 0
-  p.ringMat.color.setHex(c)
-  p.ringMat.emissive.setHex(alive ? c : 0x000000)
+  p.ringMat.color.setHex(c);  p.ringMat.emissive.setHex(alive ? c : 0x000000)
   p.ringMat.emissiveIntensity = alive ? 0.6 : 0
   p.ringMat.opacity = alive ? 0.85 : 0.3
   p.spriteMat.opacity = alive ? 1 : 0.35
@@ -273,15 +307,36 @@ function clearTrails(players: Map<string, PlayerObj>) {
   }
 }
 
+// ── Grenade arc (parabolic bezier) ─────────────────────────────────────────────
+
+function makeGrenadeArc(
+  tx: number, tz: number, lx: number, lz: number, col: number,
+): THREE.Line {
+  const SEGS = 14, LIFT = 1.5
+  const pts: THREE.Vector3[] = []
+  for (let i = 0; i <= SEGS; i++) {
+    const u = i / SEGS
+    pts.push(new THREE.Vector3(
+      tx + (lx - tx) * u,
+      0.12 + LIFT * 4 * u * (1 - u),  // parabola peaks at u=0.5
+      tz + (lz - tz) * u,
+    ))
+  }
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.28 }),
+  )
+}
+
 // ── Utility objects ────────────────────────────────────────────────────────────
 
 function makeUtilObj(g: GrenadeEvent, cfg: MapConfig, scene: THREE.Scene): UtilObj | null {
   if (g.type === 'decoy') return null
   if (!isFinite(g.throw_x) || !isFinite(g.land_x)) return null
 
-  const type    = g.type  // narrowed: 'smoke' | 'flash' | 'he' | 'molotov'
-  const col     = utilHexColor(type)
-  const dur     = utilDuration(type)
+  const type = g.type  // narrowed: 'smoke' | 'flash' | 'he' | 'molotov'
+  const col  = utilHexColor(type)
+  const dur  = utilDuration(type)
   const [tx, tz] = worldTo3D(g.throw_x, g.throw_y, cfg)
   const [lx, lz] = worldTo3D(g.land_x,  g.land_y,  cfg)
 
@@ -297,14 +352,8 @@ function makeUtilObj(g: GrenadeEvent, cfg: MapConfig, scene: THREE.Scene): UtilO
   throwDot.position.set(tx, 0.12, tz)
   group.add(throwDot)
 
-  // child[1]: arc trail
-  group.add(new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(tx, 0.12, tz),
-      new THREE.Vector3(lx, 0.12, lz),
-    ]),
-    new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.22 }),
-  ))
+  // child[1]: parabolic arc
+  group.add(makeGrenadeArc(tx, tz, lx, lz, col))
 
   // child[2]: landing effect
   let mainMat: THREE.MeshStandardMaterial
@@ -321,13 +370,11 @@ function makeUtilObj(g: GrenadeEvent, cfg: MapConfig, scene: THREE.Scene): UtilO
   } else if (type === 'he') {
     mainMat  = new THREE.MeshStandardMaterial({ color: col, emissive: new THREE.Color(col), emissiveIntensity: 2.0, transparent: true, opacity: 0.85 })
     mainMesh = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.07, 6, 14), mainMat)
-    mainMesh.rotation.x = Math.PI / 2
-    mainMesh.position.set(lx, 0.12, lz)
+    mainMesh.rotation.x = Math.PI / 2; mainMesh.position.set(lx, 0.12, lz)
   } else {
     mainMat  = new THREE.MeshStandardMaterial({ color: col, emissive: new THREE.Color(col), emissiveIntensity: 0.9, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
     mainMesh = new THREE.Mesh(new THREE.CircleGeometry(0.68, 14), mainMat)
-    mainMesh.rotation.x = -Math.PI / 2
-    mainMesh.position.set(lx, 0.04, lz)
+    mainMesh.rotation.x = -Math.PI / 2; mainMesh.position.set(lx, 0.04, lz)
   }
   group.add(mainMesh)
   scene.add(group)
@@ -371,8 +418,7 @@ function updateUtilAnim(u: UtilObj, t: number) {
 
 function makeKillMarker(x3d: number, z3d: number, killT: number, scene: THREE.Scene): KillObj {
   const group = new THREE.Group()
-  group.position.set(x3d, 0, z3d)
-  group.visible = false
+  group.position.set(x3d, 0, z3d); group.visible = false
 
   const mat = new THREE.LineBasicMaterial({ color: KILL_COL, transparent: true, opacity: 1 })
   const s   = 0.26
@@ -405,8 +451,51 @@ function updateKillMarker(km: KillObj, t: number) {
   km.mat.opacity              = fade
   km.ringMat.opacity          = 0.7 * fade
   km.ringMat.emissiveIntensity = 2 * fade
-  // Pop scale on appearance
   km.group.scale.setScalar(age < 0.25 ? 1 + (1 - age / 0.25) * 0.8 : 1)
+}
+
+// ── Bomb marker ────────────────────────────────────────────────────────────────
+
+function makeBombObj(x3d: number, z3d: number, scene: THREE.Scene): BombObj {
+  const group = new THREE.Group()
+  group.position.set(x3d, 0, z3d); group.visible = false
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: BOMB_COL, emissive: new THREE.Color(BOMB_COL), emissiveIntensity: 1.8,
+    transparent: true, opacity: 0.9,
+  })
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.14, 8), mat)
+  body.position.y = 0.1; group.add(body)
+
+  const ringMat = new THREE.MeshStandardMaterial({
+    color: BOMB_COL, emissive: new THREE.Color(BOMB_COL), emissiveIntensity: 2.2,
+    transparent: true, opacity: 0.65,
+  })
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.045, 6, 20), ringMat)
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.08; group.add(ring)
+
+  scene.add(group)
+  return { group, mat, ringMat, plantTime: 0, defuseTime: null, defused: false }
+}
+
+function updateBombObj(bomb: BombObj, t: number) {
+  bomb.group.visible = t >= bomb.plantTime
+  if (!bomb.group.visible) return
+
+  const isDefused = bomb.defused && bomb.defuseTime !== null && t >= bomb.defuseTime
+  if (isDefused) {
+    bomb.mat.color.setHex(BOMB_DEFUSE_COL);  bomb.mat.emissive.setHex(BOMB_DEFUSE_COL)
+    bomb.ringMat.color.setHex(BOMB_DEFUSE_COL); bomb.ringMat.emissive.setHex(BOMB_DEFUSE_COL)
+    bomb.mat.emissiveIntensity = 0.8; bomb.ringMat.emissiveIntensity = 1.2
+    bomb.group.scale.setScalar(1)
+  } else {
+    const age   = t - bomb.plantTime
+    const pulse = 1 + Math.sin(age * Math.PI * 1.5) * 0.09
+    bomb.group.scale.setScalar(pulse)
+    bomb.mat.color.setHex(BOMB_COL);  bomb.mat.emissive.setHex(BOMB_COL)
+    bomb.ringMat.color.setHex(BOMB_COL); bomb.ringMat.emissive.setHex(BOMB_COL)
+    bomb.mat.emissiveIntensity = 1.8; bomb.ringMat.emissiveIntensity = 2.2
+  }
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -416,30 +505,33 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
   const cameraRef   = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
 
-  const pbRef           = useRef<PB>({ playing: false, speed: 1, time: 0, duration: 0, roundIdx: 0 })
-  const playersRef      = useRef<Map<string, PlayerObj>>(new Map())
-  const framesRef       = useRef<PositionFrame[]>([])
-  const deadAtRef       = useRef<Record<string, number>>({})
-  const pendingRoundRef = useRef<number | null>(null)
-  const roundsRef       = useRef<Round[]>([])
-  const utilObjsRef     = useRef<UtilObj[]>([])
-  const killObjsRef     = useRef<KillObj[]>([])
-  const utilTogglesRef  = useRef<UtilToggle>({ smoke: true, flash: true, he: true, molotov: true })
+  const pbRef            = useRef<PB>({ playing: false, speed: 1, time: 0, duration: 0, roundIdx: 0 })
+  const playersRef       = useRef<Map<string, PlayerObj>>(new Map())
+  const framesRef        = useRef<PositionFrame[]>([])
+  const deadAtRef        = useRef<Record<string, number>>({})
+  const pendingRoundRef  = useRef<number | null>(null)
+  const roundsRef        = useRef<Round[]>([])
+  const utilObjsRef      = useRef<UtilObj[]>([])
+  const killObjsRef      = useRef<KillObj[]>([])
+  const bombObjRef       = useRef<BombObj | null>(null)
+  const utilTogglesRef   = useRef<UtilToggle>({ smoke: true, flash: true, he: true, molotov: true })
+  const roundEndShownRef = useRef(false)
 
-  const [loaded,      setLoaded]      = useState(false)
-  const [uiPlaying,   setUiPlaying]   = useState(false)
-  const [uiSpeed,     setUiSpeed]     = useState<1 | 2 | 4>(1)
-  const [uiTime,      setUiTime]      = useState(0)
-  const [uiDuration,  setUiDuration]  = useState(0)
-  const [uiRound,     setUiRound]     = useState(0)
-  const [killFeed,    setKillFeed]    = useState<{ killer: string; victim: string; weapon: string; hs: boolean }[]>([])
-  const [utilToggles, setUtilToggles] = useState<UtilToggle>({ smoke: true, flash: true, he: true, molotov: true })
+  const [loaded,       setLoaded]       = useState(false)
+  const [uiPlaying,    setUiPlaying]    = useState(false)
+  const [uiSpeed,      setUiSpeed]      = useState<1 | 2 | 4>(1)
+  const [uiTime,       setUiTime]       = useState(0)
+  const [uiDuration,   setUiDuration]   = useState(0)
+  const [uiRound,      setUiRound]      = useState(0)
+  const [killFeed,     setKillFeed]     = useState<{ killer: string; victim: string; weapon: string; hs: boolean }[]>([])
+  const [utilToggles,  setUtilToggles]  = useState<UtilToggle>({ smoke: true, flash: true, he: true, molotov: true })
+  const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null)
+  const [bombStatus,   setBombStatus]   = useState<'planted' | 'defused' | null>(null)
 
   const togglePlay = useCallback(() => {
     const pb = pbRef.current
     if (!pb.playing && pb.duration > 0 && pb.time >= pb.duration) pb.time = 0
-    pb.playing = !pb.playing
-    setUiPlaying(pb.playing)
+    pb.playing = !pb.playing; setUiPlaying(pb.playing)
   }, [])
 
   const handleSpeed = useCallback((s: 1 | 2 | 4) => {
@@ -471,6 +563,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     let lodAccum = 0, lastCamY = -1
 
     const W = el.clientWidth, H = el.clientHeight || 460
+    const myTeamName = team1 ?? parsed?.header.team1 ?? ''
 
     // ── Scene ─────────────────────────────────────────────────────────────────
     const scene = new THREE.Scene()
@@ -489,17 +582,13 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
 
     // ── Lighting ──────────────────────────────────────────────────────────────
     scene.add(new THREE.HemisphereLight(0x1e2b50, 0x040508, 0.7))
-
     const sun = new THREE.DirectionalLight(0xffffff, 1.8)
     sun.position.set(8, 25, 10); sun.castShadow = true
     sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.001
     const sc = sun.shadow.camera as THREE.OrthographicCamera
     sc.near = 1; sc.far = 80; sc.left = -18; sc.right = 18; sc.top = 18; sc.bottom = -18
     scene.add(sun)
-
-    // Subtle fill from opposite side to soften harsh shadows
-    const fill = new THREE.DirectionalLight(0x1a2a44, 0.55)
-    fill.position.set(-6, 8, -8); scene.add(fill)
+    scene.add(Object.assign(new THREE.DirectionalLight(0x1a2a44, 0.55), { position: new THREE.Vector3(-6, 8, -8) }))
 
     for (const [cx, cz] of [[-MAP_PLANE/2,-MAP_PLANE/2],[MAP_PLANE/2,-MAP_PLANE/2],[-MAP_PLANE/2,MAP_PLANE/2],[MAP_PLANE/2,MAP_PLANE/2]] as [number,number][]) {
       const pt = new THREE.PointLight(NEON, 0.55, MAP_PLANE * 1.5, 2)
@@ -566,8 +655,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     const rounds = parsed?.rounds ?? []
     roundsRef.current = rounds
 
-    const myTeamName = team1 ?? parsed?.header.team1 ?? ''
-    const myTeamSet  = new Set((parsed?.players ?? []).filter(p => p.team === myTeamName).map(p => p.name))
+    const myTeamSet = new Set((parsed?.players ?? []).filter(p => p.team === myTeamName).map(p => p.name))
 
     const allNames = new Set<string>()
     outer: for (const rnd of rounds) {
@@ -593,36 +681,51 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     function initRound(idx: number) {
       const rnd = rounds[idx]
 
-      // Dispose previous utility & kill objects
+      // Dispose previous overlays
       for (const u of utilObjsRef.current) { scene.remove(u.group); disposeGroup(u.group) }
       for (const km of killObjsRef.current) { scene.remove(km.group); disposeGroup(km.group) }
-      utilObjsRef.current = []; killObjsRef.current = []
+      if (bombObjRef.current) { scene.remove(bombObjRef.current.group); disposeGroup(bombObjRef.current.group) }
+      utilObjsRef.current = []; killObjsRef.current = []; bombObjRef.current = null
 
       framesRef.current = rnd?.frames ?? []
       deadAtRef.current = rnd ? buildDeadAt(rnd) : {}
       clearTrails(players)
 
       const dur = rnd?.duration ?? 0
-      pbRef.current.time     = 0
-      pbRef.current.duration = dur
-      pbRef.current.roundIdx = idx
-      pbRef.current.playing  = false
+      pbRef.current.time = 0; pbRef.current.duration = dur
+      pbRef.current.roundIdx = idx; pbRef.current.playing = false
       for (const p of players.values()) { setAlive(p, true); p.group.visible = false }
-      setUiTime(0); setUiDuration(dur); setUiRound(idx); setUiPlaying(false); setKillFeed([])
+
+      roundEndShownRef.current = false
+      setUiTime(0); setUiDuration(dur); setUiRound(idx); setUiPlaying(false)
+      setKillFeed([]); setRoundOutcome(null); setBombStatus(null)
 
       if (!cfg) return
 
-      // Build utility objects
+      // Utilities
       for (const g of (rnd?.grenades ?? [])) {
         const u = makeUtilObj(g, cfg, scene)
         if (u) utilObjsRef.current.push(u)
       }
 
-      // Build kill markers
+      // Kill markers
       for (const k of (rnd?.kills ?? [])) {
         if (!isFinite(k.victim_x) || !isFinite(k.victim_y)) continue
         const [x3d, z3d] = worldTo3D(k.victim_x, k.victim_y, cfg)
         killObjsRef.current.push(makeKillMarker(x3d, z3d, k.time, scene))
+      }
+
+      // Bomb marker
+      if (rnd?.bomb_planted) {
+        const coords = getBombCoords(parsed?.events ?? [], rounds, idx)
+        if (coords) {
+          const [bx, bz] = worldTo3D(coords.x, coords.y, cfg)
+          const bomb = makeBombObj(bx, bz, scene)
+          bomb.plantTime = Math.max(0, dur - BOMB_TIMER)
+          bomb.defused   = !!rnd.bomb_defused
+          bomb.defuseTime = rnd.bomb_defused ? dur : null
+          bombObjRef.current = bomb
+        }
       }
     }
 
@@ -654,7 +757,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
         if (pb.time >= pb.duration) pb.playing = false
       }
 
-      // LOD: hide name labels when camera is zoomed out — check every ~100ms
+      // LOD: suppress name labels when camera is zoomed far out
       lodAccum += delta
       if (lodAccum >= 0.1) {
         lodAccum = 0
@@ -668,7 +771,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
         }
       }
 
-      // Player positions
+      // Players
       if (cfg && framesRef.current.length > 0) {
         const snaps = getPositions(framesRef.current, pb.time)
         if (snaps) {
@@ -696,16 +799,45 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       // Kill markers
       for (const km of killObjsRef.current) updateKillMarker(km, pb.time)
 
+      // Bomb
+      if (bombObjRef.current) updateBombObj(bombObjRef.current, pb.time)
+
       // Throttled React UI sync ~12fps
       uiAccum += delta
       if (uiAccum >= 1 / 12) {
         uiAccum = 0
         setUiTime(pb.time)
         setUiPlaying(pb.playing)
+
         const rnd = roundsRef.current[pb.roundIdx]
         if (rnd) {
           const vis = rnd.kills.filter(k => k.time <= pb.time).slice(-4).reverse()
           setKillFeed(vis.map(k => ({ killer: k.killer_name, victim: k.victim_name, weapon: k.weapon, hs: k.headshot })))
+        }
+
+        // Bomb HUD indicator
+        const bomb = bombObjRef.current
+        if (bomb && pb.time >= bomb.plantTime) {
+          const defused = bomb.defused && bomb.defuseTime !== null && pb.time >= bomb.defuseTime
+          setBombStatus(defused ? 'defused' : 'planted')
+        } else {
+          setBombStatus(null)
+        }
+
+        // Round outcome badge
+        if (pb.time >= pb.duration && pb.duration > 0 && !roundEndShownRef.current) {
+          roundEndShownRef.current = true
+          const r = roundsRef.current[pb.roundIdx]
+          if (r) {
+            const win  = r.winner === myTeamName
+            const draw = !r.winner || r.win_reason === 'round_draw'
+            setRoundOutcome({ result: draw ? 'draw' : win ? 'win' : 'loss', reason: formatWinReason(r.win_reason), roundNum: r.number })
+          }
+        }
+        // Clear badge if user scrubs back
+        if (pb.time < pb.duration * 0.85 && roundEndShownRef.current) {
+          roundEndShownRef.current = false
+          setRoundOutcome(null)
         }
       }
 
@@ -727,6 +859,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       ro.disconnect(); controls.dispose(); renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
       players.clear(); utilObjsRef.current = []; killObjsRef.current = []
+      bombObjRef.current = null
     }
   }, [mapName, parsed, team1, team2])
 
@@ -742,10 +875,10 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
   const oppLabel    = team2 ?? parsed?.header.team2 ?? 'Team 2'
 
   const UTIL_BTNS: { key: UtilKey; label: string; active: string; dot: string }[] = [
-    { key: 'smoke',   label: 'Smoke',   active: 'border-blue-400/50 text-blue-300 bg-blue-400/10',     dot: 'bg-blue-400' },
+    { key: 'smoke',   label: 'Smoke',   active: 'border-blue-400/50 text-blue-300 bg-blue-400/10',      dot: 'bg-blue-400' },
     { key: 'flash',   label: 'Flash',   active: 'border-yellow-300/50 text-yellow-200 bg-yellow-300/10', dot: 'bg-yellow-300' },
     { key: 'he',      label: 'HE',      active: 'border-orange-400/50 text-orange-300 bg-orange-400/10', dot: 'bg-orange-400' },
-    { key: 'molotov', label: 'Molotov', active: 'border-red-500/50 text-red-300 bg-red-500/10',         dot: 'bg-red-500' },
+    { key: 'molotov', label: 'Molotov', active: 'border-red-500/50 text-red-300 bg-red-500/10',          dot: 'bg-red-500' },
   ]
 
   return (
@@ -755,7 +888,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       <div className="relative w-full" style={{ height: 460 }}>
         <div ref={mountRef} className="absolute inset-0" />
 
-        {/* Loading overlay */}
+        {/* Loading */}
         {!loaded && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#070a16]">
             <Loader2 size={28} className="text-neon-green animate-spin" />
@@ -782,6 +915,21 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
               </span>
             </div>
 
+            {/* Bomb status HUD */}
+            {bombStatus && (
+              <div className="absolute top-3 right-14 pointer-events-none select-none">
+                <span className={cn(
+                  'text-[11px] font-mono font-bold px-2.5 py-1 rounded-md border backdrop-blur-sm uppercase tracking-widest flex items-center gap-1.5 animate-pulse',
+                  bombStatus === 'planted'
+                    ? 'bg-orange-500/20 border-orange-500/50 text-orange-300'
+                    : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400',
+                )}>
+                  <span className={cn('w-2 h-2 rounded-full', bombStatus === 'planted' ? 'bg-orange-400' : 'bg-emerald-400')} />
+                  {bombStatus === 'planted' ? 'BOMB PLANTED' : 'BOMB DEFUSED'}
+                </span>
+              </div>
+            )}
+
             {/* Reset camera */}
             <button
               onClick={resetCamera}
@@ -791,16 +939,42 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
               <RotateCcw size={14} />
             </button>
 
+            {/* Round outcome badge — centered, fades in at round end */}
+            {roundOutcome && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                <div className={cn(
+                  'flex flex-col items-center gap-1.5 rounded-2xl border px-10 py-5 backdrop-blur-md shadow-2xl',
+                  roundOutcome.result === 'win'
+                    ? 'bg-neon-green/10 border-neon-green/40'
+                    : roundOutcome.result === 'loss'
+                      ? 'bg-red-500/10 border-red-500/40'
+                      : 'bg-yellow-400/10 border-yellow-400/40',
+                )}>
+                  <span className={cn(
+                    'text-3xl font-black font-mono uppercase tracking-widest',
+                    roundOutcome.result === 'win' ? 'text-neon-green' :
+                    roundOutcome.result === 'loss' ? 'text-red-400' : 'text-yellow-400',
+                  )}>
+                    {roundOutcome.result === 'win' ? 'WIN' : roundOutcome.result === 'loss' ? 'LOSS' : 'DRAW'}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    Round {roundOutcome.roundNum} · {roundOutcome.reason}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Color legend — bottom-left */}
             <div className="absolute bottom-3 left-3 pointer-events-none select-none flex flex-col gap-1">
               {[
-                { dot: 'bg-neon-green',  label: myTeamLabel },
-                { dot: 'bg-red-500',     label: oppLabel },
-                { dot: 'bg-blue-400',    label: 'Smoke' },
-                { dot: 'bg-yellow-300',  label: 'Flash' },
-                { dot: 'bg-orange-400',  label: 'HE' },
-                { dot: 'bg-red-500/80',  label: 'Molotov' },
-                { dot: 'bg-red-400',     label: 'Kill' },
+                { dot: 'bg-neon-green',   label: myTeamLabel },
+                { dot: 'bg-red-500',      label: oppLabel },
+                { dot: 'bg-blue-400',     label: 'Smoke' },
+                { dot: 'bg-yellow-300',   label: 'Flash' },
+                { dot: 'bg-orange-400',   label: 'HE' },
+                { dot: 'bg-red-600',      label: 'Molotov' },
+                { dot: 'bg-red-400',      label: 'Kill' },
+                { dot: 'bg-orange-500',   label: 'Bomb' },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${item.dot} shrink-0`} />
@@ -843,18 +1017,14 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
             <div className="flex items-center gap-1 shrink-0">
               {([1, 2, 4] as const).map(s => (
                 <button
-                  key={s}
-                  onClick={() => handleSpeed(s)}
-                  disabled={!hasFrames}
+                  key={s} onClick={() => handleSpeed(s)} disabled={!hasFrames}
                   className={cn(
                     'h-6 px-2 text-[10px] font-mono rounded border transition-colors disabled:opacity-30',
                     uiSpeed === s
                       ? 'bg-neon-green/20 border-neon-green/40 text-neon-green'
                       : 'border-border/50 text-muted-foreground hover:border-neon-green/30 hover:text-foreground',
                   )}
-                >
-                  {s}×
-                </button>
+                >{s}×</button>
               ))}
             </div>
 
@@ -863,11 +1033,8 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
             </span>
 
             <input
-              type="range"
-              min={0} max={uiDuration || 1} step={0.05}
-              value={uiTime}
-              onChange={handleScrub}
-              disabled={!hasFrames}
+              type="range" min={0} max={uiDuration || 1} step={0.05}
+              value={uiTime} onChange={handleScrub} disabled={!hasFrames}
               className="flex-1 h-1.5 disabled:opacity-30"
               style={{ accentColor: '#00ff87' }}
             />
@@ -876,18 +1043,14 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
           {/* Row 2: utility toggles + round selector */}
           <div className="flex items-center gap-4 flex-wrap">
 
-            {/* Utility toggles */}
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-[10px] text-muted-foreground/50 font-mono uppercase tracking-wider">Util</span>
               {UTIL_BTNS.map(def => (
                 <button
-                  key={def.key}
-                  onClick={() => handleToggleUtil(def.key)}
+                  key={def.key} onClick={() => handleToggleUtil(def.key)}
                   className={cn(
                     'h-6 px-2 text-[10px] font-mono rounded border transition-all flex items-center gap-1',
-                    utilToggles[def.key]
-                      ? def.active
-                      : 'border-border/25 text-muted-foreground/35 bg-transparent',
+                    utilToggles[def.key] ? def.active : 'border-border/25 text-muted-foreground/35',
                   )}
                 >
                   <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', def.dot, !utilToggles[def.key] && 'opacity-30')} />
@@ -896,7 +1059,6 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
               ))}
             </div>
 
-            {/* Round selector */}
             {rounds.length > 0 && (
               <div className="flex items-center gap-1 flex-wrap min-w-0">
                 <span className="text-[10px] text-muted-foreground/50 font-mono uppercase tracking-wider shrink-0">Round</span>
@@ -904,9 +1066,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
                   const hasData = !!(rnd.frames && rnd.frames.length > 0)
                   return (
                     <button
-                      key={i}
-                      onClick={() => selectRound(i)}
-                      disabled={!hasData}
+                      key={i} onClick={() => selectRound(i)} disabled={!hasData}
                       title={`Round ${rnd.number}${hasData ? '' : ' — no frame data'}`}
                       className={cn(
                         'h-6 min-w-[26px] px-1.5 text-[10px] font-mono rounded border transition-colors',
@@ -916,9 +1076,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
                             ? 'border-border/50 text-muted-foreground hover:border-neon-green/30 hover:text-foreground'
                             : 'border-border/20 text-muted-foreground/25 cursor-not-allowed',
                       )}
-                    >
-                      {rnd.number}
-                    </button>
+                    >{rnd.number}</button>
                   )
                 })}
               </div>
