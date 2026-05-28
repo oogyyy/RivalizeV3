@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import OpponentCardWithDelete from '@/components/teams/OpponentCardWithDelete'
-import { Target, Brain, Upload, Layers, Activity, Zap } from 'lucide-react'
+import { Target, Brain, Upload, Layers, Activity, Zap, Trophy } from 'lucide-react'
 import type { AggregatedStats } from '@/types/database'
 
 export default async function OpponentsPage() {
@@ -116,6 +116,12 @@ export default async function OpponentsPage() {
             <Button variant="secondary" className="gap-2">
               <Zap size={15} className="text-orange-400" />
               Import FaceIt
+            </Button>
+          </Link>
+          <Link href="/opponents/pro-demos">
+            <Button variant="secondary" className="gap-2">
+              <Trophy size={15} className="text-yellow-400" />
+              Pro Library
             </Button>
           </Link>
           {primaryTeamId && (
