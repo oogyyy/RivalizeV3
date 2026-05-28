@@ -35,6 +35,7 @@ const HE_DUR         = 1.8
 const MOLOTOV_DUR    = 7
 const KILL_SECS      = 2.5
 const BOMB_TIMER     = 40   // CS2 default bomb timer
+const GRENADE_LIFT   = 1.5  // parabola peak height multiplier
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface Replay3DProps {
@@ -68,12 +69,15 @@ interface PlayerObj {
 }
 
 interface UtilObj {
-  group:    THREE.Group
-  mainMat:  THREE.MeshStandardMaterial
-  type:     UtilKey
-  throwT:   number
-  landT:    number
-  duration: number
+  group:      THREE.Group
+  mainMat:    THREE.MeshStandardMaterial
+  grenadeMat: THREE.MeshStandardMaterial
+  type:       UtilKey
+  throwT:     number
+  landT:      number
+  duration:   number
+  tx: number; tz: number   // throw 3D coords
+  lx: number; lz: number   // land 3D coords
 }
 
 interface KillObj {
@@ -356,13 +360,13 @@ function clearTrails(players: Map<string, PlayerObj>) {
 function makeGrenadeArc(
   tx: number, tz: number, lx: number, lz: number, col: number,
 ): THREE.Line {
-  const SEGS = 14, LIFT = 1.5
+  const SEGS = 14
   const pts: THREE.Vector3[] = []
   for (let i = 0; i <= SEGS; i++) {
     const u = i / SEGS
     pts.push(new THREE.Vector3(
       tx + (lx - tx) * u,
-      0.12 + LIFT * 4 * u * (1 - u),  // parabola peaks at u=0.5
+      0.12 + GRENADE_LIFT * 4 * u * (1 - u),
       tz + (lz - tz) * u,
     ))
   }
@@ -387,14 +391,14 @@ function makeUtilObj(g: GrenadeEvent, cfg: MapConfig, scene: THREE.Scene): UtilO
   const group = new THREE.Group()
   group.visible = false
 
-  // child[0]: throw dot
-  const throwDotMat = new THREE.MeshStandardMaterial({
-    color: col, emissive: new THREE.Color(col), emissiveIntensity: 0.6,
-    transparent: true, opacity: 0.55,
+  // child[0]: grenade mesh — moves along arc during flight
+  const grenadeMat = new THREE.MeshStandardMaterial({
+    color: col, emissive: new THREE.Color(col), emissiveIntensity: 1.4,
+    roughness: 0.35, metalness: 0.55, transparent: true, opacity: 0.95,
   })
-  const throwDot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 6), throwDotMat)
-  throwDot.position.set(tx, 0.12, tz)
-  group.add(throwDot)
+  const grenadeMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.075, 0), grenadeMat)
+  grenadeMesh.position.set(tx, 0.12, tz)
+  group.add(grenadeMesh)
 
   // child[1]: parabolic arc
   group.add(makeGrenadeArc(tx, tz, lx, lz, col))
@@ -423,17 +427,28 @@ function makeUtilObj(g: GrenadeEvent, cfg: MapConfig, scene: THREE.Scene): UtilO
   group.add(mainMesh)
   scene.add(group)
 
-  return { group, mainMat, type, throwT: g.time, landT: g.land_time, duration: dur }
+  return { group, mainMat, grenadeMat, type, throwT: g.time, landT: g.land_time, duration: dur, tx, tz, lx, lz }
 }
 
 function updateUtilAnim(u: UtilObj, t: number) {
-  const throwDot = u.group.children[0]
+  const grenade  = u.group.children[0] as THREE.Mesh
   const arcLine  = u.group.children[1]
   const mainMesh = u.group.children[2]
   const inFlight = t >= u.throwT && t < u.landT
   const age      = t - u.landT
 
-  throwDot.visible = inFlight
+  // Animate grenade object along parabolic arc
+  if (inFlight) {
+    const frac = Math.max(0, Math.min(1, (t - u.throwT) / Math.max(0.001, u.landT - u.throwT)))
+    grenade.position.set(
+      u.tx + (u.lx - u.tx) * frac,
+      0.12 + GRENADE_LIFT * 4 * frac * (1 - frac),
+      u.tz + (u.lz - u.tz) * frac,
+    )
+    grenade.rotation.y = t * 7
+    grenade.rotation.x = t * 4
+  }
+  grenade.visible  = inFlight
   arcLine.visible  = inFlight
   mainMesh.visible = age >= 0 && age < u.duration
 
