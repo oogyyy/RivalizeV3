@@ -89,10 +89,12 @@ export interface DemoHeader {
 }
 
 export interface PlayerSnapshot {
-  n: string   // player name
-  x: number   // world X
-  y: number   // world Y
-  a: boolean  // alive
+  n: string    // player name
+  x: number    // world X
+  y: number    // world Y
+  a: boolean   // alive
+  h?: number   // health (0-100)
+  w?: number   // yaw angle in degrees (-180 to 180)
 }
 
 export interface PositionFrame {

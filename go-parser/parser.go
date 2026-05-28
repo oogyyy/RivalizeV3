@@ -42,6 +42,8 @@ type PlayerSnapshot struct {
 	X int    `json:"x"` // world X (rounded to integer)
 	Y int    `json:"y"` // world Y (rounded to integer)
 	A bool   `json:"a"` // alive
+	H int    `json:"h"` // health (0-100)
+	W int    `json:"w"` // yaw angle in degrees (-180 to 180)
 }
 
 type PositionFrame struct {
@@ -607,6 +609,8 @@ func parseDemo(buf []byte) (result *ParseResult, err error) {
 				X: int(math.Round(float64(pos.X))),
 				Y: int(math.Round(float64(pos.Y))),
 				A: pl.IsAlive(),
+				H: pl.Health(),
+				W: int(math.Round(float64(pl.ViewDirectionX()))),
 			})
 		}
 		if len(snaps) > 0 {

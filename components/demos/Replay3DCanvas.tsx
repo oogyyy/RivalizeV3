@@ -60,6 +60,11 @@ interface PlayerObj {
   trailHistory: { t: number; x: number; z: number }[]
   teamR: number; teamG: number; teamB: number
   isMyTeam: boolean; alive: boolean
+  dirArrow:    THREE.Mesh
+  hpBarFg:     THREE.Mesh
+  hpBarBg:     THREE.Mesh
+  hpBarMat:    THREE.MeshBasicMaterial
+  hpBarBgMat:  THREE.MeshBasicMaterial
 }
 
 interface UtilObj {
@@ -123,11 +128,19 @@ function getPositions(frames: PositionFrame[], t: number) {
   return a.p.map(ap => {
     const bp = b.p.find(s => s.n === ap.n)
     if (!bp) return ap
+    // Circular interpolation for yaw to avoid spinning through 360°
+    const aw = ap.w ?? 0
+    const bw = bp.w ?? aw
+    let dw = bw - aw
+    if (dw > 180) dw -= 360
+    if (dw < -180) dw += 360
     return {
       n: ap.n,
       x: ap.x + (bp.x - ap.x) * alpha,
       y: ap.y + (bp.y - ap.y) * alpha,
       a: alpha < 0.5 ? ap.a : bp.a,
+      h: Math.round((ap.h ?? 100) * (1 - alpha) + (bp.h ?? 100) * alpha),
+      w: aw + dw * alpha,
     }
   })
 }
@@ -242,8 +255,25 @@ function makePlayer(
   ring.rotation.x = Math.PI / 2; ring.position.y = 0.04
 
   const sprite = makeNameSprite(name, teamHex)
-  const group  = new THREE.Group()
-  group.add(body, ring, sprite); scene.add(group)
+
+  // Facing direction arrow — ConeGeometry defaults to pointing +Y, rotate to +Z
+  const arrowMat = new THREE.MeshBasicMaterial({ color: teamHex, transparent: true, opacity: 0.72 })
+  const dirArrow = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.18, 5), arrowMat)
+  dirArrow.rotation.x = Math.PI / 2
+  dirArrow.position.set(0, P_RADIUS + 0.04, P_RADIUS + 0.20)
+
+  // Health bar — flat in the XZ plane, visible from top-down camera
+  const HP_W = 0.62
+  const hpBarBgMat = new THREE.MeshBasicMaterial({ color: 0x0c0e1c })
+  const hpBarBg = new THREE.Mesh(new THREE.BoxGeometry(HP_W + 0.06, 0.025, 0.092), hpBarBgMat)
+  hpBarBg.position.set(0, 0.14, 0)
+
+  const hpBarMat = new THREE.MeshBasicMaterial({ color: 0x00dd66 })
+  const hpBarFg = new THREE.Mesh(new THREE.BoxGeometry(HP_W, 0.032, 0.072), hpBarMat)
+  hpBarFg.position.set(0, 0.145, 0)
+
+  const group = new THREE.Group()
+  group.add(body, ring, sprite, dirArrow, hpBarBg, hpBarFg); scene.add(group)
 
   const trailPosArr = new Float32Array(MAX_TRAIL * 3)
   const trailColArr = new Float32Array(MAX_TRAIL * 3)
@@ -261,6 +291,7 @@ function makePlayer(
     trailLine, trailGeo, trailPosArr, trailColArr,
     trailHistory: [], teamR: rC, teamG: gC, teamB: bC,
     isMyTeam, alive: true,
+    dirArrow, hpBarFg, hpBarBg, hpBarMat, hpBarBgMat,
   }
 }
 
@@ -275,6 +306,9 @@ function setAlive(p: PlayerObj, alive: boolean) {
   p.ringMat.opacity = alive ? 0.85 : 0.3
   p.spriteMat.opacity = alive ? 1 : 0.35
   p.group.scale.setScalar(alive ? 1 : 0.82)
+  p.hpBarFg.visible = alive
+  p.hpBarBg.visible = alive
+  p.dirArrow.visible = alive
 }
 
 function updateTrail(p: PlayerObj, t: number, x3d: number, z3d: number, alive: boolean) {
@@ -694,7 +728,14 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       const dur = rnd?.duration ?? 0
       pbRef.current.time = 0; pbRef.current.duration = dur
       pbRef.current.roundIdx = idx; pbRef.current.playing = false
-      for (const p of players.values()) { setAlive(p, true); p.group.visible = false }
+      for (const p of players.values()) {
+        p.alive = false  // force setAlive to run fully on next state change
+        setAlive(p, true)
+        p.group.visible = false
+        // Reset HP bar to full health
+        p.hpBarFg.scale.x = 1; p.hpBarFg.position.x = 0
+        p.hpBarMat.color.setHex(0x00dd66)
+      }
 
       roundEndShownRef.current = false
       setUiTime(0); setUiDuration(dur); setUiRound(idx); setUiPlaying(false)
@@ -780,9 +821,22 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
             const [x3d, z3d] = worldTo3D(sn.x, sn.y, cfg)
             po.group.visible = true
             po.group.position.set(x3d, 0, z3d)
+            // Apply yaw: CS2 yaw 0=east(+X), 90=north(+Y→Three.js -Z)
+            // Three.js: rotation.y=0 faces +Z, -π/2 faces +X
+            if (sn.w !== undefined) {
+              po.group.rotation.y = -sn.w * (Math.PI / 180) - Math.PI / 2
+            }
             const deadT = deadAtRef.current[sn.n]
             const alive = deadT === undefined || pb.time < deadT
             setAlive(po, alive)
+            // Update HP bar width and color
+            if (alive) {
+              const frac = Math.max(0, Math.min(sn.h ?? 100, 100)) / 100
+              const HP_HALF = 0.31
+              po.hpBarFg.scale.x = frac
+              po.hpBarFg.position.x = -HP_HALF * (1 - frac)
+              po.hpBarMat.color.setHex(frac > 0.6 ? 0x00dd66 : frac > 0.3 ? 0xffcc00 : 0xff3333)
+            }
             updateTrail(po, pb.time, x3d, z3d, alive)
           }
         }
@@ -858,6 +912,12 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       cancelled = true; cancelAnimationFrame(animId)
       ro.disconnect(); controls.dispose(); renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
+      for (const po of players.values()) {
+        po.hpBarMat.dispose(); po.hpBarBgMat.dispose()
+        po.hpBarFg.geometry.dispose(); po.hpBarBg.geometry.dispose()
+        po.dirArrow.geometry.dispose()
+        ;(po.dirArrow.material as THREE.MeshBasicMaterial).dispose()
+      }
       players.clear(); utilObjsRef.current = []; killObjsRef.current = []
       bombObjRef.current = null
     }
