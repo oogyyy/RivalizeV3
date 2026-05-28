@@ -37,6 +37,177 @@ const KILL_SECS      = 2.5
 const BOMB_TIMER     = 40   // CS2 default bomb timer
 const GRENADE_LIFT   = 1.5  // parabola peak height multiplier
 
+// ── 3D Map Geometry ────────────────────────────────────────────────────────────
+// Regions defined in normalised UV coords [0–1] matching the radar image.
+// u/v (0,0) = top-left, (1,1) = bottom-right.
+// y  = floor surface height in scene units (players walk here).
+// h  = visual height of the geometry box in scene units.
+// 'platform' boxes extend downward from y; 'wall' boxes extend upward from y.
+
+interface GeoRegion {
+  u0: number; v0: number; u1: number; v1: number
+  y:  number   // floor surface height (scene units)
+  h:  number   // box visual height (scene units)
+  type: 'platform' | 'wall'
+}
+
+const MAP_3D_GEO: Record<string, GeoRegion[]> = {
+  de_dust2: [
+    // platforms
+    { u0: 0.50, v0: 0.26, u1: 0.66, v1: 0.52, y: 0.55, h: 0.10, type: 'platform' }, // catwalk / short-A
+    { u0: 0.60, v0: 0.05, u1: 0.85, v1: 0.44, y: 0.32, h: 0.10, type: 'platform' }, // A site
+    { u0: 0.72, v0: 0.42, u1: 0.96, v1: 0.66, y: 0.30, h: 0.10, type: 'platform' }, // CT spawn
+    { u0: 0.38, v0: 0.32, u1: 0.56, v1: 0.58, y: 0.14, h: 0.08, type: 'platform' }, // mid lower
+    { u0: 0.06, v0: 0.42, u1: 0.36, v1: 0.70, y: 0.18, h: 0.08, type: 'platform' }, // B site
+    // walls
+    { u0: 0.10, v0: 0.04, u1: 0.58, v1: 0.13, y: 0,    h: 1.40, type: 'wall' }, // long-A top wall
+    { u0: 0.82, v0: 0.04, u1: 0.90, v1: 0.45, y: 0,    h: 1.40, type: 'wall' }, // A-site right wall
+    { u0: 0.44, v0: 0.40, u1: 0.55, v1: 0.50, y: 0.14, h: 0.75, type: 'wall' }, // mid box
+    { u0: 0.28, v0: 0.60, u1: 0.44, v1: 0.69, y: 0,    h: 0.95, type: 'wall' }, // B-tunnels passage
+  ],
+  de_mirage: [
+    { u0: 0.04, v0: 0.25, u1: 0.34, v1: 0.60, y: 0.38, h: 0.10, type: 'platform' }, // A site
+    { u0: 0.04, v0: 0.58, u1: 0.28, v1: 0.80, y: 0.26, h: 0.10, type: 'platform' }, // ramp / palace
+    { u0: 0.30, v0: 0.36, u1: 0.60, v1: 0.56, y: 0.14, h: 0.08, type: 'platform' }, // mid connector
+    { u0: 0.65, v0: 0.45, u1: 0.90, v1: 0.74, y: 0.08, h: 0.08, type: 'platform' }, // B site
+    { u0: 0.46, v0: 0.60, u1: 0.67, v1: 0.82, y: 0.22, h: 0.08, type: 'platform' }, // CT spawn
+    { u0: 0.03, v0: 0.24, u1: 0.10, v1: 0.62, y: 0,    h: 1.80, type: 'wall' }, // A-site left building
+    { u0: 0.28, v0: 0.40, u1: 0.37, v1: 0.54, y: 0,    h: 1.20, type: 'wall' }, // jungle / connector wall
+    { u0: 0.64, v0: 0.74, u1: 0.90, v1: 0.80, y: 0,    h: 1.50, type: 'wall' }, // B-site building
+  ],
+  de_inferno: [
+    { u0: 0.60, v0: 0.10, u1: 0.88, v1: 0.46, y: 0.42, h: 0.10, type: 'platform' }, // A site
+    { u0: 0.24, v0: 0.55, u1: 0.64, v1: 0.76, y: 0.05, h: 0.08, type: 'platform' }, // banana
+    { u0: 0.10, v0: 0.34, u1: 0.38, v1: 0.60, y: 0.22, h: 0.08, type: 'platform' }, // B site
+    { u0: 0.44, v0: 0.20, u1: 0.64, v1: 0.46, y: 0.28, h: 0.08, type: 'platform' }, // CT spawn / arch
+    { u0: 0.12, v0: 0.70, u1: 0.50, v1: 0.92, y: 0.10, h: 0.08, type: 'platform' }, // T spawn
+    { u0: 0.72, v0: 0.10, u1: 0.88, v1: 0.20, y: 0,    h: 2.00, type: 'wall' }, // A construction building
+    { u0: 0.58, v0: 0.40, u1: 0.68, v1: 0.50, y: 0.42, h: 1.00, type: 'wall' }, // A balcony
+    { u0: 0.10, v0: 0.34, u1: 0.20, v1: 0.48, y: 0,    h: 1.80, type: 'wall' }, // B-site building
+  ],
+  de_nuke: [
+    { u0: 0.16, v0: 0.12, u1: 0.50, v1: 0.44, y:  0.65,  h: 0.10, type: 'platform' }, // upper / outer
+    { u0: 0.16, v0: 0.44, u1: 0.50, v1: 0.75, y: -0.38,  h: 0.10, type: 'platform' }, // lower site
+    { u0: 0.50, v0: 0.15, u1: 0.86, v1: 0.60, y:  0.22,  h: 0.08, type: 'platform' }, // outside / lobby
+    { u0: 0.52, v0: 0.60, u1: 0.82, v1: 0.82, y:  0.42,  h: 0.08, type: 'platform' }, // CT / ramp
+    { u0: 0.38, v0: 0.10, u1: 0.60, v1: 0.52, y:  0,     h: 2.50, type: 'wall' }, // silo
+    { u0: 0.15, v0: 0.10, u1: 0.20, v1: 0.78, y:  0,     h: 1.80, type: 'wall' }, // reactor left wall
+  ],
+  de_ancient: [
+    { u0: 0.60, v0: 0.15, u1: 0.85, v1: 0.46, y: 0.32, h: 0.10, type: 'platform' }, // A site
+    { u0: 0.10, v0: 0.46, u1: 0.40, v1: 0.72, y: 0.26, h: 0.10, type: 'platform' }, // B site
+    { u0: 0.35, v0: 0.30, u1: 0.62, v1: 0.54, y: 0.12, h: 0.08, type: 'platform' }, // mid
+    { u0: 0.48, v0: 0.50, u1: 0.72, v1: 0.76, y: 0.22, h: 0.08, type: 'platform' }, // CT spawn
+    { u0: 0.58, v0: 0.12, u1: 0.68, v1: 0.48, y: 0,    h: 1.50, type: 'wall' }, // A-site ruins wall
+    { u0: 0.30, v0: 0.32, u1: 0.42, v1: 0.50, y: 0,    h: 1.20, type: 'wall' }, // mid ruins
+  ],
+  de_anubis: [
+    { u0: 0.58, v0: 0.10, u1: 0.85, v1: 0.46, y:  0.32,  h: 0.10, type: 'platform' }, // A site
+    { u0: 0.12, v0: 0.50, u1: 0.40, v1: 0.78, y:  0.22,  h: 0.10, type: 'platform' }, // B site
+    { u0: 0.35, v0: 0.32, u1: 0.60, v1: 0.54, y:  0.10,  h: 0.08, type: 'platform' }, // mid
+    { u0: 0.38, v0: 0.52, u1: 0.62, v1: 0.70, y: -0.18,  h: 0.08, type: 'platform' }, // water crossing
+    { u0: 0.55, v0: 0.08, u1: 0.65, v1: 0.48, y:  0,     h: 1.40, type: 'wall' }, // temple walls
+  ],
+  de_overpass: [
+    { u0: 0.14, v0: 0.56, u1: 0.44, v1: 0.82, y: -0.24, h: 0.10, type: 'platform' }, // A site (under bridge)
+    { u0: 0.56, v0: 0.14, u1: 0.86, v1: 0.48, y:  0.62, h: 0.10, type: 'platform' }, // B site elevated
+    { u0: 0.28, v0: 0.25, u1: 0.58, v1: 0.55, y: -0.14, h: 0.08, type: 'platform' }, // mid / water
+    { u0: 0.12, v0: 0.08, u1: 0.50, v1: 0.28, y:  0.42, h: 0.08, type: 'platform' }, // T spawn upper
+    { u0: 0.35, v0: 0.40, u1: 0.54, v1: 0.62, y:  0,    h: 2.00, type: 'wall' }, // bridge support
+    { u0: 0.12, v0: 0.28, u1: 0.20, v1: 0.60, y:  0,    h: 1.60, type: 'wall' }, // A-site wall
+  ],
+  de_vertigo: [
+    { u0: 0.55, v0: 0.14, u1: 0.88, v1: 0.50, y: 0.82, h: 0.10, type: 'platform' }, // A site
+    { u0: 0.10, v0: 0.46, u1: 0.44, v1: 0.78, y: 0.80, h: 0.10, type: 'platform' }, // B site
+    { u0: 0.38, v0: 0.32, u1: 0.60, v1: 0.52, y: 0.65, h: 0.08, type: 'platform' }, // mid scaffold
+    { u0: 0.52, v0: 0.52, u1: 0.72, v1: 0.70, y: 0.52, h: 0.08, type: 'platform' }, // CT stairs
+    { u0: 0.05, v0: 0.42, u1: 0.12, v1: 0.82, y: 0,    h: 2.00, type: 'wall' }, // left edge
+    { u0: 0.86, v0: 0.12, u1: 0.96, v1: 0.54, y: 0,    h: 2.00, type: 'wall' }, // right edge
+  ],
+  de_train: [
+    { u0: 0.55, v0: 0.10, u1: 0.85, v1: 0.45, y: 0.28, h: 0.10, type: 'platform' }, // A site
+    { u0: 0.12, v0: 0.48, u1: 0.42, v1: 0.75, y: 0.22, h: 0.10, type: 'platform' }, // B site
+    { u0: 0.35, v0: 0.28, u1: 0.60, v1: 0.52, y: 0.10, h: 0.08, type: 'platform' }, // mid / train yard
+    { u0: 0.48, v0: 0.50, u1: 0.68, v1: 0.72, y: 0.20, h: 0.08, type: 'platform' }, // CT approach
+    { u0: 0.10, v0: 0.28, u1: 0.38, v1: 0.40, y: 0,    h: 1.60, type: 'wall' }, // train cars row 1
+    { u0: 0.55, v0: 0.48, u1: 0.82, v1: 0.58, y: 0,    h: 1.60, type: 'wall' }, // train cars row 2
+  ],
+}
+
+// Returns the approximate floor height (scene Y) for a given 3D map position.
+// Falls back to 0 for unmapped maps or positions outside any defined region.
+function getMapFloorHeight(x3d: number, z3d: number, mapName: string): number {
+  const regions = MAP_3D_GEO[mapName]
+  if (!regions) return 0
+  const u = x3d / MAP_PLANE + 0.5
+  const v = z3d / MAP_PLANE + 0.5
+  // Pick the smallest (most specific) platform region that contains this UV point
+  let bestY = 0, bestArea = Infinity
+  for (const r of regions) {
+    if (r.type === 'wall') continue
+    if (u >= r.u0 && u <= r.u1 && v >= r.v0 && v <= r.v1) {
+      const area = (r.u1 - r.u0) * (r.v1 - r.v0)
+      if (area < bestArea) { bestArea = area; bestY = r.y }
+    }
+  }
+  return bestY
+}
+
+// Builds simplified 3D map structures into the scene.
+// Returns all created objects so they can be disposed on cleanup.
+function buildMapGeometry(mapName: string, scene: THREE.Scene): THREE.Object3D[] {
+  const regions = MAP_3D_GEO[mapName] ?? []
+  const objs: THREE.Object3D[] = []
+
+  const platMat = new THREE.MeshStandardMaterial({
+    color: 0x1c3d5e, emissive: new THREE.Color(0x0a1a2e), emissiveIntensity: 0.28,
+    roughness: 0.88, transparent: true, opacity: 0.38,
+    side: THREE.DoubleSide,
+  })
+  const wallMat = new THREE.MeshStandardMaterial({
+    color: 0x0a1520, emissive: new THREE.Color(NEON), emissiveIntensity: 0.035,
+    roughness: 0.92, transparent: true, opacity: 0.15,
+    side: THREE.DoubleSide, depthWrite: false,
+  })
+  const platEdgeMat = new THREE.LineBasicMaterial({ color: NEON, transparent: true, opacity: 0.42 })
+  const wallEdgeMat = new THREE.LineBasicMaterial({ color: NEON, transparent: true, opacity: 0.18 })
+
+  for (const r of regions) {
+    const sx0 = (r.u0 - 0.5) * MAP_PLANE
+    const sz0 = (r.v0 - 0.5) * MAP_PLANE
+    const sx1 = (r.u1 - 0.5) * MAP_PLANE
+    const sz1 = (r.v1 - 0.5) * MAP_PLANE
+    const cx  = (sx0 + sx1) / 2
+    const cz  = (sz0 + sz1) / 2
+    const w   = sx1 - sx0
+    const d   = sz1 - sz0
+
+    const geo = new THREE.BoxGeometry(w, r.h, d)
+
+    if (r.type === 'platform') {
+      // Box top face sits at y; center is at y - h/2
+      const mat  = platMat.clone()
+      const mesh = new THREE.Mesh(geo, mat)
+      mesh.position.set(cx, r.y - r.h / 2, cz)
+      mesh.receiveShadow = true
+      scene.add(mesh); objs.push(mesh)
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), platEdgeMat.clone())
+      edges.position.copy(mesh.position)
+      scene.add(edges); objs.push(edges)
+    } else {
+      // Box bottom at y, top at y + h; center at y + h/2
+      const mat  = wallMat.clone()
+      const mesh = new THREE.Mesh(geo, mat)
+      mesh.position.set(cx, r.y + r.h / 2, cz)
+      scene.add(mesh); objs.push(mesh)
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), wallEdgeMat.clone())
+      edges.position.copy(mesh.position)
+      scene.add(edges); objs.push(edges)
+    }
+  }
+  return objs
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface Replay3DProps {
   mapName: string
@@ -58,7 +229,7 @@ interface PlayerObj {
   trailGeo:     THREE.BufferGeometry
   trailPosArr:  Float32Array
   trailColArr:  Float32Array
-  trailHistory: { t: number; x: number; z: number }[]
+  trailHistory: { t: number; x: number; y: number; z: number }[]
   teamR: number; teamG: number; teamB: number
   isMyTeam: boolean; alive: boolean
   dirArrow:    THREE.Mesh
@@ -328,10 +499,10 @@ function setAlive(p: PlayerObj, alive: boolean) {
   p.dirArrow.visible = alive
 }
 
-function updateTrail(p: PlayerObj, t: number, x3d: number, z3d: number, alive: boolean) {
+function updateTrail(p: PlayerObj, t: number, x3d: number, y3d: number, z3d: number, alive: boolean) {
   const hist = p.trailHistory
   if (alive && (!hist.length || t - hist[hist.length - 1].t >= TRAIL_STEP)) {
-    hist.push({ t, x: x3d, z: z3d })
+    hist.push({ t, x: x3d, y: y3d, z: z3d })
   }
   const cutoff = t - TRAIL_SECS
   while (hist.length && hist[0].t < cutoff) hist.shift()
@@ -341,7 +512,7 @@ function updateTrail(p: PlayerObj, t: number, x3d: number, z3d: number, alive: b
   for (let i = 0; i < n; i++) {
     const e = hist[start + i], base = i * 3, fade = i / (n - 1)
     p.trailPosArr[base]     = e.x
-    p.trailPosArr[base + 1] = 0.08
+    p.trailPosArr[base + 1] = e.y + 0.08
     p.trailPosArr[base + 2] = e.z
     p.trailColArr[base]     = p.teamR * fade
     p.trailColArr[base + 1] = p.teamG * fade
@@ -881,6 +1052,9 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       if (!cancelled) setLoaded(true)
     })
 
+    // ── 3D map geometry (platforms + walls) ───────────────────────────────────
+    const mapGeoObjs = buildMapGeometry(mapName, scene)
+
     // ── Border ────────────────────────────────────────────────────────────────
     const half = MAP_PLANE / 2, bY = 0.06
     const makeBorder = (h: number, inset: number, opacity: number) => {
@@ -1147,7 +1321,11 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
             const po = players.get(sn.n); if (!po) continue
             const [x3d, z3d] = worldTo3D(sn.x, sn.y, cfg)
             po.group.visible = true
-            po.group.position.set(x3d, 0, z3d)
+            // Use actual Z from parser when available, else infer from map geometry regions
+            const floorY = sn.z !== undefined
+              ? (sn.z / (1024 * cfg.scale)) * MAP_PLANE * 2.5
+              : getMapFloorHeight(x3d, z3d, mapName)
+            po.group.position.set(x3d, floorY, z3d)
             // CS2 yaw: 0=east(+X), 90=south(+Y source→Three.js +Z)
             // Three.js rotation.y=π/2 faces +X → formula: π/2 - yaw*(π/180)
             if (sn.w !== undefined) {
@@ -1164,7 +1342,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
               po.hpBarFg.position.x = -HP_HALF * (1 - frac)
               po.hpBarMat.color.setHex(frac > 0.6 ? 0x00dd66 : frac > 0.3 ? 0xffcc00 : 0xff3333)
             }
-            updateTrail(po, pb.time, x3d, z3d, alive)
+            updateTrail(po, pb.time, x3d, floorY, z3d, alive)
           }
         }
       }
@@ -1288,6 +1466,15 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       }
       players.clear(); utilObjsRef.current = []; killObjsRef.current = []
       bombObjRef.current = null
+      for (const o of mapGeoObjs) {
+        const m = o as THREE.Mesh
+        m.geometry?.dispose()
+        if (m.material) {
+          Array.isArray(m.material)
+            ? m.material.forEach((mt: THREE.Material) => mt.dispose())
+            : (m.material as THREE.Material).dispose()
+        }
+      }
     }
   }, [mapName, parsed, team1, team2])
 
