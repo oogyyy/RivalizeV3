@@ -557,6 +557,89 @@ function updateBombObj(bomb: BombObj, t: number) {
   }
 }
 
+// ── Bomb site detection (k-means, 3 iters) ────────────────────────────────────
+
+function detectBombSites(
+  events: GameEvent[], rounds: Round[], cfg: MapConfig,
+): { x3d: number; z3d: number; label: string }[] {
+  const plants: { x: number; y: number }[] = []
+  rounds.forEach((rnd, idx) => {
+    if (!rnd.bomb_planted) return
+    const c = getBombCoords(events, rounds, idx)
+    if (c && isFinite(c.x) && isFinite(c.y)) plants.push(c)
+  })
+  if (!plants.length) return []
+
+  // Find the two most-distant plants to seed clusters
+  let maxD = 0, sA = plants[0], sB = plants[0]
+  for (let i = 0; i < plants.length; i++)
+    for (let j = i + 1; j < plants.length; j++) {
+      const d = Math.hypot(plants[i].x - plants[j].x, plants[i].y - plants[j].y)
+      if (d > maxD) { maxD = d; sA = plants[i]; sB = plants[j] }
+    }
+
+  if (maxD < 300) {
+    // Only one site planted in this demo
+    const cx = plants.reduce((s, p) => s + p.x, 0) / plants.length
+    const cy = plants.reduce((s, p) => s + p.y, 0) / plants.length
+    const [x3d, z3d] = worldTo3D(cx, cy, cfg)
+    return [{ x3d, z3d, label: 'SITE' }]
+  }
+
+  let cA = sA, cB = sB
+  for (let iter = 0; iter < 3; iter++) {
+    const gA: typeof plants = [], gB: typeof plants = []
+    for (const p of plants)
+      (Math.hypot(p.x-cA.x, p.y-cA.y) <= Math.hypot(p.x-cB.x, p.y-cB.y) ? gA : gB).push(p)
+    if (gA.length) cA = { x: gA.reduce((s,p)=>s+p.x,0)/gA.length, y: gA.reduce((s,p)=>s+p.y,0)/gA.length }
+    if (gB.length) cB = { x: gB.reduce((s,p)=>s+p.x,0)/gB.length, y: gB.reduce((s,p)=>s+p.y,0)/gB.length }
+  }
+
+  const [ax, az] = worldTo3D(cA.x, cA.y, cfg)
+  const [bx, bz] = worldTo3D(cB.x, cB.y, cfg)
+  // Assign A to whichever cluster is further right (higher 3D X) — consistent heuristic
+  const aFirst = ax >= bx
+  return [
+    { x3d: ax, z3d: az, label: aFirst ? 'A' : 'B' },
+    { x3d: bx, z3d: bz, label: aFirst ? 'B' : 'A' },
+  ]
+}
+
+function makeSiteMarker(x3d: number, z3d: number, label: string, scene: THREE.Scene) {
+  const SITE_COL = 0xffaa22
+
+  // Soft fill disc
+  const fillMat = new THREE.MeshBasicMaterial({ color: SITE_COL, transparent: true, opacity: 0.06, depthWrite: false })
+  const fill = new THREE.Mesh(new THREE.CircleGeometry(1.5, 20), fillMat)
+  fill.rotation.x = -Math.PI / 2; fill.position.set(x3d, 0.012, z3d)
+  scene.add(fill)
+
+  // Outer ring
+  const ringPts: THREE.Vector3[] = []
+  for (let i = 0; i <= 40; i++) {
+    const a = (i / 40) * Math.PI * 2
+    ringPts.push(new THREE.Vector3(x3d + Math.cos(a) * 1.5, 0.02, z3d + Math.sin(a) * 1.5))
+  }
+  scene.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(ringPts),
+    new THREE.LineBasicMaterial({ color: SITE_COL, transparent: true, opacity: 0.38 }),
+  ))
+
+  // Floating site label sprite
+  const W = 80, H = 48
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H
+  const ctx = cv.getContext('2d')!
+  ctx.clearRect(0, 0, W, H)
+  ctx.font = `bold ${label.length === 1 ? 36 : 20}px monospace`
+  ctx.fillStyle = `#${SITE_COL.toString(16)}`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillText(label, W / 2, H / 2)
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthWrite: false, transparent: true, opacity: 0.75 }))
+  sprite.scale.set(1.1, 0.66, 1)
+  sprite.position.set(x3d, 0.8, z3d)
+  scene.add(sprite)
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay3DProps) {
@@ -633,7 +716,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     if (!el) return
 
     let cancelled = false, animId: number, lastTS = 0, uiAccum = 0
-    let lodAccum = 0, lastCamY = -1
+    let lodAccum = 0, lastCamY = -1, totalTime = 0
 
     const W = el.clientWidth, H = el.clientHeight || 460
     const myTeamName = team1 ?? parsed?.header.team1 ?? ''
@@ -722,6 +805,52 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       ))
     }
 
+    // ── Perimeter walls ───────────────────────────────────────────────────────
+    const WALL_H = 1.8
+    const wallPanelMat = new THREE.MeshStandardMaterial({
+      color: 0x0a1520, emissive: new THREE.Color(NEON), emissiveIntensity: 0.05,
+      roughness: 0.95, transparent: true, opacity: 0.20, side: THREE.DoubleSide,
+    })
+    const makeWall = (cx: number, cz: number, w: number, d: number) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, WALL_H, d), wallPanelMat)
+      m.position.set(cx, WALL_H / 2, cz); scene.add(m)
+    }
+    makeWall(0, -half, MAP_PLANE, 0.05)   // north
+    makeWall(0,  half, MAP_PLANE, 0.05)   // south
+    makeWall(-half, 0, 0.05, MAP_PLANE)   // west
+    makeWall( half, 0, 0.05, MAP_PLANE)   // east
+
+    // Neon glow line along the top of each wall
+    const wallTopMat = new THREE.LineBasicMaterial({ color: NEON, transparent: true, opacity: 0.55 })
+    for (const [ax, az, bx, bz] of [
+      [-half, -half,  half, -half],  // north top
+      [-half,  half,  half,  half],  // south top
+      [-half, -half, -half,  half],  // west top
+      [ half, -half,  half,  half],  // east top
+    ] as [number,number,number,number][]) {
+      scene.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(ax, WALL_H, az), new THREE.Vector3(bx, WALL_H, bz),
+        ]),
+        wallTopMat,
+      ))
+    }
+
+    // ── Atmospheric particles ──────────────────────────────────────────────────
+    const PARTICLE_COUNT = 320
+    const pPositions = new Float32Array(PARTICLE_COUNT * 3)
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      pPositions[i*3]     = (Math.random() - 0.5) * MAP_PLANE
+      pPositions[i*3 + 1] = Math.random() * 5.5 + 0.4
+      pPositions[i*3 + 2] = (Math.random() - 0.5) * MAP_PLANE
+    }
+    const pGeo = new THREE.BufferGeometry()
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3))
+    const particleSystem = new THREE.Points(pGeo, new THREE.PointsMaterial({
+      color: NEON, size: 0.032, transparent: true, opacity: 0.22, depthWrite: false,
+    }))
+    scene.add(particleSystem)
+
     // ── Players ────────────────────────────────────────────────────────────────
     const rounds = parsed?.rounds ?? []
     roundsRef.current = rounds
@@ -747,6 +876,12 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       po.group.traverse(o => { o.userData.playerName = name })
       po.group.visible = false
       players.set(name, po)
+    }
+
+    // ── Bomb site markers (derived from demo data) ────────────────────────────
+    if (cfg) {
+      const sites = detectBombSites(parsed?.events ?? [], rounds, cfg)
+      for (const s of sites) makeSiteMarker(s.x3d, s.z3d, s.label, scene)
     }
 
     // ── Round init ─────────────────────────────────────────────────────────────
@@ -851,8 +986,11 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     const tick = (ts: number) => {
       animId = requestAnimationFrame(tick)
       const delta = Math.min((ts - lastTS) / 1000, 0.1)
-      lastTS = ts
+      lastTS = ts; totalTime += delta
       const pb = pbRef.current
+
+      // Slowly drift particles — barely perceptible, gives depth
+      particleSystem.rotation.y = totalTime * 0.006
 
       if (pendingRoundRef.current !== null) {
         initRound(pendingRoundRef.current)
