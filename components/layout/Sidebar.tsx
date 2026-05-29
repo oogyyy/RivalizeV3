@@ -1,12 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Target, Shield, Brain,
-  User, Settings, LogOut, ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Users,
+  User, Settings, ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Users,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import type { Profile } from '@/types/database'
@@ -151,10 +150,8 @@ interface SidebarProps {
   onLinkClick?: () => void
 }
 
-export default function Sidebar({ profile }: SidebarProps) {
-  const router = useRouter()
+export default function Sidebar({ profile: _profile }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const [loggingOut, setLoggingOut] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const W = collapsed ? 62 : 200
 
@@ -164,17 +161,6 @@ export default function Sidebar({ profile }: SidebarProps) {
       .then((d: { count: number }) => setPendingCount(d.count))
       .catch(() => {})
   }, [])
-
-  const handleLogout = async () => {
-    setLoggingOut(true)
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
-
-  const displayName = profile?.display_name || profile?.username || 'Player'
-  const initials = displayName[0].toUpperCase()
 
   return (
     <aside
@@ -234,69 +220,6 @@ export default function Sidebar({ profile }: SidebarProps) {
         <SidebarNav collapsed={collapsed} badges={{ '/friends': pendingCount }}/>
       </nav>
 
-      {/* User section */}
-      <div style={{ padding: '10px 8px 14px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 12px 8px' }}>
-            {profile?.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={profile.avatar_url}
-                alt={displayName}
-                style={{
-                  width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0,
-                  border: '2px solid rgba(255,45,120,0.45)',
-                }}
-              />
-            ) : (
-              <div style={{
-                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                background: 'rgba(255,45,120,0.16)', border: '2px solid rgba(255,45,120,0.45)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'var(--font-sora, Sora), sans-serif',
-                fontWeight: 700, fontSize: 13, color: '#ff2d78',
-              }}>
-                {initials}
-              </div>
-            )}
-            <div style={{ minWidth: 0 }}>
-              <div style={{
-                fontSize: 13, fontWeight: 600, color: '#fff',
-                fontFamily: 'var(--font-inter, Inter), sans-serif',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {displayName}
-              </div>
-              {profile?.username && (
-                <div style={{
-                  fontSize: 11, color: 'rgba(255,255,255,0.36)',
-                  fontFamily: 'var(--font-inter, Inter), sans-serif',
-                }}>
-                  @{profile.username}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        <button
-          onClick={handleLogout}
-          disabled={loggingOut}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-            padding: collapsed ? '8px 0' : '7px 12px',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            borderRadius: 7, background: 'transparent', border: 'none',
-            color: 'rgba(255,255,255,0.33)', cursor: loggingOut ? 'not-allowed' : 'pointer',
-            fontFamily: 'var(--font-inter, Inter), sans-serif', fontSize: 13,
-            outline: 'none', opacity: loggingOut ? 0.5 : 1, transition: 'color 0.12s',
-          }}
-          onMouseEnter={e => { if (!loggingOut) e.currentTarget.style.color = 'rgba(255,255,255,0.6)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.33)' }}
-        >
-          <LogOut size={16}/>
-          {!collapsed && (loggingOut ? 'Signing out…' : 'Sign out')}
-        </button>
-      </div>
     </aside>
   )
 }
