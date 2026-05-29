@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
@@ -176,7 +176,7 @@ export default function FaceitImportClient({
           </label>
           <select
             value={selectedTeamId}
-            onChange={e => setSelectedTeamId(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedTeamId(e.target.value)}
             className="w-full text-sm bg-card border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-neon-green/50"
           >
             {teams.length === 0 && <option value="">No teams</option>}
@@ -192,8 +192,8 @@ export default function FaceitImportClient({
           <div className="flex gap-2">
             <input
               value={nickname}
-              onChange={e => setNickname(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleLookup()}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setNickname(e.target.value)}
+              onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleLookup()}
               placeholder="e.g. s1mple"
               className="flex-1 text-sm bg-card border border-border rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-neon-green/50"
             />
@@ -314,7 +314,7 @@ export default function FaceitImportClient({
         )}
 
         {/* Done CTA */}
-        {Object.values(importStates).some(s => s.status === 'done') && (
+        {(Object.values(importStates) as MatchImportState[]).some(s => s.status === 'done') && (
           <div className="p-4 rounded-lg bg-neon-green/10 border border-neon-green/20 text-center space-y-3">
             <CheckCircle2 size={24} className="text-neon-green mx-auto" />
             <p className="text-sm font-semibold text-foreground">Demos imported successfully</p>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -147,7 +147,7 @@ export default function ProDemosClient({
             {teams.length > 0 && (
               <select
                 value={selectedTeamId}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedTeamId(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedTeamId(e.target.value)}
                 className="text-sm bg-card border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-neon-green/50"
               >
                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -199,7 +199,7 @@ export default function ProDemosClient({
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               value={teamSearch}
-              onChange={e => setTeamSearch(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setTeamSearch(e.target.value)}
               placeholder="Search teams…"
               className="pl-8 pr-3 py-1.5 text-xs bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-neon-green/50 w-40"
             />
