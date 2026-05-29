@@ -14,20 +14,28 @@ const bodySchema = z.object({
 
 // ── Prompt sets ──────────────────────────────────────────────────────────────
 
+const UTILITY_FORMAT_INSTRUCTION = `
+UTILITY FORMATTING RULES (follow for every grenade/molotov/flash mentioned):
+1. Name the EXACT throw position using the map's standard callout (e.g. "B Apps", "Top Mid", "CT Spawn").
+2. Name the EXACT target/landing callout — never say "towards the site". Say "CT smoke", "Van smoke", "Market Window smoke", "Short corner flash", etc.
+3. After each utility entry append a markdown link: [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+{map}+UTILITY_TYPE+FROM_CALLOUT+to+LANDING_CALLOUT) — substitute real callout names, lowercase, spaces replaced with +.
+Example: [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+mirage+smoke+b+apps+to+ct)
+`
+
 const SELF_PROMPTS: Record<string, string> = {
-  t_side:    'Generate a detailed T-Side default for {map}. Cover: opening utility usage, info-gathering positions for each player, default split routes, timing breakpoints (first 30s / mid-round / late), and how to adapt when CT reads develop. Be specific with player positions and roles.',
-  ct_side:   'Generate a detailed CT-Side default for {map}. Cover: anchor positions for each player, initial utility (smokes/flashes for aggressive info denial), rotation triggers (when to rotate based on info), crossfire setups, and late-round retake coordination.',
-  a_execute: 'Generate a complete A site execute for {map}. Cover: full utility sequence (who throws what, in which order, at what time), entry player role, trading partners, post-plant positions, and how to adjust if the execute is read early.',
-  b_execute: 'Generate a complete B site execute for {map}. Cover: full utility sequence (who throws what, in which order, at what time), entry player role, trading partners, post-plant positions, and fake potential to draw rotations.',
+  t_side:    'Generate a detailed T-Side default for {map}. Cover: opening utility usage, info-gathering positions for each player, default split routes, timing breakpoints (first 30s / mid-round / late), and how to adapt when CT reads develop. Be specific with player positions and roles. Use exact {map} callouts throughout.',
+  ct_side:   'Generate a detailed CT-Side default for {map}. Cover: anchor positions for each player, initial utility (smokes/flashes for aggressive info denial), rotation triggers (when to rotate based on info), crossfire setups, and late-round retake coordination. Use exact {map} callouts throughout.',
+  a_execute: 'Generate a complete A site execute for {map}. Cover: full utility sequence (who throws what, from which exact callout, landing on which exact callout, and at what time), entry player role, trading partners, post-plant positions, and how to adjust if the execute is read early.',
+  b_execute: 'Generate a complete B site execute for {map}. Cover: full utility sequence (who throws what, from which exact callout, landing on which exact callout, and at what time), entry player role, trading partners, post-plant positions, and fake potential to draw rotations.',
   roles:     'Define clear role assignments for a 5-player team on {map}. Cover: Entry Fragger, AWPer, Support, Lurker, IGL — specific to T and CT side on this map.',
   economy:   'Create detailed economy rules for {map}. Cover: full buy threshold, force buy triggers, eco discipline, pistol round strategy, save rules, and weapon priority.',
 }
 
 const ANTISTRAT_PROMPTS: Record<string, string> = {
-  t_side:    'Based on this opponent\'s CT-side patterns on {map}, design our T-side attack plan to exploit their weaknesses. Cover: their typical CT anchor positions and rotations, which site is most attackable and why, specific utility to neutralise their setups, timing windows when their rotations are slow, and fake options to open up the map.',
-  ct_side:   'Based on this opponent\'s T-side tendencies on {map}, design our CT-side setup to shut them down. Cover: their most common executes and default routes, CT positions that counter their entry paths, utility to deny their setups, rotation triggers based on their patterns, and how to stop their key bomb plant locations.',
-  a_execute: 'Analyse how this opponent defends A site on {map} and build our A execute to beat their setup. Cover: their A anchor positions and utility stack, our smoke/flash sequence to clear those positions, entry angles that bypass their crossfires, trading setups, and post-plant positioning against their retake patterns.',
-  b_execute: 'Analyse how this opponent defends B site on {map} and build our B execute to beat their setup. Cover: their B defensive positions and timings, our utility to clear their setup, coordinated entry plan, and how to use a B fake to draw their CT rotations and create an opening.',
+  t_side:    'Based on this opponent\'s CT-side patterns on {map}, design our T-side attack plan to exploit their weaknesses. Cover: their typical CT anchor positions and rotations, which site is most attackable and why, specific utility to neutralise their setups, timing windows when their rotations are slow, and fake options to open up the map. Use exact {map} callouts throughout.',
+  ct_side:   'Based on this opponent\'s T-side tendencies on {map}, design our CT-side setup to shut them down. Cover: their most common executes and default routes, CT positions that counter their entry paths, utility to deny their setups, rotation triggers based on their patterns, and how to stop their key bomb plant locations. Use exact {map} callouts throughout.',
+  a_execute: 'Analyse how this opponent defends A site on {map} and build our A execute to beat their setup. Cover: their A anchor positions and utility stack, our smoke/flash sequence (from which exact callout, landing on which exact callout) to clear those positions, entry angles that bypass their crossfires, trading setups, and post-plant positioning against their retake patterns.',
+  b_execute: 'Analyse how this opponent defends B site on {map} and build our B execute to beat their setup. Cover: their B defensive positions and timings, our utility (from which exact callout, landing on which exact callout) to clear their setup, coordinated entry plan, and how to use a B fake to draw their CT rotations and create an opening.',
   roles:     'Based on this opponent\'s player tendencies and stats on {map}, assign our team roles to maximise counter-play. For each role (Entry Fragger, AWPer, Support, Lurker, IGL) explain how they should specifically play against this opponent\'s personnel and patterns to gain maximum advantage.',
   economy:   'Based on this opponent\'s economic patterns on {map}, build our economy counter-strategy. Cover: when they typically force buy and how we punish it, how we play against their eco rounds, their buy preferences on CT vs T side, when we should drop weapons vs. save, and how to create economic pressure through consistent round wins.',
 }
@@ -191,15 +199,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ? `\nTeam roster — use ONLY these exact names for players, never invent names:\n${storedPlayers.map((n, i) => `${i + 1}. ${n}`).join('\n')}`
     : `\nDo NOT invent player names. Refer to players by role only (Entry Fragger, AWPer, Support, Lurker, IGL).`
 
+  const utilityInstruction = UTILITY_FORMAT_INSTRUCTION.replace(/{map}/g, playbook.map.replace('de_', ''))
+
   const systemPrompt = isAntistrat
     ? `You are an expert CS2 anti-strat analyst building a pre-match counter-strategy playbook against a specific opponent.
 Map: ${playbook.map}
 Playbook: ${playbook.name}
 ${demoContext}
 ${rosterInstruction}
-
+${utilityInstruction}
 Write tactical anti-strat content for the requested section. Use markdown with headers and bullet points.
-Be specific to ${playbook.map} callouts and positions.
+Be specific to ${playbook.map} callouts and positions — never use vague phrases like "towards the site".
 Base your analysis directly on the opponent demo data above — reference their specific tendencies, players, and patterns.
 Every recommendation should directly counter what this opponent does.`
     : `You are an expert CS2 tactical coach writing a structured playbook for a competitive team.
@@ -207,9 +217,9 @@ Map: ${playbook.map}
 Playbook: ${playbook.name}
 ${demoContext}
 ${rosterInstruction}
-
+${utilityInstruction}
 Write clear, structured tactical content. Use markdown with headers and bullet points.
-Be specific to ${playbook.map} — reference real callouts, angles, and positions.
+Be specific to ${playbook.map} — use real callout names for every position, throw point, and landing spot. Never use vague phrases like "towards the site".
 ${demoContext ? 'Incorporate the team demo data above to tailor recommendations.' : ''}
 Keep it practical — coaches should be able to read this to players directly.`
 
@@ -222,7 +232,7 @@ Keep it practical — coaches should be able to read this to players directly.`
     model: groq('llama-3.3-70b-versatile'),
     system: systemPrompt,
     prompt,
-    maxTokens: 1200,
+    maxTokens: 1600,
     temperature: 0.6,
   })
 

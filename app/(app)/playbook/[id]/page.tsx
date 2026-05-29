@@ -66,11 +66,13 @@ function MarkdownContent({ content }: { content: string }) {
 }
 
 function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/)
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)]+\))/)
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
     if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i} className="italic text-muted-foreground">{part.slice(1, -1)}</em>
     if (part.startsWith('`') && part.endsWith('`')) return <code key={i} className="px-1 py-0.5 bg-muted rounded text-xs font-mono text-[#00ffc8]">{part.slice(1, -1)}</code>
+    const linkMatch = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/)
+    if (linkMatch) return <a key={i} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-[#00ffc8] underline underline-offset-2 hover:text-[#00ffc8]/80 text-xs">{linkMatch[1]}</a>
     return part
   })
 }
