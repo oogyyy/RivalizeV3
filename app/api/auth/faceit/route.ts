@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   // SameSite=None required so cookies are sent on the cross-origin POST
   // that FACEIT's /post-redirect page makes back to our callback.
-  const res = NextResponse.redirect(`https://accounts.faceit.com/sso?${params.toString()}`)
+  const res = NextResponse.redirect(`https://accounts.faceit.com/accounts?${params.toString()}`)
   res.cookies.set('faceit_pkce_verifier', codeVerifier, {
     httpOnly: true,
     maxAge: 600,
