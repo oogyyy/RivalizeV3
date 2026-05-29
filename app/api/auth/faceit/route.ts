@@ -29,13 +29,14 @@ export async function GET(req: NextRequest) {
 
   const redirectUri = `${appUrl}/api/auth/faceit/callback`
 
-  // PKCE: generate code verifier + challenge
-  const codeVerifier  = randomBytes(64).toString('base64url')
+  // PKCE: 32 bytes → 43-char base64url verifier (well within PKCE spec minimums)
+  const codeVerifier  = randomBytes(32).toString('base64url')
   const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url')
 
-  // Encode verifier + user ID in state to avoid cross-origin cookie issues.
-  // The state is opaque to FACEIT and echoed back in the callback.
-  const statePayload = Buffer.from(JSON.stringify({ cv: codeVerifier, uid: user.id })).toString('base64url')
+  // State = verifier (always 43 chars) + userId (always 36 chars) = 79 chars total.
+  // Flat concat avoids JSON+base64url wrapping that pushed the state to ~190 chars,
+  // which FACEIT may silently truncate, breaking JSON.parse in the callback.
+  const statePayload = codeVerifier + user.id
 
   const params = new URLSearchParams({
     response_type:         'code',

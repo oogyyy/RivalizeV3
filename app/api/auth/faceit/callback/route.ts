@@ -39,15 +39,11 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
     return htmlResponse(`${appUrl}/profile?error=faceit_invalid`)
   }
 
-  // Decode stateless PKCE payload embedded in state
-  let codeVerifier: string
-  let userId: string
-  try {
-    const payload = JSON.parse(Buffer.from(state, 'base64url').toString('utf8')) as { cv: string; uid: string }
-    codeVerifier = payload.cv
-    userId       = payload.uid
-    if (!codeVerifier || !userId) throw new Error('missing fields')
-  } catch {
+  // State = verifier (43 chars, base64url) + userId (36 chars, UUID) — fixed-length concat
+  const VERIFIER_LEN = 43
+  const codeVerifier = state.slice(0, VERIFIER_LEN)
+  const userId       = state.slice(VERIFIER_LEN)
+  if (codeVerifier.length !== VERIFIER_LEN || userId.length !== 36) {
     return htmlResponse(`${appUrl}/profile?error=faceit_invalid`)
   }
 
