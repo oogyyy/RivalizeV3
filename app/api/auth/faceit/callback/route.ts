@@ -9,20 +9,37 @@ function getAppUrl(req: NextRequest): string {
   return `${proto}://${host}`
 }
 
-async function handleCallback(req: NextRequest, code: string | null, state: string | null) {
+function htmlRedirect(url: string): NextResponse {
+  // Works whether FACEIT POSTs directly or through an iframe —
+  // window.top navigates the top-level browser window.
+  const escaped = url.replace(/'/g, "\\'")
+  const html = `<!DOCTYPE html><html><head>
+<meta http-equiv="refresh" content="0;url=${url}">
+</head><body>
+<script>try{window.top.location.href='${escaped}'}catch(e){window.location.href='${escaped}'}</script>
+</body></html>`
+  return new NextResponse(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  })
+}
+
+async function handleCallback(req: NextRequest, code: string | null, state: string | null, isPost: boolean) {
   const appUrl = getAppUrl(req)
 
   const codeVerifier  = req.cookies.get('faceit_pkce_verifier')?.value
   const expectedState = req.cookies.get('faceit_pkce_state')?.value
 
+  const redirect = (url: string) => isPost ? htmlRedirect(url) : NextResponse.redirect(url)
+
   if (!code || !codeVerifier || state !== expectedState) {
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_invalid`)
+    return redirect(`${appUrl}/profile?error=faceit_invalid`)
   }
 
   const clientId     = process.env.FACEIT_CLIENT_ID
   const clientSecret = process.env.FACEIT_CLIENT_SECRET
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_config`)
+    return redirect(`${appUrl}/profile?error=faceit_config`)
   }
 
   const redirectUri = `${appUrl}/api/auth/faceit/callback`
@@ -43,7 +60,7 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   })
 
   if (!tokenRes.ok) {
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_token`)
+    return redirect(`${appUrl}/profile?error=faceit_token`)
   }
 
   const { access_token } = await tokenRes.json() as { access_token: string }
@@ -54,7 +71,7 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   })
 
   if (!userRes.ok) {
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_userinfo`)
+    return redirect(`${appUrl}/profile?error=faceit_userinfo`)
   }
 
   const faceitUser = await userRes.json() as {
@@ -66,7 +83,7 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.redirect(`${appUrl}/login`)
+    return redirect(`${appUrl}/login`)
   }
 
   const { error: updateError } = await supabase.from('profiles').update({
@@ -74,10 +91,18 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   }).eq('id', user.id)
 
   if (updateError) {
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_save`)
+    return redirect(`${appUrl}/profile?error=faceit_save`)
   }
 
-  const res = NextResponse.redirect(`${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`)
+  const successUrl = `${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`
+  if (isPost) {
+    const res = htmlRedirect(successUrl)
+    res.cookies.delete('faceit_pkce_verifier')
+    res.cookies.delete('faceit_pkce_state')
+    return res
+  }
+
+  const res = NextResponse.redirect(successUrl)
   res.cookies.delete('faceit_pkce_verifier')
   res.cookies.delete('faceit_pkce_state')
   return res
@@ -88,7 +113,7 @@ export async function GET(req: NextRequest) {
   const url   = new URL(req.url)
   const code  = url.searchParams.get('code')
   const state = url.searchParams.get('state')
-  return handleCallback(req, code, state)
+  return handleCallback(req, code, state, false)
 }
 
 // FACEIT uses a form POST via its /post-redirect page
@@ -109,5 +134,5 @@ export async function POST(req: NextRequest) {
     } catch {}
   }
 
-  return handleCallback(req, code, state)
+  return handleCallback(req, code, state, true)
 }

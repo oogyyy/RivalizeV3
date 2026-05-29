@@ -30,22 +30,22 @@ export async function GET(req: NextRequest) {
     code_challenge_method: 'S256',
   })
 
-  const isProd = appUrl.startsWith('https')
-
+  // SameSite=None required so cookies are sent on the cross-origin POST
+  // that FACEIT's /post-redirect page makes back to our callback.
   const res = NextResponse.redirect(`https://accounts.faceit.com/sso?${params.toString()}`)
   res.cookies.set('faceit_pkce_verifier', codeVerifier, {
     httpOnly: true,
     maxAge: 600,
     path: '/',
-    secure: isProd,
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
   })
   res.cookies.set('faceit_pkce_state', state, {
     httpOnly: true,
     maxAge: 600,
     path: '/',
-    secure: isProd,
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
   })
   return res
 }
