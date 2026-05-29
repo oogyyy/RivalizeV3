@@ -23,14 +23,17 @@ export async function GET() {
   const incoming: unknown[] = []
   const outgoing: unknown[] = []
 
+  type ProfileRow = { id: string; username: string; display_name: string | null; avatar_url: string | null; preferred_roles: string[] | null }
   for (const row of rows ?? []) {
-    const r = row as {
+    const r = row as unknown as {
       id: string; status: string; created_at: string
-      requester: { id: string; username: string; display_name: string | null; avatar_url: string | null; preferred_roles: string[] | null }
-      addressee: { id: string; username: string; display_name: string | null; avatar_url: string | null; preferred_roles: string[] | null }
+      requester: ProfileRow[]
+      addressee: ProfileRow[]
     }
-    const iRequested = r.requester.id === user.id
-    const other = iRequested ? r.addressee : r.requester
+    const requester = r.requester[0]
+    const addressee = r.addressee[0]
+    const iRequested = requester?.id === user.id
+    const other = iRequested ? addressee : requester
 
     const entry = { id: r.id, status: r.status, created_at: r.created_at, profile: other }
 
