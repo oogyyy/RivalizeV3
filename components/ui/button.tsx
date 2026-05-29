@@ -8,41 +8,41 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        /* Primary CTA — pink gradient */
+        /* Primary CTA */
         default:
-          'bg-gradient-to-br from-[#ff2d78] to-[#cc0060] text-white font-semibold hover:opacity-90 active:opacity-80 shadow-[0_0_18px_rgba(255,45,120,0.32)]',
+          'bg-primary text-white shadow-[0_0_18px_rgba(255,45,120,0.28)] hover:opacity-90 active:scale-[0.98]',
 
-        /* Destructive */
-        destructive:
-          'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80',
-
-        /* Neutral outlined */
-        outline:
-          'border border-[rgba(255,255,255,0.12)] bg-transparent text-foreground hover:bg-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.2)]',
+        /* Pink accent — alias of default */
+        neon:
+          'bg-primary text-white shadow-[0_0_18px_rgba(255,45,120,0.28)] hover:opacity-90 active:scale-[0.98]',
 
         /* Filled secondary */
         secondary:
-          'bg-[rgba(255,255,255,0.07)] text-foreground border border-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.18)]',
+          'bg-white/[0.07] text-foreground border border-white/[0.09] hover:bg-white/[0.10] hover:border-white/[0.14]',
 
         /* Ghost */
         ghost:
-          'text-muted-foreground hover:bg-[rgba(255,255,255,0.06)] hover:text-foreground',
+          'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]',
+
+        /* Destructive */
+        destructive:
+          'bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20',
+
+        /* Neutral outlined */
+        outline:
+          'border border-border bg-transparent text-foreground hover:bg-white/[0.05]',
 
         /* Text link */
         link:
-          'text-[#ff2d78] underline-offset-4 hover:underline p-0 h-auto',
+          'text-primary underline-offset-4 hover:underline h-auto p-0',
 
-        /* Pink accent — same as default */
-        neon:
-          'bg-gradient-to-br from-[#ff2d78] to-[#cc0060] text-white font-semibold hover:opacity-90 shadow-[0_0_18px_rgba(255,45,120,0.32)]',
-
-        /* Brand ghost */
+        /* Brand ghost — alias of ghost */
         'brand-ghost':
-          'text-[#ff2d78] hover:bg-[rgba(255,45,120,0.08)] active:bg-[rgba(255,45,120,0.12)]',
+          'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]',
 
-        /* Brand outline */
+        /* Brand outline — alias of outline */
         'brand-outline':
-          'border border-[rgba(255,45,120,0.4)] text-[#ff2d78] hover:bg-[rgba(255,45,120,0.08)] hover:border-[rgba(255,45,120,0.6)]',
+          'border border-border bg-transparent text-foreground hover:bg-white/[0.05]',
       },
       size: {
         sm:        'h-[28px] px-2.5 text-xs rounded-md',

@@ -6,20 +6,41 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Target, Shield, Brain,
-  User, Settings, LogOut, ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked,
+  User, Settings, LogOut, ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { href: '/opponents', label: 'Opponents', Icon: Target },
-  { href: '/my-team',   label: 'My Team',   Icon: Shield },
-  { href: '/ai-coach',  label: 'AI Scout',  Icon: Brain },
-  { href: '/playbook',  label: 'Playbooks', Icon: BookOpen },
-  { href: '/veto',      label: 'Veto',      Icon: Swords },
-  { href: '/lineups',   label: 'Lineups',   Icon: BookMarked },
-  { href: '/profile',   label: 'Profile',   Icon: User },
-  { href: '/settings',  label: 'Settings',  Icon: Settings },
+const NAV_GROUPS = [
+  {
+    label: 'Overview',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+    ]
+  },
+  {
+    label: 'Scout',
+    items: [
+      { href: '/opponents',       label: 'Opponents', Icon: Target },
+      { href: '/opponents/pro-demos', label: 'Pro Demos', Icon: Film },
+    ]
+  },
+  {
+    label: 'Prepare',
+    items: [
+      { href: '/my-team',  label: 'My Team',  Icon: Shield },
+      { href: '/ai-coach', label: 'AI Scout', Icon: Brain },
+      { href: '/playbook', label: 'Playbook', Icon: BookOpen },
+      { href: '/veto',     label: 'Veto',     Icon: Swords },
+      { href: '/lineups',  label: 'Lineups',  Icon: BookMarked },
+    ]
+  },
+  {
+    label: 'Account',
+    items: [
+      { href: '/profile',  label: 'Profile',  Icon: User },
+      { href: '/settings', label: 'Settings', Icon: Settings },
+    ]
+  }
 ]
 
 interface SidebarNavProps {
@@ -30,50 +51,68 @@ interface SidebarNavProps {
 export function SidebarNav({ onLinkClick, collapsed }: SidebarNavProps) {
   const pathname = usePathname()
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {NAV_ITEMS.map(({ href, label, Icon }) => {
-        const isActive = pathname === href || pathname.startsWith(href + '/')
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onLinkClick}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: collapsed ? '10px 0' : '9px 12px',
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              borderRadius: 7,
-              background: isActive ? 'rgba(255,45,120,0.1)' : 'transparent',
-              borderLeft: isActive ? '3px solid #ff2d78' : '3px solid transparent',
-              color: isActive ? '#ff2d78' : 'rgba(255,255,255,0.48)',
-              textDecoration: 'none',
-              fontFamily: 'var(--font-inter, Inter), sans-serif',
-              fontSize: 13.5,
-              fontWeight: isActive ? 600 : 400,
-              transition: 'all 0.12s',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-            }}
-            onMouseEnter={e => {
-              if (!isActive) {
-                e.currentTarget.style.color = 'rgba(255,255,255,0.8)'
-                e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-              }
-            }}
-            onMouseLeave={e => {
-              if (!isActive) {
-                e.currentTarget.style.color = 'rgba(255,255,255,0.48)'
-                e.currentTarget.style.background = 'transparent'
-              }
-            }}
-          >
-            <span style={{ flexShrink: 0 }}><Icon size={17}/></span>
-            {!collapsed && label}
-          </Link>
-        )
-      })}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: collapsed ? 2 : 4 }}>
+      {NAV_GROUPS.map((group) => (
+        <div key={group.label}>
+          {!collapsed && (
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 px-3 mb-1 mt-2">
+              {group.label}
+            </p>
+          )}
+          {group.items.map(({ href, label, Icon }) => {
+            const isActive = pathname === href || pathname.startsWith(href + '/')
+            return (
+              <div key={href} className="relative group">
+                <Link
+                  href={href}
+                  onClick={onLinkClick}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: collapsed ? '10px 0' : '9px 12px',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                    borderRadius: 7,
+                    background: isActive ? 'rgba(255,45,120,0.1)' : 'transparent',
+                    borderLeft: isActive ? '3px solid #ff2d78' : '3px solid transparent',
+                    color: isActive ? '#ff2d78' : 'rgba(255,255,255,0.48)',
+                    textDecoration: 'none',
+                    fontFamily: 'var(--font-inter, Inter), sans-serif',
+                    fontSize: 13.5,
+                    fontWeight: isActive ? 600 : 400,
+                    transition: 'all 0.12s',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                  }}
+                  onMouseEnter={e => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.8)'
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.48)'
+                      e.currentTarget.style.background = 'transparent'
+                    }
+                  }}
+                >
+                  <span style={{ flexShrink: 0 }}><Icon size={17}/></span>
+                  {!collapsed && label}
+                </Link>
+                {collapsed && (
+                  <div
+                    role="tooltip"
+                    className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 rounded-md bg-popover border border-border text-xs font-medium text-foreground whitespace-nowrap z-50 shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-100"
+                  >
+                    {label}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ))}
     </div>
   )
 }

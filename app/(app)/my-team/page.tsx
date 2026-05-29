@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import MyTeamStatsAndDemos from '@/components/teams/MyTeamStatsAndDemos'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 export default async function MyTeamPage() {
   const user = await getCurrentUser()
@@ -47,17 +48,13 @@ export default async function MyTeamPage() {
     <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between animate-fade-in-up">
-        <div>
-          <p className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-[0.14em] mb-1">
-            My Team
-          </p>
-          <h1 className="text-[22px] md:text-2xl font-bold text-foreground tracking-tight">{teamName}</h1>
-          <p className="text-[13px] text-muted-foreground mt-1">Your team&apos;s performance overview</p>
-        </div>
-        {primaryTeamId && (
-          <DemoUploadButton teamId={primaryTeamId} demoType="self" />
-        )}
+      <div className="animate-fade-in-up">
+        <PageHeader
+          label="My Team"
+          title={teamName}
+          description="Your team's performance overview"
+          actions={primaryTeamId ? <DemoUploadButton teamId={primaryTeamId} demoType="self" /> : undefined}
+        />
       </div>
 
       <MyTeamStatsAndDemos initialDemos={demos} primaryTeamId={primaryTeamId} />

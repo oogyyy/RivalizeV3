@@ -15,6 +15,7 @@ import {
   ToggleLeft, ToggleRight, Trash2, Lock, Mail
 } from 'lucide-react'
 import type { UserSettings } from '@/types/database'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type AIModel = 'gpt-4o' | 'grok-2' | 'claude-3-5-sonnet'
 type ResponseStyle = 'detailed' | 'concise' | 'coaching'
@@ -265,10 +266,11 @@ export default function SettingsPage() {
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5 md:space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage your account preferences and configuration</p>
-      </div>
+      <PageHeader
+        label="Account"
+        title="Settings"
+        description="Manage your account preferences and configuration"
+      />
 
       {/* Save indicator */}
       {(saving || saved) && (

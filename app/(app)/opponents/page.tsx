@@ -12,6 +12,7 @@ import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import OpponentCardWithDelete from '@/components/teams/OpponentCardWithDelete'
 import { Target, Brain, Upload, Layers, Activity, Zap, Trophy } from 'lucide-react'
 import type { AggregatedStats } from '@/types/database'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 export default async function OpponentsPage() {
   const user = await getCurrentUser()
@@ -93,41 +94,37 @@ export default async function OpponentsPage() {
     <div className="p-5 md:p-7 space-y-6 max-w-7xl mx-auto">
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 animate-fade-in-up">
-        <div>
-          <p className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-[0.14em] mb-1">
-            Scouting
-          </p>
-          <h1 className="text-[22px] md:text-2xl font-bold text-foreground tracking-tight">
-            Opponents
-          </h1>
-          <p className="text-[13px] text-muted-foreground mt-1">
-            Your scouting library — teams you&apos;re preparing to face
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          <Link href="/ai-coach">
-            <Button variant="secondary" className="gap-2">
-              <Brain size={15} />
-              AI Scout
-            </Button>
-          </Link>
-          <Link href="/opponents/import">
-            <Button variant="secondary" className="gap-2">
-              <Zap size={15} className="text-orange-400" />
-              Import FaceIt
-            </Button>
-          </Link>
-          <Link href="/opponents/pro-demos">
-            <Button variant="secondary" className="gap-2">
-              <Trophy size={15} className="text-yellow-400" />
-              Pro Library
-            </Button>
-          </Link>
-          {primaryTeamId && (
-            <DemoUploadButton teamId={primaryTeamId} />
-          )}
-        </div>
+      <div className="animate-fade-in-up">
+        <PageHeader
+          label="Scouting"
+          title="Opponents"
+          description="Your scouting library — teams you're preparing to face"
+          actions={
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link href="/ai-coach">
+                <Button variant="secondary" className="gap-2">
+                  <Brain size={15} />
+                  AI Scout
+                </Button>
+              </Link>
+              <Link href="/opponents/import">
+                <Button variant="secondary" className="gap-2">
+                  <Zap size={15} className="text-orange-400" />
+                  Import FaceIt
+                </Button>
+              </Link>
+              <Link href="/opponents/pro-demos">
+                <Button variant="secondary" className="gap-2">
+                  <Trophy size={15} className="text-yellow-400" />
+                  Pro Library
+                </Button>
+              </Link>
+              {primaryTeamId && (
+                <DemoUploadButton teamId={primaryTeamId} />
+              )}
+            </div>
+          }
+        />
       </div>
 
       {/* ── Stats row ── */}

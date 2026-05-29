@@ -14,6 +14,7 @@ import {
   Activity,
 } from 'lucide-react'
 import type { AggregatedStats, ParsedDemoData } from '@/types/database'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -156,26 +157,20 @@ export default async function DashboardPage() {
     <div className="p-5 md:p-7 space-y-6 max-w-7xl mx-auto">
 
       {/* ── Page header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in-up">
-        <div>
-          <p className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-[0.14em] mb-1">
-            Dashboard
-          </p>
-          <h1 className="text-[22px] md:text-2xl font-bold text-foreground tracking-tight">
-            Welcome back, <span className="text-[#00ffc8]">{displayName}</span>
-          </h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Your match-prep hub — study opponents, generate anti-strats, win.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href="/ai-coach">
-            <Button variant="neon" className="gap-2 shadow-[0_0_16px_rgba(0,255,200,0.2)]">
-              <Brain size={15} />
-              AI Scout
-            </Button>
-          </Link>
-        </div>
+      <div className="animate-fade-in-up">
+        <PageHeader
+          label="Dashboard"
+          title={<>Welcome back, <span className="text-[#00ffc8]">{displayName}</span></>}
+          description="Your match-prep hub — study opponents, generate anti-strats, win."
+          actions={
+            <Link href="/ai-coach">
+              <Button variant="neon" className="gap-2 shadow-[0_0_16px_rgba(0,255,200,0.2)]">
+                <Brain size={15} />
+                AI Scout
+              </Button>
+            </Link>
+          }
+        />
       </div>
 
       {/* ── Quick stats row ── */}
