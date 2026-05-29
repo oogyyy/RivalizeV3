@@ -49,7 +49,7 @@ export default function RoutinesPanel({ folderId, opponentName: _opponentName }:
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={(e: MouseEvent) => { e.stopPropagation(); load() }}
+            onClick={(e) => { e.stopPropagation(); load() }}
             className="p-1 rounded text-muted-foreground hover:text-foreground"
             title="Re-detect"
           >
