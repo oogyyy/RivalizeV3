@@ -122,9 +122,20 @@ export async function POST(request: Request) {
     const map = match.voting?.map?.pick?.[0] ?? 'unknown'
 
     // Stream demo from FaceIt → R2
-    const demoRes = await fetch(demoUrl)
+    let demoRes: Response
+    try {
+      demoRes = await fetch(demoUrl)
+    } catch {
+      return NextResponse.json(
+        { error: 'Demo not available yet — FACEIT may still be processing it. Try again in a few minutes.' },
+        { status: 502 }
+      )
+    }
     if (!demoRes.ok || !demoRes.body) {
-      return NextResponse.json({ error: 'Failed to download demo from FaceIt' }, { status: 502 })
+      const hint = demoRes.status === 403 || demoRes.status === 404
+        ? 'Demo not available yet — try again in a few minutes.'
+        : `Demo download failed (HTTP ${demoRes.status})`
+      return NextResponse.json({ error: hint }, { status: 502 })
     }
 
     const filename = `faceit-${matchId}.dem.gz`

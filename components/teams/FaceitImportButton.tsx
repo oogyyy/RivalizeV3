@@ -233,7 +233,7 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
                         <CheckCircle2 size={16} className="text-neon-green" />
                       )}
                       {row.importState === 'error' && (
-                        <span className="text-[10px] text-red-400 max-w-[100px] text-right leading-tight">
+                        <span className="text-[10px] text-red-400 max-w-[160px] text-right leading-tight">
                           {row.importError}
                         </span>
                       )}
