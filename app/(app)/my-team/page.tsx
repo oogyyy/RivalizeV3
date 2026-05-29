@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
+import FaceitImportButton from '@/components/teams/FaceitImportButton'
 import MyTeamStatsAndDemos from '@/components/teams/MyTeamStatsAndDemos'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -32,6 +33,13 @@ export default async function MyTeamPage() {
     if (team?.name) teamName = team.name
   }
 
+  const { data: myProfile } = await admin
+    .from('profiles')
+    .select('faceit_id')
+    .eq('id', user.id)
+    .single()
+  const myFaceitId = myProfile?.faceit_id ?? null
+
   const { data: recentDemos } = teamIds.length
     ? await admin
         .from('demos')
@@ -53,7 +61,14 @@ export default async function MyTeamPage() {
           label="My Team"
           title={teamName}
           description="Your team's performance overview"
-          actions={primaryTeamId ? <DemoUploadButton teamId={primaryTeamId} demoType="self" /> : undefined}
+          actions={primaryTeamId ? (
+            <div className="flex items-center gap-2">
+              {myFaceitId && (
+                <FaceitImportButton teamId={primaryTeamId} faceitNickname={myFaceitId} />
+              )}
+              <DemoUploadButton teamId={primaryTeamId} demoType="self" />
+            </div>
+          ) : undefined}
         />
       </div>
 
