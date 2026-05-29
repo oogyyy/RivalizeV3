@@ -101,9 +101,9 @@ export default function ProDemosClient({
         }
       }
 
-      // Fallback: open HLTV search for this match
-      const query = encodeURIComponent(`${match.team1} vs ${match.team2} ${match.event}`)
-      window.open(`https://www.hltv.org/search#query=${query}`, '_blank')
+      // Fallback: open HLTV results for this match
+      const query = encodeURIComponent(`${match.team1} ${match.team2}`)
+      window.open(`https://www.hltv.org/results?content=demo&query=${query}`, '_blank')
     } finally {
       setImporting((p: Record<string, boolean>) => ({ ...p, [match.id]: false }))
     }
@@ -290,14 +290,13 @@ export default function ProDemosClient({
                       </Button>
                     ) : (
                       <a
-                        href={`https://www.hltv.org/search#query=${encodeURIComponent(`${match.team1} vs ${match.team2}`)}`}
+                        href={`https://www.hltv.org/results?content=demo&query=${encodeURIComponent(`${match.team1} ${match.team2}`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors"
                       >
-                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-muted-foreground">
-                          <ExternalLink size={10} />
-                          HLTV
-                        </Button>
+                        <ExternalLink size={10} />
+                        HLTV
                       </a>
                     )}
                   </div>
