@@ -20,13 +20,17 @@ export async function GET(req: NextRequest) {
   const codeVerifier   = req.cookies.get('faceit_pkce_verifier')?.value
   const expectedState  = req.cookies.get('faceit_pkce_state')?.value
 
+  console.log('[faceit-callback] code:', !!code, 'codeVerifier:', !!codeVerifier, 'stateMatch:', state === expectedState)
+
   if (!code || !codeVerifier || state !== expectedState) {
+    console.log('[faceit-callback] PKCE validation failed - code:', !!code, 'verifier:', !!codeVerifier, 'state match:', state === expectedState)
     return NextResponse.redirect(`${appUrl}/profile?error=faceit_invalid`)
   }
 
   const clientId    = process.env.FACEIT_CLIENT_ID
   const clientSecret = process.env.FACEIT_CLIENT_SECRET
   if (!clientId || !clientSecret) {
+    console.log('[faceit-callback] Missing OAuth credentials')
     return NextResponse.redirect(`${appUrl}/profile?error=faceit_config`)
   }
 
@@ -48,10 +52,13 @@ export async function GET(req: NextRequest) {
   })
 
   if (!tokenRes.ok) {
+    const tokenErrText = await tokenRes.text().catch(() => '')
+    console.log('[faceit-callback] Token exchange failed:', tokenRes.status, tokenErrText)
     return NextResponse.redirect(`${appUrl}/profile?error=faceit_token`)
   }
 
   const { access_token } = await tokenRes.json() as { access_token: string }
+  console.log('[faceit-callback] Token exchange OK')
 
   // Fetch FACEIT user info
   const userRes = await fetch('https://api.faceit.com/auth/v1/resources/userinfo', {
@@ -59,6 +66,7 @@ export async function GET(req: NextRequest) {
   })
 
   if (!userRes.ok) {
+    console.log('[faceit-callback] Userinfo fetch failed:', userRes.status)
     return NextResponse.redirect(`${appUrl}/profile?error=faceit_userinfo`)
   }
 
@@ -69,9 +77,10 @@ export async function GET(req: NextRequest) {
 
   // Persist to the user's profile
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  console.log('[faceit-callback] getUser result - user:', !!user, 'error:', authErr?.message)
   if (!user) {
-    return NextResponse.redirect(`${appUrl}/login`)
+    return NextResponse.redirect(`${appUrl}/profile?error=faceit_session`)
   }
 
   // Store the FACEIT nickname in faceit_id (matches what the manual input stores)
@@ -80,8 +89,11 @@ export async function GET(req: NextRequest) {
   }).eq('id', user.id)
 
   if (updateError) {
+    console.log('[faceit-callback] DB update failed:', updateError.message)
     return NextResponse.redirect(`${appUrl}/profile?error=faceit_save`)
   }
+
+  console.log('[faceit-callback] Success - linked nickname:', faceitUser.nickname)
 
   const res = NextResponse.redirect(`${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`)
   // Clear PKCE cookies

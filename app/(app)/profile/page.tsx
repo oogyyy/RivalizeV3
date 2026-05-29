@@ -226,7 +226,10 @@ export default function ProfilePage() {
         })
       })
     } else if (linkError) {
-      setLinkBanner(`Link failed: ${linkError.replace(/_/g, ' ')}`)
+      const msg = linkError === 'faceit_session'
+        ? 'Link failed: session expired, please try again'
+        : `Link failed: ${linkError.replace(/_/g, ' ')}`
+      setLinkBanner(msg)
     }
   }, [searchParams])
 
