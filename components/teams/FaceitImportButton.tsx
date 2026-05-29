@@ -67,10 +67,7 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
         error?: string
       }
       if (!res.ok || data.error) throw new Error(data.error ?? 'Lookup failed')
-      const esea = (data.matches ?? []).filter(m =>
-        m.competition_name.toLowerCase().includes('esea')
-      )
-      setRows(esea.map(m => ({ ...m, importState: 'idle' })))
+      setRows((data.matches ?? []).map(m => ({ ...m, importState: 'idle' })))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load matches')
     } finally {
@@ -144,9 +141,9 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Import ESEA Matches</h2>
+            <h2 className="text-lg font-bold text-foreground">Import from FACEIT</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Linked as <span className="text-neon-green font-medium">{faceitNickname}</span> · recent ESEA League matches
+              Linked as <span className="text-neon-green font-medium">{faceitNickname}</span> · recent CS2 match history
             </p>
           </div>
           <button
@@ -178,9 +175,9 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
 
           {!loading && !error && rows.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
-              <p className="text-sm font-medium text-foreground">No ESEA matches found</p>
+              <p className="text-sm font-medium text-foreground">No matches found</p>
               <p className="text-xs text-muted-foreground">
-                No recent ESEA League CS2 matches for <span className="text-neon-green">{faceitNickname}</span>
+                No recent CS2 matches for <span className="text-neon-green">{faceitNickname}</span>
               </p>
             </div>
           )}
@@ -270,7 +267,7 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
         <div className="shrink-0 border-t border-border px-5 py-3 flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
             {rows.length > 0 && !loading
-              ? `${rows.length} ESEA match${rows.length !== 1 ? 'es' : ''} found`
+              ? `${rows.length} match${rows.length !== 1 ? 'es' : ''} found`
               : ' '}
           </p>
           <Button variant="outline" size="sm" onClick={handleClose}>
