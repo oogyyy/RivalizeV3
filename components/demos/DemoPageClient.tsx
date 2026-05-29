@@ -488,8 +488,27 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [debugOpen, setDebugOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [replayTime, setReplayTime] = useState(0)
   const [replayPlaying, setReplayPlaying] = useState(false)
+
+  const handleShare = useCallback(async () => {
+    if (sharing) return
+    setSharing(true)
+    try {
+      const res = await fetch(`/api/demos/${demo.id}/share`, { method: 'POST' })
+      if (res.ok) {
+        const { shareId } = await res.json() as { shareId: string }
+        const url = `${window.location.origin}/share/${shareId}`
+        await navigator.clipboard.writeText(url)
+        setShareCopied(true)
+        setTimeout(() => setShareCopied(false), 3000)
+      }
+    } finally {
+      setSharing(false)
+    }
+  }, [demo.id, sharing])
 
   const fetchDemo = useCallback(async () => {
     const supabase = createClient()
@@ -549,6 +568,18 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
             {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             {parsing ? 'Parsing...' : demo.status === 'completed' ? 'Re-parse' : 'Parse Now'}
           </Button>
+          {demo.status === 'completed' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleShare}
+              disabled={sharing}
+            >
+              {sharing ? <Loader2 size={14} className="animate-spin" /> : shareCopied ? <Check size={14} className="text-neon-green" /> : <Copy size={14} />}
+              {shareCopied ? 'Link copied!' : 'Share'}
+            </Button>
+          )}
           <Link href={aiScoutHref}>
             <Button variant="neon" size="sm" className="gap-2">
               <Brain size={14} />

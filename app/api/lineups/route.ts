@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
   let query = admin
     .from('lineups')
-    .select('id, team_id, map, name, type, notes, created_by, created_at, updated_at')
+    .select('id, team_id, map, name, type, notes, is_public, created_by, created_at, updated_at')
     .in('team_id', teamIds)
     .order('updated_at', { ascending: false })
 
