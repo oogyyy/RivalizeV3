@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import FolderCard from '@/components/teams/FolderCard'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
+import FaceitImportButton from '@/components/teams/FaceitImportButton'
 import TeamTabNav from './TeamTabNav'
 import InviteCodeSection from './InviteCodeSection'
 import {
@@ -57,6 +58,14 @@ export default async function TeamPage({
   if (!myMembership) redirect('/teams')
 
   const isOwnerOrAdmin = myMembership.role === 'owner' || myMembership.role === 'admin'
+
+  // Fetch current user's faceit_id for FACEIT import
+  const { data: myProfile } = await admin
+    .from('profiles')
+    .select('faceit_id')
+    .eq('id', user.id)
+    .single()
+  const myFaceitId = myProfile?.faceit_id ?? null
 
   // Fetch all team members with profiles
   const { data: members } = await admin
@@ -433,7 +442,12 @@ export default async function TeamPage({
                   {(demos ?? []).length} total
                 </p>
               </div>
-              {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
+              <div className="flex items-center gap-2">
+                {isOwnerOrAdmin && myFaceitId && (
+                  <FaceitImportButton teamId={resolvedTeamId} faceitNickname={myFaceitId} />
+                )}
+                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
+              </div>
             </div>
 
             {(demos ?? []).length === 0 ? (

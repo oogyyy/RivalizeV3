@@ -78,8 +78,14 @@ export async function POST(request: Request) {
           competition_name: m.competition_name,
           started_at: m.started_at,
           teams: {
-            faction1: m.teams.faction1.name || '',
-            faction2: m.teams.faction2.name || '',
+            faction1: {
+              name: m.teams.faction1.name || '',
+              roster: m.teams.faction1.roster?.map(p => p.nickname) ?? [],
+            },
+            faction2: {
+              name: m.teams.faction2.name || '',
+              roster: m.teams.faction2.roster?.map(p => p.nickname) ?? [],
+            },
           },
           score: m.results?.score ?? null,
           winner: m.results?.winner ?? null,
