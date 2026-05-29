@@ -49,5 +49,8 @@ export async function GET(req: NextRequest) {
     code_challenge_method: 'S256',
   })
 
-  return NextResponse.redirect(`https://accounts.faceit.com/accounts?${params.toString()}`)
+  // redirect_popup=true tells FACEIT to do a standard browser redirect to
+  // redirect_uri?code=...&state=... instead of the Connect widget popup flow
+  // which relies on window.opener (null on Firefox due to COOP enforcement).
+  return NextResponse.redirect(`https://accounts.faceit.com/accounts?redirect_popup=true&${params.toString()}`)
 }
