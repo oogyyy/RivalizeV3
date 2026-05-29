@@ -102,8 +102,8 @@ export default function ProDemosClient({
       }
 
       // Fallback: open HLTV results for this match
-      const query = encodeURIComponent(`${match.team1} ${match.team2}`)
-      window.open(`https://www.hltv.org/results?content=demo&query=${query}`, '_blank')
+      const query = encodeURIComponent(`site:hltv.org ${match.team1} vs ${match.team2} ${match.event}`)
+      window.open(`https://www.google.com/search?q=${query}`, '_blank')
     } finally {
       setImporting((p: Record<string, boolean>) => ({ ...p, [match.id]: false }))
     }
@@ -290,7 +290,7 @@ export default function ProDemosClient({
                       </Button>
                     ) : (
                       <a
-                        href={`https://www.hltv.org/results?content=demo&query=${encodeURIComponent(`${match.team1} ${match.team2}`)}`}
+                        href={`https://www.google.com/search?q=${encodeURIComponent(`site:hltv.org ${match.team1} vs ${match.team2} ${match.event}`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors"
