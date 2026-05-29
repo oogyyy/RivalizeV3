@@ -42,6 +42,8 @@ function PlaybookListInner() {
   const [selectedTeam, setSelectedTeam]     = useState(searchParams.get('team') ?? '')
   const [selectedFolder, setSelectedFolder] = useState('')
   const [deleting, setDeleting]       = useState<string | null>(null)
+  const [availablePlayers, setAvailablePlayers] = useState<string[]>([])
+  const [selectedPlayers, setSelectedPlayers]   = useState<string[]>([])
 
   useEffect(() => {
     Promise.all([
@@ -75,6 +77,17 @@ function PlaybookListInner() {
     }
   }, [selectedFolder]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch player names from self demos when team changes
+  useEffect(() => {
+    if (!selectedTeam) return
+    fetch(`/api/teams/players?teamId=${selectedTeam}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((names: string[]) => {
+        setAvailablePlayers(names)
+        setSelectedPlayers([])
+      })
+  }, [selectedTeam])
+
   const availableMaps = selectedOpponent ? opponentMaps : CS2_MAPS
 
   const handleCreate = async () => {
@@ -91,6 +104,7 @@ function PlaybookListInner() {
         name,
         folderId:     selectedFolder || undefined,
         opponentName: opponentName || undefined,
+        players:      selectedPlayers.length > 0 ? selectedPlayers : undefined,
       }),
     })
     if (res.ok) {
@@ -199,6 +213,51 @@ function PlaybookListInner() {
                   <option key={o.id} value={o.id}>{o.opponent_display_name}</option>
                 ))}
               </select>
+            )}
+          </div>
+
+          {/* Teammate selector */}
+          <div className="mb-3">
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Teammates <span className="text-muted-foreground/60">(optional — names used in tactics)</span>
+            </label>
+            {availablePlayers.length === 0 ? (
+              <p className="text-xs text-muted-foreground/60 py-1">
+                No self demos uploaded yet — AI will use role labels (Entry Fragger, AWPer, etc.)
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {availablePlayers.slice(0, 10).map(name => {
+                  const on = selectedPlayers.includes(name)
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => {
+                        if (on) {
+                          setSelectedPlayers(prev => prev.filter(n => n !== name))
+                        } else if (selectedPlayers.length < 5) {
+                          setSelectedPlayers(prev => [...prev, name])
+                        }
+                      }}
+                      className={cn(
+                        'text-xs px-2.5 py-1 rounded-full border transition-colors',
+                        on
+                          ? 'bg-neon-green/15 border-neon-green/50 text-neon-green'
+                          : 'bg-background border-border text-muted-foreground hover:border-neon-green/30 hover:text-foreground',
+                        !on && selectedPlayers.length >= 5 && 'opacity-40 cursor-not-allowed'
+                      )}
+                    >
+                      {name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {selectedPlayers.length > 0 && (
+              <p className="text-[10px] text-muted-foreground/60 mt-1">
+                {selectedPlayers.length}/5 selected · AI will use these names in all tactics
+              </p>
             )}
           </div>
 

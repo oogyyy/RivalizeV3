@@ -9,6 +9,7 @@ const createSchema = z.object({
   name:         z.string().min(1).max(128).default('Untitled Playbook'),
   folderId:     z.string().uuid().optional(),
   opponentName: z.string().max(128).optional(),
+  players:      z.array(z.string().max(64)).max(5).optional(),
 })
 
 export async function GET() {
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
   const parsed = createSchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body', details: parsed.error.flatten() }, { status: 400 })
 
-  const { teamId, map, name, folderId, opponentName } = parsed.data
+  const { teamId, map, name, folderId, opponentName, players } = parsed.data
 
   const { data, error } = await supabase
     .from('playbooks')
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
       sections:      {},
       folder_id:     folderId ?? null,
       opponent_name: opponentName ?? null,
+      players:       players ?? [],
     })
     .select('id, team_id, map, name, created_at, updated_at')
     .single()

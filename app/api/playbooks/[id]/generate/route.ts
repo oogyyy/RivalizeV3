@@ -121,7 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: playbook } = await supabase
     .from('playbooks')
-    .select('map, name, folder_id, opponent_name, team_id')
+    .select('map, name, folder_id, opponent_name, team_id, players')
     .eq('id', id)
     .single()
 
@@ -185,11 +185,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const promptTmpl = prompts[sectionType] ?? prompts.t_side
   const prompt     = promptTmpl.replace(/{map}/g, playbook.map)
 
+  // Build roster instruction — use stored names, or role labels, never invented names
+  const storedPlayers: string[] = (playbook as { players?: string[] }).players ?? []
+  const rosterInstruction = storedPlayers.length > 0
+    ? `\nTeam roster — use ONLY these exact names for players, never invent names:\n${storedPlayers.map((n, i) => `${i + 1}. ${n}`).join('\n')}`
+    : `\nDo NOT invent player names. Refer to players by role only (Entry Fragger, AWPer, Support, Lurker, IGL).`
+
   const systemPrompt = isAntistrat
     ? `You are an expert CS2 anti-strat analyst building a pre-match counter-strategy playbook against a specific opponent.
 Map: ${playbook.map}
 Playbook: ${playbook.name}
 ${demoContext}
+${rosterInstruction}
 
 Write tactical anti-strat content for the requested section. Use markdown with headers and bullet points.
 Be specific to ${playbook.map} callouts and positions.
@@ -199,6 +206,7 @@ Every recommendation should directly counter what this opponent does.`
 Map: ${playbook.map}
 Playbook: ${playbook.name}
 ${demoContext}
+${rosterInstruction}
 
 Write clear, structured tactical content. Use markdown with headers and bullet points.
 Be specific to ${playbook.map} — reference real callouts, angles, and positions.
