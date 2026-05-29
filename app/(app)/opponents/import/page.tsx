@@ -16,7 +16,7 @@ export default async function FaceitImportPage() {
 
   const teams = (memberships ?? []).map((m) => ({
     id: m.team_id,
-    name: (m.teams as { id: string; name: string } | null)?.name ?? 'Unknown Team',
+    name: (m.teams as unknown as { id: string; name: string } | null)?.name ?? 'Unknown Team',
   }))
 
   const primaryTeamId = teams[0]?.id ?? null
