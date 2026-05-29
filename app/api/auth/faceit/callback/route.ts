@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 function getAppUrl(req: NextRequest): string {
   const explicit = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL
@@ -35,10 +35,19 @@ function htmlResponse(redirectUrl: string): NextResponse {
 async function handleCallback(req: NextRequest, code: string | null, state: string | null) {
   const appUrl = getAppUrl(req)
 
-  const codeVerifier  = req.cookies.get('faceit_pkce_verifier')?.value
-  const expectedState = req.cookies.get('faceit_pkce_state')?.value
+  if (!code || !state) {
+    return htmlResponse(`${appUrl}/profile?error=faceit_invalid`)
+  }
 
-  if (!code || !codeVerifier || state !== expectedState) {
+  // Decode stateless PKCE payload embedded in state
+  let codeVerifier: string
+  let userId: string
+  try {
+    const payload = JSON.parse(Buffer.from(state, 'base64url').toString('utf8')) as { cv: string; uid: string }
+    codeVerifier = payload.cv
+    userId       = payload.uid
+    if (!codeVerifier || !userId) throw new Error('missing fields')
+  } catch {
     return htmlResponse(`${appUrl}/profile?error=faceit_invalid`)
   }
 
@@ -85,25 +94,17 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
     nickname: string
   }
 
-  // Persist to the user's profile
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return htmlResponse(`${appUrl}/login`)
-  }
-
-  const { error: updateError } = await supabase.from('profiles').update({
+  // Use admin client to bypass RLS — user ID comes from signed state, not session cookie
+  const admin = createAdminClient()
+  const { error: updateError } = await admin.from('profiles').update({
     faceit_id: faceitUser.nickname,
-  }).eq('id', user.id)
+  }).eq('id', userId)
 
   if (updateError) {
     return htmlResponse(`${appUrl}/profile?error=faceit_save`)
   }
 
-  const res = htmlResponse(`${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`)
-  res.cookies.delete('faceit_pkce_verifier')
-  res.cookies.delete('faceit_pkce_state')
-  return res
+  return htmlResponse(`${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`)
 }
 
 // Standard GET redirect (most OAuth flows)
