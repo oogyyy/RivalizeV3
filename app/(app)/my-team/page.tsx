@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import FaceitImportButton from '@/components/teams/FaceitImportButton'
+import FaceitEloCard from '@/components/teams/FaceitEloCard'
 import MyTeamStatsAndDemos from '@/components/teams/MyTeamStatsAndDemos'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -72,7 +73,11 @@ export default async function MyTeamPage() {
         />
       </div>
 
-      <MyTeamStatsAndDemos initialDemos={demos} primaryTeamId={primaryTeamId} />
+      <MyTeamStatsAndDemos
+        initialDemos={demos}
+        primaryTeamId={primaryTeamId}
+        faceitNickname={myFaceitId}
+      />
     </div>
   )
 }

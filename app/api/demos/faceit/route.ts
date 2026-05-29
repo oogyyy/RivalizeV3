@@ -20,6 +20,11 @@ const lookupSchema = z.object({
   nickname: z.string().min(1).max(64),
 })
 
+const eloCheckSchema = z.object({
+  action: z.literal('elo-check'),
+  nickname: z.string().min(1).max(64),
+})
+
 const importSchema = z.object({
   action: z.literal('import'),
   teamId: z.string().uuid(),
@@ -28,7 +33,7 @@ const importSchema = z.object({
   playerFaction: z.enum(['faction1', 'faction2']).default('faction2'),
 })
 
-const bodySchema = z.discriminatedUnion('action', [lookupSchema, importSchema])
+const bodySchema = z.discriminatedUnion('action', [lookupSchema, eloCheckSchema, importSchema])
 
 /** GET — check if FaceIt is configured */
 export async function GET() {
@@ -96,6 +101,61 @@ export async function POST(request: Request) {
       })
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'FaceIt lookup failed'
+      return NextResponse.json({ error: msg }, { status: 500 })
+    }
+  }
+
+  // ── ELO check: fetch current ELO, store snapshot, return history ──
+  if (parsed.data.action === 'elo-check') {
+    const admin = createAdminClient()
+    try {
+      const player = await getPlayerByNickname(parsed.data.nickname)
+      const cs2 = player.games?.cs2
+      if (!cs2) {
+        return NextResponse.json({ error: 'Player has no CS2 stats on FaceIt' }, { status: 404 })
+      }
+
+      const elo   = cs2.faceit_elo
+      const level = cs2.skill_level
+
+      // Cache faceit_player_id and current elo on the profile row
+      await admin.from('profiles').update({
+        faceit_player_id: player.player_id,
+      }).eq('id', user.id)
+
+      // Insert ELO snapshot (deduplicate: skip if last snapshot within 1 hour has same ELO)
+      const { data: lastSnap } = await admin
+        .from('faceit_elo_snapshots')
+        .select('elo, recorded_at')
+        .eq('user_id', user.id)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const oneHourAgo = new Date(Date.now() - 3600_000).toISOString()
+      const isDuplicate = lastSnap && lastSnap.elo === elo && lastSnap.recorded_at > oneHourAgo
+
+      if (!isDuplicate) {
+        await admin.from('faceit_elo_snapshots').insert({ user_id: user.id, elo, level })
+      }
+
+      // Return last 30 snapshots for the trend chart
+      const { data: history } = await admin
+        .from('faceit_elo_snapshots')
+        .select('elo, level, recorded_at')
+        .eq('user_id', user.id)
+        .order('recorded_at', { ascending: true })
+        .limit(30)
+
+      return NextResponse.json({
+        elo,
+        level,
+        nickname: player.nickname,
+        avatar: player.avatar,
+        history: history ?? [],
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'ELO check failed'
       return NextResponse.json({ error: msg }, { status: 500 })
     }
   }
@@ -187,6 +247,7 @@ export async function POST(request: Request) {
         match_date: matchDate,
         league: `FaceIt — ${match.competition_name}`,
         raw_file_path: fileUrl,
+        faceit_match_id: matchId,
         status: 'processing',
         demo_type: 'opponent',
         created_by: user.id,

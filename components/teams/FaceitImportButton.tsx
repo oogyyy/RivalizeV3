@@ -50,13 +50,35 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<MatchRow[]>([])
+  const [pendingCount, setPendingCount] = useState<number | null>(null)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
+  // Silently pre-fetch match list and pending count on mount
+  useEffect(() => {
+    if (!faceitNickname) return
+    const prefetch = async () => {
+      try {
+        const res = await fetch('/api/demos/faceit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'lookup', nickname: faceitNickname }),
+        })
+        if (!res.ok) return
+        const data = await res.json() as { matches?: FaceitMatch[] }
+        const matches = data.matches ?? []
+        setRows(matches.map(m => ({ ...m, importState: 'idle' as ImportState })))
+        setPendingCount(matches.length)
+      } catch { /* silent — badge stays hidden */ }
+    }
+    prefetch()
+  }, [faceitNickname])
+
   async function loadMatches() {
+    // Skip fetch if pre-populated by the mount effect
+    if (rows.length > 0) return
     setLoading(true)
     setError(null)
-    setRows([])
     try {
       const res = await fetch('/api/demos/faceit', {
         method: 'POST',
@@ -147,6 +169,11 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
       <Button variant="outline" onClick={handleOpen} className="gap-2 relative">
         <Download size={16} />
         Import from FACEIT
+        {pendingCount !== null && pendingCount > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-[#ff2d78] text-white text-[10px] font-bold flex items-center justify-center px-1 shadow-lg">
+            {pendingCount}
+          </span>
+        )}
       </Button>
     )
   }

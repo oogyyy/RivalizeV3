@@ -52,6 +52,16 @@ export default async function MyTeamPlayerPage({
     stats: PlayerStats
     kills: Kill[]
     deaths: Kill[]
+    result?: 'Win' | 'Loss' | 'Draw' | null
+  }
+
+  function getResult(pd: ParsedDemoData): 'Win' | 'Loss' | 'Draw' | null {
+    const opSide = ((pd as unknown) as Record<string, unknown>).opponentSide as string ?? 'team2'
+    const h = pd.header ?? {} as Record<string, number>
+    const our   = opSide === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
+    const their = opSide === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
+    if (our === 0 && their === 0) return null
+    return our > their ? 'Win' : our < their ? 'Loss' : 'Draw'
   }
 
   const demoEntries: DemoEntry[] = []
@@ -75,6 +85,7 @@ export default async function MyTeamPlayerPage({
       stats: player,
       kills: playerKills,
       deaths: playerDeaths,
+      result: getResult(pd),
     })
   }
 
