@@ -94,10 +94,8 @@ export default function FaceitImportClient({
     if (!selectedTeamId) return
     const matchId = match.match_id
 
-    // Determine which faction is the "opponent" — opposite of us
-    // We don't know which faction our team is, so prompt user
-    // For simplicity: treat faction2 as opponent by default (common setup)
-    const opponentName = match.teams.faction2
+    // The searched player is the opponent — use their nickname as the folder name
+    const opponentName = player?.nickname ?? match.teams.faction2
 
     setImportStates((prev: Record<string, MatchImportState>) => ({ ...prev, [matchId]: { status: 'importing' } }))
     try {
@@ -256,7 +254,13 @@ export default function FaceitImportClient({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium text-foreground truncate">
-                          {match.teams.faction1} <span className="text-muted-foreground">vs</span> {match.teams.faction2}
+                          {(() => {
+                            const t1 = match.teams.faction1
+                            const t2 = match.teams.faction2
+                            const hasNames = t1 && t2
+                            if (hasNames) return <>{t1} <span className="text-muted-foreground">vs</span> {t2}</>
+                            return <>{player?.nickname ?? 'Unknown'} <span className="text-muted-foreground">match</span></>
+                          })()}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
