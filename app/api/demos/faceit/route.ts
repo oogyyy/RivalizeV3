@@ -124,18 +124,23 @@ export async function POST(request: Request) {
     // Stream demo from FaceIt → R2
     let demoRes: Response
     try {
-      demoRes = await fetch(demoUrl)
-    } catch {
+      demoRes = await fetch(demoUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible)' },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(55000),
+      })
+    } catch (err) {
+      const cause = err instanceof Error ? err.message : String(err)
       return NextResponse.json(
-        { error: 'Demo not available yet — FACEIT may still be processing it. Try again in a few minutes.' },
+        { error: `Demo download failed: ${cause}`, debug_url: demoUrl },
         { status: 502 }
       )
     }
     if (!demoRes.ok || !demoRes.body) {
-      const hint = demoRes.status === 403 || demoRes.status === 404
-        ? 'Demo not available yet — try again in a few minutes.'
-        : `Demo download failed (HTTP ${demoRes.status})`
-      return NextResponse.json({ error: hint }, { status: 502 })
+      return NextResponse.json(
+        { error: `Demo download failed (HTTP ${demoRes.status})`, debug_url: demoUrl },
+        { status: 502 }
+      )
     }
 
     const filename = `faceit-${matchId}.dem.gz`
