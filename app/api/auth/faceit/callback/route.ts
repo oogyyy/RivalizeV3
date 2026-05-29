@@ -9,15 +9,26 @@ function getAppUrl(req: NextRequest): string {
   return `${proto}://${host}`
 }
 
-function htmlRedirect(url: string): NextResponse {
-  // Works whether FACEIT POSTs directly or through an iframe —
-  // window.top navigates the top-level browser window.
-  const escaped = url.replace(/'/g, "\\'")
+function htmlResponse(redirectUrl: string, msg: Record<string, unknown>): NextResponse {
+  const safeUrl   = redirectUrl.replace(/'/g, '%27')
+  const safeMsg   = JSON.stringify(msg).replace(/<\//g, '<\\/')
+  // If opened as a popup (window.opener exists) send postMessage so the
+  // parent page handles the result, then close the popup.
+  // Otherwise fall back to a top-level navigation (non-popup / direct flow).
   const html = `<!DOCTYPE html><html><head>
-<meta http-equiv="refresh" content="0;url=${url}">
-</head><body>
-<script>try{window.top.location.href='${escaped}'}catch(e){window.location.href='${escaped}'}</script>
-</body></html>`
+<meta http-equiv="refresh" content="0;url=${safeUrl}">
+</head><body><script>
+(function(){
+  var msg=${safeMsg};
+  var dest='${safeUrl}';
+  if(window.opener&&!window.opener.closed){
+    window.opener.postMessage(msg,'*');
+    window.close();
+  }else{
+    try{window.top.location.href=dest}catch(e){window.location.href=dest}
+  }
+})();
+</script></body></html>`
   return new NextResponse(html, {
     status: 200,
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -30,16 +41,17 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   const codeVerifier  = req.cookies.get('faceit_pkce_verifier')?.value
   const expectedState = req.cookies.get('faceit_pkce_state')?.value
 
-  const redirect = (url: string) => isPost ? htmlRedirect(url) : NextResponse.redirect(url)
+  const respond = (url: string, msg: Record<string, unknown>) =>
+    isPost ? htmlResponse(url, msg) : NextResponse.redirect(url)
 
   if (!code || !codeVerifier || state !== expectedState) {
-    return redirect(`${appUrl}/profile?error=faceit_invalid`)
+    return respond(`${appUrl}/profile?error=faceit_invalid`, { type: 'faceit-oauth', success: false, error: 'faceit_invalid' })
   }
 
   const clientId     = process.env.FACEIT_CLIENT_ID
   const clientSecret = process.env.FACEIT_CLIENT_SECRET
   if (!clientId || !clientSecret) {
-    return redirect(`${appUrl}/profile?error=faceit_config`)
+    return respond(`${appUrl}/profile?error=faceit_config`, { type: 'faceit-oauth', success: false, error: 'faceit_config' })
   }
 
   const redirectUri = `${appUrl}/api/auth/faceit/callback`
@@ -60,7 +72,7 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   })
 
   if (!tokenRes.ok) {
-    return redirect(`${appUrl}/profile?error=faceit_token`)
+    return respond(`${appUrl}/profile?error=faceit_token`, { type: 'faceit-oauth', success: false, error: 'faceit_token' })
   }
 
   const { access_token } = await tokenRes.json() as { access_token: string }
@@ -71,7 +83,7 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   })
 
   if (!userRes.ok) {
-    return redirect(`${appUrl}/profile?error=faceit_userinfo`)
+    return respond(`${appUrl}/profile?error=faceit_userinfo`, { type: 'faceit-oauth', success: false, error: 'faceit_userinfo' })
   }
 
   const faceitUser = await userRes.json() as {
@@ -83,7 +95,7 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return redirect(`${appUrl}/login`)
+    return respond(`${appUrl}/login`, { type: 'faceit-oauth', success: false, error: 'faceit_session' })
   }
 
   const { error: updateError } = await supabase.from('profiles').update({
@@ -91,18 +103,15 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   }).eq('id', user.id)
 
   if (updateError) {
-    return redirect(`${appUrl}/profile?error=faceit_save`)
+    return respond(`${appUrl}/profile?error=faceit_save`, { type: 'faceit-oauth', success: false, error: 'faceit_save' })
   }
 
   const successUrl = `${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`
-  if (isPost) {
-    const res = htmlRedirect(successUrl)
-    res.cookies.delete('faceit_pkce_verifier')
-    res.cookies.delete('faceit_pkce_state')
-    return res
-  }
+  const successMsg = { type: 'faceit-oauth', success: true, nickname: faceitUser.nickname }
 
-  const res = NextResponse.redirect(successUrl)
+  const res = isPost
+    ? htmlResponse(successUrl, successMsg)
+    : NextResponse.redirect(successUrl)
   res.cookies.delete('faceit_pkce_verifier')
   res.cookies.delete('faceit_pkce_state')
   return res

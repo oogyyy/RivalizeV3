@@ -606,7 +606,24 @@ export default function ProfilePage() {
                 variant="outline"
                 size="sm"
                 className="shrink-0 gap-1.5 text-xs text-orange-400 border-orange-400/30 hover:border-orange-400/60 hover:text-orange-300"
-                onClick={() => window.location.href = '/api/auth/faceit'}
+                onClick={() => {
+                  const popup = window.open('/api/auth/faceit', 'faceit-oauth', 'width=600,height=700,scrollbars=yes')
+                  const onMessage = (e: MessageEvent) => {
+                    if (e.data?.type !== 'faceit-oauth') return
+                    window.removeEventListener('message', onMessage)
+                    popup?.close()
+                    if (e.data.success) {
+                      setFaceitId(e.data.nickname)
+                      setLinkBanner(`FACEIT account linked as ${e.data.nickname}!`)
+                    } else {
+                      setLinkBanner(`Link failed: ${(e.data.error as string)?.replace(/_/g, ' ') ?? 'unknown error'}`)
+                    }
+                  }
+                  window.addEventListener('message', onMessage)
+                  const checkClosed = setInterval(() => {
+                    if (popup?.closed) { clearInterval(checkClosed); window.removeEventListener('message', onMessage) }
+                  }, 1000)
+                }}
               >
                 <ExternalLink size={11} />
                 Link FACEIT
