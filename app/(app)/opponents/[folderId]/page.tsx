@@ -301,9 +301,12 @@ export default async function OpponentPage({
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <p className="text-xs font-medium text-foreground truncate">
+                              <Link
+                                href={`/opponents/${folderId}/player/${encodeURIComponent(player.name)}`}
+                                className="text-xs font-medium text-foreground hover:text-neon-green transition-colors truncate"
+                              >
                                 {player.name}
-                              </p>
+                              </Link>
                               <span className={`text-[9px] font-bold px-1 py-0.5 rounded shrink-0 ${ri.color} ${ri.bg}`}>
                                 {ri.label}
                               </span>
