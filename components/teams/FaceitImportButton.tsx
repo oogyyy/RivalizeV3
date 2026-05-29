@@ -113,8 +113,13 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
           playerFaction,
         }),
       })
-      const data = await res.json() as { error?: string }
-      if (!res.ok || data.error) throw new Error(data.error ?? 'Import failed')
+      const data = await res.json() as { error?: string; debug_url?: string }
+      if (!res.ok || data.error) {
+        const msg = data.debug_url
+          ? `${data.error ?? 'Import failed'}\n\nURL tried: ${data.debug_url}`
+          : (data.error ?? 'Import failed')
+        throw new Error(msg)
+      }
       setRows(prev => prev.map(r =>
         r.match_id === matchId ? { ...r, importState: 'done' } : r
       ))

@@ -121,18 +121,33 @@ export async function POST(request: Request) {
     const demoUrl = demoUrls[0]
     const map = match.voting?.map?.pick?.[0] ?? 'unknown'
 
+    // Validate URL before attempting download
+    let parsedUrl: URL
+    try {
+      parsedUrl = new URL(demoUrl)
+    } catch {
+      return NextResponse.json(
+        { error: `Invalid demo URL returned by FACEIT: ${demoUrl}` },
+        { status: 502 }
+      )
+    }
+
     // Stream demo from FaceIt → R2
     let demoRes: Response
     try {
-      demoRes = await fetch(demoUrl, {
+      demoRes = await fetch(parsedUrl.toString(), {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible)' },
         redirect: 'follow',
         signal: AbortSignal.timeout(55000),
       })
     } catch (err) {
-      const cause = err instanceof Error ? err.message : String(err)
+      // Unwrap Node.js fetch error cause chain for a meaningful message
+      const top = err instanceof Error ? err.message : String(err)
+      const inner = (err as { cause?: unknown })?.cause
+      const cause = inner instanceof Error ? inner.message : inner ? String(inner) : null
+      const detail = cause ? `${top} → ${cause}` : top
       return NextResponse.json(
-        { error: `Demo download failed: ${cause}`, debug_url: demoUrl },
+        { error: `Demo download failed: ${detail}`, debug_url: demoUrl },
         { status: 502 }
       )
     }
