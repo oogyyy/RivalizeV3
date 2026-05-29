@@ -35,14 +35,15 @@ function htmlResponse(redirectUrl: string, msg: Record<string, unknown>): NextRe
   })
 }
 
-async function handleCallback(req: NextRequest, code: string | null, state: string | null, isPost: boolean) {
+async function handleCallback(req: NextRequest, code: string | null, state: string | null) {
   const appUrl = getAppUrl(req)
 
   const codeVerifier  = req.cookies.get('faceit_pkce_verifier')?.value
   const expectedState = req.cookies.get('faceit_pkce_state')?.value
 
-  const respond = (url: string, msg: Record<string, unknown>) =>
-    isPost ? htmlResponse(url, msg) : NextResponse.redirect(url)
+  // Always return HTML so the popup-aware script can postMessage the parent
+  // and close itself. Falls back to direct navigation when not in a popup.
+  const respond = (url: string, msg: Record<string, unknown>) => htmlResponse(url, msg)
 
   if (!code || !codeVerifier || state !== expectedState) {
     return respond(`${appUrl}/profile?error=faceit_invalid`, { type: 'faceit-oauth', success: false, error: 'faceit_invalid' })
@@ -109,9 +110,7 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   const successUrl = `${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`
   const successMsg = { type: 'faceit-oauth', success: true, nickname: faceitUser.nickname }
 
-  const res = isPost
-    ? htmlResponse(successUrl, successMsg)
-    : NextResponse.redirect(successUrl)
+  const res = htmlResponse(successUrl, successMsg)
   res.cookies.delete('faceit_pkce_verifier')
   res.cookies.delete('faceit_pkce_state')
   return res
@@ -122,7 +121,7 @@ export async function GET(req: NextRequest) {
   const url   = new URL(req.url)
   const code  = url.searchParams.get('code')
   const state = url.searchParams.get('state')
-  return handleCallback(req, code, state, false)
+  return handleCallback(req, code, state)
 }
 
 // FACEIT uses a form POST via its /post-redirect page
@@ -143,5 +142,5 @@ export async function POST(req: NextRequest) {
     } catch {}
   }
 
-  return handleCallback(req, code, state, true)
+  return handleCallback(req, code, state)
 }
