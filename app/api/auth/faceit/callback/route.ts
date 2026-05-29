@@ -9,22 +9,17 @@ function getAppUrl(req: NextRequest): string {
   return `${proto}://${host}`
 }
 
-// Handles FACEIT OAuth2 callback: exchanges the auth code for tokens,
-// fetches the FACEIT user profile, and saves the ID + nickname to the DB.
-export async function GET(req: NextRequest) {
+async function handleCallback(req: NextRequest, code: string | null, state: string | null) {
   const appUrl = getAppUrl(req)
-  const url    = new URL(req.url)
-  const code   = url.searchParams.get('code')
-  const state  = url.searchParams.get('state')
 
-  const codeVerifier   = req.cookies.get('faceit_pkce_verifier')?.value
-  const expectedState  = req.cookies.get('faceit_pkce_state')?.value
+  const codeVerifier  = req.cookies.get('faceit_pkce_verifier')?.value
+  const expectedState = req.cookies.get('faceit_pkce_state')?.value
 
   if (!code || !codeVerifier || state !== expectedState) {
     return NextResponse.redirect(`${appUrl}/profile?error=faceit_invalid`)
   }
 
-  const clientId    = process.env.FACEIT_CLIENT_ID
+  const clientId     = process.env.FACEIT_CLIENT_ID
   const clientSecret = process.env.FACEIT_CLIENT_SECRET
   if (!clientId || !clientSecret) {
     return NextResponse.redirect(`${appUrl}/profile?error=faceit_config`)
@@ -63,8 +58,8 @@ export async function GET(req: NextRequest) {
   }
 
   const faceitUser = await userRes.json() as {
-    sub: string       // FACEIT user UUID
-    nickname: string  // FACEIT username
+    sub: string
+    nickname: string
   }
 
   // Persist to the user's profile
@@ -74,7 +69,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${appUrl}/login`)
   }
 
-  // Store the FACEIT nickname in faceit_id (matches what the manual input stores)
   const { error: updateError } = await supabase.from('profiles').update({
     faceit_id: faceitUser.nickname,
   }).eq('id', user.id)
@@ -84,8 +78,36 @@ export async function GET(req: NextRequest) {
   }
 
   const res = NextResponse.redirect(`${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`)
-  // Clear PKCE cookies
   res.cookies.delete('faceit_pkce_verifier')
   res.cookies.delete('faceit_pkce_state')
   return res
+}
+
+// Standard GET redirect (most OAuth flows)
+export async function GET(req: NextRequest) {
+  const url   = new URL(req.url)
+  const code  = url.searchParams.get('code')
+  const state = url.searchParams.get('state')
+  return handleCallback(req, code, state)
+}
+
+// FACEIT uses a form POST via its /post-redirect page
+export async function POST(req: NextRequest) {
+  let code: string | null = null
+  let state: string | null = null
+
+  const contentType = req.headers.get('content-type') ?? ''
+  if (contentType.includes('application/x-www-form-urlencoded')) {
+    const body = new URLSearchParams(await req.text())
+    code  = body.get('code')
+    state = body.get('state')
+  } else {
+    try {
+      const body = await req.json() as { code?: string; state?: string }
+      code  = body.code ?? null
+      state = body.state ?? null
+    } catch {}
+  }
+
+  return handleCallback(req, code, state)
 }
