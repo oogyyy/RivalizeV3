@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { createHash, randomBytes } from 'crypto'
 
 function getAppUrl(req: NextRequest): string {
@@ -20,39 +21,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${appUrl}/profile?error=faceit_config`)
   }
 
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.redirect(`${appUrl}/login`)
+  }
+
   const redirectUri = `${appUrl}/api/auth/faceit/callback`
 
   // PKCE: generate code verifier + challenge
   const codeVerifier  = randomBytes(64).toString('base64url')
   const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url')
-  const state         = randomBytes(16).toString('hex')
+
+  // Encode verifier + user ID in state to avoid cross-origin cookie issues.
+  // The state is opaque to FACEIT and echoed back in the callback.
+  const statePayload = Buffer.from(JSON.stringify({ cv: codeVerifier, uid: user.id })).toString('base64url')
 
   const params = new URLSearchParams({
     response_type:         'code',
     client_id:             clientId,
     redirect_uri:          redirectUri,
     scope:                 'openid profile email',
-    state,
+    state:                 statePayload,
     code_challenge:        codeChallenge,
     code_challenge_method: 'S256',
   })
 
-  const isProd = appUrl.startsWith('https')
-
-  const res = NextResponse.redirect(`https://accounts.faceit.com/sso?${params.toString()}`)
-  res.cookies.set('faceit_pkce_verifier', codeVerifier, {
-    httpOnly: true,
-    maxAge: 600,
-    path: '/',
-    secure: isProd,
-    sameSite: 'lax',
-  })
-  res.cookies.set('faceit_pkce_state', state, {
-    httpOnly: true,
-    maxAge: 600,
-    path: '/',
-    secure: isProd,
-    sameSite: 'lax',
-  })
-  return res
+  return NextResponse.redirect(`https://accounts.faceit.com/accounts?${params.toString()}`)
 }

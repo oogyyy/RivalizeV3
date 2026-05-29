@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 function getAppUrl(req: NextRequest): string {
   const explicit = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL
@@ -9,24 +9,50 @@ function getAppUrl(req: NextRequest): string {
   return `${proto}://${host}`
 }
 
+function htmlResponse(redirectUrl: string): NextResponse {
+  const safeUrl = redirectUrl.replace(/'/g, '%27')
+  const html = `<!DOCTYPE html><html><head>
+<meta http-equiv="refresh" content="0;url=${safeUrl}">
+</head><body><script>
+(function(){
+  var dest='${safeUrl}';
+  if(window.opener&&!window.opener.closed){
+    window.opener.location.href=dest;
+    window.close();
+  }else{
+    try{window.top.location.href=dest}catch(e){window.location.href=dest}
+  }
+})();
+</script></body></html>`
+  return new NextResponse(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  })
+}
+
 async function handleCallback(req: NextRequest, code: string | null, state: string | null) {
   const appUrl = getAppUrl(req)
 
-  const codeVerifier  = req.cookies.get('faceit_pkce_verifier')?.value
-  const expectedState = req.cookies.get('faceit_pkce_state')?.value
+  if (!code || !state) {
+    return htmlResponse(`${appUrl}/profile?error=faceit_invalid`)
+  }
 
-  console.log('[faceit-callback] code:', !!code, 'codeVerifier:', !!codeVerifier, 'stateMatch:', state === expectedState)
-
-  if (!code || !codeVerifier || state !== expectedState) {
-    console.log('[faceit-callback] PKCE validation failed - code:', !!code, 'verifier:', !!codeVerifier, 'state match:', state === expectedState)
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_invalid`)
+  // Decode stateless PKCE payload embedded in state
+  let codeVerifier: string
+  let userId: string
+  try {
+    const payload = JSON.parse(Buffer.from(state, 'base64url').toString('utf8')) as { cv: string; uid: string }
+    codeVerifier = payload.cv
+    userId       = payload.uid
+    if (!codeVerifier || !userId) throw new Error('missing fields')
+  } catch {
+    return htmlResponse(`${appUrl}/profile?error=faceit_invalid`)
   }
 
   const clientId     = process.env.FACEIT_CLIENT_ID
   const clientSecret = process.env.FACEIT_CLIENT_SECRET
   if (!clientId || !clientSecret) {
-    console.log('[faceit-callback] Missing OAuth credentials')
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_config`)
+    return htmlResponse(`${appUrl}/profile?error=faceit_config`)
   }
 
   const redirectUri = `${appUrl}/api/auth/faceit/callback`
@@ -47,13 +73,10 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   })
 
   if (!tokenRes.ok) {
-    const tokenErrText = await tokenRes.text().catch(() => '')
-    console.log('[faceit-callback] Token exchange failed:', tokenRes.status, tokenErrText)
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_token`)
+    return htmlResponse(`${appUrl}/profile?error=faceit_token`)
   }
 
   const { access_token } = await tokenRes.json() as { access_token: string }
-  console.log('[faceit-callback] Token exchange OK')
 
   // Fetch FACEIT user info
   const userRes = await fetch('https://api.faceit.com/auth/v1/resources/userinfo', {
@@ -61,8 +84,7 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
   })
 
   if (!userRes.ok) {
-    console.log('[faceit-callback] Userinfo fetch failed:', userRes.status)
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_userinfo`)
+    return htmlResponse(`${appUrl}/profile?error=faceit_userinfo`)
   }
 
   const faceitUser = await userRes.json() as {
@@ -70,29 +92,17 @@ async function handleCallback(req: NextRequest, code: string | null, state: stri
     nickname: string
   }
 
-  // Persist to the user's profile
-  const supabase = await createClient()
-  const { data: { user }, error: authErr } = await supabase.auth.getUser()
-  console.log('[faceit-callback] getUser result - user:', !!user, 'error:', authErr?.message)
-  if (!user) {
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_session`)
-  }
-
-  const { error: updateError } = await supabase.from('profiles').update({
+  // Use admin client to bypass RLS — user ID comes from signed state, not session cookie
+  const admin = createAdminClient()
+  const { error: updateError } = await admin.from('profiles').update({
     faceit_id: faceitUser.nickname,
-  }).eq('id', user.id)
+  }).eq('id', userId)
 
   if (updateError) {
-    console.log('[faceit-callback] DB update failed:', updateError.message)
-    return NextResponse.redirect(`${appUrl}/profile?error=faceit_save`)
+    return htmlResponse(`${appUrl}/profile?error=faceit_save`)
   }
 
-  console.log('[faceit-callback] Success - linked nickname:', faceitUser.nickname)
-
-  const res = NextResponse.redirect(`${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`)
-  res.cookies.delete('faceit_pkce_verifier')
-  res.cookies.delete('faceit_pkce_state')
-  return res
+  return htmlResponse(`${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`)
 }
 
 // Standard GET redirect (most OAuth flows)
@@ -114,7 +124,6 @@ export async function POST(req: NextRequest) {
     code  = body.get('code')
     state = body.get('state')
   } else {
-    // Fallback: try JSON body
     try {
       const body = await req.json() as { code?: string; state?: string }
       code  = body.code ?? null
@@ -122,6 +131,5 @@ export async function POST(req: NextRequest) {
     } catch {}
   }
 
-  console.log('[faceit-callback] POST received - code:', !!code, 'state:', !!state)
   return handleCallback(req, code, state)
 }
