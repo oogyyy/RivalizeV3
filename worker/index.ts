@@ -2,10 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import { parseAndSaveDemo } from '../lib/demo-parser/parse-and-save'
 
 const POLL_INTERVAL_MS  = 2_000
-// Worst-case: 4 attempts × (75s warmup + 6min parse) + (8s + 20s + 40s delays) ≈ 48 min.
-// Set the stale threshold above that so reclaimStale doesn't fire during a slow cold-start
-// and kick off a concurrent duplicate parse.
 const STALE_AFTER_MS    = 55 * 60 * 1000  // reclaim jobs stuck > 55 min
+const MAX_RETRIES       = 3               // permanently fail after this many attempts
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,12 +22,13 @@ async function reclaimStale(): Promise<void> {
 }
 
 async function claimNext(): Promise<string | null> {
-  // Find oldest unclaimed processing demo
+  // Find oldest unclaimed processing demo that hasn't exceeded retry limit
   const { data } = await supabase
     .from('demos')
     .select('id')
     .eq('status', 'processing')
     .is('processing_started_at', null)
+    .lt('retry_count', MAX_RETRIES)
     .order('created_at', { ascending: true })
     .limit(1)
 
@@ -58,9 +57,28 @@ async function tick(): Promise<void> {
   try {
     await parseAndSaveDemo(demoId)
     console.log(`[worker] Done      ${demoId}`)
-  } catch {
-    // parseAndSaveDemo already wrote status='failed' + error_message to DB
-    console.error(`[worker] Failed    ${demoId}`)
+  } catch (err) {
+    // Increment retry count; parseAndSaveDemo wrote status='failed' + error_message to DB
+    const { data: current } = await supabase
+      .from('demos')
+      .select('retry_count')
+      .eq('id', demoId)
+      .single()
+
+    const retryCount = (current?.retry_count ?? 0) + 1
+    if (retryCount >= MAX_RETRIES) {
+      console.error(`[worker] Failed permanently (${retryCount}/${MAX_RETRIES}) ${demoId}`)
+      await supabase
+        .from('demos')
+        .update({ retry_count: retryCount, status: 'failed', processing_started_at: null })
+        .eq('id', demoId)
+    } else {
+      console.error(`[worker] Failed attempt ${retryCount}/${MAX_RETRIES} ${demoId} — will retry`)
+      await supabase
+        .from('demos')
+        .update({ retry_count: retryCount, status: 'processing', processing_started_at: null })
+        .eq('id', demoId)
+    }
   }
 }
 

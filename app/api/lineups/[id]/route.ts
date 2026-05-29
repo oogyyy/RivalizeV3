@@ -66,9 +66,11 @@ export async function PATCH(
   if (!canEdit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const allowed: Record<string, unknown> = {}
-  for (const k of ['name', 'type', 'notes', 'canvas_data'] as const) {
+  for (const k of ['name', 'type', 'notes', 'canvas_data', 'is_public'] as const) {
     if (body[k] !== undefined) allowed[k as string] = body[k]
   }
+  if (body.is_public === true)  allowed['published_at'] = new Date().toISOString()
+  if (body.is_public === false) allowed['published_at'] = null
   allowed['updated_at'] = new Date().toISOString()
 
   const { data, error } = await admin

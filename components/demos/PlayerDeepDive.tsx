@@ -17,6 +17,7 @@ interface DemoEntry {
   stats: PlayerStats
   kills: Kill[]
   deaths: Kill[]
+  result?: 'Win' | 'Loss' | 'Draw' | null
 }
 
 interface Props {
@@ -72,6 +73,7 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
       adr: Math.round(e.stats.adr),
       rating: Math.round(e.stats.rating * 100) / 100,
       hs: Math.round(e.stats.headshot_percentage),
+      result: e.result ?? null,
     })),
   [demoEntries])
 
@@ -126,10 +128,19 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
       {/* Rating trend */}
       {trendData.length > 1 && (
         <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <TrendingUp size={12} />
-            Rating per Demo
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp size={12} />
+              Rating per Demo
+            </p>
+            {demoEntries.some(e => e.result) && (
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#00ffc8]" />W</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#ff4466]" />L</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#818cf8]" />—</span>
+              </div>
+            )}
+          </div>
           <ResponsiveContainer width="100%" height={140}>
             <AreaChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
               <defs>
@@ -145,7 +156,15 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
                 contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
                 formatter={(v: number) => [v.toFixed(2), 'Rating']}
               />
-              <Area type="monotone" dataKey="rating" stroke="#818cf8" strokeWidth={2} fill="url(#ratingGrad)" dot={{ r: 3, fill: '#818cf8' }} />
+              <Area
+                type="monotone" dataKey="rating" stroke="#818cf8" strokeWidth={2}
+                fill="url(#ratingGrad)"
+                dot={(props: { cx: number; cy: number; payload: { result?: string | null } }) => {
+                  const { cx, cy, payload } = props
+                  const fill = payload.result === 'Win' ? '#00ffc8' : payload.result === 'Loss' ? '#ff4466' : '#818cf8'
+                  return <circle key={`dot-${cx}-${cy}`} cx={cx} cy={cy} r={4} fill={fill} stroke="none" />
+                }}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>

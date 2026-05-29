@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import {
   Target, Brain, BarChart3, TrendingUp,
   ArrowRight, ChevronRight, Shield, Layers,
-  Activity,
+  Activity, Crosshair,
 } from 'lucide-react'
 import type { AggregatedStats, ParsedDemoData } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -145,6 +145,44 @@ export default async function DashboardPage() {
         .in('team_id', teamIds)
     : { data: [] }
 
+  // Fetch all completed self-demos to compute win rate + avg K/D
+  const { data: allSelfDemosData } = teamIds.length
+    ? await admin
+        .from('demos')
+        .select('parsed_data')
+        .in('team_id', teamIds)
+        .eq('demo_type', 'self')
+        .eq('status', 'completed')
+    : { data: [] }
+
+  type SelfDemoMeta = { parsed_data: unknown }
+  const selfCompleted = (allSelfDemosData ?? []) as SelfDemoMeta[]
+
+  let selfWins = 0, selfTotal = 0, selfKills = 0, selfDeaths = 0, selfPlayerCount = 0
+  for (const d of selfCompleted) {
+    const result = getSelfDemoResult(d.parsed_data)
+    if (result !== null) {
+      selfTotal++
+      if (result === 'Win') selfWins++
+    }
+    const pd = d.parsed_data as Record<string, unknown> | null
+    const players = (pd?.players ?? []) as Array<{ team: string; kills: number; deaths: number }>
+    const opSide = (pd?.opponentSide as string | undefined) ?? 'team2'
+    const header = (pd?.header ?? {}) as Record<string, unknown>
+    const opLabel = opSide === 'team1' ? (header.team1 as string ?? '') : (header.team2 as string ?? '')
+    for (const p of players) {
+      if (p.team === opLabel) continue
+      selfKills  += p.kills
+      selfDeaths += p.deaths
+      selfPlayerCount++
+    }
+  }
+
+  const winRateDisplay = selfTotal > 0 ? `${Math.round((selfWins / selfTotal) * 100)}%` : '—'
+  const avgKDDisplay   = selfDeaths > 0 && selfPlayerCount > 0
+    ? (selfKills / selfDeaths).toFixed(2)
+    : '—'
+
   const totalDemos     = (allDemosMeta ?? []).length
   const analyzedDemos  = (allDemosMeta ?? []).filter((d) => d.status === 'completed').length
   const totalOpponents = typedFolders.length
@@ -174,7 +212,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── Quick stats row ── */}
-      <div className="grid grid-cols-3 gap-3 md:gap-4 animate-fade-in-up animate-fade-in-up-delay-1">
+      <div className="grid grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 animate-fade-in-up animate-fade-in-up-delay-1">
         <StatCard
           label="Opponents"
           value={totalOpponents}
@@ -195,6 +233,22 @@ export default async function DashboardPage() {
           icon={<Activity size={17} className="text-[#00ffc8]" />}
           iconBg="bg-[rgba(0,255,200,0.1)]"
           accent="stat-card-green"
+        />
+        <StatCard
+          label="Win Rate"
+          value={winRateDisplay}
+          icon={<TrendingUp size={17} className="text-amber-400" />}
+          iconBg="bg-amber-500/10"
+          accent="stat-card-amber"
+          sub={selfTotal > 0 ? `${selfWins}W / ${selfTotal - selfWins}L` : undefined}
+        />
+        <StatCard
+          label="Team K/D"
+          value={avgKDDisplay}
+          icon={<Crosshair size={17} className="text-purple-400" />}
+          iconBg="bg-purple-500/10"
+          accent="stat-card-purple"
+          sub={selfPlayerCount > 0 ? `${selfKills}K / ${selfDeaths}D` : undefined}
         />
       </div>
 
@@ -431,12 +485,13 @@ export default async function DashboardPage() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, icon, iconBg, accent }: {
+function StatCard({ label, value, icon, iconBg, accent, sub }: {
   label: string
-  value: number
+  value: number | string
   icon: React.ReactNode
   iconBg: string
   accent: string
+  sub?: string
 }) {
   return (
     <div className={cn('relative bg-card border border-border rounded-xl p-4 md:p-5 card-hover overflow-hidden', accent)}>
@@ -451,6 +506,9 @@ function StatCard({ label, value, icon, iconBg, accent }: {
       <p className="text-[28px] md:text-3xl font-bold text-foreground tabular-nums font-mono leading-none">
         {value}
       </p>
+      {sub && (
+        <p className="text-[10px] text-muted-foreground/50 font-mono mt-1">{sub}</p>
+      )}
     </div>
   )
 }

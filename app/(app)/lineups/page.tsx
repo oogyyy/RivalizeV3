@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, type ChangeEvent, type KeyboardEvent } from 'react'
-import { BookMarked, Plus, Trash2, Map, Filter, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { BookMarked, Plus, Trash2, Map, Filter, Loader2, ChevronDown, ChevronUp, Globe } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import LineupBoard, { type DrawAction } from '@/components/lineups/LineupBoard'
@@ -35,6 +36,7 @@ interface Lineup {
   type: string
   notes: string | null
   canvas_data: DrawAction[]
+  is_public: boolean
   created_at: string
 }
 
@@ -53,6 +55,7 @@ export default function LineupsPage() {
   const [selectedTeam, setSelectedTeam] = useState('')
   const [showForm, setShowForm]   = useState(false)
   const [deleting, setDeleting]   = useState<string | null>(null)
+  const [publishing, setPublishing] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -102,6 +105,22 @@ export default function LineupsPage() {
     })
   }
 
+  async function handlePublish(id: string, makePublic: boolean) {
+    setPublishing(id)
+    try {
+      const res = await fetch(`/api/lineups/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_public: makePublic }),
+      })
+      if (res.ok) {
+        setLineups((prev: Lineup[]) => prev.map((l: Lineup) => l.id === id ? { ...l, is_public: makePublic } : l))
+      }
+    } finally {
+      setPublishing(null)
+    }
+  }
+
   async function handleDelete(id: string) {
     setDeleting(id)
     try {
@@ -139,10 +158,19 @@ export default function LineupsPage() {
                 <p className="text-sm text-muted-foreground">Smoke, flash and molotov lineups per map</p>
               </div>
             </div>
-            <Button variant="neon" size="sm" className="gap-1.5" onClick={() => setShowForm((v: boolean) => !v)}>
-              <Plus size={14} />
-              New Lineup
-            </Button>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/lineups/community"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg border border-border hover:border-border/80"
+              >
+                <Globe size={13} />
+                Community
+              </Link>
+              <Button variant="neon" size="sm" className="gap-1.5" onClick={() => setShowForm((v: boolean) => !v)}>
+                <Plus size={14} />
+                New Lineup
+              </Button>
+            </div>
           </div>
 
           {/* Filters */}
@@ -276,6 +304,19 @@ export default function LineupsPage() {
                       <p className="text-xs text-muted-foreground">{mapLabel} · {typeInfo.label}</p>
                     </div>
                     <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handlePublish(lineup.id, !lineup.is_public)}
+                        disabled={publishing === lineup.id}
+                        title={lineup.is_public ? 'Unpublish from Community' : 'Publish to Community'}
+                        className={cn(
+                          'p-1.5 rounded border transition-colors',
+                          lineup.is_public
+                            ? 'border-neon-green/40 text-neon-green bg-neon-green/5 hover:bg-neon-green/10'
+                            : 'border-border/50 text-muted-foreground hover:text-neon-green',
+                        )}
+                      >
+                        {publishing === lineup.id ? <Loader2 size={13} className="animate-spin" /> : <Globe size={13} />}
+                      </button>
                       <button
                         onClick={() => setOpenId((v: string | null) => v === lineup.id ? null : lineup.id)}
                         className="p-1.5 rounded border border-border/50 text-muted-foreground hover:text-foreground transition-colors"

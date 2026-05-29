@@ -11,6 +11,7 @@ import {
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import MapFolderList, { type MapGroup } from '@/components/teams/MapFolderList'
 import PerformanceTrends from '@/components/teams/PerformanceTrends'
+import FaceitEloCard from '@/components/teams/FaceitEloCard'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 
 // ── Stats computation (mirrors page.tsx server-side logic) ─────────────────────
@@ -203,9 +204,11 @@ const AI_QUICK_ACTIONS = [
 export default function MyTeamStatsAndDemos({
   initialDemos,
   primaryTeamId,
+  faceitNickname,
 }: {
   initialDemos: DemoRowData[]
   primaryTeamId: string | null
+  faceitNickname?: string | null
 }) {
   // Store only the user's manual overrides — resilient to router.refresh() changing initialDemos
   const [sideOverrides, setSideOverrides] = useState<Record<string, 'team1' | 'team2'>>({})
@@ -304,7 +307,11 @@ export default function MyTeamStatsAndDemos({
                   </div>
                   <div>
                     {topPlayers.map((p, i) => (
-                      <div key={p.name} className="grid grid-cols-[1fr_56px_48px_48px] gap-2 px-2 py-2.5 border-b border-border/30 last:border-0 items-center hover:bg-accent/40 rounded-lg transition-colors">
+                      <Link
+                        key={p.name}
+                        href={`/my-team/player/${encodeURIComponent(p.name)}`}
+                        className="grid grid-cols-[1fr_56px_48px_48px] gap-2 px-2 py-2.5 border-b border-border/30 last:border-0 items-center hover:bg-accent/40 rounded-lg transition-colors group"
+                      >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className={cn(
                             'text-[10px] w-5 h-5 rounded-md flex items-center justify-center shrink-0 font-bold font-mono',
@@ -313,8 +320,8 @@ export default function MyTeamStatsAndDemos({
                                       'text-muted-foreground/50'
                           )}>{i + 1}</span>
                           <div className="min-w-0">
-                            <p className="text-[13px] font-medium text-foreground truncate">{p.name}</p>
-                            <p className="text-[10px] text-muted-foreground/50">{p.games} {p.games === 1 ? 'game' : 'games'}</p>
+                            <p className="text-[13px] font-medium text-foreground group-hover:text-[#00ffc8] transition-colors truncate">{p.name}</p>
+                            <p className="text-[10px] text-muted-foreground/50">{p.games} {p.games === 1 ? 'game' : 'games'} · view stats →</p>
                           </div>
                         </div>
                         <p className={cn(
@@ -327,13 +334,18 @@ export default function MyTeamStatsAndDemos({
                         <p className="font-mono text-[12px] text-muted-foreground text-right">
                           {p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : '—'}
                         </p>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 </div>
               )}
             </div>
           </div>
+
+          {/* FACEIT ELO — only shown when FACEIT is connected and team exists */}
+          {faceitNickname && primaryTeamId && (
+            <FaceitEloCard faceitNickname={faceitNickname} teamId={primaryTeamId} />
+          )}
 
           {/* Map Pool */}
           <div className="rounded-xl border border-border bg-card p-5">
