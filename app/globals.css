@@ -5,10 +5,10 @@
 
   /* Background scale */
   --background:         240 50% 7%;    /* #09091a */
-  --card:               240 40% 12%;   /* #111027 — lifted from 9% for visible contrast */
+  --card:               240 36% 16%;   /* #181633 — solid, clearly above background */
   --card-foreground:    0 0% 100%;
 
-  --popover:            240 40% 12%;
+  --popover:            240 36% 16%;
   --popover-foreground: 0 0% 100%;
 
   /* Text */
@@ -19,11 +19,11 @@
   --primary-foreground: 0 0% 100%;
 
   /* Secondary */
-  --secondary:          240 40% 11%;
+  --secondary:          240 38% 13%;
   --secondary-foreground: 0 0% 100%;
 
   /* Muted */
-  --muted:              240 38% 13%;
+  --muted:              240 36% 19%;
   --muted-foreground:   0 0% 62%;
 
   /* Accent — Purple #9b1dff */
