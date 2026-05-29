@@ -304,7 +304,11 @@ export default function MyTeamStatsAndDemos({
                   </div>
                   <div>
                     {topPlayers.map((p, i) => (
-                      <div key={p.name} className="grid grid-cols-[1fr_56px_48px_48px] gap-2 px-2 py-2.5 border-b border-border/30 last:border-0 items-center hover:bg-accent/40 rounded-lg transition-colors">
+                      <Link
+                        key={p.name}
+                        href={`/my-team/player/${encodeURIComponent(p.name)}`}
+                        className="grid grid-cols-[1fr_56px_48px_48px] gap-2 px-2 py-2.5 border-b border-border/30 last:border-0 items-center hover:bg-accent/40 rounded-lg transition-colors group"
+                      >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className={cn(
                             'text-[10px] w-5 h-5 rounded-md flex items-center justify-center shrink-0 font-bold font-mono',
@@ -313,8 +317,8 @@ export default function MyTeamStatsAndDemos({
                                       'text-muted-foreground/50'
                           )}>{i + 1}</span>
                           <div className="min-w-0">
-                            <p className="text-[13px] font-medium text-foreground truncate">{p.name}</p>
-                            <p className="text-[10px] text-muted-foreground/50">{p.games} {p.games === 1 ? 'game' : 'games'}</p>
+                            <p className="text-[13px] font-medium text-foreground group-hover:text-[#00ffc8] transition-colors truncate">{p.name}</p>
+                            <p className="text-[10px] text-muted-foreground/50">{p.games} {p.games === 1 ? 'game' : 'games'} · view stats →</p>
                           </div>
                         </div>
                         <p className={cn(
@@ -327,7 +331,7 @@ export default function MyTeamStatsAndDemos({
                         <p className="font-mono text-[12px] text-muted-foreground text-right">
                           {p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : '—'}
                         </p>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 </div>

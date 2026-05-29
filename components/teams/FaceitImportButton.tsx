@@ -88,6 +88,13 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
     if (rows.some(r => r.importState === 'done')) router.refresh()
   }
 
+  async function importAll() {
+    const idle = rows.filter(r => r.importState === 'idle')
+    for (const row of idle) {
+      await importMatch(row.match_id)
+    }
+  }
+
   async function importMatch(matchId: string) {
     const row = rows.find(r => r.match_id === matchId)
     if (!row) return
@@ -132,9 +139,12 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
     }
   }
 
+  const idleCount = rows.filter(r => r.importState === 'idle').length
+  const importingAny = rows.some(r => r.importState === 'importing')
+
   if (!open) {
     return (
-      <Button variant="outline" onClick={handleOpen} className="gap-2">
+      <Button variant="outline" onClick={handleOpen} className="gap-2 relative">
         <Download size={16} />
         Import from FACEIT
       </Button>
@@ -275,15 +285,31 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-border px-5 py-3 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
+        <div className="shrink-0 border-t border-border px-5 py-3 flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground shrink-0">
             {rows.length > 0 && !loading
               ? `${rows.length} match${rows.length !== 1 ? 'es' : ''} found`
               : ' '}
           </p>
-          <Button variant="outline" size="sm" onClick={handleClose}>
-            {rows.some(r => r.importState === 'done') ? 'Done' : 'Close'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {idleCount > 1 && !loading && (
+              <Button
+                variant="neon"
+                size="sm"
+                disabled={importingAny}
+                onClick={importAll}
+                className="gap-1.5"
+              >
+                {importingAny
+                  ? <><Loader2 size={11} className="animate-spin" /> Importing…</>
+                  : <><Download size={11} /> Import All ({idleCount})</>
+                }
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleClose}>
+              {rows.some(r => r.importState === 'done') ? 'Done' : 'Close'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
