@@ -196,6 +196,7 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .accent-line-red    { height: 2px; background: linear-gradient(90deg, rgba(255,64,64,0.8), rgba(255,64,64,0.15) 60%, transparent); }
 .accent-line-green  { height: 2px; background: linear-gradient(90deg, rgba(0,200,100,0.8), rgba(0,200,100,0.15) 60%, transparent); }
 .accent-line-blue   { height: 2px; background: linear-gradient(90deg, rgba(59,130,246,0.8), rgba(59,130,246,0.15) 60%, transparent); }
+.accent-line-amber  { height: 2px; background: linear-gradient(90deg, rgba(251,146,60,0.8), rgba(251,146,60,0.15) 60%, transparent); }
 
 /* ── Glassmorphism ───────────────────────────────────────────────────────────── */
 .glass-card {

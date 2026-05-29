@@ -18,6 +18,7 @@ import DemoInlineChat from '@/components/demos/DemoInlineChat'
 import StrategyBoard from '@/components/demos/StrategyBoard'
 import VoiceCommsPlayer from '@/components/demos/VoiceCommsPlayer'
 import RoutinesPanel from '@/components/demos/RoutinesPanel'
+import AiMatchReport from '@/components/demos/AiMatchReport'
 import { MAP_THUMBS } from '@/lib/map-config'
 
 const Replay3DCanvas = dynamic(
@@ -34,7 +35,7 @@ import Link from 'next/link'
 import type { Demo, ParsedDemoData, PlayerStats, Round } from '@/types/database'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
-type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy' | 'replay' | '3d' | 'strategy'
+type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy' | 'replay' | '3d' | 'strategy' | 'ai'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'overview',  label: 'Overview',       icon: <BarChart3 size={14} /> },
@@ -45,6 +46,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'replay',    label: '2D Replay',      icon: <Play size={14} /> },
   { id: '3d',        label: '3D Replay',      icon: <Box size={14} /> },
   { id: 'strategy',  label: 'Strategy Board', icon: <Target size={14} /> },
+  { id: 'ai',        label: 'AI Report',      icon: <Brain size={14} /> },
 ]
 
 function StatCard({ label, value, sub, color = 'text-foreground' }: {
@@ -744,6 +746,10 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
 
             {activeTab === 'strategy' && parsed && (
               <StrategyBoard mapName={parsed.header.map} />
+            )}
+
+            {activeTab === 'ai' && (
+              <AiMatchReport demoId={demo.id} />
             )}
           </div>
         </>

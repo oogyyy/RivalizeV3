@@ -8,6 +8,7 @@ import { ArrowLeft } from 'lucide-react'
 import type { AggregatedStats, PlayerStats, Round, Kill, GrenadeEvent } from '@/types/database'
 import PrepPrintButton from './PrepPrintButton'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
+import AiBriefSection from '@/components/prep/AiBriefSection'
 
 const MAP_LABELS: Record<string, string> = {
   de_dust2: 'Dust2', de_mirage: 'Mirage', de_inferno: 'Inferno', de_nuke: 'Nuke',
@@ -176,6 +177,13 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
               </div>
             </div>
           </div>
+
+          {/* AI Intelligence Brief */}
+          <AiBriefSection
+            folderId={folderId}
+            cachedBrief={(folder.ai_brief as string | null) ?? null}
+            updatedAt={(folder.ai_brief_updated_at as string | null) ?? null}
+          />
 
           {/* Overview stats */}
           <section className="prep-section rounded-xl border border-border bg-card p-5">

@@ -6,6 +6,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Shield } from 'lucide-react'
 import PlayerDeepDive from '@/components/demos/PlayerDeepDive'
+import PlayerWeaknessPanel from '@/components/demos/PlayerWeaknessPanel'
 import type { ParsedDemoData, PlayerStats, Kill } from '@/types/database'
 
 export default async function MyTeamPlayerPage({
@@ -117,7 +118,8 @@ export default async function MyTeamPlayerPage({
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
+      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-6">
+        <PlayerWeaknessPanel demoEntries={demoEntries as Parameters<typeof PlayerWeaknessPanel>[0]['demoEntries']} />
         <PlayerDeepDive
           playerName={decodedName}
           folderId=""
