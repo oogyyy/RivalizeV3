@@ -77,7 +77,7 @@ function buildReportContext(pd: ParsedData, demoType: string): string {
   const rounds: Round[] = pd.rounds ?? []
   if (rounds.length > 0) {
     const ecoRounds = rounds.filter((r) => (r.team1_economy ?? 0) < 2000 || (r.team2_economy ?? 0) < 2000).length
-if (ecoRounds > 0) lines.push(`\nEco/force rounds: ${ecoRounds}/${rounds.length}`)
+    if (ecoRounds > 0) lines.push(`\nEco/force rounds: ${ecoRounds}/${rounds.length}`)
   }
 
   return lines.join('\n')
