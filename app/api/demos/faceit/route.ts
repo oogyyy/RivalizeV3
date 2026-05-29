@@ -6,9 +6,11 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
   isFaceitConfigured,
+  isDownloadsConfigured,
   getPlayerByNickname,
   getPlayerMatchHistory,
   getMatchDetail,
+  getSignedDemoUrl,
 } from '@/lib/faceit'
 import { uploadStream, getPublicUrl } from '@/lib/r2'
 import { slugify } from '@/lib/utils'
@@ -118,42 +120,46 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No demo URL available for this match yet' }, { status: 404 })
     }
 
-    const demoUrl = demoUrls[0]
+    const resourceUrl = demoUrls[0]
     const map = match.voting?.map?.pick?.[0] ?? 'unknown'
 
-    // Validate URL before attempting download
-    let parsedUrl: URL
-    try {
-      parsedUrl = new URL(demoUrl)
-    } catch {
+    if (!isDownloadsConfigured()) {
       return NextResponse.json(
-        { error: `Invalid demo URL returned by FACEIT: ${demoUrl}` },
+        { error: 'FACEIT demo downloads require a Downloads API token. Add FACEIT_DOWNLOADS_TOKEN to your environment variables (apply at https://fce.gg/downloads-api-application).' },
+        { status: 503 }
+      )
+    }
+
+    // Exchange resource URL for a signed download URL via the Downloads API
+    let signedUrl: string
+    try {
+      signedUrl = await getSignedDemoUrl(resourceUrl)
+    } catch (err) {
+      return NextResponse.json(
+        { error: `Failed to get signed demo URL: ${err instanceof Error ? err.message : String(err)}` },
         { status: 502 }
       )
     }
 
-    // Stream demo from FaceIt → R2
+    // Stream demo from signed URL → R2
     let demoRes: Response
     try {
-      demoRes = await fetch(parsedUrl.toString(), {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible)' },
+      demoRes = await fetch(signedUrl, {
         redirect: 'follow',
         signal: AbortSignal.timeout(55000),
       })
     } catch (err) {
-      // Unwrap Node.js fetch error cause chain for a meaningful message
       const top = err instanceof Error ? err.message : String(err)
       const inner = (err as { cause?: unknown })?.cause
       const cause = inner instanceof Error ? inner.message : inner ? String(inner) : null
-      const detail = cause ? `${top} → ${cause}` : top
       return NextResponse.json(
-        { error: `Demo download failed: ${detail}`, debug_url: demoUrl },
+        { error: `Demo download failed: ${cause ? `${top} → ${cause}` : top}` },
         { status: 502 }
       )
     }
     if (!demoRes.ok || !demoRes.body) {
       return NextResponse.json(
-        { error: `Demo download failed (HTTP ${demoRes.status})`, debug_url: demoUrl },
+        { error: `Demo download failed (HTTP ${demoRes.status})` },
         { status: 502 }
       )
     }
