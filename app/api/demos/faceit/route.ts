@@ -78,11 +78,15 @@ export async function POST(request: Request) {
           competition_name: m.competition_name,
           started_at: m.started_at,
           teams: {
-            faction1: m.teams.faction1.name,
-            faction2: m.teams.faction2.name,
+            faction1: m.teams.faction1.name
+              || m.teams.faction1.roster?.[0]?.nickname
+              || 'Team 1',
+            faction2: m.teams.faction2.name
+              || m.teams.faction2.roster?.[0]?.nickname
+              || 'Team 2',
           },
-          score: m.results?.score,
-          winner: m.results?.winner,
+          score: m.results?.score ?? null,
+          winner: m.results?.winner ?? null,
           match_url: m.match_url,
         })),
       })

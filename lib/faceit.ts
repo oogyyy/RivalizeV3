@@ -44,10 +44,10 @@ export interface FaceitMatchItem {
   game_id: string
   competition_type: string
   competition_name: string
-  results: { winner: string; score: { faction1: number; faction2: number } }
+  results: { winner: string; score: { faction1: number; faction2: number } } | null
   teams: {
-    faction1: { name: string; roster: Array<{ nickname: string; player_id: string }> }
-    faction2: { name: string; roster: Array<{ nickname: string; player_id: string }> }
+    faction1: { name: string | null; roster?: Array<{ nickname: string; player_id: string }> }
+    faction2: { name: string | null; roster?: Array<{ nickname: string; player_id: string }> }
   }
   started_at: number
   finished_at: number
