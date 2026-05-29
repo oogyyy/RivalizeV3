@@ -6,8 +6,9 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Target, Shield, Brain,
-  User, Settings, LogOut, ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film,
+  User, Settings, LogOut, ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Users,
 } from 'lucide-react'
+import { useEffect } from 'react'
 import type { Profile } from '@/types/database'
 
 const NAV_GROUPS = [
@@ -20,7 +21,7 @@ const NAV_GROUPS = [
   {
     label: 'Scout',
     items: [
-      { href: '/opponents',       label: 'Opponents', Icon: Target },
+      { href: '/opponents',           label: 'Opponents', Icon: Target },
       { href: '/opponents/pro-demos', label: 'Pro Demos', Icon: Film },
     ]
   },
@@ -35,6 +36,12 @@ const NAV_GROUPS = [
     ]
   },
   {
+    label: 'Social',
+    items: [
+      { href: '/friends', label: 'Friends', Icon: Users },
+    ]
+  },
+  {
     label: 'Account',
     items: [
       { href: '/profile',  label: 'Profile',  Icon: User },
@@ -46,9 +53,10 @@ const NAV_GROUPS = [
 interface SidebarNavProps {
   onLinkClick?: () => void
   collapsed?: boolean
+  badges?: Record<string, number>
 }
 
-export function SidebarNav({ onLinkClick, collapsed }: SidebarNavProps) {
+export function SidebarNav({ onLinkClick, collapsed, badges = {} }: SidebarNavProps) {
   const pathname = usePathname()
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: collapsed ? 2 : 4 }}>
@@ -61,6 +69,7 @@ export function SidebarNav({ onLinkClick, collapsed }: SidebarNavProps) {
           )}
           {group.items.map(({ href, label, Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + '/')
+            const badge = badges[href] ?? 0
             return (
               <div key={href} className="relative group">
                 <Link
@@ -97,15 +106,35 @@ export function SidebarNav({ onLinkClick, collapsed }: SidebarNavProps) {
                     }
                   }}
                 >
-                  <span style={{ flexShrink: 0 }}><Icon size={17}/></span>
+                  <span style={{ flexShrink: 0, position: 'relative' }}>
+                    <Icon size={17}/>
+                    {badge > 0 && collapsed && (
+                      <span style={{
+                        position: 'absolute', top: -4, right: -4,
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: '#00ffc8', border: '1.5px solid #060512',
+                      }} />
+                    )}
+                  </span>
                   {!collapsed && label}
+                  {!collapsed && badge > 0 && (
+                    <span style={{
+                      marginLeft: 'auto', minWidth: 18, height: 18,
+                      borderRadius: 9, background: '#00ffc8',
+                      color: '#060512', fontSize: 10, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 5px',
+                    }}>
+                      {badge}
+                    </span>
+                  )}
                 </Link>
                 {collapsed && (
                   <div
                     role="tooltip"
                     className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 rounded-md bg-popover border border-border text-xs font-medium text-foreground whitespace-nowrap z-50 shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-100"
                   >
-                    {label}
+                    {label}{badge > 0 ? ` (${badge})` : ''}
                   </div>
                 )}
               </div>
@@ -126,7 +155,15 @@ export default function Sidebar({ profile }: SidebarProps) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
   const W = collapsed ? 62 : 200
+
+  useEffect(() => {
+    fetch('/api/friends/pending-count')
+      .then(r => r.ok ? r.json() : { count: 0 })
+      .then((d: { count: number }) => setPendingCount(d.count))
+      .catch(() => {})
+  }, [])
 
   const handleLogout = async () => {
     setLoggingOut(true)
@@ -194,7 +231,7 @@ export default function Sidebar({ profile }: SidebarProps) {
 
       {/* Navigation */}
       <nav style={{ flex: 1, padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <SidebarNav collapsed={collapsed}/>
+        <SidebarNav collapsed={collapsed} badges={{ '/friends': pendingCount }}/>
       </nav>
 
       {/* User section */}

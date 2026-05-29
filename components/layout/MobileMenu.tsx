@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Menu, X, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -14,7 +14,15 @@ interface MobileMenuProps {
 export default function MobileMenu({ profile }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
   const router = useRouter()
+
+  useEffect(() => {
+    fetch('/api/friends/pending-count')
+      .then(r => r.ok ? r.json() : { count: 0 })
+      .then((d: { count: number }) => setPendingCount(d.count))
+      .catch(() => {})
+  }, [])
 
   const handleLogout = async () => {
     setLoggingOut(true)
@@ -100,7 +108,7 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
 
             {/* Navigation */}
             <nav style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-              <SidebarNav onLinkClick={() => setIsOpen(false)}/>
+              <SidebarNav onLinkClick={() => setIsOpen(false)} badges={{ '/friends': pendingCount }}/>
             </nav>
 
             {/* User section */}
