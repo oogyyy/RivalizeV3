@@ -609,7 +609,7 @@ export default function ProfilePage() {
                 variant="outline"
                 size="sm"
                 className="shrink-0 gap-1.5 text-xs text-orange-400 border-orange-400/30 hover:border-orange-400/60 hover:text-orange-300"
-                onClick={() => window.open('/api/auth/faceit', 'faceit-oauth', 'width=600,height=700,scrollbars=yes')}
+                onClick={() => { window.location.href = '/api/auth/faceit' }}
               >
                 <ExternalLink size={11} />
                 Link FACEIT
