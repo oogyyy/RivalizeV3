@@ -38,8 +38,9 @@ function detectFaction(match: FaceitMatch, nickname: string): 'faction1' | 'fact
 }
 
 function formatMatchDate(ts: number): string {
-  return new Date(ts * 1000).toLocaleDateString(undefined, {
+  return new Date(ts * 1000).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
+    timeZone: 'UTC',
   })
 }
 
@@ -93,7 +94,8 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
 
     const playerFaction = detectFaction(row, faceitNickname)
     const opponentFaction = playerFaction === 'faction1' ? 'faction2' : 'faction1'
-    const opponentName = row.teams[opponentFaction].name || 'Unknown'
+    const opponentTeam = row.teams[opponentFaction]
+    const opponentName = opponentTeam.name || opponentTeam.roster.slice(0, 2).join(', ') || 'Unknown'
 
     setRows(prev => prev.map(r =>
       r.match_id === matchId ? { ...r, importState: 'importing', importError: undefined } : r
@@ -187,8 +189,12 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
               {rows.map(row => {
                 const playerFaction = detectFaction(row, faceitNickname)
                 const opponentFaction = playerFaction === 'faction1' ? 'faction2' : 'faction1'
-                const opponentName = row.teams[opponentFaction].name || 'Unknown'
-                const myTeamName = row.teams[playerFaction].name || faceitNickname
+                const opponentTeam = row.teams[opponentFaction]
+                const opponentName = opponentTeam.name
+                  || opponentTeam.roster.slice(0, 2).join(', ')
+                  || 'Unknown'
+                const myTeam = row.teams[playerFaction]
+                const myTeamName = myTeam.name || myTeam.roster.find(n => n === faceitNickname) || faceitNickname
                 const score = row.score
                 const won = row.winner === playerFaction
 
