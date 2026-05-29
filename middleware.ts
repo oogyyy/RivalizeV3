@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 const ALLOWED_ORIGINS = [
   process.env.NEXT_PUBLIC_APP_URL,
   'http://localhost:3000',
+  'https://accounts.faceit.com',
 ].filter(Boolean) as string[]
 
 function withCors(response: NextResponse, origin: string | null): NextResponse {
