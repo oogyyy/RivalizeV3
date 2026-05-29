@@ -48,5 +48,5 @@ export async function GET(req: NextRequest) {
     code_challenge_method: 'S256',
   })
 
-  return NextResponse.redirect(`https://accounts.faceit.com/accounts?${params.toString()}`)
+  return NextResponse.redirect(`https://api.faceit.com/auth/v1/oauth/authorize?${params.toString()}`)
 }
