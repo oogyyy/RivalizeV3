@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useDropzone } from 'react-dropzone'
 import { useSearchParams } from 'next/navigation'
@@ -149,6 +149,9 @@ export default function ProfilePage() {
   const [stats, setStats] = useState({ demos: 0, teams: 0 })
   const [linkBanner, setLinkBanner] = useState<string | null>(null)
   const [unlinking, setUnlinking] = useState<'steam' | 'faceit' | null>(null)
+  const [faceitLinking, setFaceitLinking] = useState(false)
+  const faceitPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const faceitPopupRef = useRef<Window | null>(null)
 
   // Form state
   const [displayName, setDisplayName] = useState('')
@@ -159,6 +162,10 @@ export default function ProfilePage() {
   const [steamId, setSteamId] = useState('')
   const [discordId, setDiscordId] = useState('')
   const [faceitId, setFaceitId] = useState('')
+
+  useEffect(() => {
+    return () => { if (faceitPollRef.current) clearInterval(faceitPollRef.current) }
+  }, [])
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -232,6 +239,33 @@ export default function ProfilePage() {
       setLinkBanner(msg)
     }
   }, [searchParams])
+
+  const handleLinkFaceit = () => {
+    const popup = window.open('/api/auth/faceit', 'faceit-oauth', 'width=600,height=700,scrollbars=yes')
+    if (!popup) return
+    faceitPopupRef.current = popup
+    setFaceitLinking(true)
+
+    const supabase = createClient()
+    faceitPollRef.current = setInterval(async () => {
+      // Stop if popup was closed by user without completing
+      if (popup.closed && faceitLinking) {
+        clearInterval(faceitPollRef.current!)
+        setFaceitLinking(false)
+        return
+      }
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('faceit_id').eq('id', user.id).single()
+      if (data?.faceit_id) {
+        clearInterval(faceitPollRef.current!)
+        setFaceitLinking(false)
+        setFaceitId(data.faceit_id)
+        setLinkBanner(`FACEIT account linked as ${data.faceit_id}!`)
+        try { popup.close() } catch {}
+      }
+    }, 2000)
+  }
 
   const handleUnlink = async (provider: 'steam' | 'faceit') => {
     setUnlinking(provider)
@@ -609,10 +643,11 @@ export default function ProfilePage() {
                 variant="outline"
                 size="sm"
                 className="shrink-0 gap-1.5 text-xs text-orange-400 border-orange-400/30 hover:border-orange-400/60 hover:text-orange-300"
-                onClick={() => { window.location.href = '/api/auth/faceit' }}
+                onClick={handleLinkFaceit}
+                disabled={faceitLinking}
               >
-                <ExternalLink size={11} />
-                Link FACEIT
+                {faceitLinking ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+                {faceitLinking ? 'Linking…' : 'Link FACEIT'}
               </Button>
             )}
           </div>
