@@ -492,25 +492,6 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
   const [sharing, setSharing] = useState(false)
   const [replayTime, setReplayTime] = useState(0)
   const [replayPlaying, setReplayPlaying] = useState(false)
-  const [shareCopied, setShareCopied] = useState(false)
-  const [sharing, setSharing] = useState(false)
-
-  const handleShare = useCallback(async () => {
-    if (sharing) return
-    setSharing(true)
-    try {
-      const res = await fetch(`/api/demos/${demo.id}/share`, { method: 'POST' })
-      if (res.ok) {
-        const { shareId } = await res.json() as { shareId: string }
-        const url = `${window.location.origin}/share/${shareId}`
-        await navigator.clipboard.writeText(url)
-        setShareCopied(true)
-        setTimeout(() => setShareCopied(false), 3000)
-      }
-    } finally {
-      setSharing(false)
-    }
-  }, [demo.id, sharing])
 
   const handleShare = useCallback(async () => {
     if (sharing) return
