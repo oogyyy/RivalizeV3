@@ -75,9 +75,13 @@ export async function GET(req: NextRequest) {
   }
 
   // Store the FACEIT nickname in faceit_id (matches what the manual input stores)
-  await supabase.from('profiles').update({
+  const { error: updateError } = await supabase.from('profiles').update({
     faceit_id: faceitUser.nickname,
   }).eq('id', user.id)
+
+  if (updateError) {
+    return NextResponse.redirect(`${appUrl}/profile?error=faceit_save`)
+  }
 
   const res = NextResponse.redirect(`${appUrl}/profile?linked=faceit&nickname=${encodeURIComponent(faceitUser.nickname)}`)
   // Clear PKCE cookies

@@ -3,14 +3,16 @@ import { createClient } from '@/lib/supabase/server'
 import { createHash, randomBytes } from 'crypto'
 
 // Initiates FACEIT OAuth2 PKCE flow.
-// Requires FACEIT_CLIENT_ID in env vars (from https://developers.faceit.com).
+// Requires FACEIT_CLIENT_ID + FACEIT_CLIENT_SECRET in env vars.
 export async function GET(req: NextRequest) {
-  const clientId = process.env.FACEIT_CLIENT_ID
-  if (!clientId) {
-    return NextResponse.json({ error: 'FACEIT_CLIENT_ID not configured' }, { status: 500 })
+  const clientId     = process.env.FACEIT_CLIENT_ID
+  const clientSecret = process.env.FACEIT_CLIENT_SECRET
+  if (!clientId || !clientSecret) {
+    const appUrl = (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+    return NextResponse.redirect(`${appUrl}/profile?error=faceit_config`)
   }
 
-  const appUrl     = (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+  const appUrl      = (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
   const redirectUri = `${appUrl}/api/auth/faceit/callback`
 
   // PKCE: generate code verifier + challenge
@@ -18,21 +20,32 @@ export async function GET(req: NextRequest) {
   const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url')
   const state         = randomBytes(16).toString('hex')
 
-  // Store verifier + state in a short-lived cookie
   const params = new URLSearchParams({
-    response_type:          'code',
-    client_id:              clientId,
-    redirect_uri:           redirectUri,
-    scope:                  'openid profile email',
+    response_type:         'code',
+    client_id:             clientId,
+    redirect_uri:          redirectUri,
+    scope:                 'openid profile email',
     state,
-    code_challenge:         codeChallenge,
-    code_challenge_method:  'S256',
+    code_challenge:        codeChallenge,
+    code_challenge_method: 'S256',
   })
 
-  const res = NextResponse.redirect(
-    `https://accounts.faceit.com/sso?${params.toString()}`
-  )
-  res.cookies.set('faceit_pkce_verifier', codeVerifier, { httpOnly: true, maxAge: 600, path: '/' })
-  res.cookies.set('faceit_pkce_state',    state,         { httpOnly: true, maxAge: 600, path: '/' })
+  const isProd = appUrl.startsWith('https')
+
+  const res = NextResponse.redirect(`https://accounts.faceit.com/sso?${params.toString()}`)
+  res.cookies.set('faceit_pkce_verifier', codeVerifier, {
+    httpOnly: true,
+    maxAge: 600,
+    path: '/',
+    secure: isProd,
+    sameSite: 'lax',
+  })
+  res.cookies.set('faceit_pkce_state', state, {
+    httpOnly: true,
+    maxAge: 600,
+    path: '/',
+    secure: isProd,
+    sameSite: 'lax',
+  })
   return res
 }
