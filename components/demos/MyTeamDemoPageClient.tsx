@@ -13,6 +13,7 @@ import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
 import ReplayCanvas from '@/components/demos/ReplayCanvas'
 import dynamic from 'next/dynamic'
 import DemoInlineChat from '@/components/demos/DemoInlineChat'
+import AiMatchReport from '@/components/demos/AiMatchReport'
 
 const Replay3DCanvas = dynamic(
   () => import('@/components/demos/Replay3DCanvas'),
@@ -32,7 +33,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts'
 
-type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy' | 'replay' | '3d'
+type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy' | 'replay' | '3d' | 'ai'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'overview',  label: 'Overview',       icon: <BarChart3 size={14} /> },
@@ -42,6 +43,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'economy',   label: 'Economy',        icon: <TrendingUp size={14} /> },
   { id: 'replay',    label: '2D Replay',      icon: <Play size={14} /> },
   { id: '3d',        label: '3D Replay',      icon: <Box size={14} /> },
+  { id: 'ai',        label: 'AI Report',      icon: <Brain size={14} /> },
 ]
 
 const AI_ACTIONS = [
@@ -776,6 +778,10 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                       />
                     </div>
                   </div>
+                )}
+
+                {activeTab === 'ai' && (
+                  <AiMatchReport demoId={demo.id} />
                 )}
               </div>
             </div>
