@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { Play, Pause, RotateCcw, Tag } from 'lucide-react'
+import { Play, Pause, RotateCcw, Tag, Video, StopCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useVideoCapture } from '@/hooks/useVideoCapture'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
 import type { Round, PlayerStats, PositionFrame } from '@/types/database'
 
@@ -27,6 +28,7 @@ interface Props {
   team1Name: string
   team2Name: string
   mapName: string
+  onPlaybackChange?: (time: number, playing: boolean) => void
 }
 
 // ── Frame interpolation ───────────────────────────────────────────────────────
@@ -115,10 +117,11 @@ function getKillPositions(
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ReplayCanvas({ rounds, players, team1Name, team2Name, mapName }: Props) {
+export default function ReplayCanvas({ rounds, players, team1Name, team2Name, mapName, onPlaybackChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef    = useRef<number>(0)
   const lastTsRef = useRef<number>(0)
+  const { recordState, toggle: toggleRecord } = useVideoCapture(canvasRef)
 
   const [roundIdx,     setRoundIdx]     = useState(0)
   const [isPlaying,    setIsPlaying]    = useState(false)
@@ -387,6 +390,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
 
   useEffect(() => { draw(time) }, [time, draw])
   useEffect(() => { setTime(0); setIsPlaying(false) }, [roundIdx]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onPlaybackChange?.(time, isPlaying) }, [time, isPlaying, onPlaybackChange])
 
   const toggle  = () => { if (time >= maxTime) setTime(0); setIsPlaying(p => !p) }
   const restart = () => { setTime(0); setIsPlaying(false) }
@@ -548,6 +552,23 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         <span className="text-xs font-mono text-muted-foreground ml-auto">
           {time.toFixed(1)}s / {maxTime.toFixed(1)}s · {pastKills.length}/{kills.length} kills
         </span>
+
+        <button
+          onClick={toggleRecord}
+          disabled={recordState === 'processing'}
+          className={cn(
+            'flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs transition-colors',
+            recordState === 'recording'
+              ? 'border-red-400/40 bg-red-400/10 text-red-400 hover:bg-red-400/20'
+              : 'border-border/50 text-muted-foreground hover:text-foreground',
+          )}
+          title={recordState === 'recording' ? 'Stop & save clip' : 'Record clip'}
+        >
+          {recordState === 'recording'
+            ? <><StopCircle size={12} /> Stop</>
+            : <><Video size={12} /> Clip</>
+          }
+        </button>
       </div>
 
       {/* Legend */}

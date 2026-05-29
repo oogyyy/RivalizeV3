@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import MapFolderList, { type MapGroup } from '@/components/teams/MapFolderList'
+import PerformanceTrends from '@/components/teams/PerformanceTrends'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 
 // ── Stats computation (mirrors page.tsx server-side logic) ─────────────────────
@@ -265,6 +266,13 @@ export default function MyTeamStatsAndDemos({
           accent="stat-card-purple"
         />
       </div>
+
+      {/* ── Performance Trends ── */}
+      {effectiveDemos.filter(d => d.status === 'completed').length >= 2 && (
+        <div className="animate-fade-in-up animate-fade-in-up-delay-2">
+          <PerformanceTrends demos={effectiveDemos} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fade-in-up animate-fade-in-up-delay-2">
 

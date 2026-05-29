@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Swords, TrendingUp, TrendingDown, Minus, Brain, Loader2, AlertCircle, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import VetoSimulator from '@/components/veto/VetoSimulator'
 
 interface MapStat { wins: number; losses: number; winRate: number }
 
@@ -127,7 +128,7 @@ export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, ha
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-6">
+      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-8">
         {!hasData && (
           <div className="flex items-center gap-3 p-4 rounded-lg bg-yellow-400/10 border border-yellow-400/20 text-sm text-yellow-300">
             <AlertCircle size={16} className="shrink-0" />
@@ -201,6 +202,20 @@ export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, ha
           <span className="flex items-center gap-1.5"><TrendingUp size={12} className="text-neon-green" />Strong map (≥55% WR)</span>
           <span className="flex items-center gap-1.5"><Minus size={12} className="text-yellow-400" />Even (45–55% WR)</span>
           <span className="flex items-center gap-1.5"><TrendingDown size={12} className="text-red-400" />Weak map (&lt;45% WR)</span>
+        </div>
+
+        {/* Interactive Veto Simulator */}
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Swords size={16} className="text-neon-green" />
+            <h2 className="text-base font-semibold text-foreground">Veto Simulator</h2>
+            <span className="text-xs text-muted-foreground">— play out the veto step by step</span>
+          </div>
+          <VetoSimulator
+            selfMapStats={selfMapStats}
+            opponents={opponents}
+            activeDutyMaps={activeDutyMaps}
+          />
         </div>
 
         {/* AI recommendation */}

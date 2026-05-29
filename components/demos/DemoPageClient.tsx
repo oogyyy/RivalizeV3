@@ -12,8 +12,12 @@ import PlayerStatsTable from '@/components/demos/PlayerStatsTable'
 import { ReparseProgress } from '@/components/demos/ReparseProgress'
 import RoundTimeline from '@/components/demos/RoundTimeline'
 import HeatmapCanvas from '@/components/demos/HeatmapCanvas'
+import TimingHeatmap from '@/components/demos/TimingHeatmap'
 import ReplayCanvas from '@/components/demos/ReplayCanvas'
 import DemoInlineChat from '@/components/demos/DemoInlineChat'
+import StrategyBoard from '@/components/demos/StrategyBoard'
+import VoiceCommsPlayer from '@/components/demos/VoiceCommsPlayer'
+import RoutinesPanel from '@/components/demos/RoutinesPanel'
 import { MAP_THUMBS } from '@/lib/map-config'
 
 const Replay3DCanvas = dynamic(
@@ -30,16 +34,17 @@ import Link from 'next/link'
 import type { Demo, ParsedDemoData, PlayerStats, Round } from '@/types/database'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
-type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy' | 'replay' | '3d'
+type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy' | 'replay' | '3d' | 'strategy'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview', label: 'Overview',       icon: <BarChart3 size={14} /> },
-  { id: 'players',  label: 'Player Stats',   icon: <Crosshair size={14} /> },
-  { id: 'rounds',   label: 'Round Timeline', icon: <Clock size={14} /> },
-  { id: 'heatmap',  label: 'Heatmap',        icon: <Map size={14} /> },
-  { id: 'economy',  label: 'Economy',        icon: <TrendingUp size={14} /> },
-  { id: 'replay',   label: '2D Replay',      icon: <Play size={14} /> },
-  { id: '3d',       label: '3D Replay',      icon: <Box size={14} /> },
+  { id: 'overview',  label: 'Overview',       icon: <BarChart3 size={14} /> },
+  { id: 'players',   label: 'Player Stats',   icon: <Crosshair size={14} /> },
+  { id: 'rounds',    label: 'Round Timeline', icon: <Clock size={14} /> },
+  { id: 'heatmap',   label: 'Heatmap',        icon: <Map size={14} /> },
+  { id: 'economy',   label: 'Economy',        icon: <TrendingUp size={14} /> },
+  { id: 'replay',    label: '2D Replay',      icon: <Play size={14} /> },
+  { id: '3d',        label: '3D Replay',      icon: <Box size={14} /> },
+  { id: 'strategy',  label: 'Strategy Board', icon: <Target size={14} /> },
 ]
 
 function StatCard({ label, value, sub, color = 'text-foreground' }: {
@@ -406,6 +411,69 @@ function EconomyTab({ parsed }: { parsed: ParsedDemoData }) {
   )
 }
 
+function HeatmapTabPanel({ parsed }: { parsed: ParsedDemoData }) {
+  const [heatSubTab, setHeatSubTab] = useState<'position' | 'timing'>('position')
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Map size={16} className="text-neon-green" />
+            {heatSubTab === 'position' ? 'Position Heatmap' : 'Timing Heatmap'}
+          </CardTitle>
+          <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
+            <button
+              onClick={() => setHeatSubTab('position')}
+              className={cn(
+                'px-3 py-1.5 font-medium transition-colors',
+                heatSubTab === 'position' ? 'bg-neon-green/20 text-neon-green' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Position
+            </button>
+            <button
+              onClick={() => setHeatSubTab('timing')}
+              className={cn(
+                'px-3 py-1.5 font-medium transition-colors',
+                heatSubTab === 'timing' ? 'bg-neon-green/20 text-neon-green' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Timing
+            </button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {heatSubTab === 'position' ? (
+          parsed.heatmap_data && parsed.heatmap_data.length > 0 ? (
+            <div className="flex justify-center">
+              <HeatmapCanvas
+                points={parsed.heatmap_data}
+                mapName={parsed.header.map}
+                team1Name={parsed.header.team1}
+                team2Name={parsed.header.team2}
+                width={512}
+                height={512}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+              <Map size={32} className="text-muted-foreground" />
+              <p className="text-muted-foreground">No heatmap data available for this demo</p>
+            </div>
+          )
+        ) : (
+          <TimingHeatmap
+            rounds={parsed.rounds ?? []}
+            team1Name={parsed.header.team1}
+            team2Name={parsed.header.team2}
+          />
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 interface Props {
   demo: Demo
   folderId: string | null
@@ -418,6 +486,8 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [debugOpen, setDebugOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [replayTime, setReplayTime] = useState(0)
+  const [replayPlaying, setReplayPlaying] = useState(false)
 
   const fetchDemo = useCallback(async () => {
     const supabase = createClient()
@@ -613,55 +683,43 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
             )}
 
             {activeTab === 'heatmap' && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Map size={16} className="text-neon-green" />
-                    Position Heatmap
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {parsed.heatmap_data && parsed.heatmap_data.length > 0 ? (
-                    <div className="flex justify-center">
-                      <HeatmapCanvas
-                        points={parsed.heatmap_data}
-                        mapName={parsed.header.map}
-                        team1Name={parsed.header.team1}
-                        team2Name={parsed.header.team2}
-                        width={512}
-                        height={512}
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-                      <Map size={32} className="text-muted-foreground" />
-                      <p className="text-muted-foreground">No heatmap data available for this demo</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <HeatmapTabPanel parsed={parsed} />
             )}
 
             {activeTab === 'economy' && <EconomyTab parsed={parsed} />}
 
             {activeTab === 'replay' && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Play size={16} className="text-neon-green" />
-                    2D Kill Replay
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ReplayCanvas
-                    rounds={parsed.rounds ?? []}
-                    players={parsed.players ?? []}
-                    team1Name={parsed.header.team1}
-                    team2Name={parsed.header.team2}
-                    mapName={parsed.header.map}
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Play size={16} className="text-neon-green" />
+                      2D Kill Replay
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ReplayCanvas
+                      rounds={parsed.rounds ?? []}
+                      players={parsed.players ?? []}
+                      team1Name={parsed.header.team1}
+                      team2Name={parsed.header.team2}
+                      mapName={parsed.header.map}
+                      onPlaybackChange={(t, playing) => { setReplayTime(t); setReplayPlaying(playing) }}
+                    />
+                  </CardContent>
+                </Card>
+                <VoiceCommsPlayer
+                  demoId={demo.id}
+                  roundTime={replayTime}
+                  isPlaying={replayPlaying}
+                />
+                {folderId && (
+                  <RoutinesPanel
+                    folderId={folderId}
+                    opponentName={demo.opponent_name}
                   />
-                </CardContent>
-              </Card>
+                )}
+              </div>
             )}
 
             {activeTab === '3d' && parsed && (
@@ -682,6 +740,10 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
                   />
                 </div>
               </div>
+            )}
+
+            {activeTab === 'strategy' && parsed && (
+              <StrategyBoard mapName={parsed.header.map} />
             )}
           </div>
         </>

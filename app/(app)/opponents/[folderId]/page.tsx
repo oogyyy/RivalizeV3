@@ -10,11 +10,15 @@ import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import DeleteFolderButton from '@/components/teams/DeleteFolderButton'
 import OpponentDemoList from '@/components/teams/OpponentDemoList'
+import TeamNotes from '@/components/teams/TeamNotes'
+import RoundSearchPanel from '@/components/demos/RoundSearchPanel'
+import RoutinesPanel from '@/components/demos/RoutinesPanel'
 import {
   ArrowLeft, Brain, Trophy, Target, BarChart3,
   Crosshair, MapPin, TrendingUp, ExternalLink, FileText,
 } from 'lucide-react'
 import type { AggregatedStats, PlayerStats } from '@/types/database'
+import { getPlayerRoleInfo } from '@/lib/roles'
 
 export default async function OpponentPage({
   params,
@@ -244,6 +248,22 @@ export default async function OpponentPage({
               isOwnerOrAdmin={isOwnerOrAdmin}
               opponentDisplayName={folder.opponent_display_name}
             />
+
+            {/* Cross-demo round search */}
+            {(demos ?? []).some(d => d.status === 'completed') && (
+              <RoundSearchPanel
+                folderId={folderId}
+                opponentName={folder.opponent_display_name}
+              />
+            )}
+
+            {/* Routine detection */}
+            {(demos ?? []).some(d => d.status === 'completed') && (
+              <RoutinesPanel
+                folderId={folderId}
+                opponentName={folder.opponent_display_name}
+              />
+            )}
           </div>
 
           {/* Right sidebar */}
@@ -264,20 +284,7 @@ export default async function OpponentPage({
                 ) : (
                   <div className="divide-y divide-border">
                     {topPlayers.slice(0, 5).map((player, idx) => {
-                      const role = player.headshot_percentage < 20
-                        ? 'AWP'
-                        : player.flash_assists >= 4
-                        ? 'Support'
-                        : player.kills >= 20
-                        ? 'Entry'
-                        : 'Rifler'
-                      const roleColor = role === 'AWP'
-                        ? 'text-purple-400 bg-purple-400/10'
-                        : role === 'Entry'
-                        ? 'text-orange-400 bg-orange-400/10'
-                        : role === 'Support'
-                        ? 'text-blue-400 bg-blue-400/10'
-                        : 'text-muted-foreground bg-accent'
+                      const ri = getPlayerRoleInfo(player)
                       return (
                         <div key={player.steam_id} className="flex items-center gap-3 px-4 py-3">
                           <span
@@ -294,11 +301,14 @@ export default async function OpponentPage({
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <p className="text-xs font-medium text-foreground truncate">
+                              <Link
+                                href={`/opponents/${folderId}/player/${encodeURIComponent(player.name)}`}
+                                className="text-xs font-medium text-foreground hover:text-neon-green transition-colors truncate"
+                              >
                                 {player.name}
-                              </p>
-                              <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${roleColor} shrink-0`}>
-                                {role}
+                              </Link>
+                              <span className={`text-[9px] font-bold px-1 py-0.5 rounded shrink-0 ${ri.color} ${ri.bg}`}>
+                                {ri.label}
                               </span>
                             </div>
                             <p className="text-[10px] text-muted-foreground">
@@ -362,6 +372,13 @@ export default async function OpponentPage({
                 </CardContent>
               </Card>
             )}
+
+            {/* Team Notes */}
+            <TeamNotes
+              teamId={teamId}
+              folderId={folderId}
+              currentUserId={user.id}
+            />
 
             {/* AI Anti-Strat CTA */}
             <Card className="bg-gradient-to-br from-neon-green/10 to-neon-green/5 border border-neon-green/20">

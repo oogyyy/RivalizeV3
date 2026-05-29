@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Target, Shield, Brain,
-  User, Settings, LogOut, ChevronLeft, ChevronRight, BookOpen, Swords,
+  User, Settings, LogOut, ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: '/ai-coach',  label: 'AI Scout',  Icon: Brain },
   { href: '/playbook',  label: 'Playbooks', Icon: BookOpen },
   { href: '/veto',      label: 'Veto',      Icon: Swords },
+  { href: '/lineups',   label: 'Lineups',   Icon: BookMarked },
   { href: '/profile',   label: 'Profile',   Icon: User },
   { href: '/settings',  label: 'Settings',  Icon: Settings },
 ]
