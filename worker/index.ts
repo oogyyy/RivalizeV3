@@ -150,7 +150,7 @@ async function tick(): Promise<void> {
       console.log(`[worker][demoId=${demoId}] Applying parsed data (will set status=completed)...`)
       await applyParsedDemo(demoId, result.parsedData, result.warnings)
       const duration = ((Date.now() - start) / 1000).toFixed(1)
-      console.log(`[worker][demoId=${demoId}] SUCCESS (DB status=completed) in ${duration}s`
+      console.log(`[worker][demoId=${demoId}] SUCCESS (DB status=completed) in ${duration}s`)
     } else {
       throw new Error(result.error)
     }
@@ -183,7 +183,7 @@ async function tick(): Promise<void> {
       .eq('id', demoId)
 
     if (isPermanent) {
-      console.error(`[worker][demoId=${demoId}] Marked as permanently failed`
+      console.error(`[worker][demoId=${demoId}] Marked as permanently failed`)
     }
   }
 }
