@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Send, Minus, X, Upload, Brain, ArrowRight } from 'lucide-react'
+import dynamic from 'next/dynamic'
 
 /* ── Background ── */
 function Background() {
@@ -57,21 +58,24 @@ function RivalizeLogo() {
   )
 }
 
-/* ── Hero Chat Widget ── */
-const INITIAL_MESSAGES = [
-  { role: 'user', text: 'How do they play eco rounds?' },
-  { role: 'ai', text: '68% of eco rounds: stack B with pistols, fast rush through tunnels, zero utility. Counter: single B anchor + 4-man A execute.' },
-]
+/* ── Hero Chat Widget (dynamically imported for faster initial load) ── */
+const HeroChatWidget = dynamic(() => Promise.resolve(HeroChatWidgetInner), {
+  ssr: false,
+  loading: () => <div style={{ width: 348, height: 320, background: 'rgba(10,8,28,0.6)', borderRadius: 14 }} />,
+})
 
-const AI_RESPONSES = [
-  'Based on 4 recorded demos, they run a default 2-1-2 on T-side with an aggressive mid-push at 1:20. Stack B with 3 players and smoke mid-door at round start.',
-  "Their AWPer holds long-A at round start 78% of the time. Flash over the top before your A-main push and they'll be caught off-guard.",
-  'On eco rounds they stack B tunnels with pistols. A single anchor on B + 4-man A execute counters them reliably.',
-]
-
-function HeroChatWidget() {
+function HeroChatWidgetInner() {
   const [chatInput, setChatInput] = useState('')
-  const [messages, setMessages] = useState(INITIAL_MESSAGES)
+  const [messages, setMessages] = useState([
+    { role: 'user', text: 'How do they play eco rounds?' },
+    { role: 'ai', text: '68% of eco rounds: stack B with pistols, fast rush through tunnels, zero utility. Counter: single B anchor + 4-man A execute.' },
+  ])
+
+  const AI_RESPONSES = [
+    'Based on 4 recorded demos, they run a default 2-1-2 on T-side with an aggressive mid-push at 1:20. Stack B with 3 players and smoke mid-door at round start.',
+    "Their AWPer holds long-A at round start 78% of the time. Flash over the top before your A-main push and they'll be caught off-guard.",
+    'On eco rounds they stack B tunnels with pistols. A single anchor on B + 4-man A execute counters them reliably.',
+  ]
 
   const sendMsg = () => {
     if (!chatInput.trim()) return
