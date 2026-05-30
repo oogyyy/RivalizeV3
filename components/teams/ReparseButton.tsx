@@ -11,9 +11,10 @@ interface Props {
   /** 'icon' = small icon-only button (default, for completed demos)
    *  'prominent' = labelled button used on stuck/failed demos */
   variant?: 'icon' | 'prominent'
+  onEnqueued?: () => void
 }
 
-export default function ReparseButton({ demoId, variant = 'icon' }: Props) {
+export default function ReparseButton({ demoId, variant = 'icon', onEnqueued }: Props) {
   const [loading, setLoading] = useState(false)
   const [done,    setDone]    = useState(false)
   const [error,   setError]   = useState<string | null>(null)
@@ -25,14 +26,17 @@ export default function ReparseButton({ demoId, variant = 'icon' }: Props) {
     setLoading(true)
     setError(null)
     setDone(false)
+
     try {
-      // /reparse is synchronous — it keeps the connection open until parsing completes.
+      // New behavior: just enqueue. The worker will pick it up asynchronously.
       const res = await fetch(`/api/demos/${demoId}/reparse`, { method: 'POST' })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
+
       setDone(true)
+      onEnqueued?.()
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed')
@@ -56,9 +60,9 @@ export default function ReparseButton({ demoId, variant = 'icon' }: Props) {
           )}
         >
           {loading
-            ? <><Loader2 size={11} className="animate-spin" /> Parsing…</>
+            ? <><Loader2 size={11} className="animate-spin" /> Queued…</>
             : done
-            ? <><RefreshCw size={11} /> Done</>
+            ? <><RefreshCw size={11} /> Queued for parsing</>
             : <><RefreshCw size={11} /> Retry parsing</>
           }
         </Button>
@@ -76,7 +80,7 @@ export default function ReparseButton({ demoId, variant = 'icon' }: Props) {
       <button
         onClick={handleReparse}
         disabled={loading}
-        title={loading ? 'Parsing…' : 'Re-parse demo'}
+        title={loading ? 'Queuing re-parse…' : 'Re-parse demo'}
         className="p-1.5 rounded-md text-muted-foreground hover:text-blue-400 hover:bg-blue-400/10 transition-all duration-150 disabled:opacity-40"
       >
         {loading
