@@ -1,0 +1,4 @@
+ALTER TABLE demos ADD COLUMN IF NOT EXISTS ai_report TEXT;
+
+ALTER TABLE team_folders ADD COLUMN IF NOT EXISTS ai_brief TEXT;
+ALTER TABLE team_folders ADD COLUMN IF NOT EXISTS ai_brief_updated_at TIMESTAMPTZ;

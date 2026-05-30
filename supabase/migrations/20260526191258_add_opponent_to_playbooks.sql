@@ -1,0 +1,3 @@
+ALTER TABLE playbooks
+  ADD COLUMN IF NOT EXISTS folder_id    UUID REFERENCES team_folders(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS opponent_name TEXT;
