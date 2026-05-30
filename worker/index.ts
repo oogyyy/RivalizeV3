@@ -147,9 +147,10 @@ async function tick(): Promise<void> {
     const result: ParseJobResult = await parseAndSaveDemo(demoId)
 
     if (result.success) {
+      console.log(`[worker][demoId=${demoId}] Applying parsed data (will set status=completed)...`)
       await applyParsedDemo(demoId, result.parsedData, result.warnings)
       const duration = ((Date.now() - start) / 1000).toFixed(1)
-      console.log(`[worker][demoId=${demoId}] SUCCESS in ${duration}s`)
+      console.log(`[worker][demoId=${demoId}] SUCCESS (DB status=completed) in ${duration}s`)
     } else {
       throw new Error(result.error)
     }
