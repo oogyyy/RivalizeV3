@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'cdn.discordapp.com' },
     ],
   },
+  // Optimizes lucide-react icon imports (heavily used across the app)
+  // Reduces bundle size by only including used icons at build time.
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
 }
 
 export default nextConfig
