@@ -13,9 +13,10 @@ import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import FaceitImportButton from '@/components/teams/FaceitImportButton'
 import TeamTabNav from './TeamTabNav'
 import InviteCodeSection from './InviteCodeSection'
+import InviteFriendsDialog from './InviteFriendsDialog'
 import {
   Users, Upload, Brain, Trophy, Crosshair, ArrowLeft,
-  Crown, Shield, User, Plus, BarChart3, Target, MapPin,
+  Crown, Shield, User, BarChart3, Target, MapPin,
 } from 'lucide-react'
 import type { PlayerStats, AggregatedStats } from '@/types/database'
 
@@ -538,12 +539,10 @@ export default async function TeamPage({
                 </p>
               </div>
               {isOwnerOrAdmin && (
-                <a href="#invite" className="scroll-smooth">
-                  <Button variant="outline" className="gap-2">
-                    <Plus size={16} />
-                    Invite Member
-                  </Button>
-                </a>
+                <InviteFriendsDialog
+                  teamId={resolvedTeamId}
+                  existingMemberIds={(members ?? []).map(m => m.user_id)}
+                />
               )}
             </div>
 

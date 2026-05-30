@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import MobileMenu from '@/components/layout/MobileMenu'
+import TopBar from '@/components/layout/TopBar'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
@@ -59,10 +60,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Desktop sidebar */}
       <Sidebar profile={profile} />
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto min-w-0 pt-16 md:pt-0" style={{ position: 'relative', zIndex: 1 }}>
-        {children}
-      </main>
+      {/* Content column */}
+      <div className="flex-1 min-w-0 flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
+        <TopBar profile={profile} />
+        <main className="flex-1 overflow-auto pt-16 md:pt-0">
+          {children}
+        </main>
+      </div>
 
       {/* Mobile menu */}
       <MobileMenu profile={profile} />

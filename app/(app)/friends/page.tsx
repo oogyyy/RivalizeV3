@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Users, UserPlus, Check, X, Loader2, Search,
-  UserMinus, Clock, UserCheck, AlertCircle, ExternalLink,
+  UserMinus, Clock, UserCheck, AlertCircle, ExternalLink, Mail,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,13 @@ interface FriendData {
   outgoing: FriendEntry[]
 }
 
+interface TeamInvitation {
+  id: string
+  created_at: string
+  team: { id: string; name: string; slug: string; logo_url: string | null }
+  inviter: { id: string; username: string; display_name: string | null; avatar_url: string | null }
+}
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function Avatar({ profile, size = 'md' }: { profile: FriendProfile; size?: 'sm' | 'md' }) {
@@ -54,16 +61,22 @@ function Avatar({ profile, size = 'md' }: { profile: FriendProfile; size?: 'sm' 
 
 export default function FriendsPage() {
   const [data, setData] = useState<FriendData>({ friends: [], incoming: [], outgoing: [] })
+  const [teamInvitations, setTeamInvitations] = useState<TeamInvitation[]>([])
   const [loading, setLoading] = useState(true)
   const [searchValue, setSearchValue] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [sendSuccess, setSendSuccess] = useState<string | null>(null)
   const [actioning, setActioning] = useState<string | null>(null)
+  const [teamActioning, setTeamActioning] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/friends')
-    if (res.ok) setData(await res.json() as FriendData)
+    const [friendsRes, invitesRes] = await Promise.all([
+      fetch('/api/friends'),
+      fetch('/api/team-invitations'),
+    ])
+    if (friendsRes.ok) setData(await friendsRes.json() as FriendData)
+    if (invitesRes.ok) setTeamInvitations(await invitesRes.json() as TeamInvitation[])
     setLoading(false)
   }, [])
 
@@ -114,7 +127,18 @@ export default function FriendsPage() {
     setActioning(null)
   }
 
-  const totalPending = data.incoming.length
+  const handleTeamInvitation = async (id: string, action: 'accept' | 'decline') => {
+    setTeamActioning(id)
+    await fetch(`/api/team-invitations/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    await load()
+    setTeamActioning(null)
+  }
+
+  const totalPending = data.incoming.length + teamInvitations.length
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6">
@@ -175,6 +199,59 @@ export default function FriendsPage() {
         </div>
       ) : (
         <>
+          {/* Team invitations */}
+          {teamInvitations.length > 0 && (
+            <section>
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Mail size={12} />
+                Team Invitations ({teamInvitations.length})
+              </h2>
+              <div className="rounded-xl border border-neon-green/20 bg-neon-green/5 divide-y divide-border overflow-hidden">
+                {teamInvitations.map(invite => {
+                  const inviterName = invite.inviter.display_name || invite.inviter.username
+                  return (
+                    <div key={invite.id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="w-10 h-10 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center shrink-0">
+                        {invite.team.logo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={invite.team.logo_url} alt={invite.team.name} className="w-full h-full object-cover rounded-xl" />
+                        ) : (
+                          <span className="text-sm font-bold text-neon-green">{invite.team.name.charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{invite.team.name}</p>
+                        <p className="text-xs text-muted-foreground">Invited by @{inviterName}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="neon"
+                          className="gap-1.5 text-xs h-8"
+                          onClick={() => handleTeamInvitation(invite.id, 'accept')}
+                          disabled={teamActioning === invite.id}
+                        >
+                          {teamActioning === invite.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                          Join
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-xs h-8 text-red-400 border-red-400/30 hover:border-red-400/60"
+                          onClick={() => handleTeamInvitation(invite.id, 'decline')}
+                          disabled={teamActioning === invite.id}
+                        >
+                          <X size={11} />
+                          Decline
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
           {/* Incoming requests */}
           {data.incoming.length > 0 && (
             <section>
