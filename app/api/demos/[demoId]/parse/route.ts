@@ -1,14 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import { parseAndSaveDemo } from '@/lib/demo-parser/parse-and-save'
 
 /**
  * POST /api/demos/[demoId]/parse
- * Parses a demo synchronously on the Railway persistent server (no timeout).
- * Claims the demo by setting processing_started_at so the worker doesn't race
- * against this route. reclaimStale recovers it after 30 min if the process dies.
- */
+ *
+ * Now just enqueues the demo for the worker.
+ * No more synchronous parsing (the old source of most stuck jobs).
+ */ 
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ demoId: string }> },
@@ -22,7 +21,7 @@ export async function POST(
   const admin = createAdminClient()
   const { data: demo } = await admin
     .from('demos')
-    .select('team_id')
+    .select('team_id, status')
     .eq('id', demoId)
     .single()
 
@@ -37,20 +36,17 @@ export async function POST(
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Claim the demo so the worker doesn't race against this synchronous parse.
-  // stale reclaim recovers it after 30 min if the process dies mid-parse.
+  // Reset to queued so the worker can pick it up
   await admin
     .from('demos')
-    .update({ status: 'processing', processing_started_at: new Date().toISOString(), error_message: null })
+    .update({
+      status: 'queued',
+      processing_started_at: null,
+      queued_at: new Date().toISOString(),
+      error_message: null,
+      retry_count: 0,
+    })
     .eq('id', demoId)
 
-  try {
-    await parseAndSaveDemo(demoId)
-    return NextResponse.json({ success: true })
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    )
-  }
+  return NextResponse.json({ success: true, enqueued: true })
 }
