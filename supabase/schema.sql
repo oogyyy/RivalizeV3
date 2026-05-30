@@ -81,13 +81,12 @@ CREATE INDEX IF NOT EXISTS demos_team_id_idx ON demos(team_id);
 CREATE INDEX IF NOT EXISTS demos_opponent_slug_idx ON demos(opponent_slug);
 CREATE INDEX IF NOT EXISTS demos_status_idx ON demos(status);
 
--- New clean queue index (primary path for worker v2)
+-- Primary queue index for the new worker
 CREATE INDEX IF NOT EXISTS demos_queue_claimable_idx ON demos(created_at)
   WHERE status = 'queued' AND processing_started_at IS NULL;
 
--- Legacy index retained during transition (will be cleaned up in Phase 3)
-CREATE INDEX IF NOT EXISTS demos_worker_queue_idx ON demos(created_at)
-  WHERE status = 'processing' AND processing_started_at IS NULL;
+-- Note: The old legacy index (demos_worker_queue_idx on status='processing') is no longer
+-- created for new environments. It can be dropped in production via a future migration.
 
 CREATE TABLE IF NOT EXISTS team_folders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
