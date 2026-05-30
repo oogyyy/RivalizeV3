@@ -18,6 +18,9 @@ export type ParseJobResult =
   | { success: false; error: string; isPermanent: boolean }
 
 // Errors that are worth retrying (service hiccups, cold starts, network blips)
+// NOTE: This classification overlaps with similar logic in worker/index.ts catch block
+// and the isTransient list below. See #85 for future consolidation work during the
+// queued vs legacy 'processing' transition.
 function isRetryable(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err)
   // Non-retryable: bad demo file (422), no player data, explicit demo errors
@@ -112,6 +115,9 @@ export async function parseAndSaveDemo(demoId: string): Promise<ParseJobResult> 
     const raw = err instanceof Error ? err.message : String(err)
     console.error(`[parse] All attempts failed for ${demoId}:`, raw)
 
+    // NOTE: This isTransient list intentionally overlaps with isRetryable() above and
+    // similar classification in worker/index.ts. Duplication noted for future cleanup.
+    // See #85 (autonomous transition hygiene) for consolidation tracking.
     const isTransient =
       raw.includes('truncated') ||
       raw.includes('R2 download') ||
