@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard, Target, Shield, Brain,
-  ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Users,
+  ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import type { Profile } from '@/types/database'
@@ -32,12 +32,6 @@ const NAV_GROUPS = [
       { href: '/playbook', label: 'Playbook', Icon: BookOpen },
       { href: '/veto',     label: 'Veto',     Icon: Swords },
       { href: '/lineups',  label: 'Lineups',  Icon: BookMarked },
-    ]
-  },
-  {
-    label: 'Social',
-    items: [
-      { href: '/friends', label: 'Friends', Icon: Users },
     ]
   },
 ]
