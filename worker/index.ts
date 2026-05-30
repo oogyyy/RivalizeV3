@@ -36,16 +36,6 @@ interface DemoClaim {
 }
 
 /**
- * Dynamic reclaim timeout based on file size.
- * Small demos reclaim faster; 300MB+ demos get more breathing room.
- */
-function getReclaimCutoff(fileSizeBytes: number | null): Date {
-  const mb = fileSizeBytes ? fileSizeBytes / (1024 * 1024) : 0
-  const minutes = mb > 250 ? LARGE_DEMO_RECLAIM_MINUTES : BASE_RECLAIM_MINUTES
-  return new Date(Date.now() - minutes * 60 * 1000)
-}
-
-/**
  * Reclaim jobs that have been claimed too long.
  * Handles both the new 'queued' path and legacy 'processing' rows (temporary).
  */
@@ -53,7 +43,7 @@ async function reclaimStale(): Promise<void> {
   const now = new Date()
 
   // Legacy 'processing' rows (from the old synchronous upload flow).
-  // TODO: Remove this block once the transition to the 'queued' model is complete.
+  // TODO: Remove this block once the transition to the 'queued' model is complete. See #85
   const legacyCutoff = new Date(now.getTime() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
 
   await supabase
@@ -104,7 +94,7 @@ async function claimNext(): Promise<DemoClaim | null> {
   }
 
   // Temporary fallback for legacy demos still using the old 'processing' flow.
-  // TODO: Remove this fallback once all clients use the 'queued' enqueue path.
+  // TODO: Remove this fallback once all clients use the 'queued' enqueue path. See #85
   const { data: legacy } = await supabase
     .from('demos')
     .select('id, file_size_bytes, status')
