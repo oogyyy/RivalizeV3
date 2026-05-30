@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard, Target, Shield, Brain,
-  User, Settings, ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Users,
+  ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Users,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import type { Profile } from '@/types/database'
@@ -40,13 +40,6 @@ const NAV_GROUPS = [
       { href: '/friends', label: 'Friends', Icon: Users },
     ]
   },
-  {
-    label: 'Account',
-    items: [
-      { href: '/profile',  label: 'Profile',  Icon: User },
-      { href: '/settings', label: 'Settings', Icon: Settings },
-    ]
-  }
 ]
 
 interface SidebarNavProps {
