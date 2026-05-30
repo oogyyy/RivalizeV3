@@ -14,6 +14,10 @@ import { parseAndSaveDemo, applyParsedDemo, type ParseJobResult } from '../lib/d
  * - During the transition period, this worker also supports older demos that were
  *   created directly in 'processing' state (the old synchronous model).
  * - This fallback will be removed once the transition is complete.
+ *
+ * IMPORTANT (transition hygiene): On transient failures we now ALWAYS reset
+ * back to 'queued' (not 'processing'). This ensures retried jobs stay on the
+ * modern path and the legacy 'processing' state is naturally starved out.
  */
 
 const POLL_INTERVAL_MS = 2_000
@@ -53,7 +57,8 @@ async function reclaimStale(): Promise<void> {
   const now = new Date()
 
   // Legacy 'processing' rows (from the old synchronous upload flow).
-  // TODO: Remove this block once the transition to the 'queued' model is complete.
+  // TODO: Remove this block once the transition to the 'queued' model is complete
+  //       and no 'processing' rows remain in the table.
   const legacyCutoff = new Date(now.getTime() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
 
   await supabase
@@ -104,7 +109,8 @@ async function claimNext(): Promise<DemoClaim | null> {
   }
 
   // Temporary fallback for legacy demos still using the old 'processing' flow.
-  // TODO: Remove this fallback once all clients use the 'queued' enqueue path.
+  // TODO: Remove this fallback once all clients use the 'queued' enqueue path
+  //       and the table no longer contains 'processing' rows.
   const { data: legacy } = await supabase
     .from('demos')
     .select('id, file_size_bytes, status')
@@ -173,7 +179,8 @@ async function tick(): Promise<void> {
       .from('demos')
       .update({
         retry_count: retryCount,
-        status: isPermanent ? 'failed' : 'processing',
+        status: isPermanent ? 'failed' : 'queued',
+        queued_at: isPermanent ? null : new Date().toISOString(),
         processing_started_at: null,
         error_message: isPermanent
           ? `Permanent failure after ${MAX_RETRIES} attempts: ${errMsg}`
