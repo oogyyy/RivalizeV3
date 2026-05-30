@@ -27,11 +27,11 @@ export async function GET() {
   for (const row of rows ?? []) {
     const r = row as unknown as {
       id: string; status: string; created_at: string
-      requester: ProfileRow[]
-      addressee: ProfileRow[]
+      requester: ProfileRow
+      addressee: ProfileRow
     }
-    const requester = r.requester[0]
-    const addressee = r.addressee[0]
+    const requester = r.requester
+    const addressee = r.addressee
     const iRequested = requester?.id === user.id
     const other = iRequested ? addressee : requester
 
