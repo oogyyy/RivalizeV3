@@ -7,6 +7,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import MobileMenu from '@/components/layout/MobileMenu'
 import TopBar from '@/components/layout/TopBar'
 import SocialPanel from '@/components/layout/SocialPanel'
+import FeedbackBubble from '@/components/feedback/FeedbackBubble'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
@@ -74,6 +75,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Mobile menu */}
       <MobileMenu profile={profile} />
+
+      {/* Global Feedback Bubble */}
+      <FeedbackBubble />
     </div>
   )
 }
