@@ -19,9 +19,8 @@ import { parseAndSaveDemo, applyParsedDemo, type ParseJobResult } from '../lib/d
 const POLL_INTERVAL_MS = 2_000
 const MAX_RETRIES = 3
 
-// Base reclaim windows (will be adjusted by file size)
+// Base reclaim windows (used for stale job detection in legacy + queued paths)
 const BASE_RECLAIM_MINUTES = 35
-const LARGE_DEMO_RECLAIM_MINUTES = 55
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,16 +35,6 @@ interface DemoClaim {
 }
 
 /**
- * Dynamic reclaim timeout based on file size.
- * Small demos reclaim faster; 300MB+ demos get more breathing room.
- */
-function getReclaimCutoff(fileSizeBytes: number | null): Date {
-  const mb = fileSizeBytes ? fileSizeBytes / (1024 * 1024) : 0
-  const minutes = mb > 250 ? LARGE_DEMO_RECLAIM_MINUTES : BASE_RECLAIM_MINUTES
-  return new Date(Date.now() - minutes * 60 * 1000)
-}
-
-/**
  * Reclaim jobs that have been claimed too long.
  * Handles both the new 'queued' path and legacy 'processing' rows (temporary).
  */
@@ -53,7 +42,7 @@ async function reclaimStale(): Promise<void> {
   const now = new Date()
 
   // Legacy 'processing' rows (from the old synchronous upload flow).
-  // TODO: Remove this block once the transition to the 'queued' model is complete. See #85
+  // TODO: Remove this block once the transition to the 'queued' model is complete. refs #85
   const legacyCutoff = new Date(now.getTime() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
 
   await supabase
@@ -93,7 +82,7 @@ async function claimNext(): Promise<DemoClaim | null> {
     const row = queued[0]
     const { data: claimed } = await supabase
       .from('demos')
-      .update({ status: 'processing', processing_started_at: new Date().toISOString() })
+      .update({ status: 'processing', processing_started_at: new Date().toISOString(), last_heartbeat_at: new Date().toISOString() })
       .eq('id', row.id)
       .eq('status', 'queued')
       .is('processing_started_at', null)
@@ -104,7 +93,7 @@ async function claimNext(): Promise<DemoClaim | null> {
   }
 
   // Temporary fallback for legacy demos still using the old 'processing' flow.
-  // TODO: Remove this fallback once all clients use the 'queued' enqueue path. See #85
+  // TODO: Remove this fallback once all clients use the 'queued' enqueue path. refs #85
   const { data: legacy } = await supabase
     .from('demos')
     .select('id, file_size_bytes, status')
@@ -118,7 +107,7 @@ async function claimNext(): Promise<DemoClaim | null> {
     const row = legacy[0]
     const { data: claimed } = await supabase
       .from('demos')
-      .update({ processing_started_at: new Date().toISOString() })
+      .update({ processing_started_at: new Date().toISOString(), last_heartbeat_at: new Date().toISOString() })
       .eq('id', row.id)
       .eq('status', 'processing')
       .is('processing_started_at', null)
@@ -149,6 +138,13 @@ async function tick(): Promise<void> {
     if (result.success) {
       console.log(`[worker][demoId=${demoId}] Applying parsed data (will set status=completed)...`)
       await applyParsedDemo(demoId, result.parsedData, result.warnings)
+
+      // Basic heartbeat on successful completion for observability (especially useful for large demos)
+      await supabase
+        .from('demos')
+        .update({ last_heartbeat_at: new Date().toISOString() })
+        .eq('id', demoId)
+
       const duration = ((Date.now() - start) / 1000).toFixed(1)
       console.log(`[worker][demoId=${demoId}] SUCCESS (DB status=completed) in ${duration}s`)
     } else {
