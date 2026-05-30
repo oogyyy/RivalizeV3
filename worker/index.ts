@@ -53,7 +53,7 @@ async function reclaimStale(): Promise<void> {
   const now = new Date()
 
   // Legacy 'processing' rows (from the old synchronous upload flow).
-  // TODO: Remove this block once the transition to the 'queued' model is complete.
+  // TODO: Remove this block once the transition to the 'queued' model is complete. refs #85
   const legacyCutoff = new Date(now.getTime() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
 
   await supabase
@@ -104,7 +104,7 @@ async function claimNext(): Promise<DemoClaim | null> {
   }
 
   // Temporary fallback for legacy demos still using the old 'processing' flow.
-  // TODO: Remove this fallback once all clients use the 'queued' enqueue path.
+  // TODO: Remove this fallback once all clients use the 'queued' enqueue path. refs #85
   const { data: legacy } = await supabase
     .from('demos')
     .select('id, file_size_bytes, status')
