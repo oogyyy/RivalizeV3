@@ -131,7 +131,12 @@ export async function parseAndSaveDemo(demoId: string): Promise<ParseJobResult> 
 
 /**
  * Applies the parsed data to the database and updates team folder aggregates.
- * This is now called by the worker after a successful parse.
+ * This is called by the worker after a successful parse.
+ *
+ * ROBUSTNESS: We now verify the critical demos UPDATE actually succeeded.
+ * Previously a silent failure here could cause the worker to log SUCCESS
+ * while the row remained stuck in 'processing' (the exact bug observed
+ * with large rescued demos during the v2 rollout).
  */
 export async function applyParsedDemo(
   demoId: string,
@@ -146,67 +151,94 @@ export async function applyParsedDemo(
     .eq('id', demoId)
     .single()
 
-  if (!demo) return
+  if (!demo) {
+    throw new Error(`applyParsedDemo: demo ${demoId} not found when applying results`)
+  }
 
-  await admin.from('demos').update({
-    parsed_data: parsedData,
-    status: 'completed',
-    map: parsedData.header?.map ?? 'unknown',
-    error_message: null,
-  }).eq('id', demoId)
+  console.log(`[apply] Updating demo ${demoId} status -> completed (map=${parsedData.header?.map ?? 'unknown'})`)
+
+  // Critical write: mark as completed. Must succeed or we throw so the worker can retry/fail the job.
+  const { data: updated, error: updateErr } = await admin
+    .from('demos')
+    .update({
+      parsed_data: parsedData,
+      status: 'completed',
+      map: parsedData.header?.map ?? 'unknown',
+      error_message: null,
+    })
+    .eq('id', demoId)
+    .select('id')
+
+  if (updateErr) {
+    throw new Error(`Failed to mark demo ${demoId} completed (Supabase error): ${updateErr.message}`)
+  }
+  if (!updated || updated.length === 0) {
+    throw new Error(`Failed to mark demo ${demoId} completed: update affected 0 rows (concurrent modification, deleted row, or unexpected constraint)`)
+  }
+
+  console.log(`[apply] Demo ${demoId} successfully marked completed`)
 
   if (warnings.length) {
     console.warn(`[parse] warnings for ${demoId}:`, warnings)
   }
 
-  // Recalculate folder stats for opponent demos only
+  // Recalculate folder stats for opponent demos only.
+  // Non-fatal: if this fails we still want the demo itself marked complete.
   if (demo.demo_type === 'opponent' && demo.opponent_slug) {
-    const { data: allDemos } = await admin
-      .from('demos')
-      .select('parsed_data')
-      .eq('team_id', demo.team_id)
-      .eq('opponent_slug', demo.opponent_slug)
-      .eq('status', 'completed')
-      .eq('demo_type', 'opponent')
-
-    if (allDemos && allDemos.length > 0) {
-      const wins = allDemos.filter(d => {
-        const pd = d.parsed_data as ParsedDataRow | null
-        const h = pd?.header
-        if (!h) return false
-        const s1 = h.score_team1 ?? 0
-        const s2 = h.score_team2 ?? 0
-        return pd?.opponentSide === 'team1' ? s2 > s1 : s1 > s2
-      }).length
-
-      const draws = allDemos.filter(d => {
-        const h = (d.parsed_data as ParsedDataRow | null)?.header
-        return h && (h.score_team1 ?? 0) === (h.score_team2 ?? 0)
-      }).length
-
-      const mapsPlayed: Record<string, number> = {}
-      for (const d of allDemos) {
-        const m = (d.parsed_data as ParsedDataRow | null)?.header?.map
-        if (m) mapsPlayed[m] = (mapsPlayed[m] ?? 0) + 1
-      }
-
-      const topPlayers = computeTopPlayers(allDemos)
-      await admin.from('team_folders').update({
-        aggregated_stats: {
-          total_matches: allDemos.length,
-          wins,
-          losses: allDemos.length - wins - draws,
-          draws,
-          win_rate: wins / allDemos.length,
-          avg_rating: topPlayers.length > 0
-            ? topPlayers.reduce((s, p) => s + p.rating, 0) / topPlayers.length
-            : 1.0,
-          maps_played: mapsPlayed,
-          top_players: topPlayers,
-        },
-      })
-        .eq('user_team_id', demo.team_id)
+    try {
+      const { data: allDemos } = await admin
+        .from('demos')
+        .select('parsed_data')
+        .eq('team_id', demo.team_id)
         .eq('opponent_slug', demo.opponent_slug)
+        .eq('status', 'completed')
+        .eq('demo_type', 'opponent')
+
+      if (allDemos && allDemos.length > 0) {
+        const wins = allDemos.filter(d => {
+          const pd = d.parsed_data as ParsedDataRow | null
+          const h = pd?.header
+          if (!h) return false
+          const s1 = h.score_team1 ?? 0
+          const s2 = h.score_team2 ?? 0
+          return pd?.opponentSide === 'team1' ? s2 > s1 : s1 > s2
+        }).length
+
+        const draws = allDemos.filter(d => {
+          const h = (d.parsed_data as ParsedDataRow | null)?.header
+          return h && (h.score_team1 ?? 0) === (h.score_team2 ?? 0)
+        }).length
+
+        const mapsPlayed: Record<string, number> = {}
+        for (const d of allDemos) {
+          const m = (d.parsed_data as ParsedDataRow | null)?.header?.map
+          if (m) mapsPlayed[m] = (mapsPlayed[m] ?? 0) + 1
+        }
+
+        const topPlayers = computeTopPlayers(allDemos)
+        const { error: folderErr } = await admin.from('team_folders').update({
+          aggregated_stats: {
+            total_matches: allDemos.length,
+            wins,
+            losses: allDemos.length - wins - draws,
+            draws,
+            win_rate: wins / allDemos.length,
+            avg_rating: topPlayers.length > 0
+              ? topPlayers.reduce((s, p) => s + p.rating, 0) / topPlayers.length
+              : 1.0,
+            maps_played: mapsPlayed,
+            top_players: topPlayers,
+          },
+        })
+          .eq('user_team_id', demo.team_id)
+          .eq('opponent_slug', demo.opponent_slug)
+
+        if (folderErr) {
+          console.error(`[apply] Non-fatal: failed to update team_folders aggregates for ${demoId}: ${folderErr.message}`)
+        }
+      }
+    } catch (aggErr) {
+      console.error(`[apply] Non-fatal error updating team_folders for ${demoId}:`, aggErr)
     }
   }
 }
