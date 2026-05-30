@@ -20,8 +20,9 @@ const schema = z.object({
 })
 
 /**
- * Creates the demo DB record and returns immediately.
- * The client is responsible for calling POST /api/demos/[id]/parse next.
+ * Creates the demo DB record in 'queued' state.
+ * The worker will pick it up asynchronously.
+ * No more synchronous parsing from the web server.
  */
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -63,11 +64,11 @@ export async function POST(request: Request) {
       league: league ?? null,
       raw_file_path: r2Key,
       file_url: fileUrl,
-      status: 'processing',
+      status: 'queued',           // <-- Changed from 'processing'
+      queued_at: new Date().toISOString(),
       file_size_bytes: fileSize ?? null,
       created_by: user.id,
       demo_type: demoType,
-      // Preserve the caller's opponentSide default; the client adjusts it via the card selector.
       parsed_data: { opponentSide },
     })
     .select()
