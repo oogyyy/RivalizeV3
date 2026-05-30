@@ -169,7 +169,8 @@ async function tick(): Promise<void> {
       .from('demos')
       .update({
         retry_count: retryCount,
-        status: isPermanent ? 'failed' : 'processing',
+        status: isPermanent ? 'failed' : 'queued',
+        queued_at: new Date().toISOString(),
         processing_started_at: null,
         error_message: isPermanent
           ? `Permanent failure after ${MAX_RETRIES} attempts: ${errMsg}`
