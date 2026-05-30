@@ -53,7 +53,7 @@ async function reclaimStale(): Promise<void> {
   const now = new Date()
 
   // Legacy 'processing' rows (from the old synchronous upload flow).
-  // TODO: Remove this block once the transition to the 'queued' model is complete.
+  // TODO: Remove this block once the transition to the 'queued' model is complete. See #85
   const legacyCutoff = new Date(now.getTime() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
 
   await supabase
@@ -104,7 +104,7 @@ async function claimNext(): Promise<DemoClaim | null> {
   }
 
   // Temporary fallback for legacy demos still using the old 'processing' flow.
-  // TODO: Remove this fallback once all clients use the 'queued' enqueue path.
+  // TODO: Remove this fallback once all clients use the 'queued' enqueue path. See #85
   const { data: legacy } = await supabase
     .from('demos')
     .select('id, file_size_bytes, status')
@@ -150,7 +150,7 @@ async function tick(): Promise<void> {
       console.log(`[worker][demoId=${demoId}] Applying parsed data (will set status=completed)...`)
       await applyParsedDemo(demoId, result.parsedData, result.warnings)
       const duration = ((Date.now() - start) / 1000).toFixed(1)
-      console.log(`[worker][demoId=${demoId}] SUCCESS (DB status=completed) in ${duration}s`)
+      console.log(`[worker][demoId=${demoId}] SUCCESS (DB status=completed) in ${duration}s`
     } else {
       throw new Error(result.error)
     }
@@ -173,7 +173,8 @@ async function tick(): Promise<void> {
       .from('demos')
       .update({
         retry_count: retryCount,
-        status: isPermanent ? 'failed' : 'processing',
+        status: isPermanent ? 'failed' : 'queued',
+        queued_at: new Date().toISOString(),
         processing_started_at: null,
         error_message: isPermanent
           ? `Permanent failure after ${MAX_RETRIES} attempts: ${errMsg}`
@@ -182,7 +183,7 @@ async function tick(): Promise<void> {
       .eq('id', demoId)
 
     if (isPermanent) {
-      console.error(`[worker][demoId=${demoId}] Marked as permanently failed`)
+      console.error(`[worker][demoId=${demoId}] Marked as permanently failed`
     }
   }
 }
