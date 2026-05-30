@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  // ── Lookup: search player and return recent matches ──
+  // ── Lookup and ELO check paths unchanged ──
   if (parsed.data.action === 'lookup') {
     try {
       const player = await getPlayerByNickname(parsed.data.nickname)
@@ -105,7 +105,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── ELO check: fetch current ELO, store snapshot, return history ──
   if (parsed.data.action === 'elo-check') {
     const admin = createAdminClient()
     try {
@@ -118,12 +117,10 @@ export async function POST(request: Request) {
       const elo   = cs2.faceit_elo
       const level = cs2.skill_level
 
-      // Cache faceit_player_id and current elo on the profile row
       await admin.from('profiles').update({
         faceit_player_id: player.player_id,
       }).eq('id', user.id)
 
-      // Insert ELO snapshot (deduplicate: skip if last snapshot within 1 hour has same ELO)
       const { data: lastSnap } = await admin
         .from('faceit_elo_snapshots')
         .select('elo, recorded_at')
@@ -139,7 +136,6 @@ export async function POST(request: Request) {
         await admin.from('faceit_elo_snapshots').insert({ user_id: user.id, elo, level })
       }
 
-      // Return last 30 snapshots for the trend chart
       const { data: history } = await admin
         .from('faceit_elo_snapshots')
         .select('elo, level, recorded_at')
@@ -160,7 +156,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Import: download demo and register it ──
+  // ── Import: download demo and enqueue it (no more 'processing' insert) ──
   const { teamId, matchId, opponentName, playerFaction } = parsed.data
 
   const admin = createAdminClient()
@@ -190,7 +186,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Exchange resource URL for a signed download URL via the Downloads API
     let signedUrl: string
     try {
       signedUrl = await getSignedDemoUrl(resourceUrl)
@@ -201,7 +196,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Stream demo from signed URL → R2
     let demoRes: Response
     try {
       demoRes = await fetch(signedUrl, {
@@ -227,7 +221,6 @@ export async function POST(request: Request) {
     const filename = `faceit-${matchId}.dem.gz`
     const r2Key = `${teamId}/faceit-${Date.now()}-${filename}`
 
-    // Determine opponent: the faction that is NOT the player's faction
     const opponentFaction = playerFaction === 'faction1' ? 'faction2' : 'faction1'
     const opponentSlug = slugify(opponentName)
     const matchDate = new Date(match.started_at * 1000).toISOString()
@@ -236,7 +229,7 @@ export async function POST(request: Request) {
 
     const fileUrl = getPublicUrl(r2Key)
 
-    // Register demo in DB
+    // Register as 'queued' so the worker picks it up
     const { data: demo, error: demoError } = await admin
       .from('demos')
       .insert({
@@ -248,7 +241,8 @@ export async function POST(request: Request) {
         league: `FaceIt — ${match.competition_name}`,
         raw_file_path: fileUrl,
         faceit_match_id: matchId,
-        status: 'processing',
+        status: 'queued',
+        queued_at: new Date().toISOString(),
         demo_type: 'opponent',
         created_by: user.id,
       })
@@ -259,7 +253,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: demoError?.message ?? 'Failed to register demo' }, { status: 500 })
     }
 
-    // Upsert team folder
     await admin.from('team_folders').upsert(
       { user_team_id: teamId, opponent_slug: opponentSlug, opponent_display_name: opponentName },
       { onConflict: 'user_team_id,opponent_slug' }
