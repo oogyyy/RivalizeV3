@@ -5,11 +5,11 @@ export interface RealParseResult {
   warnings: string[]
 }
 
-// Per-request timeout for the actual parse call (large demo files can be slow)
-const PARSER_TIMEOUT_MS = 6 * 60 * 1000
+// Per-request timeout for the actual parse call — large demos (300MB+ compressed) need ~20 min
+const PARSER_TIMEOUT_MS = 25 * 60 * 1000
 
 // How long to wait for the parser to become healthy before giving up
-const WARMUP_MAX_MS      = 75_000
+const WARMUP_MAX_MS      = 90_000
 const WARMUP_INTERVAL_MS = 4_000
 
 /**
