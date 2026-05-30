@@ -50,14 +50,19 @@ export interface Demo {
   league: string | null
   raw_file_path: string
   parsed_data: ParsedDemoData | null
-  status: 'processing' | 'completed' | 'failed'
+  status: DemoStatus
   /** 'opponent' = scouting upload; 'self' = own-team self-analysis upload */
   demo_type: 'opponent' | 'self'
   created_by: string
   created_at: string
   processing_started_at: string | null
+  queued_at: string | null
+  last_heartbeat_at: string | null
   error_message: string | null
   file_size_bytes: number | null
+  share_id: string | null
+  retry_count: number
+  faceit_match_id?: string | null
 }
 
 export interface Friendship {
@@ -193,7 +198,8 @@ export interface AggregatedStats {
   win_rate: number
 }
 
-export type DemoStatus = 'processing' | 'completed' | 'failed'
+// Updated for the new reliable queue system
+export type DemoStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type TeamRole = 'owner' | 'admin' | 'member'
 export type AIModel = 'gpt-4o' | 'grok-2' | 'claude-3-5-sonnet'
 export type ResponseStyle = 'detailed' | 'concise' | 'coaching'
