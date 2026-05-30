@@ -1,9 +1,8 @@
-export const maxDuration = 300
+export const maxDuration = 60
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import { parseAndSaveDemo } from '@/lib/demo-parser/parse-and-save'
 
 export async function POST(
   _req: Request,
@@ -35,21 +34,14 @@ export async function POST(
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Claim the demo for this synchronous parse so the worker doesn't race us,
-  // and so reclaimStale can recover if this route crashes before parseAndSaveDemo finishes.
+  // Enqueue for the worker (no more synchronous long-running parse)
   await admin.from('demos').update({
-    status: 'processing',
+    status: 'queued',
     error_message: null,
-    processing_started_at: new Date().toISOString(),
+    processing_started_at: null,
+    queued_at: new Date().toISOString(),
+    retry_count: 0,
   }).eq('id', demoId)
 
-  try {
-    await parseAndSaveDemo(demoId)
-    return NextResponse.json({ success: true })
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    )
-  }
+  return NextResponse.json({ success: true, enqueued: true })
 }
