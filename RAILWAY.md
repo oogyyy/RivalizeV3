@@ -24,7 +24,8 @@ to R2 from the client browser.
 ### Background parsing (reliable worker model)
 
 Rivalize uses a **dedicated worker service** (see `worker/`) that continuously
-polls the `demos` table for jobs in `status = 'queued'` (or legacy `processing` during transition).
+polls the `demos` table for jobs in `status = 'queued'` (legacy `'processing'` support
+remains as a temporary read-only fallback during the 2026 transition; see below).
 
 Key improvements (implemented in 2026):
 - Strict enqueue-only API layer (web routes no longer perform parsing)
@@ -32,12 +33,20 @@ Key improvements (implemented in 2026):
 - Dynamic, file-size-aware stale job reclaim (much faster than the old fixed 35 min)
 - Structured logging with `[worker][demoId=...]` correlation
 - Clean separation: `parseAndSaveDemo` now returns results; the worker owns all DB state transitions
+- (In progress) Full deprecation of legacy 'processing' path — see PRs #84, #87, and issue #85
 
 The worker and the Go parser (`go-parser/`) run as separate Railway services.
 
 For very high scale you can later add horizontal replicas to the worker or
 move to a proper job queue (Inngest / BullMQ), but the current design handles
 low-to-moderate volume very reliably.
+
+**Transition note (2026-05):** All new enqueues (register, reparse, FaceIt import, etc.)
+use `status='queued'`. The worker prefers queued jobs. A small hygiene fix in #87
+ensures retries also stay on the queued path (preventing "bleed" back into legacy
+state). Legacy claim/reclaim code remains only for any residual rows and will be
+removed once the table is confirmed clean. Related: robust apply updates (#84),
+legacy index drop.
 
 ---
 
