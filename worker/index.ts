@@ -82,7 +82,7 @@ async function claimNext(): Promise<DemoClaim | null> {
     const row = queued[0]
     const { data: claimed } = await supabase
       .from('demos')
-      .update({ status: 'processing', processing_started_at: new Date().toISOString() })
+      .update({ status: 'processing', processing_started_at: new Date().toISOString(), last_heartbeat_at: new Date().toISOString() })
       .eq('id', row.id)
       .eq('status', 'queued')
       .is('processing_started_at', null)
@@ -107,7 +107,7 @@ async function claimNext(): Promise<DemoClaim | null> {
     const row = legacy[0]
     const { data: claimed } = await supabase
       .from('demos')
-      .update({ processing_started_at: new Date().toISOString() })
+      .update({ processing_started_at: new Date().toISOString(), last_heartbeat_at: new Date().toISOString() })
       .eq('id', row.id)
       .eq('status', 'processing')
       .is('processing_started_at', null)
@@ -138,6 +138,13 @@ async function tick(): Promise<void> {
     if (result.success) {
       console.log(`[worker][demoId=${demoId}] Applying parsed data (will set status=completed)...`)
       await applyParsedDemo(demoId, result.parsedData, result.warnings)
+
+      // Basic heartbeat on successful completion for observability (especially useful for large demos)
+      await supabase
+        .from('demos')
+        .update({ last_heartbeat_at: new Date().toISOString() })
+        .eq('id', demoId)
+
       const duration = ((Date.now() - start) / 1000).toFixed(1)
       console.log(`[worker][demoId=${demoId}] SUCCESS (DB status=completed) in ${duration}s`)
     } else {
