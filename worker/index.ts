@@ -19,9 +19,8 @@ import { parseAndSaveDemo, applyParsedDemo, type ParseJobResult } from '../lib/d
 const POLL_INTERVAL_MS = 2_000
 const MAX_RETRIES = 3
 
-// Base reclaim windows (will be adjusted by file size)
+// Base reclaim windows (used for stale job detection in legacy + queued paths)
 const BASE_RECLAIM_MINUTES = 35
-const LARGE_DEMO_RECLAIM_MINUTES = 55
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,16 +32,6 @@ interface DemoClaim {
   id: string
   file_size_bytes: number | null
   status: string
-}
-
-/**
- * Dynamic reclaim timeout based on file size.
- * Small demos reclaim faster; 300MB+ demos get more breathing room.
- */
-function getReclaimCutoff(fileSizeBytes: number | null): Date {
-  const mb = fileSizeBytes ? fileSizeBytes / (1024 * 1024) : 0
-  const minutes = mb > 250 ? LARGE_DEMO_RECLAIM_MINUTES : BASE_RECLAIM_MINUTES
-  return new Date(Date.now() - minutes * 60 * 1000)
 }
 
 /**
