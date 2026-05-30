@@ -128,23 +128,11 @@ export default function SocialPanel() {
           {open ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
 
-        {/* Rotated label + badge */}
+        {/* Icon + badge */}
         <div style={{
           marginTop: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-          position: 'relative',
         }}>
           <Users size={15} style={{ color: 'rgba(255,255,255,0.28)', flexShrink: 0 }} />
-          <span style={{
-            writingMode: 'vertical-rl', textOrientation: 'mixed',
-            transform: 'rotate(180deg)',
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.12em',
-            color: 'rgba(255,255,255,0.22)',
-            textTransform: 'uppercase',
-            fontFamily: 'var(--font-inter, Inter), sans-serif',
-            userSelect: 'none',
-          }}>
-            Social
-          </span>
           {pendingCount > 0 && (
             <div style={{
               width: 16, height: 16, borderRadius: '50%',
