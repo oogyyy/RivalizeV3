@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { parseAndSaveDemo } from '../lib/demo-parser/parse-and-save'
 
 const POLL_INTERVAL_MS  = 2_000
-const STALE_AFTER_MS    = 55 * 60 * 1000  // reclaim jobs stuck > 55 min
+const STALE_AFTER_MS    = 15 * 60 * 1000  // reclaim jobs stuck > 15 min
 const MAX_RETRIES       = 3               // permanently fail after this many attempts
 
 const supabase = createClient(
@@ -58,7 +58,7 @@ async function tick(): Promise<void> {
     await parseAndSaveDemo(demoId)
     console.log(`[worker] Done      ${demoId}`)
   } catch (err) {
-    // Increment retry count; parseAndSaveDemo wrote status='failed' + error_message to DB
+    const errMsg = err instanceof Error ? err.message : String(err)
     const { data: current } = await supabase
       .from('demos')
       .select('retry_count')
@@ -67,16 +67,16 @@ async function tick(): Promise<void> {
 
     const retryCount = (current?.retry_count ?? 0) + 1
     if (retryCount >= MAX_RETRIES) {
-      console.error(`[worker] Failed permanently (${retryCount}/${MAX_RETRIES}) ${demoId}`)
+      console.error(`[worker] Failed permanently (${retryCount}/${MAX_RETRIES}) ${demoId}:`, errMsg)
       await supabase
         .from('demos')
-        .update({ retry_count: retryCount, status: 'failed', processing_started_at: null })
+        .update({ retry_count: retryCount, status: 'failed', processing_started_at: null, error_message: errMsg })
         .eq('id', demoId)
     } else {
-      console.error(`[worker] Failed attempt ${retryCount}/${MAX_RETRIES} ${demoId} — will retry`)
+      console.error(`[worker] Failed attempt ${retryCount}/${MAX_RETRIES} ${demoId} — will retry:`, errMsg)
       await supabase
         .from('demos')
-        .update({ retry_count: retryCount, status: 'processing', processing_started_at: null })
+        .update({ retry_count: retryCount, status: 'processing', processing_started_at: null, error_message: `Attempt ${retryCount}/${MAX_RETRIES} failed: ${errMsg}` })
         .eq('id', demoId)
     }
   }
