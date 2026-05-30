@@ -4,12 +4,16 @@ import { parseAndSaveDemo, applyParsedDemo, type ParseJobResult } from '../lib/d
 /**
  * Rivalize Demo Processing Worker v2
  *
- * Responsibilities:
- * - Claim jobs from 'queued' (new path) and legacy 'processing' (during transition)
- * - Execute heavy parsing via parseAndSaveDemo
- * - Own ALL status transitions (queued → processing → completed/failed)
- * - Dynamic, file-size-aware stale reclaim
- * - Excellent structured logging for debugging stuck jobs
+ * This is the main background worker for parsing CS2 demos.
+ *
+ * Primary flow:
+ * - New demos are created with status='queued' by the API layer.
+ * - This worker claims 'queued' jobs, parses them, and marks them completed/failed.
+ *
+ * Legacy support (temporary):
+ * - During the transition period, this worker also supports older demos that were
+ *   created directly in 'processing' state (the old synchronous model).
+ * - This fallback will be removed once the transition is complete.
  */
 
 const POLL_INTERVAL_MS = 2_000
@@ -42,13 +46,14 @@ function getReclaimCutoff(fileSizeBytes: number | null): Date {
 }
 
 /**
- * Reclaim jobs that have been claimed too long (crashed worker, timeout, etc).
- * Now handles both 'processing' (legacy) and any future stuck states.
+ * Reclaim jobs that have been claimed too long.
+ * Handles both the new 'queued' path and legacy 'processing' rows (temporary).
  */
 async function reclaimStale(): Promise<void> {
   const now = new Date()
 
-  // Legacy 'processing' rows (from old synchronous paths)
+  // Legacy 'processing' rows (from the old synchronous upload flow).
+  // TODO: Remove this block once the transition to the 'queued' model is complete.
   const legacyCutoff = new Date(now.getTime() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
 
   await supabase
@@ -58,7 +63,7 @@ async function reclaimStale(): Promise<void> {
     .not('processing_started_at', 'is', null)
     .lt('processing_started_at', legacyCutoff)
 
-  // Any 'queued' rows that somehow got a processing_started_at (shouldn't happen, but defensive)
+  // Defensive reclaim for any 'queued' rows that somehow got stuck with a claim.
   await supabase
     .from('demos')
     .update({ processing_started_at: null })
@@ -67,11 +72,14 @@ async function reclaimStale(): Promise<void> {
 }
 
 /**
- * Atomically claim the next job using Postgres FOR UPDATE SKIP LOCKED.
- * Prefers 'queued' rows (new path). Falls back to legacy 'processing' rows during transition.
+ * Atomically claim the next available job.
+ *
+ * Priority:
+ * 1. 'queued' jobs (the new, preferred path)
+ * 2. Legacy 'processing' rows (temporary fallback during transition)
  */
 async function claimNext(): Promise<DemoClaim | null> {
-  // Prefer clean 'queued' jobs first
+  // Prefer the new 'queued' path
   const { data: queued } = await supabase
     .from('demos')
     .select('id, file_size_bytes, status')
@@ -95,7 +103,8 @@ async function claimNext(): Promise<DemoClaim | null> {
     if (claimed) return claimed as DemoClaim
   }
 
-  // Fallback: legacy 'processing' rows that were never claimed (or reclaimed)
+  // Temporary fallback for legacy demos still using the old 'processing' flow.
+  // TODO: Remove this fallback once all clients use the 'queued' enqueue path.
   const { data: legacy } = await supabase
     .from('demos')
     .select('id, file_size_bytes, status')
@@ -178,7 +187,7 @@ async function tick(): Promise<void> {
 }
 
 async function run(): Promise<void> {
-  console.log('[worker] Demo processing worker v2 started (queued + legacy support)')
+  console.log('[worker] Demo processing worker v2 started')
   while (true) {
     try {
       await tick()
