@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { parseAndSaveDemo } from '../lib/demo-parser/parse-and-save'
 
 const POLL_INTERVAL_MS  = 2_000
-const STALE_AFTER_MS    = 15 * 60 * 1000  // reclaim jobs stuck > 15 min
+const STALE_AFTER_MS    = 35 * 60 * 1000  // reclaim jobs stuck > 35 min (parser timeout is 25 min)
 const MAX_RETRIES       = 3               // permanently fail after this many attempts
 
 const supabase = createClient(
