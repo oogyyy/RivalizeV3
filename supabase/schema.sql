@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS team_members (
   PRIMARY KEY (team_id, user_id)
 );
 
+-- Updated as part of PR 1 (demo queue reliability)
 CREATE TABLE IF NOT EXISTS demos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
@@ -61,20 +62,32 @@ CREATE TABLE IF NOT EXISTS demos (
   league TEXT,
   raw_file_path TEXT NOT NULL,
   parsed_data JSONB,
-  status TEXT DEFAULT 'processing' CHECK (status IN ('processing', 'completed', 'failed')),
+  status TEXT DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
   -- 'opponent' = scouting upload (Opponents flow); 'self' = own-team upload (My Team flow)
   demo_type TEXT NOT NULL DEFAULT 'opponent' CHECK (demo_type IN ('opponent', 'self')),
   error_message TEXT,
   file_size_bytes BIGINT,
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  processing_started_at TIMESTAMPTZ
+  processing_started_at TIMESTAMPTZ,
+  -- New columns added in the queued status migration
+  queued_at TIMESTAMPTZ,
+  last_heartbeat_at TIMESTAMPTZ,
+  share_id TEXT UNIQUE,
+  retry_count INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS demos_team_id_idx ON demos(team_id);
 CREATE INDEX IF NOT EXISTS demos_opponent_slug_idx ON demos(opponent_slug);
 CREATE INDEX IF NOT EXISTS demos_status_idx ON demos(status);
-CREATE INDEX IF NOT EXISTS demos_worker_queue_idx ON demos(created_at) WHERE status = 'processing' AND processing_started_at IS NULL;
+
+-- New clean queue index (primary path for worker v2)
+CREATE INDEX IF NOT EXISTS demos_queue_claimable_idx ON demos(created_at)
+  WHERE status = 'queued' AND processing_started_at IS NULL;
+
+-- Legacy index retained during transition (will be cleaned up in Phase 3)
+CREATE INDEX IF NOT EXISTS demos_worker_queue_idx ON demos(created_at)
+  WHERE status = 'processing' AND processing_started_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS team_folders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
