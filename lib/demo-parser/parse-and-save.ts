@@ -137,6 +137,9 @@ export async function parseAndSaveDemo(demoId: string): Promise<ParseJobResult> 
  * Previously a silent failure here could cause the worker to log SUCCESS
  * while the row remained stuck in 'processing' (the exact bug observed
  * with large rescued demos during the v2 rollout).
+ *
+ * See autonomous tracking issue #85 for related queued vs legacy 'processing'
+ * transition hygiene, observability improvements, and follow-up work.
  */
 export async function applyParsedDemo(
   demoId: string,
