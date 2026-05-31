@@ -22,41 +22,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .single()
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', position: 'relative', background: '#09091a' }}>
-      {/* Base gradient */}
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', position: 'relative', background: 'var(--bg)' }}>
+      {/* Root background — violet accent radial + signal soft radial */}
       <div style={{
         position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-        background: 'linear-gradient(160deg, #0e0b2a 0%, #09091a 50%, #0a0815 100%)',
-      }}/>
-
-      {/* Dot grid */}
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px)',
-        backgroundSize: '28px 28px',
-        maskImage: 'radial-gradient(ellipse 100% 100% at 50% 50%, black 30%, transparent 100%)',
-        WebkitMaskImage: 'radial-gradient(ellipse 100% 100% at 50% 50%, black 30%, transparent 100%)',
-      }}/>
-
-      {/* Purple orb — top right */}
-      <div style={{
-        position: 'fixed', top: '-10%', right: '-5%', width: 600, height: 600, zIndex: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle, rgba(139,62,255,0.18) 0%, rgba(100,30,200,0.08) 45%, transparent 70%)',
-        filter: 'blur(48px)',
-      }}/>
-
-      {/* Pink orb — bottom left */}
-      <div style={{
-        position: 'fixed', bottom: '-15%', left: '5%', width: 700, height: 500, zIndex: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle, rgba(255,45,120,0.12) 0%, rgba(200,20,80,0.05) 50%, transparent 70%)',
-        filter: 'blur(56px)',
-      }}/>
-
-      {/* Teal orb — mid left (near content area) */}
-      <div style={{
-        position: 'fixed', top: '40%', left: '20%', width: 500, height: 400, zIndex: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle, rgba(0,255,200,0.05) 0%, transparent 65%)',
-        filter: 'blur(40px)',
+        background: [
+          'radial-gradient(1300px 720px at 84% -16%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 58%)',
+          'radial-gradient(1000px 600px at 2% 6%, color-mix(in srgb, var(--signal) 5%, transparent), transparent 56%)',
+          'var(--bg)',
+        ].join(', '),
       }}/>
 
       {/* Desktop sidebar */}

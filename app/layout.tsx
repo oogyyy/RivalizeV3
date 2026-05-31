@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Sora, Space_Grotesk } from 'next/font/google'
+import { Inter, Sora, Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({
@@ -18,6 +18,12 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-space',
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-mono',
 })
 
 export const viewport: Viewport = {
@@ -43,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body
-        className={`${inter.variable} ${sora.variable} ${spaceGrotesk.variable} ${inter.className} min-h-screen bg-background text-foreground antialiased`}
+        className={`${inter.variable} ${sora.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${inter.className} min-h-screen bg-background text-foreground antialiased`}
       >
         {children}
       </body>

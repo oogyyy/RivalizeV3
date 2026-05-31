@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, User, Settings, ChevronDown } from 'lucide-react'
+import { LogOut, User, Settings, ChevronDown, Upload, Bell } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
 export default function TopBar({ profile }: { profile: Profile | null }) {
@@ -16,7 +16,6 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
   const displayName = profile?.display_name || profile?.username || 'Player'
   const initials = displayName[0].toUpperCase()
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
@@ -40,17 +39,17 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 9,
         padding: '8px 14px', textDecoration: 'none',
-        color: 'rgba(255,255,255,0.6)', fontSize: 13,
-        fontFamily: 'var(--font-inter, Inter), sans-serif',
+        color: 'var(--muted)', fontSize: 13,
+        fontFamily: 'var(--font-ui)',
         transition: 'color 0.12s, background 0.12s',
-        borderRadius: 6,
+        borderRadius: 8,
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.color = '#fff'
-        e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+        e.currentTarget.style.color = 'var(--text)'
+        e.currentTarget.style.background = 'var(--hairline)'
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.color = 'rgba(255,255,255,0.6)'
+        e.currentTarget.style.color = 'var(--muted)'
         e.currentTarget.style.background = 'transparent'
       }}
     >
@@ -64,34 +63,115 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
       className="hidden md:flex"
       style={{
         alignItems: 'center',
-        justifyContent: 'flex-end',
+        gap: 14,
         padding: '0 20px',
-        height: 52,
+        height: 56,
         flexShrink: 0,
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'rgba(9,9,26,0.80)',
-        backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid var(--border)',
+        background: 'color-mix(in srgb, var(--bg) 72%, transparent)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
         position: 'sticky',
         top: 0,
         zIndex: 20,
       }}
     >
-      {/* Dropdown trigger */}
+      {/* Search */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 9, flex: 1, maxWidth: 400, height: 37,
+        padding: '0 14px', borderRadius: 10, background: 'var(--card)',
+        border: '1px solid var(--border)', color: 'var(--faint)',
+        transition: 'border-color .14s ease',
+        cursor: 'text',
+      }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-2)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+        <span style={{ fontSize: 13, fontFamily: 'var(--font-ui)', color: 'var(--faint)', flex: 1 }}>
+          Search opponents, demos, players…
+        </span>
+        <kbd style={{
+          marginLeft: 'auto', fontSize: 10, fontFamily: 'var(--font-mono)',
+          color: 'var(--faint)', border: '1px solid var(--border)',
+          borderRadius: 5, padding: '1px 5px',
+        }}>⌘K</kbd>
+      </div>
+
+      <div style={{ flex: 1 }} />
+
+      {/* Upload icon button */}
+      <button
+        style={{
+          width: 37, height: 37, borderRadius: 10, cursor: 'pointer',
+          background: 'transparent', border: '1px solid transparent',
+          color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all .13s ease',
+        }}
+        title="Upload demo"
+        onMouseEnter={e => {
+          e.currentTarget.style.background = 'var(--card)'
+          e.currentTarget.style.borderColor = 'var(--border)'
+          e.currentTarget.style.color = 'var(--text)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = 'transparent'
+          e.currentTarget.style.borderColor = 'transparent'
+          e.currentTarget.style.color = 'var(--muted)'
+        }}
+      >
+        <Upload size={17} />
+      </button>
+
+      {/* Bell icon button */}
+      <button
+        style={{
+          width: 37, height: 37, borderRadius: 10, cursor: 'pointer',
+          background: 'transparent', border: '1px solid transparent',
+          color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all .13s ease', position: 'relative',
+        }}
+        title="Notifications"
+        onMouseEnter={e => {
+          e.currentTarget.style.background = 'var(--card)'
+          e.currentTarget.style.borderColor = 'var(--border)'
+          e.currentTarget.style.color = 'var(--text)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = 'transparent'
+          e.currentTarget.style.borderColor = 'transparent'
+          e.currentTarget.style.color = 'var(--muted)'
+        }}
+      >
+        <Bell size={17} />
+        <span style={{
+          position: 'absolute', top: 8, right: 8,
+          width: 6, height: 6, borderRadius: '50%',
+          background: 'var(--signal)', boxShadow: '0 0 6px var(--signal)',
+        }} />
+      </button>
+
+      {/* Divider */}
+      <span style={{ width: 1, height: 22, background: 'var(--border)' }} />
+
+      {/* User dropdown */}
       <div ref={ref} style={{ position: 'relative' }}>
         <button
           onClick={() => setOpen(v => !v)}
           style={{
             display: 'flex', alignItems: 'center', gap: 9,
-            background: open ? 'rgba(255,255,255,0.06)' : 'transparent',
+            background: open ? 'var(--hairline)' : 'transparent',
             border: '1px solid',
-            borderColor: open ? 'rgba(255,255,255,0.12)' : 'transparent',
-            borderRadius: 8, padding: '5px 10px 5px 6px',
+            borderColor: open ? 'var(--border-2)' : 'transparent',
+            borderRadius: 10, padding: '5px 10px 5px 5px',
             cursor: 'pointer', transition: 'all 0.12s', outline: 'none',
           }}
           onMouseEnter={e => {
             if (!open) {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+              e.currentTarget.style.background = 'var(--hairline)'
+              e.currentTarget.style.borderColor = 'var(--border)'
             }
           }}
           onMouseLeave={e => {
@@ -108,35 +188,29 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
               src={profile.avatar_url}
               alt={displayName}
               style={{
-                width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0,
-                border: '2px solid rgba(255,45,120,0.45)',
+                width: 32, height: 32, borderRadius: 9, objectFit: 'cover', flexShrink: 0,
+                border: '1px solid var(--accent-line)',
               }}
             />
           ) : (
             <div style={{
-              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,45,120,0.16)', border: '2px solid rgba(255,45,120,0.45)',
+              width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+              background: 'var(--accent-soft)', border: '1px solid var(--accent-line)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'var(--font-sora, Sora), sans-serif',
-              fontWeight: 700, fontSize: 13, color: '#ff2d78',
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700, fontSize: 13, color: 'var(--accent)',
             }}>
               {initials}
             </div>
           )}
 
           {/* Name */}
-          <div style={{ textAlign: 'left' }}>
-            <div style={{
-              fontSize: 13, fontWeight: 600, color: '#fff', lineHeight: 1.25,
-              fontFamily: 'var(--font-inter, Inter), sans-serif',
-            }}>
+          <div style={{ textAlign: 'left', lineHeight: 1.25 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-ui)' }}>
               {displayName}
             </div>
             {profile?.username && (
-              <div style={{
-                fontSize: 11, color: 'rgba(255,255,255,0.36)', lineHeight: 1.25,
-                fontFamily: 'var(--font-inter, Inter), sans-serif',
-              }}>
+              <div style={{ fontSize: 10.5, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
                 @{profile.username}
               </div>
             )}
@@ -145,7 +219,7 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
           <ChevronDown
             size={13}
             style={{
-              color: 'rgba(255,255,255,0.35)',
+              color: 'var(--faint)',
               transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
               transition: 'transform 0.15s',
               flexShrink: 0,
@@ -157,32 +231,26 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
         {open && (
           <div style={{
             position: 'absolute', top: 'calc(100% + 6px)', right: 0,
-            minWidth: 180,
-            background: 'rgba(14,13,35,0.98)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 10,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(16px)',
+            minWidth: 190,
+            background: 'var(--elevated)',
+            border: '1px solid var(--border-2)',
+            borderRadius: 12,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)',
+            backdropFilter: 'blur(20px)',
             padding: '6px',
             zIndex: 50,
           }}>
             {/* User header */}
             <div style={{
               padding: '8px 14px 10px',
-              borderBottom: '1px solid rgba(255,255,255,0.07)',
+              borderBottom: '1px solid var(--border)',
               marginBottom: 4,
             }}>
-              <div style={{
-                fontSize: 13, fontWeight: 600, color: '#fff',
-                fontFamily: 'var(--font-inter, Inter), sans-serif',
-              }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-ui)' }}>
                 {displayName}
               </div>
               {profile?.username && (
-                <div style={{
-                  fontSize: 11, color: 'rgba(255,255,255,0.36)',
-                  fontFamily: 'var(--font-inter, Inter), sans-serif',
-                }}>
+                <div style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
                   @{profile.username}
                 </div>
               )}
@@ -191,7 +259,7 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
             {menuItem('/profile', User, 'Profile')}
             {menuItem('/settings', Settings, 'Settings')}
 
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 0' }} />
+            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
 
             {/* Sign out */}
             <button
@@ -200,8 +268,8 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
               style={{
                 display: 'flex', alignItems: 'center', gap: 9, width: '100%',
                 padding: '8px 14px', background: 'transparent', border: 'none',
-                color: 'rgba(255,80,80,0.7)', fontSize: 13, borderRadius: 6,
-                fontFamily: 'var(--font-inter, Inter), sans-serif',
+                color: 'var(--loss)', fontSize: 13, borderRadius: 8,
+                fontFamily: 'var(--font-ui)',
                 cursor: loggingOut ? 'not-allowed' : 'pointer',
                 opacity: loggingOut ? 0.5 : 1,
                 transition: 'color 0.12s, background 0.12s',
@@ -209,12 +277,10 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
               }}
               onMouseEnter={e => {
                 if (!loggingOut) {
-                  e.currentTarget.style.color = 'rgba(255,80,80,1)'
-                  e.currentTarget.style.background = 'rgba(255,80,80,0.08)'
+                  e.currentTarget.style.background = 'color-mix(in srgb, var(--loss) 10%, transparent)'
                 }
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.color = 'rgba(255,80,80,0.7)'
                 e.currentTarget.style.background = 'transparent'
               }}
             >
