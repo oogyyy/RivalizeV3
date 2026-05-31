@@ -49,6 +49,19 @@ export function SidebarNav({ onLinkClick, collapsed, badges = {} }: SidebarNavPr
       {NAV_GROUPS.map((group) => (
         <div key={group.label}>
           {!collapsed && (
+            <div style={{
+              fontFamily: 'var(--font-space, Space Grotesk), sans-serif',
+              fontSize: '10px',
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              color: 'rgba(255,255,255,0.35)',
+              padding: '8px 12px 4px',
+              textTransform: 'uppercase',
+            }}>
+              {group.label}
+            </div>
+          )}
+          {!collapsed && (
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 px-3 mb-1 mt-2">
               {group.label}
             </p>

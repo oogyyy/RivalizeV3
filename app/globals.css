@@ -86,11 +86,96 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .font-space { font-family: var(--font-space, 'Space Grotesk'), sans-serif; }
 .font-inter { font-family: var(--font-inter, 'Inter'), sans-serif; }
 
-/* ── Brand glow utilities ────────────────────────────────────────────────────── */
-.brand-glow    { box-shadow: 0 0 20px rgba(255,45,120,0.25), 0 0 48px rgba(255,45,120,0.1); }
-.brand-glow-sm { box-shadow: 0 0 10px rgba(255,45,120,0.2); }
-.purple-glow   { box-shadow: 0 0 20px rgba(155,29,255,0.25); }
-.teal-glow     { box-shadow: 0 0 20px rgba(0,255,200,0.2); }
+/* ── Neon Cyberpunk Glow System (Electric Nightscape v4) ───────────────────── */
+:root {
+  --accent: #ff2d78;
+  --accent-deep: #c41f5f;
+  --accent-line: rgba(255, 45, 120, 0.55);
+  --signal: #00ffcc;
+  --signal-line: rgba(0, 255, 204, 0.45);
+  --warn: #ffe04a;
+
+  --bg: #090910;
+  --card: #12121f;
+  --card-2: #18182a;
+  --elevated: #1f1f33;
+  --border: rgba(255,255,255,0.09);
+  --border-2: rgba(255,255,255,0.18);
+  --hairline: rgba(255,255,255,0.035);
+  --text: #fff;
+  --muted: rgba(255,255,255,0.52);
+}
+
+/* Strong neon glows */
+.neon-pink      { text-shadow: 0 0 8px currentColor; }
+.neon-cyan      { text-shadow: 0 0 8px currentColor; }
+.neon-yellow    { text-shadow: 0 0 8px currentColor; }
+
+.glow-pink      { box-shadow: 0 0 16px rgba(255,45,120,0.35), 0 0 40px rgba(255,45,120,0.12); }
+.glow-cyan      { box-shadow: 0 0 16px rgba(0,255,204,0.3), 0 0 40px rgba(0,255,204,0.1); }
+.glow-yellow    { box-shadow: 0 0 14px rgba(255,224,74,0.35); }
+
+.glow-pink-sm   { box-shadow: 0 0 10px rgba(255,45,120,0.28); }
+
+/* Panel system matching the prototypes */
+.rv-panel {
+  background: linear-gradient(180deg, rgba(255,255,255,0.016), transparent 120px), var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.rv-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.09) 28%, rgba(255,255,255,0.09) 72%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.rv-glass {
+  background: color-mix(in srgb, var(--card) 68%, transparent);
+  backdrop-filter: blur(20px) saturate(1.35);
+  -webkit-backdrop-filter: blur(20px) saturate(1.35);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 18px 44px -26px rgba(0,0,0,0.8);
+}
+
+.rv-sheen {
+  background: linear-gradient(180deg, rgba(255,255,255,0.022), transparent 90px), var(--card);
+}
+
+/* Insight / signal cards */
+.rv-insight {
+  border-color: color-mix(in srgb, var(--signal) 24%, transparent);
+  background:
+    radial-gradient(480px 250px at 8% -24%, color-mix(in srgb, var(--signal) 11%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--signal) 2.5%, var(--card)), var(--card));
+}
+
+.rv-insight::before {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--signal) 45%, transparent) 28%, color-mix(in srgb, var(--signal) 45%, transparent) 72%, transparent);
+}
+
+/* Accent lines and corner ticks */
+.rv-accent-line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-line) 30%, var(--accent-line) 70%, transparent);
+}
+
+.rv-tick {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  pointer-events: none;
+  z-index: 4;
+}
+.rv-tick-tl { top: 10px; left: 10px; border-top: 1.5px solid var(--accent-line); border-left: 1.5px solid var(--accent-line); }
+.rv-tick-br { bottom: 10px; right: 10px; border-bottom: 1.5px solid var(--accent-line); border-right: 1.5px solid var(--accent-line); }
 
 /* ── Text gradient ───────────────────────────────────────────────────────────── */
 .text-gradient {
@@ -98,6 +183,86 @@ input:focus, textarea:focus, select:focus { outline: none; }
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Strong neon CTAs used across the app */
+.neon-cta {
+  background: linear-gradient(135deg, #ff2d78, #c41f5f);
+  color: white;
+  border: 1px solid rgba(255,45,120,0.4);
+  box-shadow: 0 0 16px rgba(255,45,120,0.35), 0 4px 12px rgba(0,0,0,0.3);
+  transition: all 0.15s ease;
+  font-family: var(--font-space, Space Grotesk), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.neon-cta:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 0 24px rgba(255,45,120,0.5), 0 6px 16px rgba(0,0,0,0.35);
+  transform: translateY(-1px);
+}
+
+.neon-cta:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+/* Signal / cyan secondary actions */
+.signal-cta {
+  background: rgba(0,255,204,0.1);
+  color: #00ffcc;
+  border: 1px solid rgba(0,255,204,0.35);
+  font-family: var(--font-space, Space Grotesk), sans-serif;
+  font-weight: 600;
+}
+
+.signal-cta:hover {
+  background: rgba(0,255,204,0.18);
+  box-shadow: 0 0 14px rgba(0,255,204,0.3);
+}
+
+/* Consistent v4 card used across dashboard, coach, opponents, etc. */
+.v4-card {
+  @apply rv-panel rv-glass;
+}
+
+.v4-card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-space, Space Grotesk), sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.75);
+}
+
+.v4-section-title {
+  font-family: var(--font-sora, Sora), sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+/* v4 Neon Tokyo full-app polish */
+.v4-page {
+  background: #090910;
+}
+
+.v4-insight {
+  border: 1px solid color-mix(in srgb, var(--signal) 24%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--signal) 3%, var(--card)), var(--card));
+}
+
+.v4-row:hover {
+  background: var(--hairline);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Make sure common Radix/Card components inherit v4 look where possible */
+.card, .Card {
+  @apply rv-panel;
 }
 .text-gradient-teal {
   background: linear-gradient(90deg, #00ffc8, #9b1dff);
