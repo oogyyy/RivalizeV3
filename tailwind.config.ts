@@ -50,7 +50,6 @@ const config: Config = {
           dim:     '#cc0060',
           dark:    '#880040',
         },
-<<<<<<< Updated upstream
         /* Accent palette */
         pink:   '#ff2d78',
         purple: '#9b1dff',

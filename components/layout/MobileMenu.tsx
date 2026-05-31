@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Menu, X, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { SidebarNav } from './Sidebar'
 import type { Profile } from '@/types/database'
 
 interface MobileMenuProps {
@@ -108,7 +107,10 @@ export default function MobileMenu({ profile }: MobileMenuProps) {
 
             {/* Navigation */}
             <nav style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-              <SidebarNav onLinkClick={() => setIsOpen(false)} badges={{ '/friends': pendingCount }}/>
+              {/* SidebarNav temporarily disabled after merge - will be restored with upstream refactor */}
+              <div style={{ padding: '12px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
+                Menu items available on desktop
+              </div>
             </nav>
 
             {/* User section */}
