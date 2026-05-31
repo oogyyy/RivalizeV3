@@ -5,10 +5,11 @@ import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import FaceitImportButton from '@/components/teams/FaceitImportButton'
-import FaceitEloCard from '@/components/teams/FaceitEloCard'
 import MyTeamStatsAndDemos from '@/components/teams/MyTeamStatsAndDemos'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 import { PageHeader } from '@/components/layout/PageHeader'
+import CreateTeamDialog from '@/app/(app)/teams/CreateTeamDialog'
+import InviteFriendsDialog from '@/app/(app)/teams/[teamId]/InviteFriendsDialog'
 
 export default async function MyTeamPage() {
   const user = await getCurrentUser()
@@ -18,20 +19,24 @@ export default async function MyTeamPage() {
 
   const { data: memberships } = await admin
     .from('team_members')
-    .select('role, team_id')
+    .select('role, team_id, user_id')
     .eq('user_id', user.id)
 
   const teamIds = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
   const primaryTeamId = teamIds[0] ?? null
+  const myRole = (memberships ?? []).find(m => m.team_id === primaryTeamId)?.role ?? null
+  const canInvite = myRole === 'owner' || myRole === 'admin'
 
   let teamName = 'My Team'
+  let memberIds: string[] = []
+
   if (primaryTeamId) {
-    const { data: team } = await admin
-      .from('teams')
-      .select('name')
-      .eq('id', primaryTeamId)
-      .single()
-    if (team?.name) teamName = team.name
+    const [teamRes, membersRes] = await Promise.all([
+      admin.from('teams').select('name').eq('id', primaryTeamId).single(),
+      admin.from('team_members').select('user_id').eq('team_id', primaryTeamId),
+    ])
+    if (teamRes.data?.name) teamName = teamRes.data.name
+    memberIds = (membersRes.data ?? []).map(m => m.user_id).filter(Boolean)
   }
 
   const { data: myProfile } = await admin
@@ -62,14 +67,22 @@ export default async function MyTeamPage() {
           label="My Team"
           title={teamName}
           description="Your team's performance overview"
-          actions={primaryTeamId ? (
+          actions={
             <div className="flex items-center gap-2">
-              {myFaceitId && (
+              {!primaryTeamId && (
+                <CreateTeamDialog />
+              )}
+              {primaryTeamId && canInvite && (
+                <InviteFriendsDialog teamId={primaryTeamId} existingMemberIds={memberIds} />
+              )}
+              {primaryTeamId && myFaceitId && (
                 <FaceitImportButton teamId={primaryTeamId} faceitNickname={myFaceitId} />
               )}
-              <DemoUploadButton teamId={primaryTeamId} demoType="self" />
+              {primaryTeamId && (
+                <DemoUploadButton teamId={primaryTeamId} demoType="self" />
+              )}
             </div>
-          ) : undefined}
+          }
         />
       </div>
 
