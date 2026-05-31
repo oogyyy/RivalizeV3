@@ -223,8 +223,9 @@ input:focus, textarea:focus, select:focus { outline: none; }
 }
 
 /* Consistent v4 card used across dashboard, coach, opponents, etc. */
+/* Use className="rv-panel rv-glass" directly in JSX instead of .v4-card for now */
 .v4-card {
-  @apply rv-panel rv-glass;
+  /* Styles are in .rv-panel and .rv-glass */
 }
 
 .v4-card-header {
@@ -261,8 +262,9 @@ input:focus, textarea:focus, select:focus { outline: none; }
 }
 
 /* Make sure common Radix/Card components inherit v4 look where possible */
+/* Prefer adding "rv-panel" class directly in components */
 .card, .Card {
-  @apply rv-panel;
+  /* See .rv-panel definition above */
 }
 .text-gradient-teal {
   background: linear-gradient(90deg, #00ffc8, #9b1dff);
