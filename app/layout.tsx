@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Sora, Space_Grotesk, Barlow_Condensed, Outfit, DM_Mono } from 'next/font/google'
+import { Inter, Sora, Space_Grotesk } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({
@@ -18,25 +18,6 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-space',
-})
-
-/* Pro v4 design fonts (for landing page tactical typography) */
-const barlow = Barlow_Condensed({
-  subsets: ['latin'],
-  weight: ['600', '700', '900'],
-  variable: '--font-display',
-})
-
-const outfit = Outfit({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-body',
-})
-
-const dmMono = DM_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-  variable: '--font-mono',
 })
 
 export const viewport: Viewport = {
@@ -62,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body
-        className={`${inter.variable} ${sora.variable} ${spaceGrotesk.variable} ${barlow.variable} ${outfit.variable} ${dmMono.variable} min-h-screen bg-background text-foreground antialiased font-body`}
+        className={`${inter.variable} ${sora.variable} ${spaceGrotesk.variable} ${inter.className} min-h-screen bg-background text-foreground antialiased`}
       >
         {children}
       </body>
