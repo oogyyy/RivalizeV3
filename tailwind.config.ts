@@ -50,6 +50,7 @@ const config: Config = {
           dim:     '#cc0060',
           dark:    '#880040',
         },
+<<<<<<< Updated upstream
         /* Accent palette */
         pink:   '#ff2d78',
         purple: '#9b1dff',
@@ -58,12 +59,24 @@ const config: Config = {
         /* CS2-specific semantic colors */
         tside:  '#F59E0B',
         ctside: '#3B82F6',
+
+        /* Rivalize Pro v4 tactical warm theme tokens (for landing + design system) */
+        'rv-bg': '#0f0c0a',
+        'rv-surface': '#161210',
+        'rv-border': '#2e2620',
+        'rv-acc': '#dc2626',
+        'rv-text': '#ede9e3',
+        'rv-muted': '#8a7c6e',
       },
       fontFamily: {
         sans:  ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
         sora:  ['var(--font-sora)', 'Sora', 'sans-serif'],
         space: ['var(--font-space)', 'Space Grotesk', 'sans-serif'],
         mono:  ['ui-monospace', 'SFMono-Regular', 'monospace'],
+
+        /* Additional stacks for Pro v4 landing (Barlow display, Outfit body, DM Mono) */
+        body:    ['Outfit', 'var(--font-body)', 'system-ui', 'sans-serif'],
+        display: ['Barlow Condensed', 'var(--font-display)', 'sans-serif'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
