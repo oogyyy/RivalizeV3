@@ -49,12 +49,13 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `{"ok":true}`)
 }
 
-// ParseJobRequest is the new JSON-based request body.
+// ParseJobRequest is the JSON body for the new R2-based parse endpoint.
 type ParseJobRequest struct {
 	DemoID              string `json:"demo_id"`
+	R2Key               string `json:"r2_key"`               // original R2 key — used to detect .zst
 	DemoDownloadURL     string `json:"demo_download_url"`      // presigned R2 GET URL
 	ParsedJSONUploadURL string `json:"parsed_json_upload_url"` // presigned R2 PUT URL
-	ParsedJSONPublicURL string `json:"parsed_json_public_url"` // public URL for the parsed JSON
+	ParsedJSONPublicURL string `json:"parsed_json_public_url"` // permanent public URL
 }
 
 // ParseJobResponse is returned on success.
@@ -98,8 +99,8 @@ func handleParseJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if req.DemoID == "" || req.DemoDownloadURL == "" || req.ParsedJSONUploadURL == "" || req.ParsedJSONPublicURL == "" {
-		http.Error(w, "missing required fields: demo_id, demo_download_url, parsed_json_upload_url, parsed_json_public_url", http.StatusBadRequest)
+	if req.DemoID == "" || req.R2Key == "" || req.DemoDownloadURL == "" || req.ParsedJSONUploadURL == "" || req.ParsedJSONPublicURL == "" {
+		http.Error(w, "missing required fields: demo_id, r2_key, demo_download_url, parsed_json_upload_url, parsed_json_public_url", http.StatusBadRequest)
 		return
 	}
 
@@ -115,10 +116,24 @@ func handleParseJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer demoStream.Close()
-	log.Printf("[go-parser] [demoId=%s] Streaming demo (%s) into parser", req.DemoID, humanBytes(streamSize))
+	log.Printf("[go-parser] [demoId=%s] Streaming demo (%s) into parser (compressed=%v)", req.DemoID, humanBytes(streamSize), isCompressed(req.R2Key))
 
-	// 2. Parse directly from the stream — no in-memory buffer needed.
-	result, parseErr := parseDemo(demoStream)
+	// 2. Decompress on-the-fly if needed, then parse from the stream.
+	// Streaming decompression means no large buffers — zstd pipes directly
+	// into demoinfocs, keeping peak memory to just the parse structures.
+	var demoReader io.Reader = demoStream
+	if isCompressed(req.R2Key) {
+		decompressed, err := decompressStream(demoStream)
+		if err != nil {
+			log.Printf("[go-parser] [demoId=%s] Decompression setup failed: %v", req.DemoID, err)
+			writeJSONError(w, http.StatusUnprocessableEntity, "decompression failed: "+err.Error())
+			return
+		}
+		defer decompressed.Close()
+		demoReader = decompressed
+	}
+
+	result, parseErr := parseDemo(demoReader)
 	if parseErr != nil {
 		log.Printf("[go-parser] [demoId=%s] Parse failed: %v", req.DemoID, parseErr)
 		writeJSONError(w, http.StatusUnprocessableEntity, "parse failed: "+parseErr.Error())
