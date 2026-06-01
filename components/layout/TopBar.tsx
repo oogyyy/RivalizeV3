@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, User, Settings, ChevronDown, Upload, Bell, Check, X, Loader2, UserPlus } from 'lucide-react'
+import { LogOut, User, Settings, ChevronDown, Upload, Bell, Check, X, Loader2, UserPlus, FileVideo } from 'lucide-react'
 import type { Profile } from '@/types/database'
 import CommandPalette from './CommandPalette'
 
@@ -18,6 +18,14 @@ interface FriendEntry {
   id: string
   profile: FriendProfile
 }
+interface DemoNotification {
+  id: string
+  type: string
+  title: string
+  body: string | null
+  link: string | null
+  created_at: string
+}
 
 export default function TopBar({ profile }: { profile: Profile | null }) {
   const router = useRouter()
@@ -27,6 +35,7 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
   const [notifOpen, setNotifOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [incoming, setIncoming] = useState<FriendEntry[]>([])
+  const [demoNotifs, setDemoNotifs] = useState<DemoNotification[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
   const [actioning, setActioning] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
@@ -53,12 +62,16 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Fetch pending count on mount
+  // Fetch pending counts on mount (friend requests + demo notifications)
   useEffect(() => {
-    fetch('/api/friends/pending-count')
-      .then(r => r.ok ? r.json() : { count: 0 })
-      .then((d: { count: number }) => setPendingCount(d.count))
-      .catch(() => {})
+    Promise.all([
+      fetch('/api/friends/pending-count').then(r => r.ok ? r.json() : { count: 0 }),
+      fetch('/api/notifications').then(r => r.ok ? r.json() : { notifications: [] }),
+    ]).then(([friends, notifs]: [{ count: number }, { notifications: DemoNotification[] }]) => {
+      const demoCount = (notifs.notifications ?? []).filter(n => n.type === 'demo_ready').length
+      setPendingCount((friends.count ?? 0) + demoCount)
+      setDemoNotifs(notifs.notifications ?? [])
+    }).catch(() => {})
   }, [])
 
   // Global ⌘K / Ctrl+K shortcut
@@ -76,12 +89,16 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
   const loadNotifications = useCallback(async () => {
     setNotifLoading(true)
     try {
-      const res = await fetch('/api/friends')
-      if (res.ok) {
-        const d = await res.json() as { incoming: FriendEntry[] }
-        setIncoming(d.incoming ?? [])
-        setPendingCount(d.incoming?.length ?? 0)
-      }
+      const [friendsRes, notifsRes] = await Promise.all([
+        fetch('/api/friends'),
+        fetch('/api/notifications'),
+      ])
+      const friendsData = friendsRes.ok ? await friendsRes.json() as { incoming: FriendEntry[] } : { incoming: [] }
+      const notifsData  = notifsRes.ok  ? await notifsRes.json() as { notifications: DemoNotification[] } : { notifications: [] }
+
+      setIncoming(friendsData.incoming ?? [])
+      setDemoNotifs(notifsData.notifications ?? [])
+      setPendingCount((friendsData.incoming?.length ?? 0) + (notifsData.notifications?.length ?? 0))
     } catch {}
     setNotifLoading(false)
   }, [])
@@ -101,6 +118,19 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
     })
     await loadNotifications()
     setActioning(null)
+  }
+
+  const handleDemoNotifClick = async (notif: DemoNotification) => {
+    setNotifOpen(false)
+    // Mark this notification read
+    await fetch('/api/notifications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [notif.id] }),
+    }).catch(() => {})
+    setDemoNotifs(prev => prev.filter(n => n.id !== notif.id))
+    setPendingCount(prev => Math.max(0, prev - 1))
+    if (notif.link) router.push(notif.link)
   }
 
   const handleLogout = async () => {
@@ -285,12 +315,12 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
               </div>
 
               {/* Body */}
-              <div style={{ maxHeight: 320, overflowY: 'auto', padding: '6px 0' }}>
+              <div style={{ maxHeight: 360, overflowY: 'auto', padding: '6px 0' }}>
                 {notifLoading ? (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: '28px 0' }}>
                     <Loader2 size={18} style={{ color: '#00ffc8', animation: 'spin 1s linear infinite' }} />
                   </div>
-                ) : incoming.length === 0 ? (
+                ) : incoming.length === 0 && demoNotifs.length === 0 ? (
                   <div style={{ padding: '28px 16px', textAlign: 'center' }}>
                     <Bell size={24} style={{ color: 'var(--faint)', margin: '0 auto 8px' }} />
                     <p style={{ fontSize: 12, color: 'var(--faint)', fontFamily: 'var(--font-ui)' }}>
@@ -299,78 +329,132 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
                   </div>
                 ) : (
                   <>
-                    <p style={{
-                      fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
-                      letterSpacing: '0.1em', color: 'var(--faint)',
-                      fontFamily: 'var(--font-ui)', padding: '4px 14px 6px',
-                    }}>
-                      Friend Requests
-                    </p>
-                    {incoming.map(entry => {
-                      const name = entry.profile.display_name || entry.profile.username
-                      return (
-                        <div key={entry.id} style={{
-                          display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '8px 14px',
+                    {/* Demo ready notifications */}
+                    {demoNotifs.length > 0 && (
+                      <>
+                        <p style={{
+                          fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+                          letterSpacing: '0.1em', color: 'var(--faint)',
+                          fontFamily: 'var(--font-ui)', padding: '4px 14px 6px',
                         }}>
-                          {/* Avatar */}
-                          {entry.profile.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={entry.profile.avatar_url} alt={name}
-                              style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                          ) : (
+                          Demo Updates
+                        </p>
+                        {demoNotifs.map(notif => (
+                          <button
+                            key={notif.id}
+                            onClick={() => handleDemoNotifClick(notif)}
+                            style={{
+                              display: 'flex', alignItems: 'flex-start', gap: 10,
+                              padding: '8px 14px', width: '100%', background: 'transparent',
+                              border: 'none', cursor: 'pointer', textAlign: 'left',
+                              transition: 'background 0.12s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--hairline)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                          >
                             <div style={{
-                              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                              width: 30, height: 30, borderRadius: 8, flexShrink: 0,
                               background: 'rgba(0,255,200,0.1)', border: '1px solid rgba(0,255,200,0.2)',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: 11, fontWeight: 700, color: '#00ffc8',
                             }}>
-                              {name.slice(0, 2).toUpperCase()}
+                              <FileVideo size={14} style={{ color: '#00ffc8' }} />
                             </div>
-                          )}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{
-                              fontSize: 12, fontWeight: 600, color: 'var(--text)',
-                              fontFamily: 'var(--font-ui)',
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{
+                                fontSize: 12, fontWeight: 600, color: 'var(--text)',
+                                fontFamily: 'var(--font-ui)', lineHeight: 1.3,
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              }}>
+                                {notif.title}
+                              </p>
+                              {notif.body && (
+                                <p style={{ fontSize: 10, color: 'var(--faint)', fontFamily: 'var(--font-ui)', marginTop: 1 }}>
+                                  {notif.body}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Friend requests */}
+                    {incoming.length > 0 && (
+                      <>
+                        <p style={{
+                          fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+                          letterSpacing: '0.1em', color: 'var(--faint)',
+                          fontFamily: 'var(--font-ui)', padding: '4px 14px 6px',
+                          marginTop: demoNotifs.length > 0 ? 4 : 0,
+                        }}>
+                          Friend Requests
+                        </p>
+                        {incoming.map(entry => {
+                          const name = entry.profile.display_name || entry.profile.username
+                          return (
+                            <div key={entry.id} style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              padding: '8px 14px',
                             }}>
-                              {name}
-                            </p>
-                            <p style={{ fontSize: 10, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
-                              @{entry.profile.username}
-                            </p>
-                          </div>
-                          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                            <button
-                              onClick={() => handleFriendAction(entry.id, 'accept')}
-                              disabled={actioning === entry.id}
-                              title="Accept"
-                              style={{
-                                width: 26, height: 26, borderRadius: 6, border: 'none',
-                                background: 'rgba(0,255,200,0.12)', color: '#00ffc8',
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              }}
-                            >
-                              {actioning === entry.id
-                                ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
-                                : <Check size={11} />}
-                            </button>
-                            <button
-                              onClick={() => handleFriendAction(entry.id, 'reject')}
-                              disabled={actioning === entry.id}
-                              title="Decline"
-                              style={{
-                                width: 26, height: 26, borderRadius: 6, border: 'none',
-                                background: 'rgba(255,80,80,0.1)', color: 'rgba(255,80,80,0.7)',
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              }}
-                            >
-                              <X size={11} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
+                              {entry.profile.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={entry.profile.avatar_url} alt={name}
+                                  style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                              ) : (
+                                <div style={{
+                                  width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                                  background: 'rgba(0,255,200,0.1)', border: '1px solid rgba(0,255,200,0.2)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 11, fontWeight: 700, color: '#00ffc8',
+                                }}>
+                                  {name.slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{
+                                  fontSize: 12, fontWeight: 600, color: 'var(--text)',
+                                  fontFamily: 'var(--font-ui)',
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                }}>
+                                  {name}
+                                </p>
+                                <p style={{ fontSize: 10, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
+                                  @{entry.profile.username}
+                                </p>
+                              </div>
+                              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                                <button
+                                  onClick={() => handleFriendAction(entry.id, 'accept')}
+                                  disabled={actioning === entry.id}
+                                  title="Accept"
+                                  style={{
+                                    width: 26, height: 26, borderRadius: 6, border: 'none',
+                                    background: 'rgba(0,255,200,0.12)', color: '#00ffc8',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  }}
+                                >
+                                  {actioning === entry.id
+                                    ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                                    : <Check size={11} />}
+                                </button>
+                                <button
+                                  onClick={() => handleFriendAction(entry.id, 'reject')}
+                                  disabled={actioning === entry.id}
+                                  title="Decline"
+                                  style={{
+                                    width: 26, height: 26, borderRadius: 6, border: 'none',
+                                    background: 'rgba(255,80,80,0.1)', color: 'rgba(255,80,80,0.7)',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  }}
+                                >
+                                  <X size={11} />
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </>
+                    )}
                   </>
                 )}
               </div>

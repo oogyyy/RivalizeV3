@@ -7,6 +7,7 @@ import {
   createPresignedPutUrl,
   getPublicUrl,
 } from '@/lib/r2'
+import { notifyTeamDemoReady } from '@/lib/notifications'
 
 type ParsedDataRow = {
   header?: { map?: string; score_team1?: number; score_team2?: number }
@@ -154,7 +155,7 @@ async function detectOurTeamSide(
   const { data: profiles } = await admin
     .from('profiles')
     .select('steam_id')
-    .in('id', members.map(m => m.user_id))
+    .in('id', members.map((m: { user_id: string }) => m.user_id))
     .not('steam_id', 'is', null)
   if (!profiles || profiles.length === 0) return null
 
@@ -266,6 +267,15 @@ export async function applyParsedDemo(
   if (warnings.length) {
     console.warn(`[parse] warnings for ${demoId}:`, warnings)
   }
+
+  // Notify all team members that the demo is ready.
+  await notifyTeamDemoReady(
+    demo.team_id,
+    demoId,
+    parsedData.header?.map ?? 'unknown',
+    demo.opponent_slug ?? 'Unknown',
+    demo.demo_type ?? 'opponent',
+  )
 
   // Recalculate folder aggregates for opponent demos only (non-fatal).
   if (demo.demo_type === 'opponent' && demo.opponent_slug) {
