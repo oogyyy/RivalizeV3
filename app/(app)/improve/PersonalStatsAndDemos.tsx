@@ -9,6 +9,7 @@ import {
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import MapFolderList, { type MapGroup } from '@/components/teams/MapFolderList'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
+import RecentMatchesSplit from '@/app/(app)/improve/RecentMatchesSplit'
 
 const ACTIVE_DUTY_MAPS = [
   'de_ancient', 'de_anubis', 'de_dust2', 'de_inferno',
@@ -129,10 +130,12 @@ export default function PersonalStatsAndDemos({
   initialDemos,
   personalTeamId,
   steamId,
+  faceitPlayerId,
 }: {
   initialDemos: DemoRowData[]
   personalTeamId: string
   steamId: string | null
+  faceitPlayerId: string | null
 }) {
   const [demos] = useState(initialDemos)
   const stats    = useMemo(() => computeStats(demos, steamId), [demos, steamId])
@@ -187,29 +190,36 @@ export default function PersonalStatsAndDemos({
         />
       </div>
 
-      {/* Demo list */}
+      {/* Recent matches split table */}
       <div className="animate-fade-in-up animate-fade-in-up-delay-2">
-        <div className="flex items-center gap-2 mb-3">
-          <FileVideo size={15} className="text-[#00ffc8]" />
-          <h2 className="text-[13px] font-semibold text-foreground">My Matches</h2>
-          {demos.length > 0 && (
-            <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
-              {demos.length} · {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').length} maps
-            </span>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <FileVideo size={15} className="text-[#00ffc8]" />
+            <h2 className="text-[13px] font-semibold text-foreground">My Matches</h2>
+            {demos.length > 0 && (
+              <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
+                {demos.length} uploaded
+              </span>
+            )}
+          </div>
+          {demos.length === 0 && (
+            <DemoUploadButton teamId={personalTeamId} demoType="self" />
           )}
         </div>
 
-        {demos.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-card/50 p-10 text-center">
-            <FileVideo size={28} className="text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-[14px] font-medium text-foreground mb-1">No matches uploaded yet</p>
-            <p className="text-[12px] text-muted-foreground mb-5 leading-relaxed max-w-xs mx-auto">
-              Upload your pug, matchmaking, or any personal demo to start tracking your individual performance.
-            </p>
-            <DemoUploadButton teamId={personalTeamId} demoType="self" />
+        <RecentMatchesSplit demos={demos} faceitPlayerId={faceitPlayerId} />
+
+        {/* Detailed demo browser — shown when uploads exist */}
+        {demos.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">Demo Browser</h2>
+              <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
+                {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').length} maps
+              </span>
+            </div>
+            <MapFolderList mapGroups={mapGroups} onSideChange={() => {}} />
           </div>
-        ) : (
-          <MapFolderList mapGroups={mapGroups} onSideChange={() => {}} />
         )}
       </div>
     </>
