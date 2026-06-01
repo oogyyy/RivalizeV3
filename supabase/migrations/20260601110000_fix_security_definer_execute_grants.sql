@@ -15,7 +15,10 @@
 -- ── Step 1: strip the PUBLIC grant from all affected functions ────────────
 
 REVOKE EXECUTE ON FUNCTION public.handle_new_user()                             FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()                             FROM PUBLIC;
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
 REVOKE EXECUTE ON FUNCTION public.set_demo_opponent_side(uuid, text)            FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.is_team_member(uuid)                         FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.is_team_member(uuid, uuid)                   FROM PUBLIC;

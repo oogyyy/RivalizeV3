@@ -62,7 +62,10 @@ REVOKE EXECUTE ON FUNCTION public.is_team_admin(uuid) FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.is_team_creator(uuid) FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.is_team_member(uuid, uuid) FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.is_team_admin(uuid, uuid) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon, authenticated;
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon, authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
 
 -- ── 3. Remove overly broad SELECT policies on public storage buckets ──────────
 -- Public buckets serve files by URL directly — no RLS SELECT policy needed.
