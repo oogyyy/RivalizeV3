@@ -1,46 +1,44 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { parseCS2Demo } from '@/lib/demo-parser/go-parser-client'
+import { triggerParseJob } from '@/lib/demo-parser/go-parser-client'
 import { maybeDecompress } from '@/lib/demo-parser/decompress'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
-import { downloadObject } from '@/lib/r2'
+import {
+  downloadObject,
+  uploadObject,
+  deleteObject,
+  createPresignedGetUrl,
+  createPresignedPutUrl,
+  getPublicUrl,
+} from '@/lib/r2'
 
 type ParsedDataRow = {
   header?: { map?: string; score_team1?: number; score_team2?: number }
   opponentSide?: string
 }
 
-/**
- * Result type returned by the parser.
- * The worker is responsible for all status / retry_count / error_message writes.
- */
 export type ParseJobResult =
-  | { success: true; parsedData: any; warnings: string[] }
+  | { success: true; parsedJsonUrl: string; warnings: string[] }
   | { success: false; error: string; isPermanent: boolean }
 
-// Errors that are worth retrying (service hiccups, cold starts, network blips)
-// NOTE: This classification overlaps with similar logic in worker/index.ts catch block
-// and the isTransient list below. See #85 for future consolidation work during the
-// queued vs legacy 'processing' transition.
+// Errors that warrant a retry (service hiccups, cold starts, network blips)
 function isRetryable(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err)
-  // Non-retryable: bad demo file (422), no player data, explicit demo errors
   if (msg.includes('Go parser demo error')) return false
-  // Retryable: network issues, timeouts, service restarts
   return (
-    msg.includes('Go parser unreachable') ||
-    msg.includes('Go parser timed out')   ||
-    msg.includes('Go parser returned HTTP') ||
-    msg.includes('truncated')             ||
-    msg.includes('R2 download')           ||
-    msg.includes('ECONNRESET')            ||
-    msg.includes('ETIMEDOUT')             ||
+    msg.includes('Go parser unreachable')    ||
+    msg.includes('Go parser timed out')      ||
+    msg.includes('Go parser returned HTTP')  ||
+    msg.includes('R2 download')              ||
+    msg.includes('R2 upload')                ||
+    msg.includes('truncated')                ||
+    msg.includes('ECONNRESET')               ||
+    msg.includes('ETIMEDOUT')                ||
     msg.includes('fetch failed')
   )
 }
 
-async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
-  // Longer delays: the parser may need 20–60 s to cold-start on Railway
-  const delays = [8_000, 20_000, 40_000]
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  const delays = [8_000, 20_000]
   let lastErr: unknown
   for (let i = 0; i < attempts; i++) {
     try {
@@ -48,11 +46,10 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
     } catch (err) {
       lastErr = err
       if (i < attempts - 1 && isRetryable(err)) {
-        const wait = delays[i] ?? 40_000
+        const wait = delays[i] ?? 20_000
         console.warn(`[parse] attempt ${i + 1} failed (retryable), waiting ${wait / 1000}s — ${(err as Error).message}`)
         await new Promise(resolve => setTimeout(resolve, wait))
       } else if (!isRetryable(err)) {
-        // Non-retryable — fail fast
         throw err
       }
     }
@@ -61,18 +58,23 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
 }
 
 /**
- * Downloads, parses, and prepares the data.
+ * Sends the parse job to the Go parser service.
  *
- * IMPORTANT: This function NO LONGER mutates the demos table status.
- * It only performs the heavy work and returns a result.
- * The worker (or legacy transition code) is responsible for all status transitions.
+ * New flow (no large payload over HTTP):
+ * 1. Generate presigned R2 URLs for the demo download and result upload.
+ * 2. If the demo is .zst, decompress first and upload decompressed bytes to a
+ *    temp key so the Go parser never needs a zstd library.
+ * 3. Call Go parser with the presigned URLs.
+ * 4. Go parser streams the demo, parses it, uploads result JSON to R2,
+ *    and updates demos.status='parsed' in Supabase.
+ * 5. Return the parsed_json_url — no parsed data crosses this boundary.
  */
 export async function parseAndSaveDemo(demoId: string): Promise<ParseJobResult> {
   const admin = createAdminClient()
 
   const { data: demo, error: fetchErr } = await admin
     .from('demos')
-    .select('id, team_id, raw_file_path, opponent_slug, demo_type, parsed_data')
+    .select('id, raw_file_path, parsed_data')
     .eq('id', demoId)
     .single()
 
@@ -85,74 +87,104 @@ export async function parseAndSaveDemo(demoId: string): Promise<ParseJobResult> 
     return { success: false, error: `Demo ${demoId} has no file path`, isPermanent: true }
   }
 
+  // Preserve opponentSide from any existing parsed_data
   const existingOpponentSide =
     (demo.parsed_data as { opponentSide?: string } | null)?.opponentSide ?? 'team2'
 
+  let demoKey = r2Key
+  let tempKeyToClean: string | null = null
+
   try {
-    const buf = await withRetry(async () => {
+    // If the demo is compressed, decompress and upload to a temp R2 key so the
+    // Go parser can download a plain .dem file without needing a zstd library.
+    if (r2Key.toLowerCase().endsWith('.zst')) {
+      const tempKey = `temp-demos/${demoId}.dem`
+      console.log(`[parse] [demoId=${demoId}] Decompressing .zst demo for Go parser...`)
+
       const rawBuf = await downloadObject(r2Key)
-      return maybeDecompress(rawBuf, r2Key)
-    })
+      const decompressed = maybeDecompress(rawBuf, r2Key)
 
-    const { parsedData: realData, warnings } = await withRetry(() => parseCS2Demo(buf))
+      console.log(`[parse] [demoId=${demoId}] Uploading decompressed demo (${(decompressed.byteLength / 1e6).toFixed(0)} MB) to temp R2...`)
+      await uploadObject(tempKey, decompressed)
 
-    if (realData.players.length === 0) {
-      return {
-        success: false,
-        error: 'Demo parsed successfully but contained no player data',
-        isPermanent: true,
-      }
+      demoKey = tempKey
+      tempKeyToClean = tempKey
     }
 
-    // Success — return the data. The caller (worker) will write status + aggregates.
+    // Generate presigned URLs (6-hour expiry — generous for large demos + retries)
+    const EXPIRY = 6 * 3600
+    const parsedJsonKey = `parsed-demos/${demoId}.json`
+
+    const [demoDownloadUrl, parsedJsonUploadUrl] = await Promise.all([
+      createPresignedGetUrl(demoKey, EXPIRY),
+      createPresignedPutUrl(parsedJsonKey, EXPIRY),
+    ])
+    const parsedJsonPublicUrl = getPublicUrl(parsedJsonKey)
+
+    // Trigger parse job — Go parser does all heavy lifting.
+    const { parsedJsonUrl, warnings } = await withRetry(() =>
+      triggerParseJob(demoId, demoDownloadUrl, parsedJsonUploadUrl, parsedJsonPublicUrl)
+    )
+
+    // Tag opponentSide onto the result key so applyParsedDemo can find it.
+    // We store it as a worker-side parameter, not in the JSON itself.
     return {
       success: true,
-      parsedData: { ...realData, opponentSide: existingOpponentSide },
+      parsedJsonUrl: `${parsedJsonUrl}?opponentSide=${encodeURIComponent(existingOpponentSide)}`,
       warnings,
     }
-
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err)
     console.error(`[parse] All attempts failed for ${demoId}:`, raw)
 
-    // NOTE: This isTransient list intentionally overlaps with isRetryable() above and
-    // similar classification in worker/index.ts. Duplication noted for future cleanup.
-    // See #85 (autonomous transition hygiene) for consolidation tracking.
     const isTransient =
-      raw.includes('truncated') ||
-      raw.includes('R2 download') ||
-      raw.includes('zstd decompression produced no output') ||
-      raw.includes('Go parser') ||
-      raw.includes('timed out') ||
-      raw.includes('ECONNRESET') ||
+      raw.includes('truncated')          ||
+      raw.includes('R2 download')        ||
+      raw.includes('R2 upload')          ||
+      raw.includes('Go parser')          ||
+      raw.includes('timed out')          ||
+      raw.includes('ECONNRESET')         ||
       raw.includes('ETIMEDOUT')
 
-    return {
-      success: false,
-      error: raw,
-      isPermanent: !isTransient,
+    return { success: false, error: raw, isPermanent: !isTransient }
+  } finally {
+    // Clean up the temp decompressed demo from R2 (best-effort, non-fatal).
+    if (tempKeyToClean) {
+      deleteObject(tempKeyToClean).catch(e =>
+        console.warn(`[parse] Non-fatal: failed to delete temp key ${tempKeyToClean}:`, e)
+      )
     }
   }
 }
 
 /**
- * Applies the parsed data to the database and updates team folder aggregates.
- * This is called by the worker after a successful parse.
+ * Downloads the parsed JSON from R2 and writes it to the demos table.
  *
- * ROBUSTNESS: We now verify the critical demos UPDATE actually succeeded.
- * Previously a silent failure here could cause the worker to log SUCCESS
- * while the row remained stuck in 'processing' (the exact bug observed
- * with large rescued demos during the v2 rollout).
- *
- * See autonomous tracking issue #85 for related queued vs legacy 'processing'
- * transition hygiene, observability improvements, and follow-up work.
+ * Supabase timeout fix:
+ *   Position frames are stripped before writing parsed_data — they are the
+ *   largest part of the JSON (~90%) but are only needed for the position replay
+ *   feature, which can load them on demand via parsed_json_url.
+ *   The remaining data (header, players, kills, grenades, heatmap) is typically
+ *   <200 KB, well within Supabase's statement timeout.
  */
 export async function applyParsedDemo(
   demoId: string,
-  parsedData: any,
-  warnings: string[] = []
+  parsedJsonUrlWithParams: string,
+  warnings: string[] = [],
 ): Promise<void> {
   const admin = createAdminClient()
+
+  // Extract opponentSide param we embedded in the URL (avoids an extra DB fetch).
+  let parsedJsonUrl = parsedJsonUrlWithParams
+  let opponentSide = 'team2'
+  try {
+    const u = new URL(parsedJsonUrlWithParams)
+    opponentSide = u.searchParams.get('opponentSide') ?? 'team2'
+    u.searchParams.delete('opponentSide')
+    parsedJsonUrl = u.toString()
+  } catch {
+    // URL parsing failed; keep defaults and proceed
+  }
 
   const { data: demo } = await admin
     .from('demos')
@@ -161,28 +193,45 @@ export async function applyParsedDemo(
     .single()
 
   if (!demo) {
-    throw new Error(`applyParsedDemo: demo ${demoId} not found when applying results`)
+    throw new Error(`applyParsedDemo: demo ${demoId} not found`)
+  }
+
+  // Download parsed JSON from R2.
+  const parsedJsonKey = `parsed-demos/${demoId}.json`
+  const rawBuf = await downloadObject(parsedJsonKey)
+  const parsedData = JSON.parse(rawBuf.toString('utf-8'))
+
+  // Strip position frames before writing to Supabase.
+  // Frames are ~90% of the JSON size. Keep kills, grenades, header, players.
+  const parsedDataNoFrames = {
+    ...parsedData,
+    opponentSide,
+    rounds: (parsedData.rounds ?? []).map((r: Record<string, unknown>) => ({
+      ...r,
+      frames: [], // Stripped — load from parsed_json_url for position replay
+    })),
   }
 
   console.log(`[apply] Updating demo ${demoId} status -> completed (map=${parsedData.header?.map ?? 'unknown'})`)
 
-  // Critical write: mark as completed. Must succeed or we throw so the worker can retry/fail the job.
   const { data: updated, error: updateErr } = await admin
     .from('demos')
     .update({
-      parsed_data: parsedData,
-      status: 'completed',
-      map: parsedData.header?.map ?? 'unknown',
-      error_message: null,
+      parsed_data:     parsedDataNoFrames,
+      parsed_json_url: parsedJsonUrl,
+      status:          'completed',
+      map:             parsedData.header?.map ?? 'unknown',
+      parsed_at:       new Date().toISOString(),
+      error_message:   null,
     })
     .eq('id', demoId)
     .select('id')
 
   if (updateErr) {
-    throw new Error(`Failed to mark demo ${demoId} completed (Supabase error): ${updateErr.message}`)
+    throw new Error(`Failed to mark demo ${demoId} completed: ${updateErr.message}`)
   }
   if (!updated || updated.length === 0) {
-    throw new Error(`Failed to mark demo ${demoId} completed: update affected 0 rows (concurrent modification, deleted row, or unexpected constraint)`)
+    throw new Error(`Failed to mark demo ${demoId} completed: 0 rows updated`)
   }
 
   console.log(`[apply] Demo ${demoId} successfully marked completed`)
@@ -191,8 +240,7 @@ export async function applyParsedDemo(
     console.warn(`[parse] warnings for ${demoId}:`, warnings)
   }
 
-  // Recalculate folder stats for opponent demos only.
-  // Non-fatal: if this fails we still want the demo itself marked complete.
+  // Recalculate folder aggregates for opponent demos only (non-fatal).
   if (demo.demo_type === 'opponent' && demo.opponent_slug) {
     try {
       const { data: allDemos } = await admin
@@ -204,16 +252,16 @@ export async function applyParsedDemo(
         .eq('demo_type', 'opponent')
 
       if (allDemos && allDemos.length > 0) {
-        const wins = allDemos.filter(d => {
+        const wins = allDemos.filter((d: { parsed_data: unknown }) => {
           const pd = d.parsed_data as ParsedDataRow | null
-          const h = pd?.header
+          const h  = pd?.header
           if (!h) return false
           const s1 = h.score_team1 ?? 0
           const s2 = h.score_team2 ?? 0
           return pd?.opponentSide === 'team1' ? s2 > s1 : s1 > s2
         }).length
 
-        const draws = allDemos.filter(d => {
+        const draws = allDemos.filter((d: { parsed_data: unknown }) => {
           const h = (d.parsed_data as ParsedDataRow | null)?.header
           return h && (h.score_team1 ?? 0) === (h.score_team2 ?? 0)
         }).length
@@ -229,9 +277,9 @@ export async function applyParsedDemo(
           aggregated_stats: {
             total_matches: allDemos.length,
             wins,
-            losses: allDemos.length - wins - draws,
+            losses:    allDemos.length - wins - draws,
             draws,
-            win_rate: wins / allDemos.length,
+            win_rate:  wins / allDemos.length,
             avg_rating: topPlayers.length > 0
               ? topPlayers.reduce((s, p) => s + p.rating, 0) / topPlayers.length
               : 1.0,
@@ -243,7 +291,7 @@ export async function applyParsedDemo(
           .eq('opponent_slug', demo.opponent_slug)
 
         if (folderErr) {
-          console.error(`[apply] Non-fatal: failed to update team_folders aggregates for ${demoId}: ${folderErr.message}`)
+          console.error(`[apply] Non-fatal: failed to update team_folders for ${demoId}: ${folderErr.message}`)
         }
       }
     } catch (aggErr) {

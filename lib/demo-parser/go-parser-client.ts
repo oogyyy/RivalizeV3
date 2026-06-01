@@ -1,22 +1,20 @@
-import type { ParsedDemoData, GrenadeEvent } from '@/types/database'
+// Per-request timeout for the parse job (download + parse + upload can take up to 25 min)
+const PARSER_TIMEOUT_MS = 28 * 60 * 1000
 
-export interface RealParseResult {
-  parsedData: ParsedDemoData
-  warnings: string[]
-}
-
-// Per-request timeout for the actual parse call — large demos (300MB+ compressed) need ~20 min
-const PARSER_TIMEOUT_MS = 25 * 60 * 1000
-
-// How long to wait for the parser to become healthy before giving up
+// How long to wait for the parser to become healthy after a cold start
 const WARMUP_MAX_MS      = 90_000
 const WARMUP_INTERVAL_MS = 4_000
 
+export interface ParseJobResult {
+  parsedJsonUrl: string
+  warnings: string[]
+}
+
 /**
  * Pings /health until the parser responds OK or the deadline is reached.
- * This handles Railway cold starts where the service needs up to ~60s to wake.
+ * Handles Railway cold starts where the service needs up to ~60s to wake.
  */
-async function waitForParser(baseUrl: string): Promise<void> {
+export async function waitForParser(baseUrl: string): Promise<void> {
   const deadline = Date.now() + WARMUP_MAX_MS
   let attempt = 0
   while (Date.now() < deadline) {
@@ -39,32 +37,45 @@ async function waitForParser(baseUrl: string): Promise<void> {
 }
 
 /**
- * Sends a demo buffer to the Go parser service and returns structured data.
- * PARSER_URL must point to the deployed go-parser service.
+ * Sends a parse job request to the Go parser service.
+ *
+ * Instead of uploading the demo bytes, the worker passes presigned R2 URLs:
+ *   - demo_download_url     — presigned GET for the raw demo (already decompressed)
+ *   - parsed_json_upload_url — presigned PUT for the output JSON
+ *   - parsed_json_public_url — permanent public URL for the output JSON
+ *
+ * The Go parser streams the demo, parses it, uploads the result to R2,
+ * and updates demos.status = 'parsed' in Supabase. No large payload
+ * crosses the worker ↔ parser boundary.
  */
-export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
+export async function triggerParseJob(
+  demoId: string,
+  demoDownloadUrl: string,
+  parsedJsonUploadUrl: string,
+  parsedJsonPublicUrl: string,
+): Promise<ParseJobResult> {
   const parserUrl = process.env.PARSER_URL
   if (!parserUrl) {
-    throw new Error('PARSER_URL environment variable is not set. Deploy the go-parser service and set PARSER_URL.')
+    throw new Error('PARSER_URL environment variable is not set.')
   }
 
   const base = parserUrl.replace(/\/$/, '')
-
-  // Ensure the service is up before uploading the (potentially large) demo file.
-  // This gracefully handles Railway cold starts without burning a full retry attempt.
   await waitForParser(base)
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), PARSER_TIMEOUT_MS)
 
-  const form = new FormData()
-  form.append('demo', new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), 'demo.dem')
-
   let res: Response
   try {
     res = await fetch(`${base}/parse`, {
-      method: 'POST',
-      body: form,
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        demo_id:               demoId,
+        demo_download_url:     demoDownloadUrl,
+        parsed_json_upload_url: parsedJsonUploadUrl,
+        parsed_json_public_url: parsedJsonPublicUrl,
+      }),
       signal: controller.signal,
     })
   } catch (e) {
@@ -78,208 +89,18 @@ export async function parseCS2Demo(buf: Buffer): Promise<RealParseResult> {
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    // HTTP 422 means the demo file itself is bad — mark it non-retryable
     const prefix = res.status === 422 ? 'Go parser demo error' : 'Go parser returned HTTP'
     throw new Error(`${prefix} ${res.status}: ${text}`)
   }
 
-  const raw = await res.json() as {
-    header:   GoHeader
-    rounds:   GoRound[]
-    players:  GoPlayer[]
-    warnings: string[]
-  }
+  const raw = await res.json() as { ok: boolean; demo_id: string; parsed_json_url: string }
 
-  if (raw.warnings?.length) {
-    console.warn('[go-parser] warnings:', raw.warnings)
+  if (!raw.ok || !raw.parsed_json_url) {
+    throw new Error(`Go parser returned invalid response (missing parsed_json_url)`)
   }
-
-  if (!raw.header) {
-    throw new Error('Go parser returned no header data')
-  }
-
-  const parsedData: ParsedDemoData = {
-    header: {
-      map:          raw.header.map,
-      team1:        raw.header.team1,
-      team2:        raw.header.team2,
-      score_team1:  raw.header.score_team1,
-      score_team2:  raw.header.score_team2,
-      duration:     raw.header.duration,
-      total_rounds: raw.header.total_rounds,
-    },
-    rounds: (raw.rounds ?? []).map((r, i) => ({
-      number:        i + 1,
-      winner:        r.winner,
-      win_reason:    r.win_reason,
-      duration:      r.duration,
-      team1_economy: r.team1_economy,
-      team2_economy: r.team2_economy,
-      bomb_planted:  r.bomb_planted,
-      bomb_defused:  r.bomb_defused,
-      kills: (r.kills ?? []).map(k => ({
-        tick:        k.tick,
-        time:        k.time,
-        killer_name: k.killer_name,
-        victim_name: k.victim_name,
-        weapon:      k.weapon,
-        headshot:    k.headshot,
-        killer_x:    k.killer_x,
-        killer_y:    k.killer_y,
-        victim_x:    k.victim_x,
-        victim_y:    k.victim_y,
-      })),
-      grenades: (r.grenades ?? []).map(g => ({
-        tick:      g.tick,
-        time:      g.time,
-        type:      g.type as GrenadeEvent['type'],
-        thrower:   g.thrower,
-        throw_x:   g.throw_x,
-        throw_y:   g.throw_y,
-        land_x:    g.land_x,
-        land_y:    g.land_y,
-        land_time: g.land_time,
-      })),
-      frames: (r.frames ?? []),
-    })),
-    players: (raw.players ?? []).map(p => ({
-      steam_id:           p.steam_id,
-      name:               p.name,
-      team:               p.team,
-      kills:              p.kills,
-      deaths:             p.deaths,
-      assists:            p.assists,
-      headshots:          p.headshots,
-      headshot_percentage: p.headshot_percentage,
-      adr:                p.adr,
-      kast:               p.kast,
-      rating:             p.rating,
-      utility_damage:     p.utility_damage,
-      flash_assists:      p.flash_assists,
-      mvps:               p.mvps,
-      rounds_played:      p.rounds_played,
-    })),
-    events: [],
-    heatmap_data: [],
-  }
-  parsedData.heatmap_data = buildHeatmapData(parsedData.rounds, parsedData.players)
 
   return {
-    parsedData,
-    warnings: raw.warnings ?? [],
+    parsedJsonUrl: raw.parsed_json_url,
+    warnings: [],
   }
-}
-
-// ── Go service response types ─────────────────────────────────────────────────
-
-interface GoHeader {
-  map:          string
-  team1:        string
-  team2:        string
-  score_team1:  number
-  score_team2:  number
-  duration:     number
-  total_rounds: number
-}
-
-interface GoKill {
-  tick:        number
-  time:        number
-  killer_name: string
-  victim_name: string
-  weapon:      string
-  headshot:    boolean
-  killer_x:    number
-  killer_y:    number
-  victim_x:    number
-  victim_y:    number
-}
-
-interface GoGrenadeEvent {
-  tick:      number
-  time:      number
-  type:      string
-  thrower:   string
-  throw_x:   number
-  throw_y:   number
-  land_x:    number
-  land_y:    number
-  land_time: number
-}
-
-interface GoPlayerSnapshot {
-  n: string
-  x: number
-  y: number
-  a: boolean
-}
-
-interface GoPositionFrame {
-  t: number
-  p: GoPlayerSnapshot[]
-}
-
-interface GoRound {
-  number:        number
-  winner:        string
-  win_reason:    string
-  duration:      number
-  team1_economy: number
-  team2_economy: number
-  bomb_planted:  boolean
-  bomb_defused:  boolean
-  kills:         GoKill[]
-  grenades:      GoGrenadeEvent[]
-  frames:        GoPositionFrame[]
-}
-
-interface GoPlayer {
-  steam_id:            string
-  name:                string
-  team:                string
-  kills:               number
-  deaths:              number
-  assists:             number
-  headshots:           number
-  headshot_percentage: number
-  adr:                 number
-  kast:                number
-  rating:              number
-  utility_damage:      number
-  flash_assists:       number
-  mvps:                number
-  rounds_played:       number
-}
-
-// ── Heatmap generation ────────────────────────────────────────────────────────
-// Store raw CS2 world coordinates. HeatmapCanvas applies the proper Valve
-// calibration transform (worldToCanvas) at render time so points align with
-// the radar image regardless of which kills happened in a specific match.
-
-function buildHeatmapData(
-  rounds: ParsedDemoData['rounds'],
-  players: ParsedDemoData['players'],
-): ParsedDemoData['heatmap_data'] {
-  const allKills = rounds.flatMap(r => r.kills ?? [])
-  if (allKills.length === 0) return []
-
-  const teamOf = new Map<string, string>()
-  players.forEach(p => teamOf.set(p.name, p.team))
-
-  const points: NonNullable<ParsedDemoData['heatmap_data']> = []
-  allKills.forEach(k => {
-    points.push({
-      x: k.killer_x,
-      y: k.killer_y,
-      type: 'kill',
-      team: teamOf.get(k.killer_name) ?? '',
-    })
-    points.push({
-      x: k.victim_x,
-      y: k.victim_y,
-      type: 'death',
-      team: teamOf.get(k.victim_name) ?? '',
-    })
-  })
-  return points
 }
