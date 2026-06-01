@@ -42,14 +42,17 @@ export default function FeedbackBubble() {
 
     setIsSubmitting(true)
 
-    // TODO: Replace with real submission
-    // - Create Supabase table `feedback`
-    // - POST to /api/feedback
-    // - Or create GitHub issue via API
-    console.log('[Feedback submitted]', formData)
-
-    // Simulate network delay for better UX
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      if (!res.ok) throw new Error('Failed')
+    } catch {
+      setIsSubmitting(false)
+      return
+    }
 
     setIsSubmitting(false)
     setIsSubmitted(true)
