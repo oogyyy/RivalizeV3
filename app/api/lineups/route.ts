@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
   let query = admin
     .from('lineups')
-    .select('id, team_id, map, name, type, notes, is_public, created_by, created_at, updated_at')
+    .select('id, team_id, map, name, type, notes, canvas_data, is_public, created_by, created_at, updated_at, media_type, youtube_url, media_urls')
     .in('team_id', teamIds)
     .order('updated_at', { ascending: false })
 
@@ -41,9 +41,13 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { teamId, map, name, type = 'smoke', notes = '', canvasData = [] } = body as {
+  const {
+    teamId, map, name, type = 'smoke', notes = '', canvasData = [],
+    mediaType, youtubeUrl, mediaUrls,
+  } = body as {
     teamId: string; map: string; name: string
     type?: string; notes?: string; canvasData?: unknown[]
+    mediaType?: string; youtubeUrl?: string; mediaUrls?: string[]
   }
 
   if (!teamId || !map || !name) {
@@ -71,6 +75,9 @@ export async function POST(request: Request) {
       type,
       notes,
       canvas_data: canvasData,
+      media_type:  mediaType ?? 'draw',
+      youtube_url: youtubeUrl ?? null,
+      media_urls:  mediaUrls ?? null,
     })
     .select()
     .single()

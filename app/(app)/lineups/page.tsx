@@ -1,7 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, type ChangeEvent, type KeyboardEvent } from 'react'
-import { BookMarked, Plus, Trash2, Map, Filter, Loader2, ChevronDown, ChevronUp, Globe } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, type ElementType, type ChangeEvent, type KeyboardEvent } from 'react'
+import {
+  BookMarked, Plus, Trash2, Map, Filter, Loader2, ChevronDown, ChevronUp,
+  Globe, Pencil, Youtube, Video, Image, Upload, X,
+} from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -26,6 +29,8 @@ const LINEUP_TYPES = [
   { value: 'custom',  label: 'Custom',  color: '#818cf8' },
 ]
 
+type MediaType = 'draw' | 'youtube' | 'video' | 'images'
+
 interface Team { id: string; name: string }
 
 interface Lineup {
@@ -38,7 +43,50 @@ interface Lineup {
   canvas_data: DrawAction[]
   is_public: boolean
   created_at: string
+  media_type: MediaType | null
+  youtube_url: string | null
+  media_urls: string[] | null
 }
+
+function getYoutubeEmbedId(url: string): string | null {
+  const patterns = [
+    /youtube\.com\/watch\?v=([^&\s]+)/,
+    /youtu\.be\/([^?\s]+)/,
+    /youtube\.com\/shorts\/([^?\s]+)/,
+    /youtube\.com\/embed\/([^?\s]+)/,
+  ]
+  for (const p of patterns) {
+    const m = url.match(p)
+    if (m) return m[1]
+  }
+  return null
+}
+
+function YoutubeEmbed({ url }: { url: string }) {
+  const videoId = getYoutubeEmbedId(url)
+  if (!videoId) return (
+    <p className="text-xs text-muted-foreground px-4 pb-4">Invalid YouTube URL</p>
+  )
+  return (
+    <div className="px-4 pb-4">
+      <div className="relative w-full rounded-lg overflow-hidden" style={{ paddingBottom: '56.25%' }}>
+        <iframe
+          src={`https://www.youtube.com/embed/${videoId}`}
+          className="absolute inset-0 w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  )
+}
+
+const MEDIA_TABS: { value: MediaType; label: string; Icon: ElementType }[] = [
+  { value: 'draw',    label: 'Draw',    Icon: Pencil  },
+  { value: 'youtube', label: 'YouTube', Icon: Youtube },
+  { value: 'video',   label: 'Video',   Icon: Video   },
+  { value: 'images',  label: 'Images',  Icon: Image   },
+]
 
 export default function LineupsPage() {
   const [lineups, setLineups]     = useState<Lineup[]>([])
@@ -56,6 +104,13 @@ export default function LineupsPage() {
   const [showForm, setShowForm]   = useState(false)
   const [deleting, setDeleting]   = useState<string | null>(null)
   const [publishing, setPublishing] = useState<string | null>(null)
+
+  // Media form state
+  const [newMediaType, setNewMediaType] = useState<MediaType>('draw')
+  const [newYoutubeUrl, setNewYoutubeUrl] = useState('')
+  const [mediaFiles, setMediaFiles] = useState<File[]>([])
+  const [uploadingMedia, setUploadingMedia] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -77,6 +132,12 @@ export default function LineupsPage() {
   useEffect(() => { load() }, [load])
   useEffect(() => { if (teams.length > 0 && !selectedTeam) setSelectedTeam(teams[0].id) }, [teams, selectedTeam])
 
+  function resetForm() {
+    setNewName(''); setNewNotes(''); setNewYoutubeUrl('')
+    setMediaFiles([]); setNewMediaType('draw'); setShowForm(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   async function handleCreate() {
     if (!newName.trim() || !selectedTeam) return
     setCreating(true)
@@ -84,14 +145,58 @@ export default function LineupsPage() {
       const res = await fetch('/api/lineups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId: selectedTeam, map: newMap, name: newName, type: newType, notes: newNotes }),
+        body: JSON.stringify({
+          teamId: selectedTeam, map: newMap, name: newName, type: newType, notes: newNotes,
+          mediaType: newMediaType,
+          youtubeUrl: newMediaType === 'youtube' ? newYoutubeUrl.trim() : undefined,
+        }),
       })
-      if (res.ok) {
-        const lineup = await res.json()
-        setLineups((prev: Lineup[]) => [lineup, ...prev])
-        setNewName(''); setNewNotes(''); setShowForm(false)
-        setOpenId(lineup.id)
+      if (!res.ok) return
+      const lineup: Lineup = await res.json()
+
+      // Upload video/image files via presigned URLs, then patch lineup
+      if ((newMediaType === 'video' || newMediaType === 'images') && mediaFiles.length > 0) {
+        setUploadingMedia(true)
+        try {
+          const presignRes = await fetch('/api/lineups/upload-media', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              lineupId: lineup.id,
+              files: mediaFiles.map((f: File) => ({ filename: f.name, contentType: f.type, size: f.size })),
+            }),
+          })
+          if (presignRes.ok) {
+            const { uploads } = await presignRes.json() as {
+              uploads: Array<{ presignedUrl: string; key: string; publicUrl: string }>
+            }
+            await Promise.all(
+              mediaFiles.map((file: File, i: number) =>
+                fetch(uploads[i].presignedUrl, {
+                  method: 'PUT',
+                  body: file,
+                  headers: { 'Content-Type': file.type },
+                })
+              )
+            )
+            const mediaUrls = uploads.map((u: { presignedUrl: string; key: string; publicUrl: string }) => u.publicUrl)
+            await fetch(`/api/lineups/${lineup.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ media_urls: mediaUrls }),
+            })
+            lineup.media_urls = mediaUrls
+          }
+        } finally {
+          setUploadingMedia(false)
+        }
       }
+
+      setLineups((prev: Lineup[]) => [lineup, ...prev])
+      resetForm()
+      // Only open the draw board for draw-type lineups
+      if (newMediaType === 'draw') setOpenId(lineup.id)
+
     } finally {
       setCreating(false)
     }
@@ -132,16 +237,11 @@ export default function LineupsPage() {
     }
   }
 
-  const _grouped = CS2_MAPS
-    .map(m => ({
-      map: m,
-      items: lineups.filter((l: Lineup) => l.map === m.value),
-    }))
-    .filter(g => g.items.length > 0 || (!mapFilter && !typeFilter))
-
   const displayed = mapFilter
     ? lineups.filter((l: Lineup) => l.map === mapFilter)
     : lineups
+
+  const isBusy = creating || uploadingMedia
 
   return (
     <div className="min-h-full">
@@ -215,8 +315,9 @@ export default function LineupsPage() {
       <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-4">
         {/* New lineup form */}
         {showForm && (
-          <div className="rounded-xl border border-neon-green/20 bg-neon-green/5 p-4 space-y-3">
+          <div className="rounded-xl border border-neon-green/20 bg-neon-green/5 p-4 space-y-4">
             <p className="text-sm font-semibold text-foreground">New Lineup</p>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">Name</label>
@@ -267,13 +368,93 @@ export default function LineupsPage() {
                   className="w-full px-3 py-1.5 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-neon-green/50"
                 />
               </div>
+
+              {/* Media type picker */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="text-xs text-muted-foreground">Media</label>
+                <div className="flex flex-wrap gap-2">
+                  {MEDIA_TABS.map(({ value, label, Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => { setNewMediaType(value); setMediaFiles([]); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors',
+                        newMediaType === value
+                          ? 'border-neon-green/40 bg-neon-green/10 text-neon-green'
+                          : 'border-border text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      <Icon size={12} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* YouTube URL input */}
+                {newMediaType === 'youtube' && (
+                  <input
+                    value={newYoutubeUrl}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setNewYoutubeUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... or youtu.be/..."
+                    className="w-full px-3 py-1.5 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-neon-green/50"
+                  />
+                )}
+
+                {/* File upload dropzone */}
+                {(newMediaType === 'video' || newMediaType === 'images') && (
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept={newMediaType === 'video'
+                        ? 'video/mp4,video/webm,video/quicktime,video/x-m4v'
+                        : 'image/jpeg,image/png,image/webp,image/gif'}
+                      multiple={newMediaType === 'images'}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setMediaFiles(Array.from(e.target.files ?? []))}
+                      className="hidden"
+                      id="lineup-media-upload"
+                    />
+                    {mediaFiles.length > 0 ? (
+                      <div className="rounded-lg border border-neon-green/20 bg-neon-green/5 px-3 py-2 flex items-center gap-2">
+                        <Upload size={12} className="text-neon-green shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          {mediaFiles.map((f: File) => (
+                            <p key={f.name} className="text-xs text-foreground truncate">{f.name}</p>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setMediaFiles([]); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <label
+                        htmlFor="lineup-media-upload"
+                        className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-card/50 px-4 py-6 cursor-pointer hover:border-neon-green/30 transition-colors"
+                      >
+                        <Upload size={20} className="text-muted-foreground/40" />
+                        <p className="text-xs text-muted-foreground text-center">
+                          {newMediaType === 'video'
+                            ? 'Click to select a video (MP4/WebM, max 200 MB)'
+                            : 'Click to select images (JPG/PNG/WebP, max 10 MB each)'}
+                        </p>
+                      </label>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
+
             <div className="flex gap-2">
-              <Button size="sm" variant="neon" onClick={handleCreate} disabled={creating || !newName.trim()}>
-                {creating ? <Loader2 size={12} className="animate-spin mr-1" /> : null}
-                Create & Draw
+              <Button size="sm" variant="neon" onClick={handleCreate} disabled={isBusy || !newName.trim()}>
+                {isBusy ? <Loader2 size={12} className="animate-spin mr-1" /> : null}
+                {newMediaType === 'draw' ? 'Create & Draw' : 'Create'}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button size="sm" variant="ghost" onClick={resetForm}>Cancel</Button>
             </div>
           </div>
         )}
@@ -295,6 +476,8 @@ export default function LineupsPage() {
               const typeInfo = LINEUP_TYPES.find(t => t.value === lineup.type) ?? LINEUP_TYPES[4]
               const mapLabel = CS2_MAPS.find(m => m.value === lineup.map)?.label ?? lineup.map
               const isOpen = openId === lineup.id
+              const effectiveMediaType = lineup.media_type ?? 'draw'
+
               return (
                 <div key={lineup.id} className="rounded-xl border border-border bg-card overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3">
@@ -334,18 +517,65 @@ export default function LineupsPage() {
                   </div>
 
                   {isOpen && (
-                    <div className="border-t border-border p-4 space-y-3">
+                    <div className="border-t border-border">
                       {lineup.notes && (
-                        <p className="text-xs text-muted-foreground italic">{lineup.notes}</p>
+                        <p className="text-xs text-muted-foreground italic px-4 pt-3">{lineup.notes}</p>
                       )}
-                      <LineupBoard
-                        mapName={lineup.map}
-                        initialActions={lineup.canvas_data ?? []}
-                        onSave={async (actions) => {
-                          await handleSave(lineup.id, actions)
-                          setLineups((prev: Lineup[]) => prev.map((l: Lineup) => l.id === lineup.id ? { ...l, canvas_data: actions } : l))
-                        }}
-                      />
+
+                      {/* YouTube embed */}
+                      {effectiveMediaType === 'youtube' && lineup.youtube_url && (
+                        <div className="pt-3">
+                          <YoutubeEmbed url={lineup.youtube_url} />
+                        </div>
+                      )}
+
+                      {/* Video player */}
+                      {effectiveMediaType === 'video' && lineup.media_urls?.[0] && (
+                        <div className="px-4 py-3">
+                          <video
+                            src={lineup.media_urls[0]}
+                            controls
+                            className="w-full rounded-lg max-h-80"
+                            preload="metadata"
+                          />
+                        </div>
+                      )}
+
+                      {/* Image gallery */}
+                      {effectiveMediaType === 'images' && lineup.media_urls && lineup.media_urls.length > 0 && (
+                        <div className="px-4 py-3">
+                          <div className={cn('grid gap-2', lineup.media_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>
+                            {lineup.media_urls.map((url, i) => (
+                              <img
+                                key={i}
+                                src={url}
+                                alt={`${lineup.name} ${i + 1}`}
+                                className="rounded-lg w-full object-cover"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Draw board */}
+                      {effectiveMediaType === 'draw' && (
+                        <div className="p-4">
+                          <LineupBoard
+                            mapName={lineup.map}
+                            initialActions={lineup.canvas_data ?? []}
+                            onSave={async (actions) => {
+                              await handleSave(lineup.id, actions)
+                              setLineups((prev: Lineup[]) => prev.map((l: Lineup) => l.id === lineup.id ? { ...l, canvas_data: actions } : l))
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Empty video/image state */}
+                      {(effectiveMediaType === 'video' && !lineup.media_urls?.[0]) ||
+                       (effectiveMediaType === 'images' && !lineup.media_urls?.length) ? (
+                        <p className="text-xs text-muted-foreground px-4 py-3">No media uploaded yet.</p>
+                      ) : null}
                     </div>
                   )}
                 </div>
