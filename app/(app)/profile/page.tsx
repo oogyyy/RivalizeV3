@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 import { CS2_MAPS, PLAYER_ROLES } from '@/types/database'
+import FaceitEloCard from '@/components/teams/FaceitEloCard'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -176,6 +177,7 @@ export default function ProfilePage() {
   const [recentMatches, setRecentMatches] = useState<RecentMatch[]>([])
   const [teamsData, setTeamsData] = useState<TeamInfo[]>([])
   const [mapStats, setMapStats] = useState<MapStat[]>([])
+  const [primaryTeamId, setPrimaryTeamId] = useState<string | null>(null)
 
   // Linked accounts
   const [linkBanner, setLinkBanner] = useState<string | null>(null)
@@ -226,6 +228,8 @@ export default function ProfilePage() {
       const teamIds = (memberships || []).map(m => m.team_id)
 
       if (teamIds.length > 0) {
+        setPrimaryTeamId(teamIds[0])
+
         // Teams info
         const { data: teams } = await supabase
           .from('teams')
@@ -604,6 +608,11 @@ export default function ProfilePage() {
 
             {/* ── Right column ── */}
             <div className="lg:col-span-2 space-y-4">
+
+              {/* FACEIT ELO */}
+              {faceitId && primaryTeamId && (
+                <FaceitEloCard faceitNickname={faceitId} teamId={primaryTeamId} />
+              )}
 
               {/* Recent Matches */}
               <div className="rounded-xl border border-border bg-card overflow-hidden">

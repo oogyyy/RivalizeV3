@@ -11,7 +11,6 @@ import {
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import MapFolderList, { type MapGroup } from '@/components/teams/MapFolderList'
 import PerformanceTrends from '@/components/teams/PerformanceTrends'
-import FaceitEloCard from '@/components/teams/FaceitEloCard'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 
 // ── Stats computation (mirrors page.tsx server-side logic) ─────────────────────
@@ -228,11 +227,10 @@ const AI_QUICK_ACTIONS = [
 export default function MyTeamStatsAndDemos({
   initialDemos,
   primaryTeamId,
-  faceitNickname,
 }: {
   initialDemos: DemoRowData[]
   primaryTeamId: string | null
-  faceitNickname?: string | null
+  faceitNickname?: string | null  // kept in props signature for back-compat, no longer used here
 }) {
   // Store only the user's manual overrides — resilient to router.refresh() changing initialDemos
   const [sideOverrides, setSideOverrides] = useState<Record<string, 'team1' | 'team2'>>({})
@@ -365,11 +363,6 @@ export default function MyTeamStatsAndDemos({
               )}
             </div>
           </div>
-
-          {/* FACEIT ELO — only shown when FACEIT is connected and team exists */}
-          {faceitNickname && primaryTeamId && (
-            <FaceitEloCard faceitNickname={faceitNickname} teamId={primaryTeamId} />
-          )}
 
           {/* Map Pool */}
           <div className="rounded-xl border border-border bg-card p-5">
