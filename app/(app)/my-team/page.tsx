@@ -31,8 +31,24 @@ export default async function MyTeamPage({
     .eq('user_id', user.id)
 
   const membershipList = memberships ?? []
-  if (membershipList.length === 0) {
-    // No teams — render empty state
+  const teamIds = membershipList.map(m => m.team_id).filter(Boolean)
+
+  // Fetch all team names — exclude personal teams (those belong to /improve)
+  const { data: teamRows } = await admin
+    .from('teams')
+    .select('id, name, is_personal')
+    .in('id', teamIds)
+
+  const teamMap = new Map(
+    (teamRows ?? []).filter(t => !t.is_personal).map(t => [t.id, t.name as string])
+  )
+
+  const allTeams: TeamOption[] = membershipList
+    .filter(m => teamMap.has(m.team_id))
+    .map(m => ({ id: m.team_id, name: teamMap.get(m.team_id)!, role: m.role }))
+
+  // No real teams yet (user might only have a personal /improve team)
+  if (allTeams.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
         <div className="animate-fade-in-up">
@@ -47,24 +63,11 @@ export default async function MyTeamPage({
     )
   }
 
-  const teamIds = membershipList.map(m => m.team_id).filter(Boolean)
-
-  // Fetch all team names
-  const { data: teamRows } = await admin
-    .from('teams')
-    .select('id, name')
-    .in('id', teamIds)
-
-  const teamMap = new Map((teamRows ?? []).map(t => [t.id, t.name as string]))
-
-  const allTeams: TeamOption[] = membershipList
-    .filter(m => teamMap.has(m.team_id))
-    .map(m => ({ id: m.team_id, name: teamMap.get(m.team_id)!, role: m.role }))
-
-  // Resolve selected team from URL param (fall back to first)
+  // Resolve selected team from URL param (fall back to first real team)
   const { team: teamParam } = await searchParams
+  const allTeamIds = allTeams.map(t => t.id)
   const selectedTeamId =
-    (teamParam && teamIds.includes(teamParam) ? teamParam : null) ?? teamIds[0]
+    (teamParam && allTeamIds.includes(teamParam) ? teamParam : null) ?? allTeamIds[0]
 
   const myRole = membershipList.find(m => m.team_id === selectedTeamId)?.role ?? null
   const canInvite = myRole === 'owner' || myRole === 'admin'
