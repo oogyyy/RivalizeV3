@@ -20,8 +20,9 @@ interface DemoUploadButtonProps {
   onSuccess?: () => void
 }
 
-// 'queued' = uploaded + parse kicked off in background (terminal success state)
-type UploadStatus = 'pending' | 'presigning' | 'uploading' | 'registering' | 'queued' | 'error'
+// 'queued'  = uploaded + parse kicked off in background
+// 'adopted' = another team had this file already parsed; added instantly
+type UploadStatus = 'pending' | 'presigning' | 'uploading' | 'registering' | 'queued' | 'adopted' | 'error'
 
 interface FileUpload {
   file: File
@@ -75,18 +76,26 @@ async function uploadViaServer(
   if (params.fileHash) initUrl.searchParams.set('fileHash', params.fileHash)
 
   const initRes = await fetch(initUrl.toString(), { method: 'POST' })
+  const initBody = await initRes.json().catch(() => ({})) as {
+    uploadId?: string; key?: string
+    error?: string; existingDemo?: { created_at?: string }
+    adopted?: boolean; demo?: { id: string }
+  }
   if (!initRes.ok) {
-    const body = await initRes.json().catch(() => ({}))
-    if (initRes.status === 409 && body.error === 'duplicate') {
-      const d    = body.existingDemo as { created_at?: string } | undefined
-      const date = d?.created_at
-        ? new Date(d.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    if (initRes.status === 409 && initBody.error === 'duplicate') {
+      const date = initBody.existingDemo?.created_at
+        ? new Date(initBody.existingDemo.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
         : 'previously'
       throw new Error(`Already uploaded — this demo was added ${date}`)
     }
-    throw new Error(body.error ?? `Upload init failed (${initRes.status})`)
+    throw new Error(initBody.error ?? `Upload init failed (${initRes.status})`)
   }
-  const { uploadId, key } = await initRes.json() as { uploadId: string; key: string }
+  // Another team already parsed this file — demo instantly added, no upload needed.
+  if (initBody.adopted && initBody.demo) {
+    onProgress(100)
+    return { ...initBody.demo, _adopted: true }
+  }
+  const { uploadId, key } = initBody as { uploadId: string; key: string }
 
   // 2 — upload chunks
   const numChunks = Math.ceil(file.size / CHUNK_SIZE)
@@ -204,9 +213,11 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
         pct => updateUpload(i, { progress: pct }),
       )
 
-      updateUpload(i, { progress: 100, status: 'registering' })
+      const adopted = (demo as { id: string; _adopted?: boolean })._adopted === true
 
-      updateUpload(i, { status: 'queued', progress: 100, demoId: demo.id })
+      if (!adopted) updateUpload(i, { progress: 100, status: 'registering' })
+
+      updateUpload(i, { status: adopted ? 'adopted' : 'queued', progress: 100, demoId: demo.id })
     } catch (err) {
       updateUpload(i, {
         status: 'error', progress: 0,
@@ -255,7 +266,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
 
   const pendingCount = uploads.filter(u => u.status === 'pending').length
   const errorCount   = uploads.filter(u => u.status === 'error').length
-  const queuedCount  = uploads.filter(u => u.status === 'queued').length
+  const queuedCount  = uploads.filter(u => u.status === 'queued' || u.status === 'adopted').length
   const activeCount  = uploads.filter(u =>
     u.status === 'presigning' || u.status === 'uploading' || u.status === 'registering'
   ).length
@@ -271,6 +282,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
       case 'uploading':   return `Uploading ${u.progress > 0 ? `${u.progress}%` : '…'}`
       case 'registering': return 'Saving…'
       case 'queued':      return 'Queued for parsing'
+      case 'adopted':     return 'Already parsed — added instantly'
       case 'error':       return u.error ?? 'Failed'
       default:            return 'Ready'
     }
@@ -396,7 +408,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                         size={16}
                         className={cn(
                           'shrink-0',
-                          upload.status === 'queued' ? 'text-[#00ff87]'
+                          upload.status === 'queued' || upload.status === 'adopted' ? 'text-[#00ff87]'
                           : upload.status === 'error' ? 'text-red-400'
                           : 'text-muted-foreground'
                         )}
@@ -417,7 +429,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                           ) : (
                             <span className={cn(
                               'text-[10px] font-medium truncate',
-                              upload.status === 'queued' ? 'text-[#00ff87]'
+                              upload.status === 'queued' || upload.status === 'adopted' ? 'text-[#00ff87]'
                               : upload.status === 'error' ? 'text-red-400'
                               : 'text-muted-foreground'
                             )}>
@@ -430,7 +442,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
                         )}
                       </div>
                       <div className="shrink-0">
-                        {upload.status === 'queued'
+                        {upload.status === 'queued' || upload.status === 'adopted'
                           ? <CheckCircle2 size={14} className="text-[#00ff87]" />
                           : upload.status === 'error'
                           ? <AlertCircle size={14} className="text-red-400" />
@@ -454,33 +466,40 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
           </div>
 
           {/* Summary banner — shown after all uploads complete */}
-          {allSettled && (
-            <div className={cn(
-              'flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm font-medium',
-              errorCount === 0
-                ? 'border-[#00ff87]/30 bg-[#00ff87]/5 text-[#00ff87]'
-                : queuedCount > 0
-                ? 'border-yellow-500/30 bg-yellow-500/5 text-yellow-300'
-                : 'border-red-500/30 bg-red-500/5 text-red-400'
-            )}>
-              {errorCount === 0 ? (
-                <>
-                  <CheckCircle2 size={14} className="shrink-0" />
-                  {queuedCount} demo{queuedCount !== 1 ? 's' : ''} uploaded — parsing in background
-                </>
-              ) : queuedCount > 0 ? (
-                <>
-                  <AlertCircle size={14} className="shrink-0" />
-                  {queuedCount} uploaded · {errorCount} failed
-                </>
-              ) : (
-                <>
-                  <AlertCircle size={14} className="shrink-0" />
-                  All uploads failed — check your connection and try again
-                </>
-              )}
-            </div>
-          )}
+          {allSettled && (() => {
+            const uploadedCount = uploads.filter(u => u.status === 'queued').length
+            const adoptedCount  = uploads.filter(u => u.status === 'adopted').length
+            const summaryParts: string[] = []
+            if (uploadedCount > 0) summaryParts.push(`${uploadedCount} queued for parsing`)
+            if (adoptedCount  > 0) summaryParts.push(`${adoptedCount} instantly added`)
+            return (
+              <div className={cn(
+                'flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm font-medium',
+                errorCount === 0
+                  ? 'border-[#00ff87]/30 bg-[#00ff87]/5 text-[#00ff87]'
+                  : queuedCount > 0
+                  ? 'border-yellow-500/30 bg-yellow-500/5 text-yellow-300'
+                  : 'border-red-500/30 bg-red-500/5 text-red-400'
+              )}>
+                {errorCount === 0 ? (
+                  <>
+                    <CheckCircle2 size={14} className="shrink-0" />
+                    {summaryParts.join(' · ')}
+                  </>
+                ) : queuedCount > 0 ? (
+                  <>
+                    <AlertCircle size={14} className="shrink-0" />
+                    {summaryParts.join(' · ')} · {errorCount} failed
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle size={14} className="shrink-0" />
+                    All uploads failed — check your connection and try again
+                  </>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-1 border-t border-border">

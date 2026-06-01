@@ -74,24 +74,77 @@ async function handleInit(
     .eq('team_id', teamId).eq('user_id', userId).single()
   if (!member) return NextResponse.json({ error: 'Not a member of this team' }, { status: 403 })
 
-  // Duplicate detection: reject if this team already has a demo with the same hash.
-  // Scoped to team_id so a different team uploading the same file is not flagged.
-  const fileHash = q.get('fileHash')
+  const fileHash     = q.get('fileHash')
+  const opponentName = q.get('opponentName') ?? 'Unknown'
+  const demoType     = (q.get('demoType') ?? 'opponent') as 'opponent' | 'self'
+
   if (fileHash) {
-    const { data: existing } = await admin
+    // ── Same-team duplicate: reject ───────────────────────────────────────────
+    const { data: sameTeam } = await admin
       .from('demos')
       .select('id, created_at, map, opponent_name, status')
       .eq('team_id', teamId)
       .eq('file_hash', fileHash)
-      .neq('status', 'failed') // allow re-upload if the parse previously failed
+      .neq('status', 'failed') // allow re-upload if the previous parse failed
       .limit(1)
       .maybeSingle()
 
-    if (existing) {
+    if (sameTeam) {
       return NextResponse.json(
-        { error: 'duplicate', existingDemo: existing },
+        { error: 'duplicate', existingDemo: sameTeam },
         { status: 409 },
       )
+    }
+
+    // ── Cross-team duplicate: adopt instantly without uploading ───────────────
+    // Another team already uploaded and fully parsed this file.
+    // Copy their parsed data into a new demo row for this team so the user
+    // sees the result immediately — zero bytes uploaded to R2.
+    const { data: source } = await admin
+      .from('demos')
+      .select('parsed_data, parsed_json_url, map, raw_file_path, parsed_at')
+      .eq('file_hash', fileHash)
+      .eq('status', 'completed')
+      .limit(1)
+      .maybeSingle()
+
+    if (source) {
+      const resolvedOpponent = demoType === 'self' ? 'My Team' : (opponentName.trim() || 'Unknown')
+      const opponentSlug     = slugify(resolvedOpponent)
+
+      const parsedData = {
+        ...((source.parsed_data as Record<string, unknown>) ?? {}),
+        opponentSide: demoType === 'self' ? 'team1' : 'team2',
+      }
+
+      const { data: newDemo, error: insertErr } = await admin
+        .from('demos')
+        .insert({
+          team_id:         teamId,
+          opponent_name:   resolvedOpponent,
+          opponent_slug:   opponentSlug,
+          map:             source.map ?? 'unknown',
+          raw_file_path:   source.raw_file_path,
+          status:          'completed',
+          created_by:      userId,
+          demo_type:       demoType,
+          parsed_data:     parsedData,
+          parsed_json_url: source.parsed_json_url ?? null,
+          file_hash:       fileHash,
+          parsed_at:       source.parsed_at ?? new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (!insertErr && newDemo) {
+        if (demoType === 'opponent') {
+          await admin.from('team_folders').upsert(
+            { user_team_id: teamId, opponent_slug: opponentSlug, opponent_display_name: resolvedOpponent },
+            { onConflict: 'user_team_id,opponent_slug' },
+          )
+        }
+        return NextResponse.json({ adopted: true, demo: newDemo }, { status: 201 })
+      }
     }
   }
 
