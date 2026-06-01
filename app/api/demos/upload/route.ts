@@ -74,6 +74,27 @@ async function handleInit(
     .eq('team_id', teamId).eq('user_id', userId).single()
   if (!member) return NextResponse.json({ error: 'Not a member of this team' }, { status: 403 })
 
+  // Duplicate detection: reject if this team already has a demo with the same hash.
+  // Scoped to team_id so a different team uploading the same file is not flagged.
+  const fileHash = q.get('fileHash')
+  if (fileHash) {
+    const { data: existing } = await admin
+      .from('demos')
+      .select('id, created_at, map, opponent_name, status')
+      .eq('team_id', teamId)
+      .eq('file_hash', fileHash)
+      .neq('status', 'failed') // allow re-upload if the parse previously failed
+      .limit(1)
+      .maybeSingle()
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'duplicate', existingDemo: existing },
+        { status: 409 },
+      )
+    }
+  }
+
   if (!process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID) {
     return NextResponse.json({ error: 'R2 not configured' }, { status: 503 })
   }
@@ -132,6 +153,7 @@ async function handleComplete(
   const opponentName = q.get('opponentName') ?? 'Unknown'
   const demoType   = (q.get('demoType') ?? 'opponent') as 'opponent' | 'self'
   const fileSize   = parseInt(q.get('fileSize') ?? '0', 10)
+  const fileHash   = q.get('fileHash') || null
 
   if (!uploadId || !key || !teamId) {
     return NextResponse.json({ error: 'Missing uploadId, key, or teamId' }, { status: 400 })
@@ -182,6 +204,7 @@ async function handleComplete(
       created_by:     userId,
       demo_type:      demoType,
       parsed_data:    { opponentSide: demoType === 'self' ? 'team1' : 'team2' },
+      file_hash:      fileHash,
     })
     .select()
     .single()

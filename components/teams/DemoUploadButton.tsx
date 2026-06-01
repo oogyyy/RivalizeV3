@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
@@ -36,13 +36,28 @@ function isValidDemoFile(name: string) {
   return lower.endsWith('.dem') || lower.endsWith('.zst')
 }
 
+// Compute SHA-256 of the file bytes using the browser's native Web Crypto API.
+// Called as soon as the file is dropped so the hash is usually ready before the
+// user clicks Upload. Returns empty string on failure so the upload still proceeds.
+async function hashFile(file: File): Promise<string> {
+  try {
+    const buf    = await file.arrayBuffer()
+    const digest = await crypto.subtle.digest('SHA-256', buf)
+    return Array.from(new Uint8Array(digest))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+  } catch {
+    return ''
+  }
+}
+
 // 9 MB chunks — safely under Railway's ~10 MB reverse-proxy body limit.
 // R2 multipart upload requires parts ≥ 5 MB except the last one, so 9 MB works.
 const CHUNK_SIZE = 9 * 1024 * 1024
 
 async function uploadViaServer(
   file: File,
-  params: { teamId: string; opponentName: string; demoType: string },
+  params: { teamId: string; opponentName: string; demoType: string; fileHash?: string },
   onProgress: (pct: number) => void,
 ): Promise<{ id: string }> {
   const base = new URL('/api/demos/upload', window.location.origin)
@@ -57,10 +72,18 @@ async function uploadViaServer(
   const initUrl = new URL(base)
   initUrl.searchParams.set('action', 'init')
   common.forEach((v, k) => initUrl.searchParams.set(k, v))
+  if (params.fileHash) initUrl.searchParams.set('fileHash', params.fileHash)
 
   const initRes = await fetch(initUrl.toString(), { method: 'POST' })
   if (!initRes.ok) {
     const body = await initRes.json().catch(() => ({}))
+    if (initRes.status === 409 && body.error === 'duplicate') {
+      const d    = body.existingDemo as { created_at?: string } | undefined
+      const date = d?.created_at
+        ? new Date(d.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'previously'
+      throw new Error(`Already uploaded — this demo was added ${date}`)
+    }
     throw new Error(body.error ?? `Upload init failed (${initRes.status})`)
   }
   const { uploadId, key } = await initRes.json() as { uploadId: string; key: string }
@@ -100,6 +123,7 @@ async function uploadViaServer(
   completeUrl.searchParams.set('key', key)
   completeUrl.searchParams.set('fileSize', String(file.size))
   common.forEach((v, k) => completeUrl.searchParams.set(k, v))
+  if (params.fileHash) completeUrl.searchParams.set('fileHash', params.fileHash)
 
   const completeRes = await fetch(completeUrl.toString(), {
     method:  'POST',
@@ -126,6 +150,10 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   const [mounted, setMounted]         = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
+  // Hash computations start immediately when files are dropped.
+  // By the time the user clicks Upload the hash is usually already ready.
+  const hashPromises = useRef<Map<File, Promise<string>>>(new Map())
+
   const updateUpload = useCallback(
     (index: number, update: Partial<FileUpload>) =>
       setUploads(prev => prev.map((u, i) => (i === index ? { ...u, ...update } : u))),
@@ -135,6 +163,10 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const valid     = acceptedFiles.filter(f => isValidDemoFile(f.name) && f.size <= MAX_FILE_SIZE)
     const oversized = acceptedFiles.filter(f => f.size > MAX_FILE_SIZE)
+    // Kick off hashing immediately so it's ready before the user clicks Upload
+    for (const file of valid) {
+      hashPromises.current.set(file, hashFile(file))
+    }
     setUploads(prev => [
       ...prev,
       ...valid.map(file => ({ file, progress: 0, status: 'pending' as const })),
@@ -163,9 +195,12 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
     try {
       updateUpload(i, { status: 'uploading', progress: 0 })
 
+      // Await hash — usually already resolved since hashing started on file drop
+      const fileHash = await (hashPromises.current.get(file) ?? hashFile(file))
+
       const demo = await uploadViaServer(
         file,
-        { teamId, opponentName: demoType === 'self' ? 'My Team' : opponentName.trim(), demoType },
+        { teamId, opponentName: demoType === 'self' ? 'My Team' : opponentName.trim(), demoType, fileHash },
         pct => updateUpload(i, { progress: pct }),
       )
 
