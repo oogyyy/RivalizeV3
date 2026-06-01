@@ -4,6 +4,24 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 const STEAM_ID_PATTERN = /^https:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/
 
+async function fetchSteamAvatarUrl(steamId: string): Promise<string | null> {
+  const apiKey = process.env.STEAM_API_KEY
+  if (!apiKey) return null
+  try {
+    const res = await fetch(
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${apiKey}&steamids=${steamId}`,
+      { next: { revalidate: 0 } },
+    )
+    if (!res.ok) return null
+    const data = await res.json() as {
+      response: { players: Array<{ avatarfull?: string }> }
+    }
+    return data.response?.players?.[0]?.avatarfull ?? null
+  } catch {
+    return null
+  }
+}
+
 function getAppUrl(params: URLSearchParams, req: NextRequest): string {
   const returnTo = params.get('openid.return_to')
   if (returnTo) {
@@ -63,29 +81,36 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.redirect(`${appUrl}/login`)
 
-    await supabase.from('profiles').update({ steam_id: steamId }).eq('id', user.id)
+    const avatarUrl = await fetchSteamAvatarUrl(steamId)
+    await supabase.from('profiles').update({
+      steam_id: steamId,
+      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+    }).eq('id', user.id)
     return NextResponse.redirect(`${appUrl}/profile?linked=steam`)
   }
 
   // ── LOGIN mode: find or create a Supabase user, then create a session ────
   const admin = createAdminClient()
 
-  // Look up an existing profile with this Steam ID
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('id')
-    .eq('steam_id', steamId)
-    .single()
+  // Fetch Steam avatar in parallel while we look up the profile
+  const [{ data: profile }, avatarUrl] = await Promise.all([
+    admin.from('profiles').select('id').eq('steam_id', steamId).single(),
+    fetchSteamAvatarUrl(steamId),
+  ])
+
+  const profileUpdate: Record<string, string> = { steam_id: steamId }
+  if (avatarUrl) profileUpdate.avatar_url = avatarUrl
 
   let userEmail: string
 
   if (profile) {
-    // Existing Steam user — fetch their email
+    // Existing Steam user — refresh avatar and fetch their email
     const { data: { user: existingUser }, error: fetchError } = await admin.auth.admin.getUserById(profile.id)
     if (fetchError || !existingUser) {
       return NextResponse.redirect(`${appUrl}/login?error=steam_fetch`)
     }
     userEmail = existingUser.email!
+    await admin.from('profiles').update(profileUpdate).eq('id', profile.id)
   } else {
     // New user — create account with a synthetic email derived from Steam ID
     userEmail = `steam_${steamId}@rivalize.pro`
@@ -103,13 +128,13 @@ export async function GET(req: NextRequest) {
         const existing = users.find(u => u.email === userEmail)
         if (!existing) return NextResponse.redirect(`${appUrl}/login?error=steam_conflict`)
         userEmail = existing.email!
-        await admin.from('profiles').update({ steam_id: steamId }).eq('id', existing.id)
+        await admin.from('profiles').update(profileUpdate).eq('id', existing.id)
       } else {
         return NextResponse.redirect(`${appUrl}/login?error=steam_create`)
       }
     } else {
-      // Link Steam ID in the profiles row (created by DB trigger on auth.users insert)
-      await admin.from('profiles').update({ steam_id: steamId }).eq('id', created.user.id)
+      // Update the profile row created by the DB trigger with Steam ID + avatar
+      await admin.from('profiles').update(profileUpdate).eq('id', created.user.id)
     }
   }
 
