@@ -25,10 +25,8 @@ ENV PORT=8080
 ENV GOGC=75
 
 # GOMEMLIMIT: hard ceiling so the OOM killer never surprises us.
-# Railway Pro default per-service memory is 8 GB.
-# 3.5 GB leaves plenty of headroom for the OS and goroutine stacks while
-# still allowing very large demos (~500 MB raw + parse structures).
+# Set to 1.8 GB — sized for a 2 GB Railway replica (leaves ~200 MB for OS/stacks).
 # Override via Railway service environment variable if you resize the service.
-ENV GOMEMLIMIT=3758096384
+ENV GOMEMLIMIT=1932735283
 
 CMD ["./go-parser"]
