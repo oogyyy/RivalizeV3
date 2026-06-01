@@ -25,6 +25,8 @@ export interface DemoRowData {
   processing_started_at?: string | null
   error_message?: string | null
   opponent_slug?: string | null
+  faceit_match_id?: string | null
+  league?: string | null
   parsed_data: {
     header?: {
       map?: string

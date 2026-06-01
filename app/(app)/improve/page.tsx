@@ -53,14 +53,15 @@ export default async function ImprovePage() {
 
   const [personalTeamId, profileRes] = await Promise.all([
     getOrCreatePersonalTeam(user.id, admin),
-    admin.from('profiles').select('steam_id').eq('id', user.id).single(),
+    admin.from('profiles').select('steam_id, faceit_player_id').eq('id', user.id).single(),
   ])
 
   const steamId = profileRes.data?.steam_id ?? null
+  const faceitPlayerId = (profileRes.data as Record<string, unknown> | null)?.faceit_player_id as string | null ?? null
 
   const { data: demosData } = await admin
     .from('demos')
-    .select('id, status, map, match_date, created_at, opponent_slug, parsed_data, error_message, processing_started_at')
+    .select('id, status, map, match_date, created_at, opponent_slug, league, faceit_match_id, parsed_data, error_message, processing_started_at')
     .eq('team_id', personalTeamId)
     .eq('demo_type', 'self')
     .order('created_at', { ascending: false })
@@ -91,6 +92,7 @@ export default async function ImprovePage() {
         initialDemos={demos}
         personalTeamId={personalTeamId}
         steamId={steamId}
+        faceitPlayerId={faceitPlayerId}
       />
     </div>
   )
