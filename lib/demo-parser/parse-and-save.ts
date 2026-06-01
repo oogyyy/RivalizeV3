@@ -129,6 +129,52 @@ export async function parseAndSaveDemo(demoId: string): Promise<ParseJobResult> 
 }
 
 /**
+ * Detects which side (team1 / team2) is the user's own team by matching
+ * team members' Steam IDs against the player list in the parsed demo JSON.
+ * Returns the side that belongs to our team, or null if detection fails
+ * (no Steam IDs linked, no matches, or missing data).
+ */
+async function detectOurTeamSide(
+  parsedData: Record<string, unknown>,
+  teamId: string,
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<'team1' | 'team2' | null> {
+  const header  = parsedData.header as { team1?: string; team2?: string } | undefined
+  const players = parsedData.players as Array<{ steam_id?: string; team?: string }> | undefined
+
+  if (!header || !players || players.length === 0) return null
+
+  // Fetch Steam IDs for all team members who have Steam linked
+  const { data: members } = await admin
+    .from('team_members')
+    .select('user_id')
+    .eq('team_id', teamId)
+  if (!members || members.length === 0) return null
+
+  const { data: profiles } = await admin
+    .from('profiles')
+    .select('steam_id')
+    .in('id', members.map(m => m.user_id))
+    .not('steam_id', 'is', null)
+  if (!profiles || profiles.length === 0) return null
+
+  const memberSteamIds = new Set(profiles.map(p => p.steam_id).filter(Boolean))
+
+  // Count how many team members appear on each side
+  let team1Matches = 0
+  let team2Matches = 0
+  for (const p of players) {
+    if (!p.steam_id || !memberSteamIds.has(p.steam_id)) continue
+    if (p.team === header.team1)      team1Matches++
+    else if (p.team === header.team2) team2Matches++
+  }
+
+  if (team1Matches === 0 && team2Matches === 0) return null
+
+  return team1Matches >= team2Matches ? 'team1' : 'team2'
+}
+
+/**
  * Downloads the parsed JSON from R2 and writes it to the demos table.
  *
  * Supabase timeout fix:
@@ -171,6 +217,16 @@ export async function applyParsedDemo(
   const parsedJsonKey = `parsed-demos/${demoId}.json`
   const rawBuf = await downloadObject(parsedJsonKey)
   const parsedData = JSON.parse(rawBuf.toString('utf-8'))
+
+  // For self demos, attempt to auto-detect which side is the user's team
+  // using linked Steam IDs. opponentSide is stored as the OTHER team's side.
+  if (demo.demo_type === 'self') {
+    const ourSide = await detectOurTeamSide(parsedData, demo.team_id, admin)
+    if (ourSide !== null) {
+      opponentSide = ourSide === 'team1' ? 'team2' : 'team1'
+      console.log(`[apply] [${demoId}] Auto-detected our side: ${ourSide} → opponentSide=${opponentSide}`)
+    }
+  }
 
   // Strip position frames before writing to Supabase.
   // Frames are ~90% of the JSON size. Keep kills, grenades, header, players.
