@@ -3,16 +3,26 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { validateSharecode, decodeMatchShareCode } from '@/lib/cs2-sharecode'
+import { isSteamBotConfigured } from '@/lib/steam-bot'
 
-const schema = z.object({
+const chainSchema = z.object({
+  mode:           z.literal('chain'),
   steamAuthToken: z.string().min(1).max(128),
   seedSharecode:  z.string().refine(validateSharecode, { message: 'Invalid CS2 sharecode format' }),
 })
 
+const botSchema = z.object({
+  mode: z.literal('bot'),
+  // Bot mode only requires a steam_id, which is already stored in profiles.
+  // This endpoint is a no-op but we keep it for symmetry.
+})
+
+const schema = z.discriminatedUnion('mode', [chainSchema, botSchema])
+
 /**
  * POST /api/cs2/setup
- * Saves the user's Steam auth token + seed sharecode, and inserts the seed
- * match as the first entry in cs2_matches.
+ * Chain mode: saves the user's Steam auth token + seed sharecode.
+ * Bot mode:   no-op (steam_id is already in profiles from Steam link).
  */
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -29,6 +39,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
+  // In bot mode, nothing to persist — steam_id is already stored.
+  if (parsed.data.mode === 'bot') {
+    return NextResponse.json({ ok: true })
+  }
+
   const { steamAuthToken, seedSharecode } = parsed.data
 
   let decoded
@@ -40,13 +55,11 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // Save auth token + seed code to profile
   await admin.from('profiles').update({
     steam_auth_token:   steamAuthToken,
     cs2_last_sharecode: seedSharecode,
   }).eq('id', user.id)
 
-  // Insert the seed match (ignore conflict — user may re-submit same seed)
   await admin.from('cs2_matches').upsert({
     user_id:        user.id,
     sharecode:      seedSharecode,
@@ -59,13 +72,17 @@ export async function POST(request: Request) {
 }
 
 /**
- * DELETE /api/cs2/setup
- * Clears the user's Steam auth token and sharecode config.
+ * DELETE /api/cs2/setup — clear config (chain mode only; bot mode uses steam_id).
  */
 export async function DELETE() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (isSteamBotConfigured()) {
+    // Bot mode — nothing to clear (we don't store per-user bot credentials)
+    return NextResponse.json({ ok: true })
+  }
 
   const admin = createAdminClient()
   await admin.from('profiles').update({
