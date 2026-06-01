@@ -218,6 +218,14 @@ export default function ProfilePage() {
         setSteamId(prof.steam_id || '')
         setDiscordId(prof.discord_id || '')
         setFaceitId(prof.faceit_id || '')
+
+        // If Steam is linked but no avatar stored yet, fetch it from Steam now
+        if (prof.steam_id && !prof.avatar_url) {
+          fetch('/api/profile/sync-steam-avatar', { method: 'POST' })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.avatar_url) setAvatarUrl(d.avatar_url) })
+            .catch(() => {})
+        }
       }
 
       // Team memberships
