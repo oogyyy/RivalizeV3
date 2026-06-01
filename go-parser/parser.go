@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"math"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -201,17 +204,29 @@ type killedByEntry struct {
 	victimTeam   common.Team // team of the victim
 }
 
-// ── Main parse function ───────────────────────────────────────────────────────
+// ── Main parse functions ──────────────────────────────────────────────────────
 
-func parseDemo(buf []byte) (result *ParseResult, err error) {
+// parseDemo parses a CS2 demo from an io.Reader (supports streaming HTTP downloads).
+// A 4 MB read-ahead buffer reduces syscall overhead for network-backed readers.
+func parseDemo(r io.Reader) (result *ParseResult, err error) {
+	return parseDemoInternal(bufio.NewReaderSize(r, 4<<20))
+}
+
+// parseDemoBuf is a convenience wrapper for the legacy byte-buffer path.
+func parseDemoBuf(buf []byte) (result *ParseResult, err error) {
+	defer func() { buf = nil; runtime.GC() }()
+	return parseDemoInternal(bytes.NewReader(buf))
+}
+
+func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 	// Recover from panics caused by corrupt / truncated demo files
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("parser panic: %v", r)
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("parser panic: %v", rec)
 		}
 	}()
 
-	p := dem.NewParser(bytes.NewReader(buf))
+	p := dem.NewParser(r)
 	defer p.Close()
 
 	mapName := "unknown"

@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
+
 let _client: S3Client | null = null
 
 function getR2Client(): S3Client {
@@ -30,6 +31,24 @@ export async function createPresignedPutUrl(key: string, expiresIn = 3600): Prom
     Key: key,
     ContentType: 'application/octet-stream',
   }), { expiresIn })
+}
+
+/** Generate a presigned GET URL for downloading an R2 object. */
+export async function createPresignedGetUrl(key: string, expiresIn = 21600): Promise<string> {
+  return getSignedUrl(getR2Client(), new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME!,
+    Key: key,
+  }), { expiresIn })
+}
+
+/** Upload a Buffer directly to R2. */
+export async function uploadObject(key: string, data: Buffer, contentType = 'application/octet-stream'): Promise<void> {
+  await getR2Client().send(new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME!,
+    Key: key,
+    Body: data,
+    ContentType: contentType,
+  }))
 }
 
 /** Build the public download URL for an R2 object key. */

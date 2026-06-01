@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
+	"strings"
 	"time"
 )
 
@@ -23,16 +25,16 @@ func main() {
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
-		// Prevent slow clients from holding connections open indefinitely.
-		// ReadHeaderTimeout guards against Slowloris; ReadTimeout covers body upload.
-		// WriteTimeout covers the parse + response write phase.
+		// ReadHeaderTimeout guards against Slowloris attacks.
+		// ReadTimeout + WriteTimeout cover the full parse lifecycle:
+		//   download 500 MB + parse (up to 15 min) + upload result
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       10 * time.Minute, // large demos can take time to upload
-		WriteTimeout:      10 * time.Minute, // parsing a 500 MB demo can be slow
+		ReadTimeout:       30 * time.Minute,
+		WriteTimeout:      30 * time.Minute,
 		IdleTimeout:       30 * time.Second,
 	}
 
-	log.Printf("go-parser listening on :%s", port)
+	log.Printf("[go-parser] listening on :%s", port)
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
@@ -43,13 +45,27 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `{"ok":true}`)
 }
 
+// ParseJobRequest is the new JSON-based request body.
+type ParseJobRequest struct {
+	DemoID              string `json:"demo_id"`
+	DemoDownloadURL     string `json:"demo_download_url"`      // presigned R2 GET URL
+	ParsedJSONUploadURL string `json:"parsed_json_upload_url"` // presigned R2 PUT URL
+	ParsedJSONPublicURL string `json:"parsed_json_public_url"` // public URL for the parsed JSON
+}
+
+// ParseJobResponse is returned on success.
+type ParseJobResponse struct {
+	OK            bool   `json:"ok"`
+	DemoID        string `json:"demo_id"`
+	ParsedJSONURL string `json:"parsed_json_url"`
+}
+
 func handleParse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Recover from unexpected panics so a bad demo file can't bring down the server
 	defer func() {
 		if rec := recover(); rec != nil {
 			log.Printf("[parse] recovered from panic: %v", rec)
@@ -59,12 +75,106 @@ func handleParse(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Accept either multipart form upload or raw body
-	var buf []byte
-	var err error
+	ct := r.Header.Get("Content-Type")
+
+	if strings.HasPrefix(ct, "application/json") {
+		handleParseJob(w, r)
+		return
+	}
+
+	// Legacy: multipart or raw body upload (kept for backward compatibility).
+	handleParseLegacy(w, r)
+}
+
+// handleParseJob processes the new JSON-based parse request.
+// The caller supplies presigned R2 URLs; this handler only uses stdlib net/http.
+func handleParseJob(w http.ResponseWriter, r *http.Request) {
+	var req ParseJobRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.DemoID == "" || req.DemoDownloadURL == "" || req.ParsedJSONUploadURL == "" || req.ParsedJSONPublicURL == "" {
+		http.Error(w, "missing required fields: demo_id, demo_download_url, parsed_json_upload_url, parsed_json_public_url", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	start := time.Now()
+	log.Printf("[go-parser] [demoId=%s] Starting parse job", req.DemoID)
+
+	// 1. Stream demo from R2 presigned URL directly into the parser.
+	demoStream, streamSize, err := streamFromPresignedURL(ctx, req.DemoDownloadURL)
+	if err != nil {
+		log.Printf("[go-parser] [demoId=%s] R2 download failed: %v", req.DemoID, err)
+		writeJSONError(w, http.StatusBadGateway, "R2 download failed: "+err.Error())
+		return
+	}
+	defer demoStream.Close()
+	log.Printf("[go-parser] [demoId=%s] Streaming demo (%s) into parser", req.DemoID, humanBytes(streamSize))
+
+	// 2. Parse directly from the stream — no in-memory buffer needed.
+	result, parseErr := parseDemo(demoStream)
+	if parseErr != nil {
+		log.Printf("[go-parser] [demoId=%s] Parse failed: %v", req.DemoID, parseErr)
+		writeJSONError(w, http.StatusUnprocessableEntity, "parse failed: "+parseErr.Error())
+		return
+	}
+	log.Printf("[go-parser] [demoId=%s] Parsed %d players, %d rounds in %.1fs",
+		req.DemoID, len(result.Players), len(result.Rounds), time.Since(start).Seconds())
+
+	// Force GC after parsing to reclaim the demoinfocs structures.
+	runtime.GC()
+
+	// 3. Marshal parsed JSON.
+	parsedJSON, err := json.Marshal(result)
+	if err != nil {
+		log.Printf("[go-parser] [demoId=%s] JSON marshal failed: %v", req.DemoID, err)
+		writeJSONError(w, http.StatusInternalServerError, "marshal failed: "+err.Error())
+		return
+	}
+	log.Printf("[go-parser] [demoId=%s] Marshaled result (%s)", req.DemoID, humanBytes(int64(len(parsedJSON))))
+
+	// 4. Upload parsed JSON to R2 via presigned PUT URL.
+	if err := uploadToPresignedURL(ctx, req.ParsedJSONUploadURL, parsedJSON); err != nil {
+		log.Printf("[go-parser] [demoId=%s] R2 upload failed: %v", req.DemoID, err)
+		writeJSONError(w, http.StatusBadGateway, "R2 upload failed: "+err.Error())
+		return
+	}
+	log.Printf("[go-parser] [demoId=%s] Uploaded parsed JSON to R2", req.DemoID)
+
+	// Release JSON bytes before Supabase call.
+	parsedJSON = nil
+	runtime.GC()
+
+	// 5. Lightweight Supabase update: status='parsed', parsed_json_url.
+	if err := updateDemoParsed(ctx, req.DemoID, req.ParsedJSONPublicURL); err != nil {
+		// Log and return error — worker will retry the whole job.
+		log.Printf("[go-parser] [demoId=%s] Supabase update failed: %v", req.DemoID, err)
+		writeJSONError(w, http.StatusBadGateway, "Supabase update failed: "+err.Error())
+		return
+	}
+	log.Printf("[go-parser] [demoId=%s] Updated Supabase status=parsed (total %.1fs)",
+		req.DemoID, time.Since(start).Seconds())
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ParseJobResponse{
+		OK:            true,
+		DemoID:        req.DemoID,
+		ParsedJSONURL: req.ParsedJSONPublicURL,
+	})
+}
+
+// handleParseLegacy accepts raw or multipart demo file bodies.
+// Kept for backward compatibility during the transition period.
+func handleParseLegacy(w http.ResponseWriter, r *http.Request) {
+	var (
+		buf []byte
+		err error
+	)
 
 	ct := r.Header.Get("Content-Type")
-	if len(ct) > 9 && ct[:9] == "multipart" {
+	if strings.HasPrefix(ct, "multipart") {
 		if err = r.ParseMultipartForm(512 << 20); err != nil {
 			http.Error(w, "failed to parse multipart: "+err.Error(), http.StatusBadRequest)
 			return
@@ -79,20 +189,19 @@ func handleParse(w http.ResponseWriter, r *http.Request) {
 	} else {
 		buf, err = io.ReadAll(r.Body)
 	}
-
 	if err != nil {
 		http.Error(w, "failed to read body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-
 	if len(buf) < 8 {
 		http.Error(w, "file too small to be a valid demo", http.StatusBadRequest)
 		return
 	}
 
-	result, parseErr := parseDemo(buf)
+	result, parseErr := parseDemoBuf(buf)
+	buf = nil
 	if parseErr != nil {
-		log.Printf("[parse] error: %v", parseErr)
+		log.Printf("[parse] legacy error: %v", parseErr)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		json.NewEncoder(w).Encode(map[string]string{"error": parseErr.Error()})
@@ -101,6 +210,25 @@ func handleParse(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		log.Printf("[parse] encode error: %v", err)
+		log.Printf("[parse] legacy encode error: %v", err)
+	}
+}
+
+func writeJSONError(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+func humanBytes(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return fmt.Sprintf("%.1f GB", float64(n)/float64(1<<30))
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/float64(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.1f KB", float64(n)/float64(1<<10))
+	default:
+		return fmt.Sprintf("%d B", n)
 	}
 }

@@ -1,25 +1,31 @@
 import { createClient } from '@supabase/supabase-js'
-import { parseAndSaveDemo, applyParsedDemo, type ParseJobResult } from '../lib/demo-parser/parse-and-save'
+import { parseAndSaveDemo, applyParsedDemo } from '../lib/demo-parser/parse-and-save'
 
 /**
- * Rivalize Demo Processing Worker v2
+ * Rivalize Demo Processing Worker v3
  *
- * This is the main background worker for parsing CS2 demos.
+ * Two-phase processing pipeline:
  *
- * Primary flow:
- * - New demos are created with status='queued' by the API layer.
- * - This worker claims 'queued' jobs, parses them, and marks them completed/failed.
+ * Phase A — Queued → Parsed (Go parser):
+ *   Claims a 'queued' job, generates presigned R2 URLs, and calls the Go parser.
+ *   The Go parser streams the demo, parses it, uploads the result JSON to R2,
+ *   and atomically sets demos.status = 'parsed'.
+ *   No large payloads cross the worker ↔ parser HTTP boundary.
  *
- * Legacy support (temporary):
- * - During the transition period, this worker also supports older demos that were
- *   created directly in 'processing' state (the old synchronous model).
- * - This fallback will be removed once the transition is complete.
+ * Phase B — Parsed → Completed (worker):
+ *   Claims a 'parsed' job, downloads the compact parsed JSON from R2,
+ *   writes it to demos.parsed_data (frames stripped to avoid Supabase timeout),
+ *   and sets status = 'completed'.
+ *
+ * Crash recovery:
+ *   If the worker dies after Go parser sets 'parsed' but before the apply step,
+ *   the demo stays 'parsed'. On the next tick, Phase B picks it up automatically.
+ *   If the worker dies mid-parse, reclaimStale() resets it to 'queued' after
+ *   BASE_RECLAIM_MINUTES, triggering a retry via Phase A.
  */
 
-const POLL_INTERVAL_MS = 2_000
-const MAX_RETRIES = 3
-
-// Base reclaim windows (used for stale job detection in legacy + queued paths)
+const POLL_INTERVAL_MS    = 2_000
+const MAX_RETRIES         = 3
 const BASE_RECLAIM_MINUTES = 35
 
 const supabase = createClient(
@@ -32,27 +38,26 @@ interface DemoClaim {
   id: string
   file_size_bytes: number | null
   status: string
+  parsed_json_url?: string | null
 }
 
 /**
- * Reclaim jobs that have been claimed too long.
- * Handles both the new 'queued' path and legacy 'processing' rows (temporary).
+ * Reclaim stale in-progress jobs.
+ * Covers both the processing state (Phase A in-progress) and any 'parsed'
+ * demo that sat unclaimed for a very long time (worker crash mid-apply).
  */
 async function reclaimStale(): Promise<void> {
-  const now = new Date()
+  const cutoff = new Date(Date.now() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
 
-  // Legacy 'processing' rows (from the old synchronous upload flow).
-  // TODO: Remove this block once the transition to the 'queued' model is complete. refs #85
-  const legacyCutoff = new Date(now.getTime() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
-
+  // Reset any 'processing' jobs whose heartbeat is stale.
   await supabase
     .from('demos')
-    .update({ processing_started_at: null })
+    .update({ status: 'queued', processing_started_at: null })
     .eq('status', 'processing')
     .not('processing_started_at', 'is', null)
-    .lt('processing_started_at', legacyCutoff)
+    .lt('processing_started_at', cutoff)
 
-  // Defensive reclaim for any 'queued' rows that somehow got stuck with a claim.
+  // Defensive reset for 'queued' rows that somehow have a stale claim marker.
   await supabase
     .from('demos')
     .update({ processing_started_at: null })
@@ -61,15 +66,38 @@ async function reclaimStale(): Promise<void> {
 }
 
 /**
- * Atomically claim the next available job.
- *
- * Priority:
- * 1. 'queued' jobs (the new, preferred path)
- * 2. Legacy 'processing' rows (temporary fallback during transition)
+ * Priority 1: Claim a 'parsed' demo to apply to the database.
+ * The Go parser already processed these — we just need to write to Supabase.
  */
-async function claimNext(): Promise<DemoClaim | null> {
-  // Prefer the new 'queued' path
-  const { data: queued } = await supabase
+async function claimParsed(): Promise<DemoClaim | null> {
+  const { data: rows } = await supabase
+    .from('demos')
+    .select('id, file_size_bytes, status, parsed_json_url')
+    .eq('status', 'parsed')
+    .order('parsed_at', { ascending: true })
+    .limit(1)
+
+  if (!rows || rows.length === 0) return null
+
+  const row = rows[0]
+
+  // Mark as 'processing' so a concurrent worker won't double-apply.
+  const { data: claimed } = await supabase
+    .from('demos')
+    .update({ status: 'processing', processing_started_at: new Date().toISOString() })
+    .eq('id', row.id)
+    .eq('status', 'parsed') // guard against race
+    .select('id, file_size_bytes, status, parsed_json_url')
+    .single()
+
+  return claimed as DemoClaim | null
+}
+
+/**
+ * Priority 2: Claim the next 'queued' demo for Phase A (Go parser).
+ */
+async function claimQueued(): Promise<DemoClaim | null> {
+  const { data: rows } = await supabase
     .from('demos')
     .select('id, file_size_bytes, status')
     .eq('status', 'queued')
@@ -78,114 +106,165 @@ async function claimNext(): Promise<DemoClaim | null> {
     .order('created_at', { ascending: true })
     .limit(1)
 
-  if (queued && queued.length > 0) {
-    const row = queued[0]
-    const { data: claimed } = await supabase
-      .from('demos')
-      .update({ status: 'processing', processing_started_at: new Date().toISOString(), last_heartbeat_at: new Date().toISOString() })
-      .eq('id', row.id)
-      .eq('status', 'queued')
-      .is('processing_started_at', null)
-      .select('id, file_size_bytes, status')
-      .single()
+  if (!rows || rows.length === 0) return null
 
-    if (claimed) return claimed as DemoClaim
-  }
-
-  // Temporary fallback for legacy demos still using the old 'processing' flow.
-  // TODO: Remove this fallback once all clients use the 'queued' enqueue path. refs #85
-  const { data: legacy } = await supabase
+  const row = rows[0]
+  const { data: claimed } = await supabase
     .from('demos')
-    .select('id, file_size_bytes, status')
-    .eq('status', 'processing')
+    .update({
+      status:                'processing',
+      processing_started_at: new Date().toISOString(),
+      last_heartbeat_at:     new Date().toISOString(),
+    })
+    .eq('id', row.id)
+    .eq('status', 'queued')
     .is('processing_started_at', null)
-    .lt('retry_count', MAX_RETRIES)
-    .order('created_at', { ascending: true })
-    .limit(1)
+    .select('id, file_size_bytes, status')
+    .single()
 
-  if (legacy && legacy.length > 0) {
-    const row = legacy[0]
-    const { data: claimed } = await supabase
-      .from('demos')
-      .update({ processing_started_at: new Date().toISOString(), last_heartbeat_at: new Date().toISOString() })
-      .eq('id', row.id)
-      .eq('status', 'processing')
-      .is('processing_started_at', null)
-      .select('id, file_size_bytes, status')
-      .single()
-
-    if (claimed) return claimed as DemoClaim
-  }
-
-  return null
+  return claimed as DemoClaim | null
 }
 
-async function tick(): Promise<void> {
-  await reclaimStale()
-
-  const claim = await claimNext()
-  if (!claim) return
-
+/**
+ * Phase B: Apply a 'parsed' demo to the database.
+ * Downloads the compact JSON from R2 and writes it to Supabase.
+ */
+async function applyParsedJob(claim: DemoClaim): Promise<void> {
   const demoId = claim.id
-  const sizeMb = claim.file_size_bytes ? Math.round(claim.file_size_bytes / 1024 / 1024) : 0
+  const parsedJsonUrl = claim.parsed_json_url
+
+  if (!parsedJsonUrl) {
+    console.error(`[worker][demoId=${demoId}] 'parsed' demo has no parsed_json_url — resetting to queued`)
+    await supabase
+      .from('demos')
+      .update({ status: 'queued', processing_started_at: null, retry_count: 0 })
+      .eq('id', demoId)
+    return
+  }
 
   const start = Date.now()
-  console.log(`[worker][demoId=${demoId}][size=${sizeMb}MB] Claimed (status was ${claim.status})`)
+  console.log(`[worker][demoId=${demoId}] Applying parsed data from R2...`)
 
   try {
-    const result: ParseJobResult = await parseAndSaveDemo(demoId)
+    await applyParsedDemo(demoId, parsedJsonUrl, [])
+    await supabase
+      .from('demos')
+      .update({ last_heartbeat_at: new Date().toISOString() })
+      .eq('id', demoId)
+
+    const duration = ((Date.now() - start) / 1000).toFixed(1)
+    console.log(`[worker][demoId=${demoId}] APPLIED (status=completed) in ${duration}s`)
+  } catch (err) {
+    const errMsg  = err instanceof Error ? err.message : String(err)
+    const duration = ((Date.now() - start) / 1000).toFixed(1)
+
+    const { data: current } = await supabase
+      .from('demos').select('retry_count').eq('id', demoId).single()
+    const retryCount  = (current?.retry_count ?? 0) + 1
+    const isPermanent = retryCount >= MAX_RETRIES
+
+    console.error(`[worker][demoId=${demoId}] Apply FAILED attempt ${retryCount}/${MAX_RETRIES} after ${duration}s: ${errMsg}`)
+
+    await supabase.from('demos').update({
+      retry_count:           retryCount,
+      status:                isPermanent ? 'failed' : 'queued',
+      queued_at:             new Date().toISOString(),
+      processing_started_at: null,
+      error_message: isPermanent
+        ? `Permanent apply failure after ${MAX_RETRIES} attempts: ${errMsg}`
+        : `Apply attempt ${retryCount}/${MAX_RETRIES} failed: ${errMsg}`,
+    }).eq('id', demoId)
+  }
+}
+
+/**
+ * Phase A: Send a 'queued' demo to the Go parser.
+ * parseAndSaveDemo handles decompression, presigned URLs, and Go parser call.
+ */
+async function processQueuedJob(claim: DemoClaim): Promise<void> {
+  const demoId = claim.id
+  const sizeMb = claim.file_size_bytes
+    ? Math.round(claim.file_size_bytes / 1024 / 1024)
+    : 0
+
+  const start = Date.now()
+  console.log(`[worker][demoId=${demoId}][size=${sizeMb}MB] Claimed for parsing`)
+
+  try {
+    const result = await parseAndSaveDemo(demoId)
 
     if (result.success) {
-      console.log(`[worker][demoId=${demoId}] Applying parsed data (will set status=completed)...`)
-      await applyParsedDemo(demoId, result.parsedData, result.warnings)
+      const duration = ((Date.now() - start) / 1000).toFixed(1)
+      console.log(`[worker][demoId=${demoId}] Go parser completed in ${duration}s — applying to DB...`)
 
-      // Basic heartbeat on successful completion for observability (especially useful for large demos)
+      // Apply immediately in the same tick (optimistic path).
+      // If this fails, the 'parsed' status in Supabase ensures the next
+      // tick will pick it up via claimParsed() without re-parsing.
+      await applyParsedDemo(demoId, result.parsedJsonUrl, result.warnings)
+
       await supabase
         .from('demos')
         .update({ last_heartbeat_at: new Date().toISOString() })
         .eq('id', demoId)
 
-      const duration = ((Date.now() - start) / 1000).toFixed(1)
-      console.log(`[worker][demoId=${demoId}] SUCCESS (DB status=completed) in ${duration}s`)
+      console.log(`[worker][demoId=${demoId}] SUCCESS (status=completed) in ${((Date.now() - start) / 1000).toFixed(1)}s`)
     } else {
       throw new Error(result.error)
     }
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err)
+    const errMsg  = err instanceof Error ? err.message : String(err)
     const duration = ((Date.now() - start) / 1000).toFixed(1)
 
     const { data: current } = await supabase
-      .from('demos')
-      .select('retry_count, file_size_bytes')
-      .eq('id', demoId)
-      .single()
+      .from('demos').select('retry_count, status').eq('id', demoId).single()
 
-    const retryCount = (current?.retry_count ?? 0) + 1
+    const retryCount  = (current?.retry_count ?? 0) + 1
     const isPermanent = retryCount >= MAX_RETRIES
 
     console.error(`[worker][demoId=${demoId}] FAILED attempt ${retryCount}/${MAX_RETRIES} after ${duration}s: ${errMsg}`)
 
-    await supabase
-      .from('demos')
-      .update({
-        retry_count: retryCount,
-        status: isPermanent ? 'failed' : 'queued',
-        queued_at: new Date().toISOString(),
-        processing_started_at: null,
-        error_message: isPermanent
-          ? `Permanent failure after ${MAX_RETRIES} attempts: ${errMsg}`
-          : `Attempt ${retryCount}/${MAX_RETRIES} failed: ${errMsg}`,
-      })
-      .eq('id', demoId)
+    // If Go parser already set status='parsed', don't overwrite it — let
+    // claimParsed() handle the apply step on the next tick.
+    if (current?.status === 'parsed') {
+      console.log(`[worker][demoId=${demoId}] Apply failed but Go parser had set status=parsed — will retry apply on next tick`)
+      return
+    }
+
+    await supabase.from('demos').update({
+      retry_count:           retryCount,
+      status:                isPermanent ? 'failed' : 'queued',
+      queued_at:             new Date().toISOString(),
+      processing_started_at: null,
+      error_message: isPermanent
+        ? `Permanent failure after ${MAX_RETRIES} attempts: ${errMsg}`
+        : `Attempt ${retryCount}/${MAX_RETRIES} failed: ${errMsg}`,
+    }).eq('id', demoId)
 
     if (isPermanent) {
-      console.error(`[worker][demoId=${demoId}] Marked as permanently failed`)
+      console.error(`[worker][demoId=${demoId}] Permanently failed`)
     }
   }
 }
 
+async function tick(): Promise<void> {
+  await reclaimStale()
+
+  // Phase B first: apply already-parsed demos (cheaper, no Go parser needed).
+  const parsedClaim = await claimParsed()
+  if (parsedClaim) {
+    await applyParsedJob(parsedClaim)
+    return
+  }
+
+  // Phase A: send queued demos to Go parser.
+  const queuedClaim = await claimQueued()
+  if (queuedClaim) {
+    await processQueuedJob(queuedClaim)
+  }
+}
+
 async function run(): Promise<void> {
-  console.log('[worker] Demo processing worker v2 started')
+  console.log('[worker] Demo processing worker v3 started')
   while (true) {
     try {
       await tick()
