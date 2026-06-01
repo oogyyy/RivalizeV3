@@ -8,6 +8,7 @@ import MobileMenu from '@/components/layout/MobileMenu'
 import TopBar from '@/components/layout/TopBar'
 import SocialPanel from '@/components/layout/SocialPanel'
 import FeedbackBubble from '@/components/feedback/FeedbackBubble'
+import { NavigationRefresh } from '@/components/layout/NavigationRefresh'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
@@ -52,6 +53,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Global Feedback Bubble */}
       <FeedbackBubble />
+
+      {/* Refresh server data on every navigation to prevent stale RSC cache */}
+      <NavigationRefresh />
     </div>
   )
 }
