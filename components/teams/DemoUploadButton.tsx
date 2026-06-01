@@ -60,7 +60,7 @@ async function uploadViaServer(
   file: File,
   params: { teamId: string; opponentName: string; demoType: string; fileHash?: string },
   onProgress: (pct: number) => void,
-): Promise<{ id: string }> {
+): Promise<{ id: string; _adopted?: boolean }> {
   const base = new URL('/api/demos/upload', window.location.origin)
   const common = new URLSearchParams({
     teamId:       params.teamId,
