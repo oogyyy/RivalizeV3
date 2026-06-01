@@ -66,7 +66,7 @@ export async function PATCH(
   if (!canEdit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const allowed: Record<string, unknown> = {}
-  for (const k of ['name', 'type', 'notes', 'canvas_data', 'is_public'] as const) {
+  for (const k of ['name', 'type', 'notes', 'canvas_data', 'is_public', 'youtube_url', 'media_urls', 'media_type'] as const) {
     if (body[k] !== undefined) allowed[k as string] = body[k]
   }
   if (body.is_public === true)  allowed['published_at'] = new Date().toISOString()
