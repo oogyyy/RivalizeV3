@@ -13,6 +13,10 @@ import (
 )
 
 func main() {
+	// Write logs to stdout so Railway doesn't classify them as errors
+	// (Go's default log target is stderr, which Railway marks as error-level).
+	log.SetOutput(os.Stdout)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
