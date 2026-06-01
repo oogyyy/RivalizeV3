@@ -47,10 +47,11 @@ function RecordBadge({ wins, losses, draws }: { wins: number; losses: number; dr
 }
 
 export default function MapFolderList({ mapGroups, onSideChange }: Props) {
-  // Auto-expand the first group
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(mapGroups.length > 0 ? [mapGroups[0].map] : []),
-  )
+  // Auto-expand the first folder that actually has demos
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const first = mapGroups.find(g => g.demos.length > 0)
+    return new Set(first ? [first.map] : [])
+  })
 
   const toggle = (map: string) =>
     setExpanded(prev => {
@@ -70,12 +71,15 @@ export default function MapFolderList({ mapGroups, onSideChange }: Props) {
         const total   = group.wins + group.losses + group.draws
         const pending = group.demos.filter(d => d.status !== 'completed').length
 
+        const isEmpty = group.demos.length === 0
+
         return (
           <div
             key={group.map}
             className={cn(
               'border border-border rounded-xl overflow-hidden transition-all',
               isOpen ? 'bg-card' : 'bg-card/60',
+              isEmpty && 'opacity-60',
             )}
           >
             {/* ── Folder header ── */}
@@ -113,14 +117,18 @@ export default function MapFolderList({ mapGroups, onSideChange }: Props) {
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  {total > 0 ? (
-                    <RecordBadge wins={group.wins} losses={group.losses} draws={group.draws} />
+                  {isEmpty ? (
+                    <span className="text-[11px] text-muted-foreground">No demos yet</span>
+                  ) : total > 0 ? (
+                    <>
+                      <RecordBadge wins={group.wins} losses={group.losses} draws={group.draws} />
+                      <span className="text-[10px] text-muted-foreground">
+                        · Last played {formatDate(group.lastActivity)}
+                      </span>
+                    </>
                   ) : (
                     <span className="text-[11px] text-muted-foreground">No results yet</span>
                   )}
-                  <span className="text-[10px] text-muted-foreground">
-                    · Last played {formatDate(group.lastActivity)}
-                  </span>
                 </div>
               </div>
 
@@ -130,17 +138,23 @@ export default function MapFolderList({ mapGroups, onSideChange }: Props) {
                 : <ChevronRight size={14} className="text-muted-foreground shrink-0" />}
             </button>
 
-            {/* ── Expanded demo list ── */}
+            {/* ── Expanded content ── */}
             {isOpen && (
               <div className="border-t border-border px-4 py-3">
-                <DemoListMultiSelect
-                  demos={group.demos}
-                  demoHrefPrefix="/my-team/demos"
-                  showSideSelector
-                  showReparse
-                  canDelete
-                  onSideChange={onSideChange}
-                />
+                {isEmpty ? (
+                  <p className="text-[12px] text-muted-foreground py-2 text-center">
+                    No demos uploaded for this map yet.
+                  </p>
+                ) : (
+                  <DemoListMultiSelect
+                    demos={group.demos}
+                    demoHrefPrefix="/my-team/demos"
+                    showSideSelector
+                    showReparse
+                    canDelete
+                    onSideChange={onSideChange}
+                  />
+                )}
               </div>
             )}
           </div>

@@ -79,8 +79,18 @@ function computeStats(demos: DemoRowData[]) {
   return { totalMatches, totalWins, totalLosses, totalDraws, winRate, avgKD, avgAdr, topPlayers, topMaps }
 }
 
+const ACTIVE_DUTY_MAPS = [
+  'de_ancient', 'de_anubis', 'de_dust2', 'de_inferno',
+  'de_mirage', 'de_nuke', 'de_overpass',
+]
+
 function buildMapGroups(demos: DemoRowData[]): MapGroup[] {
   const mapGroupMap = new Map<string, { demos: DemoRowData[]; wins: number; losses: number; draws: number; lastActivity: string }>()
+
+  // Pre-seed all active duty maps so they always appear as folders
+  for (const map of ACTIVE_DUTY_MAPS) {
+    mapGroupMap.set(map, { demos: [], wins: 0, losses: 0, draws: 0, lastActivity: '' })
+  }
 
   for (const demo of demos) {
     const rawMap = (demo.parsed_data?.header?.map ?? demo.map ?? 'unknown').toLowerCase()
@@ -109,9 +119,23 @@ function buildMapGroups(demos: DemoRowData[]): MapGroup[] {
   return [...mapGroupMap.entries()]
     .map(([map, data]) => ({ map, ...data }))
     .sort((a, b) => {
-      if (a.map === 'unknown' && b.map !== 'unknown') return 1
-      if (b.map === 'unknown' && a.map !== 'unknown') return -1
-      return b.lastActivity.localeCompare(a.lastActivity)
+      const aHasDemos = a.demos.length > 0
+      const bHasDemos = b.demos.length > 0
+      // Folders with demos come first
+      if (aHasDemos !== bHasDemos) return aHasDemos ? -1 : 1
+      if (aHasDemos) {
+        // Both have demos: most recently active first
+        return b.lastActivity.localeCompare(a.lastActivity)
+      }
+      // Both empty: preserve fixed active duty order
+      const aIdx = ACTIVE_DUTY_MAPS.indexOf(a.map)
+      const bIdx = ACTIVE_DUTY_MAPS.indexOf(b.map)
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+      if (aIdx !== -1) return -1
+      if (bIdx !== -1) return 1
+      if (a.map === 'unknown') return 1
+      if (b.map === 'unknown') return -1
+      return 0
     })
 }
 
@@ -379,20 +403,11 @@ export default function MyTeamStatsAndDemos({
               <h2 className="text-[13px] font-semibold text-foreground">My Team&apos;s Demos</h2>
               {effectiveDemos.length > 0 && (
                 <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
-                  {effectiveDemos.length} · {mapGroups.filter(g => g.map !== 'unknown').length} maps
+                  {effectiveDemos.length} · {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').length} maps
                 </span>
               )}
             </div>
-            {effectiveDemos.length === 0 ? (
-              <div className="rounded-xl border border-border bg-card">
-                <EmptyState
-                  icon={<FileVideo size={18} className="text-muted-foreground/40" />}
-                  text="No team demos uploaded yet. Use the Upload button above to add your team's own demos."
-                />
-              </div>
-            ) : (
-              <MapFolderList mapGroups={mapGroups} onSideChange={handleSideChange} />
-            )}
+            <MapFolderList mapGroups={mapGroups} onSideChange={handleSideChange} />
           </div>
         </div>
 
