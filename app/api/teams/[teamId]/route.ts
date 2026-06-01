@@ -55,3 +55,33 @@ export async function PATCH(
 
   return NextResponse.json(updated)
 }
+
+// DELETE /api/teams/[teamId] — permanently delete a team (owner only)
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ teamId: string }> },
+) {
+  const { teamId } = await params
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = createAdminClient()
+
+  const { data: membership } = await admin
+    .from('team_members')
+    .select('role')
+    .eq('team_id', teamId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (membership?.role !== 'owner') {
+    return NextResponse.json({ error: 'Only the team owner can delete a team' }, { status: 403 })
+  }
+
+  const { error } = await admin.from('teams').delete().eq('id', teamId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ ok: true })
+}

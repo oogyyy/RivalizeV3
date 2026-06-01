@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import CreateTeamDialog from '@/app/(app)/teams/CreateTeamDialog'
 import InviteFriendsDialog from '@/app/(app)/teams/[teamId]/InviteFriendsDialog'
 import EditTeamNameDialog from '@/app/(app)/my-team/EditTeamNameDialog'
+import DeleteTeamDialog from '@/app/(app)/my-team/DeleteTeamDialog'
 import TeamSwitcher from '@/app/(app)/my-team/TeamSwitcher'
 import type { TeamOption } from '@/app/(app)/my-team/TeamSwitcher'
 
@@ -72,6 +73,7 @@ export default async function MyTeamPage({
   const myRole = membershipList.find(m => m.team_id === selectedTeamId)?.role ?? null
   const canInvite = myRole === 'owner' || myRole === 'admin'
   const canEdit   = myRole === 'owner' || myRole === 'admin'
+  const canDelete = myRole === 'owner'
 
   const teamName = teamMap.get(selectedTeamId) ?? 'My Team'
 
@@ -117,6 +119,9 @@ export default async function MyTeamPage({
               )}
               <DemoUploadButton teamId={selectedTeamId} demoType="self" />
               <CreateTeamDialog />
+              {canDelete && (
+                <DeleteTeamDialog teamId={selectedTeamId} teamName={teamName} />
+              )}
             </div>
           }
         />
