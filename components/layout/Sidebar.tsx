@@ -29,7 +29,7 @@ const NAV_GROUPS = [
     index: '03',
     label: 'Prepare',
     items: [
-      { href: '/my-team',  label: 'My Team',  Icon: Shield },
+      { href: '/my-team',  label: 'My Teams', Icon: Shield },
       { href: '/ai-coach', label: 'AI Scout', Icon: Brain, live: true },
       { href: '/playbook', label: 'Playbook', Icon: BookOpen },
       { href: '/veto',     label: 'Veto',     Icon: Swords },

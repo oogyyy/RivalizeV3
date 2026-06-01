@@ -22,7 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Opponents', href: '/opponents', icon: Target, description: 'Scouting library' },
   { label: 'Pro Library', href: '/opponents/pro-demos', icon: Trophy, description: 'Professional demos' },
   { label: 'AI Scout', href: '/ai-coach', icon: Brain, description: 'AI-powered analysis' },
-  { label: 'My Team', href: '/my-team', icon: Users, description: 'Team roster & stats' },
+  { label: 'My Teams', href: '/my-team', icon: Users, description: 'Team roster & stats' },
   { label: 'Veto', href: '/veto', icon: Map, description: 'Map veto planner' },
   { label: 'Playbook', href: '/playbook', icon: BookOpen, description: 'Strategy playbook' },
   { label: 'Friends', href: '/friends', icon: Users, description: 'Manage friends' },
