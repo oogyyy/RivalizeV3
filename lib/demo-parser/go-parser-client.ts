@@ -50,6 +50,7 @@ export async function waitForParser(baseUrl: string): Promise<void> {
  */
 export async function triggerParseJob(
   demoId: string,
+  r2Key: string,
   demoDownloadUrl: string,
   parsedJsonUploadUrl: string,
   parsedJsonPublicUrl: string,
@@ -72,6 +73,7 @@ export async function triggerParseJob(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         demo_id:               demoId,
+        r2_key:                r2Key,
         demo_download_url:     demoDownloadUrl,
         parsed_json_upload_url: parsedJsonUploadUrl,
         parsed_json_public_url: parsedJsonPublicUrl,

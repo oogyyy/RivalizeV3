@@ -1,11 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { triggerParseJob } from '@/lib/demo-parser/go-parser-client'
-import { maybeDecompress } from '@/lib/demo-parser/decompress'
 import { computeTopPlayers } from '@/lib/demo-parser/aggregate-players'
 import {
   downloadObject,
-  uploadObject,
-  deleteObject,
   createPresignedGetUrl,
   createPresignedPutUrl,
   getPublicUrl,
@@ -91,39 +88,20 @@ export async function parseAndSaveDemo(demoId: string): Promise<ParseJobResult> 
   const existingOpponentSide =
     (demo.parsed_data as { opponentSide?: string } | null)?.opponentSide ?? 'team2'
 
-  let demoKey = r2Key
-  let tempKeyToClean: string | null = null
-
   try {
-    // If the demo is compressed, decompress and upload to a temp R2 key so the
-    // Go parser can download a plain .dem file without needing a zstd library.
-    if (r2Key.toLowerCase().endsWith('.zst')) {
-      const tempKey = `temp-demos/${demoId}.dem`
-      console.log(`[parse] [demoId=${demoId}] Decompressing .zst demo for Go parser...`)
-
-      const rawBuf = await downloadObject(r2Key)
-      const decompressed = maybeDecompress(rawBuf, r2Key)
-
-      console.log(`[parse] [demoId=${demoId}] Uploading decompressed demo (${(decompressed.byteLength / 1e6).toFixed(0)} MB) to temp R2...`)
-      await uploadObject(tempKey, decompressed)
-
-      demoKey = tempKey
-      tempKeyToClean = tempKey
-    }
-
     // Generate presigned URLs (6-hour expiry — generous for large demos + retries)
     const EXPIRY = 6 * 3600
     const parsedJsonKey = `parsed-demos/${demoId}.json`
 
     const [demoDownloadUrl, parsedJsonUploadUrl] = await Promise.all([
-      createPresignedGetUrl(demoKey, EXPIRY),
+      createPresignedGetUrl(r2Key, EXPIRY),
       createPresignedPutUrl(parsedJsonKey, EXPIRY),
     ])
     const parsedJsonPublicUrl = getPublicUrl(parsedJsonKey)
 
-    // Trigger parse job — Go parser does all heavy lifting.
+    // Trigger parse job — Go parser streams, decompresses (if .zst), and parses.
     const { parsedJsonUrl, warnings } = await withRetry(() =>
-      triggerParseJob(demoId, demoDownloadUrl, parsedJsonUploadUrl, parsedJsonPublicUrl)
+      triggerParseJob(demoId, r2Key, demoDownloadUrl, parsedJsonUploadUrl, parsedJsonPublicUrl)
     )
 
     // Tag opponentSide onto the result key so applyParsedDemo can find it.
@@ -147,13 +125,6 @@ export async function parseAndSaveDemo(demoId: string): Promise<ParseJobResult> 
       raw.includes('ETIMEDOUT')
 
     return { success: false, error: raw, isPermanent: !isTransient }
-  } finally {
-    // Clean up the temp decompressed demo from R2 (best-effort, non-fatal).
-    if (tempKeyToClean) {
-      deleteObject(tempKeyToClean).catch(e =>
-        console.warn(`[parse] Non-fatal: failed to delete temp key ${tempKeyToClean}:`, e)
-      )
-    }
   }
 }
 
