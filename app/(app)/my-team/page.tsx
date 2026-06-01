@@ -10,6 +10,7 @@ import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 import { PageHeader } from '@/components/layout/PageHeader'
 import CreateTeamDialog from '@/app/(app)/teams/CreateTeamDialog'
 import InviteFriendsDialog from '@/app/(app)/teams/[teamId]/InviteFriendsDialog'
+import EditTeamNameDialog from '@/app/(app)/my-team/EditTeamNameDialog'
 
 export default async function MyTeamPage() {
   const user = await getCurrentUser()
@@ -26,6 +27,7 @@ export default async function MyTeamPage() {
   const primaryTeamId = teamIds[0] ?? null
   const myRole = (memberships ?? []).find(m => m.team_id === primaryTeamId)?.role ?? null
   const canInvite = myRole === 'owner' || myRole === 'admin'
+  const canEdit   = myRole === 'owner' || myRole === 'admin'
 
   let teamName = 'My Team'
   let memberIds: string[] = []
@@ -71,6 +73,9 @@ export default async function MyTeamPage() {
             <div className="flex items-center gap-2">
               {!primaryTeamId && (
                 <CreateTeamDialog />
+              )}
+              {primaryTeamId && canEdit && (
+                <EditTeamNameDialog teamId={primaryTeamId} currentName={teamName} />
               )}
               {primaryTeamId && canInvite && (
                 <InviteFriendsDialog teamId={primaryTeamId} existingMemberIds={memberIds} />
