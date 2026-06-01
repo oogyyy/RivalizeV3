@@ -347,6 +347,7 @@ export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props
   const [showSetup, setShowSetup] = useState(false)
   const [grabMatch, setGrabMatch] = useState<CS2Match | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -361,12 +362,18 @@ export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props
   useEffect(() => { load() }, [load])
 
   async function sync() {
-    setSyncing(true); setNewCount(null)
+    setSyncing(true); setNewCount(null); setSyncError(null)
     try {
       const res  = await fetch('/api/cs2/sync', { method: 'POST' })
-      const json = await res.json() as { newMatches: number }
-      setNewCount(json.newMatches)
-      if (json.newMatches > 0) await load()
+      const json = await res.json() as { newMatches: number; error?: string }
+      if (!res.ok || json.error) {
+        setSyncError(json.error ?? 'Sync failed')
+      } else {
+        setNewCount(json.newMatches)
+        if (json.newMatches > 0) await load()
+      }
+    } catch {
+      setSyncError('Sync failed — check your connection')
     } finally {
       setSyncing(false)
     }
@@ -385,6 +392,18 @@ export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center gap-2 px-4">
         <p className="text-[12px] text-muted-foreground">CS2 match history requires a Steam API key.</p>
+      </div>
+    )
+  }
+
+  // ── Bot mode but no Steam ID linked ──────────────────────────────────────
+  if (!loading && data && !data.linked && isBotMode) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center gap-2 px-4">
+        <p className="text-[13px] font-semibold text-foreground">Link your Steam account</p>
+        <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[220px]">
+          Go to <a href="/settings" className="text-[#00ffc8] underline-offset-2 hover:underline">Settings</a> and link your Steam profile so we can pull your match history.
+        </p>
       </div>
     )
   }
@@ -441,8 +460,11 @@ export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props
           {newCount !== null && newCount > 0 && (
             <span className="text-[10px] text-[#00ffc8]">+{newCount} new</span>
           )}
-          {newCount === 0 && (
+          {newCount === 0 && !syncError && (
             <span className="text-[10px] text-muted-foreground/50">· up to date</span>
+          )}
+          {syncError && (
+            <span className="text-[10px] text-red-400 truncate max-w-[160px]" title={syncError}>· {syncError}</span>
           )}
         </div>
         <div className="flex items-center gap-1.5">
