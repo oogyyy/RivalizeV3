@@ -202,12 +202,10 @@ export default function PersonalStatsAndDemos({
               </span>
             )}
           </div>
-          {demos.length === 0 && (
-            <DemoUploadButton teamId={personalTeamId} demoType="self" />
-          )}
+          <DemoUploadButton teamId={personalTeamId} demoType="self" />
         </div>
 
-        <RecentMatchesSplit demos={demos} faceitPlayerId={faceitPlayerId} />
+        <RecentMatchesSplit demos={demos} faceitPlayerId={faceitPlayerId} personalTeamId={personalTeamId} />
 
         {/* Detailed demo browser — shown when uploads exist */}
         {demos.length > 0 && (

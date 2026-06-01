@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { ExternalLink, Loader2, Trophy, Zap } from 'lucide-react'
+import { ExternalLink, Loader2, Zap } from 'lucide-react'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
+import CS2MatchPanel from '@/app/(app)/improve/CS2MatchPanel'
 
 // ── Map display name helper ─────────────────────────────────────────────────
 
@@ -47,67 +48,6 @@ interface FaceitRecentMatch {
   imported: boolean
 }
 
-// ── CS2 match row ───────────────────────────────────────────────────────────
-
-function CS2Row({ demo }: { demo: DemoRowData }) {
-  const h = demo.parsed_data?.header
-  const os = demo.parsed_data?.opponentSide ?? 'team2'
-
-  let result: 'W' | 'L' | 'D' | null = null
-  let scoreStr = ''
-
-  if (demo.status === 'completed' && h) {
-    const ours   = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
-    const theirs = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
-    if (ours > theirs) result = 'W'
-    else if (ours === theirs) result = 'D'
-    else result = 'L'
-    scoreStr = `${ours}–${theirs}`
-  }
-
-  const map = mapLabel(demo.parsed_data?.header?.map ?? demo.map)
-  const date = demo.match_date ?? demo.created_at
-
-  return (
-    <Link
-      href={`/demos/${demo.id}`}
-      className="flex items-center gap-3 rounded-lg border border-border bg-background/40 px-3 py-2.5 hover:bg-background/70 hover:border-border/80 transition-colors group"
-    >
-      {/* Result badge */}
-      <div className={cn(
-        'w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0',
-        result === 'W' ? 'bg-[rgba(0,255,200,0.12)] text-[#00ffc8]' :
-        result === 'L' ? 'bg-red-500/10 text-red-400' :
-        result === 'D' ? 'bg-yellow-500/10 text-yellow-400' :
-        'bg-muted/50 text-muted-foreground'
-      )}>
-        {demo.status === 'processing' || demo.status === 'queued' ? (
-          <Loader2 size={11} className="animate-spin" />
-        ) : (
-          result ?? '?'
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-medium text-foreground leading-tight truncate">{map}</p>
-        <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
-          {scoreStr ? `${scoreStr} · ` : ''}{formatDate(date)}
-        </p>
-      </div>
-
-      {/* League / type */}
-      <div className="shrink-0 text-right">
-        {demo.league && (
-          <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wide block">
-            {demo.league.length > 14 ? demo.league.slice(0, 14) + '…' : demo.league}
-          </span>
-        )}
-      </div>
-    </Link>
-  )
-}
-
 // ── FACEIT match row ─────────────────────────────────────────────────────────
 
 function FaceitRow({ match }: { match: FaceitRecentMatch }) {
@@ -129,7 +69,6 @@ function FaceitRow({ match }: { match: FaceitRecentMatch }) {
       rel="noopener noreferrer"
       className="flex items-center gap-3 rounded-lg border border-border bg-background/40 px-3 py-2.5 hover:bg-background/70 hover:border-border/80 transition-colors group"
     >
-      {/* Result badge */}
       <div className={cn(
         'w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0',
         result === 'W' ? 'bg-[rgba(0,255,200,0.12)] text-[#00ffc8]' :
@@ -140,7 +79,6 @@ function FaceitRow({ match }: { match: FaceitRecentMatch }) {
         {result ?? '?'}
       </div>
 
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <p className="text-[12px] font-medium text-foreground leading-tight truncate">
@@ -160,7 +98,6 @@ function FaceitRow({ match }: { match: FaceitRecentMatch }) {
         </p>
       </div>
 
-      {/* External link */}
       <ExternalLink size={12} className="shrink-0 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
     </a>
   )
@@ -169,11 +106,12 @@ function FaceitRow({ match }: { match: FaceitRecentMatch }) {
 // ── Column wrapper ───────────────────────────────────────────────────────────
 
 function Column({
-  icon, title, accent, children,
+  icon, title, accent, noPad, children,
 }: {
   icon: React.ReactNode
   title: string
   accent: string
+  noPad?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -182,7 +120,7 @@ function Column({
         {icon}
         <span className="text-[12px] font-semibold text-foreground tracking-wide">{title}</span>
       </div>
-      <div className="flex-1 overflow-y-auto max-h-[360px] p-3 space-y-1.5">
+      <div className={cn('flex-1 overflow-y-auto max-h-[420px]', !noPad && 'p-3 space-y-1.5')}>
         {children}
       </div>
     </div>
@@ -203,6 +141,7 @@ function EmptyCol({ message, sub }: { message: string; sub: string }) {
 interface Props {
   demos: DemoRowData[]
   faceitPlayerId: string | null
+  personalTeamId: string
 }
 
 interface FaceitState {
@@ -211,9 +150,7 @@ interface FaceitState {
   linked: boolean
 }
 
-export default function RecentMatchesSplit({ demos, faceitPlayerId }: Props) {
-  const cs2Demos = demos.filter(d => !d.faceit_match_id).slice(0, 15)
-
+export default function RecentMatchesSplit({ demos: _demos, faceitPlayerId, personalTeamId }: Props) {
   const [faceit, setFaceit] = useState<FaceitState>({
     matches: [],
     loading: !!faceitPlayerId,
@@ -247,16 +184,10 @@ export default function RecentMatchesSplit({ demos, faceitPlayerId }: Props) {
       <Column
         title="CS2 Premier / Competitive"
         accent="bg-blue-500/5"
-        icon={<Trophy size={13} className="text-blue-400" />}
+        icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>}
+        noPad
       >
-        {cs2Demos.length === 0 ? (
-          <EmptyCol
-            message="No CS2 matches yet"
-            sub="Upload a Premier or Competitive demo to start tracking."
-          />
-        ) : (
-          cs2Demos.map(d => <CS2Row key={d.id} demo={d} />)
-        )}
+        <CS2MatchPanel personalTeamId={personalTeamId} />
       </Column>
 
       {/* ── FACEIT ── */}
