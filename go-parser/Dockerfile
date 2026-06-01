@@ -19,14 +19,16 @@ COPY --from=builder /app/go-parser .
 EXPOSE 8080
 ENV PORT=8080
 
-# Tune GC to collect more frequently, keeping peak heap smaller.
-# GOGC=50 → collect when heap grows 50% above live set (default is 100%).
-ENV GOGC=50
+# GOGC=75: collect when heap grows 75% above live set (default 100%).
+# Slightly more frequent GC than default gives a better peak-memory/throughput
+# balance on Railway Pro without sacrificing much parse speed.
+ENV GOGC=75
 
-# Hard memory ceiling in bytes (leave headroom for OS + goroutine stacks).
-# Adjust this to match your Railway service memory limit.
-# Example: 512 MiB service → set to 450 MiB (471859200)
-# Unset means no ceiling (default). Set via Railway env var to override.
-# ENV GOMEMLIMIT=471859200
+# GOMEMLIMIT: hard ceiling so the OOM killer never surprises us.
+# Railway Pro default per-service memory is 8 GB.
+# 3.5 GB leaves plenty of headroom for the OS and goroutine stacks while
+# still allowing very large demos (~500 MB raw + parse structures).
+# Override via Railway service environment variable if you resize the service.
+ENV GOMEMLIMIT=3758096384
 
 CMD ["./go-parser"]
