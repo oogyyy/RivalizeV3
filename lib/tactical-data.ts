@@ -1,0 +1,233 @@
+import type { Player, Opponent, MapStat, PlaybookItem, LineupItem, TeamReminder } from '@/types/tactical';
+
+export const INITIAL_ROSTER: Player[] = [
+  { id: '1', name: 's1mple', role: 'IGL', rating: 1.25, kd: 1.15, maps: 84, form: ['W', 'W', 'W', 'W', 'W'], image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=150' },
+  { id: '2', name: 'nausbim', role: 'AWP', rating: 1.18, kd: 1.10, maps: 84, form: ['W', 'W', 'W', 'W', 'L'], image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150' },
+  { id: '3', name: 'hanatem', role: 'Rifler', rating: 1.06, kd: 1.09, maps: 34, form: ['W', 'W', 'L', 'L', 'W'], image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150' },
+  { id: '4', name: 'harther', role: 'Support', rating: 0.97, kd: 1.06, maps: 36, form: ['W', 'L', 'W', 'L', 'W'], image: 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?auto=format&fit=crop&q=80&w=150' },
+  { id: '5', name: 'onine', role: 'Rifler', rating: 1.03, kd: 1.03, maps: 27, form: ['W', 'W', 'W', 'W', 'W'], image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150' },
+];
+
+export const INITIAL_OPPONENTS: Opponent[] = [
+  { id: 'liq', name: 'Team Liquid', logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=80', region: 'EU', level: 10, demos: 24, winRate: 62, lastSeen: '1 day ago', bestMap: 'Inferno', bestMapWinRate: 75 },
+  { id: 'faze', name: 'FaZe Clan', logo: 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?auto=format&fit=crop&q=80&w=80', region: 'EU', level: 10, demos: 18, winRate: 58, lastSeen: '3 days ago', bestMap: 'Nuke', bestMapWinRate: 68 },
+  { id: 'g2', name: 'G2 Esports', logo: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=80', region: 'EU', level: 10, demos: 31, winRate: 65, lastSeen: '4 days ago', bestMap: 'Mirage', bestMapWinRate: 72 },
+  { id: 'vit', name: 'Vitality', logo: 'https://images.unsplash.com/photo-1493723843671-1d655e66ac1c?auto=format&fit=crop&q=80&w=80', region: 'EU', level: 10, demos: 22, winRate: 60, lastSeen: '2 days ago', bestMap: 'Overpass', bestMapWinRate: 66 },
+  { id: 'ence', name: 'ENCE', logo: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&q=80&w=80', region: 'EU', level: 10, demos: 16, winRate: 55, lastSeen: '5 days ago', bestMap: 'Vertigo', bestMapWinRate: 62 },
+  { id: 'mouz', name: 'MOUZ', logo: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&q=80&w=80', region: 'EU', level: 10, demos: 19, winRate: 57, lastSeen: '1 week ago', bestMap: 'Ancient', bestMapWinRate: 64 },
+];
+
+export const MAPS_POOL: MapStat[] = [
+  { name: 'Mirage',   ctWin: 58, tWin: 42, winRate: 78, status: 'picked_us' },
+  { name: 'Inferno',  ctWin: 62, tWin: 38, winRate: 78, status: 'picked_them' },
+  { name: 'Nuke',     ctWin: 58, tWin: 42, winRate: 45, status: 'banned_them' },
+  { name: 'Overpass', ctWin: 58, tWin: 42, winRate: 64, status: 'banned_us' },
+  { name: 'Ancient',  ctWin: 58, tWin: 42, winRate: 64, status: 'undecided' },
+  { name: 'Vertigo',  ctWin: 62, tWin: 38, winRate: 57, status: 'undecided' },
+  { name: 'Anubis',   ctWin: 55, tWin: 45, winRate: 71, status: 'decider' },
+];
+
+export const INITIAL_REMINDERS: TeamReminder[] = [
+  { id: '1', text: 'Review VODs and team patterns', completed: true },
+  { id: '2', text: 'Practice set execute play A-site', completed: true },
+  { id: '3', text: 'Confirm interactive ban priorities', completed: true },
+  { id: '4', text: 'Simulate veto against Aurora Gaming', completed: false },
+  { id: '5', text: 'Re-align support crosshair coordinates', completed: false },
+];
+
+export const PLAYBOOK_ITEMS: PlaybookItem[] = [
+  {
+    id: 'b-split',
+    name: 'B Split Execute',
+    mapName: 'Inferno',
+    side: 'T',
+    tags: ['UTILITY', 'RETAKE'],
+    image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=500',
+    description: 'Attack B-site from both Banana and CT speedway. Requires precise smoke setups at CT Spawn and Spool to partition off deep defenders.',
+    steps: [
+      'Banana entry team deploys close flashes and molly on sandbags.',
+      'A-short group pushes CT speedway with high support smokes.',
+      'Simultaneous execute with double flashbang pop over B Roof.',
+    ],
+    points: [
+      { x: 35, y: 72, label: 'Smoke CT Spawn', type: 'smoke' },
+      { x: 45, y: 65, label: 'Molly Sandbags', type: 'molotov' },
+      { x: 38, y: 55, label: 'Pop Flash B Site', type: 'flash' },
+      { x: 25, y: 80, label: 'Entry Team A', type: 'player' },
+      { x: 50, y: 85, label: 'Support Team B', type: 'player' },
+    ],
+  },
+  {
+    id: 'aggro-mid',
+    name: 'Aggro Mid Control',
+    mapName: 'Mirage',
+    side: 'T',
+    tags: ['FLASH', 'CONTROL'],
+    image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=500',
+    description: 'Establish heavy middle presence early in the round. Cut off window vision with standard top mid smokes and use active double pushes to overwhelm solo hold.',
+    steps: [
+      'Throw Window Smoke and Catwalk Smoke from spawn.',
+      'Flash high over Underpass to cover mid-runners.',
+      'Double peak connector with primary rifles synced with underpass creep.',
+    ],
+    points: [
+      { x: 48, y: 45, label: 'Window Smoke', type: 'smoke' },
+      { x: 58, y: 52, label: 'Connector Flash', type: 'flash' },
+      { x: 42, y: 58, label: 'Molly Short', type: 'molotov' },
+      { x: 35, y: 75, label: 'Rifler Mid', type: 'player' },
+    ],
+  },
+  {
+    id: 'ct-stack-b',
+    name: 'CT Stack B',
+    mapName: 'Nuke',
+    side: 'CT',
+    tags: ['STACK', 'GAMBLE'],
+    image: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&q=80&w=500',
+    description: 'Aggressive eco defense stacking three defenders inside B-lower vents. Lures opponent by throwing default lobby-side smokes encouraging soft lower entries.',
+    steps: [
+      'Solo hold RAMPS with early utility delays.',
+      '3 players hide behind glass/dark spots lower site.',
+      'Pop-flash on trigger warning steps.',
+    ],
+    points: [
+      { x: 50, y: 48, label: 'Ramp Molly', type: 'molotov' },
+      { x: 52, y: 80, label: 'Trigger Flash lower', type: 'flash' },
+      { x: 62, y: 82, label: 'Stack Player A', type: 'player' },
+      { x: 65, y: 85, label: 'Stack Player B', type: 'player' },
+    ],
+  },
+  {
+    id: 'a-default',
+    name: 'A Site Default',
+    mapName: 'Mirage',
+    side: 'T',
+    tags: ['SMOKE', 'CONTROL'],
+    image: 'https://images.unsplash.com/photo-1493723843671-1d655e66ac1c?auto=format&fit=crop&q=80&w=500',
+    description: 'Standard A execution using smokes on Stairs, Jungle, and CT Spawn to isolate the site and plant under safe conditions.',
+    steps: [
+      'Smoke Stairs & Jungle simultaneously.',
+      'Molly Sandwich & Under Palace.',
+      'Flash over Tetris, execute site.',
+    ],
+    points: [
+      { x: 28, y: 34, label: 'Stairs Smoke', type: 'smoke' },
+      { x: 35, y: 30, label: 'Jungle Smoke', type: 'smoke' },
+      { x: 22, y: 25, label: 'CT Spawn Smoke', type: 'smoke' },
+      { x: 30, y: 42, label: 'Molly Sandwich', type: 'molotov' },
+      { x: 42, y: 38, label: 'Tetris Pop Flash', type: 'flash' },
+      { x: 45, y: 48, label: 'Rifler Palace', type: 'player' },
+    ],
+  },
+];
+
+export const LINEUPS_LIST: LineupItem[] = [
+  {
+    id: 'lin-1',
+    name: 'God Smoke Stairways',
+    mapName: 'Mirage',
+    side: 'T',
+    type: 'smoke',
+    x: 48,
+    y: 35,
+    throwImg: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400',
+    landImg: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&q=80&w=400',
+    instructions: [
+      'Stand against the second wooden pillar on T-Platform.',
+      'Align crosshair onto the third notch of the middle scaffolding hook.',
+      'Perform standard jumpthrow.',
+    ],
+    tags: ['MIRAGE', 'STAIRS', 'EXECUTE'],
+  },
+  {
+    id: 'lin-2',
+    name: 'Palace Window Fire Molly',
+    mapName: 'Mirage',
+    side: 'T',
+    type: 'molotov',
+    x: 62,
+    y: 45,
+    throwImg: 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?auto=format&fit=crop&q=80&w=400',
+    landImg: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=400',
+    instructions: [
+      'Crouch under Palace shadow beam entry column.',
+      'Target high angle over roof edge.',
+      'Walk forward two steps then release molotov.',
+    ],
+    tags: ['MIRAGE', 'PALACE', 'FIRE'],
+  },
+  {
+    id: 'lin-3',
+    name: 'CT Smoke — Jungle',
+    mapName: 'Mirage',
+    side: 'T',
+    type: 'smoke',
+    x: 62,
+    y: 45,
+    throwImg: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400',
+    landImg: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&q=80&w=400',
+    instructions: [
+      'Position in the corner as shown in Throw Position.',
+      'Aim at the specific pixel on the roof edge.',
+      'Perform a Jump Throw (bind recommended).',
+      'Smoke lands in Jungle, blocking vision from Connector and Stairs.',
+    ],
+    tags: ['SMOKE', 'JUMP THROW', 'MID CONTROL'],
+  },
+  {
+    id: 'lin-4',
+    name: 'B-site CT Smoke',
+    mapName: 'Inferno',
+    side: 'T',
+    type: 'smoke',
+    x: 35,
+    y: 72,
+    throwImg: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=400',
+    landImg: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=400',
+    instructions: [
+      'Stand in front of logs on Banana wall.',
+      'Aim at the highest point of the chimney stack.',
+      'Stand-still throw.',
+      'Blocks CT spawn rotation completely.',
+    ],
+    tags: ['SMOKE', 'DEFAULT', 'B EXECUTE'],
+  },
+  {
+    id: 'lin-5',
+    name: 'Secret Outside Smoke',
+    mapName: 'Nuke',
+    side: 'T',
+    type: 'smoke',
+    x: 55,
+    y: 40,
+    throwImg: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&q=80&w=400',
+    landImg: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400',
+    instructions: [
+      'Stand against the yellow bin at fence outside.',
+      'Aim at the electrical cord crossing.',
+      'Left-throw.',
+      'Blocks CT outside sniper view allowing safe walk to secret.',
+    ],
+    tags: ['SMOKE', 'OUTSIDE', 'SECRET ROTATION'],
+  },
+  {
+    id: 'lin-6',
+    name: 'Mid Window Flash',
+    mapName: 'Mirage',
+    side: 'T',
+    type: 'flash',
+    x: 48,
+    y: 50,
+    throwImg: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=400',
+    landImg: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&q=80&w=400',
+    instructions: [
+      'Stand against the middle post in top-mid alley.',
+      'Aim directly at the radio tower tip.',
+      'Left-click throw whilst running forward for 1 step.',
+      'Flashes window defenders instantly without blinding underpass.',
+    ],
+    tags: ['FLASH', 'RUN THROW', 'MID RESPONSE'],
+  },
+];
+
+export const MAPS_GRID = ['Mirage', 'Inferno', 'Nuke', 'Overpass', 'Ancient', 'Vertigo', 'Anubis'];

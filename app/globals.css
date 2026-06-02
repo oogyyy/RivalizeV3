@@ -1,5 +1,23 @@
 @import "tailwindcss";
 
+/* ── Tailwind v4 theme tokens — generates bg-brand-*, text-brand-*, font-* utilities ── */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space), "Space Grotesk", sans-serif;
+  --font-mono: var(--font-mono-var, "JetBrains Mono"), "JetBrains Mono", ui-monospace, monospace;
+
+  --color-brand-bg: #07080e;
+  --color-brand-card: #0f111e;
+  --color-brand-purple: #7047eb;
+  --color-brand-purple-hover: #8862ff;
+  --color-brand-cyan: #14b8a6;
+  --color-brand-pink: #f43f5e;
+  --color-brand-border: #1e2238;
+
+  --animate-fade-in: fade-in 0.3s ease-out;
+  --animate-glow: glow 2s ease-in-out infinite;
+}
+
 :root {
   /* ── Rivalize Design System v4.0 — Dark Modern ──────────────────────────────── */
 
@@ -135,7 +153,7 @@ input:focus, textarea:focus, select:focus { outline: none; }
   /* Font stacks */
   --font-ui:      var(--font-inter, 'Inter'), system-ui, sans-serif;
   --font-display: var(--font-space, 'Space Grotesk'), sans-serif;
-  --font-mono:    var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  --font-mono:    var(--font-mono-var, 'JetBrains Mono'), ui-monospace, monospace;
 
   /* Spacing & shape */
   --pad:    22px;
@@ -244,6 +262,13 @@ input:focus, textarea:focus, select:focus { outline: none; }
   0%,100% { transform: scale(1); opacity: 0.4; }
   50%      { transform: scale(2.1); opacity: 0; }
 }
+
+/* ── Glow filter animation (used with animate-glow / CSS var --animate-glow) ── */
+@keyframes glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(112, 71, 235, 0.4)); }
+  50%       { filter: drop-shadow(0 0 12px rgba(112, 71, 235, 0.8)); }
+}
+.animate-glow { animation: glow 2s ease-in-out infinite; }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────────── */
 .rv-btn {
