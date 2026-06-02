@@ -67,10 +67,11 @@ const config: Config = {
         ctside: '#3B82F6',
       },
       fontFamily: {
-        sans:  ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
-        sora:  ['var(--font-sora)', 'Sora', 'sans-serif'],
-        space: ['var(--font-space)', 'Space Grotesk', 'sans-serif'],
-        mono:  ['ui-monospace', 'SFMono-Regular', 'monospace'],
+        sans:    ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['var(--font-space)', 'Space Grotesk', 'sans-serif'],
+        sora:    ['var(--font-sora)', 'Sora', 'sans-serif'],
+        space:   ['var(--font-space)', 'Space Grotesk', 'sans-serif'],
+        mono:    ['var(--font-mono-var)', 'JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -90,6 +91,7 @@ const config: Config = {
         'shimmer':       'shimmer 1.5s linear infinite',
         'fade-in-up':    'fade-in-up 0.35s ease-out both',
         'marquee':       'marquee 28s linear infinite',
+        'glow':          'glow 2s ease-in-out infinite',
       },
       keyframes: {
         'pulse-neon': {
@@ -123,6 +125,10 @@ const config: Config = {
         'marquee': {
           from: { transform: 'translateX(0)' },
           to:   { transform: 'translateX(-50%)' },
+        },
+        'glow': {
+          '0%, 100%': { filter: 'drop-shadow(0 0 4px rgba(112, 71, 235, 0.4))' },
+          '50%':       { filter: 'drop-shadow(0 0 12px rgba(112, 71, 235, 0.8))' },
         },
       },
     },
