@@ -56,11 +56,15 @@ export async function GET() {
     )
 
     const matches = history.items.map((m, i) => {
-      const inF1 = m.teams.faction1.roster?.some(p => p.player_id === playerId) ?? false
+      const detail = details[i].status === 'fulfilled' ? details[i].value : null
+
+      // Use detail roster when available — the history endpoint often omits rosters,
+      // causing wrong faction detection and inverted W/L + scores.
+      const teams = detail?.teams ?? m.teams
+      const inF1 = teams.faction1.roster?.some(p => p.player_id === playerId) ?? false
       const myFaction = inF1 ? 'faction1' : 'faction2'
       const oppFaction = inF1 ? 'faction2' : 'faction1'
 
-      const detail = details[i].status === 'fulfilled' ? details[i].value : null
       const map = detail?.voting?.map?.pick?.[0] ?? null
 
       return {
