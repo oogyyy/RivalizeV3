@@ -1,4 +1,4 @@
-// Runs on every rivalize.gg page. Fetches the extension session token using
+// Runs on every rivalize.pro page. Fetches the extension session token using
 // the user's existing browser cookies (same-origin fetch includes them automatically).
 const api = typeof browser !== 'undefined' ? browser : chrome
 

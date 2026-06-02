@@ -56,7 +56,7 @@ function openPanel(matchId) {
         </div>
         <div id="rvz-not-connected" class="rvz-hidden">
           <p class="rvz-hint">You're not logged in to Rivalize.</p>
-          <a href="https://rivalize.gg" target="_blank" class="rvz-link-btn">Open Rivalize ↗</a>
+          <a href="https://rivalize.pro" target="_blank" class="rvz-link-btn">Open Rivalize ↗</a>
         </div>
         <div id="rvz-form" class="rvz-hidden">
           <div class="rvz-field">

@@ -1,5 +1,5 @@
 const api = typeof browser !== 'undefined' ? browser : chrome
-const RIVALIZE_URL = 'https://rivalize.gg'
+const RIVALIZE_URL = 'https://rivalize.pro'
 
 // Restore auth state from storage on startup
 let authState = { connected: false, access_token: null, user: null }

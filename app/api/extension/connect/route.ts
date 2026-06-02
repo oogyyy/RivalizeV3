@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 
 /**
  * GET /api/extension/connect
- * Called by the content-rivalize.js content script on any rivalize.gg page.
+ * Called by the content-rivalize.js content script on any rivalize.pro page.
  * Because it's a same-origin browser fetch, Supabase session cookies are
  * included automatically — no auth headers needed.
  *
