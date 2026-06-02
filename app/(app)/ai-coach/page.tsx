@@ -662,7 +662,7 @@ export default function AIScoutPage() {
                     onClick={() => sendMessage(q.prompt)}
                     disabled={isLoading}
                     className={cn(
-                      'flex items-center gap-2.5 p-3.5 text-left rounded-xl border border-border bg-card',
+                      'rv-panel flex items-center gap-2.5 p-3.5 text-left',
                       'text-[13px] text-muted-foreground hover:text-foreground hover:border-[rgba(0,255,200,0.25)] hover:bg-[rgba(0,255,200,0.04)]',
                       'transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed',
                     )}
@@ -716,7 +716,7 @@ export default function AIScoutPage() {
                           'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
                           msg.role === 'user'
                             ? 'bg-[rgba(0,255,200,0.08)] border border-[rgba(0,255,200,0.18)] rounded-br-sm'
-                            : 'bg-card border border-border rounded-bl-sm shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
+                            : 'rv-panel rounded-bl-sm'
                         )}
                       >
                         {msg.role === 'assistant' ? (

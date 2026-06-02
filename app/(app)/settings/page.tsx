@@ -383,7 +383,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {NOTIFICATION_TOGGLES.map(toggle => (
-            <div key={toggle.key} className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/10">
+            <div key={toggle.key} className="flex items-center justify-between p-4 rounded-lg border border-[var(--border)] bg-[rgba(255,255,255,0.03)]">
               <div>
                 <p className="text-sm font-medium text-foreground">{toggle.label}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{toggle.description}</p>

@@ -160,7 +160,7 @@ export default function FriendsPage() {
       </div>
 
       {/* Add friend */}
-      <div className="rounded-xl border border-border bg-card p-4">
+      <div className="rv-panel p-4">
         <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
           <UserPlus size={14} className="text-neon-green" />
           Add Friend
@@ -304,9 +304,9 @@ export default function FriendsPage() {
               Friends ({data.friends.length})
             </h2>
             {data.friends.length > 0 ? (
-              <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+              <div className="rv-panel divide-y divide-border overflow-hidden">
                 {data.friends.map(entry => (
-                  <div key={entry.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/10 transition-colors">
+                  <div key={entry.id} className="rv-row flex items-center gap-3 px-4 py-3">
                     <Avatar profile={entry.profile} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">
@@ -341,7 +341,7 @@ export default function FriendsPage() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-border bg-card p-8 text-center">
+              <div className="rv-panel p-8 text-center">
                 <Users size={28} className="text-muted-foreground/20 mx-auto mb-3" />
                 <p className="text-sm font-medium text-foreground mb-1">No friends yet</p>
                 <p className="text-xs text-muted-foreground">
@@ -358,7 +358,7 @@ export default function FriendsPage() {
                 <Clock size={12} />
                 Pending Sent ({data.outgoing.length})
               </h2>
-              <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+              <div className="rv-panel divide-y divide-border overflow-hidden">
                 {data.outgoing.map(entry => (
                   <div key={entry.id} className="flex items-center gap-3 px-4 py-3">
                     <Avatar profile={entry.profile} />

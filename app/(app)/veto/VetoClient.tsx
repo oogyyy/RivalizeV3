@@ -157,7 +157,7 @@ export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, ha
         )}
 
         {/* Map comparison table */}
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="rv-panel overflow-hidden">
           {/* Table header */}
           <div className="grid gap-4 px-4 py-3 bg-muted/30 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider"
             style={{ gridTemplateColumns: selectedOpponent ? '140px 1fr 1fr 80px' : '140px 1fr 80px' }}
@@ -205,7 +205,7 @@ export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, ha
         </div>
 
         {/* Interactive Veto Simulator */}
-        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <div className="rv-panel p-5 space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <Swords size={16} className="text-neon-green" />
             <h2 className="text-base font-semibold text-foreground">Veto Simulator</h2>
@@ -219,10 +219,12 @@ export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, ha
         </div>
 
         {/* AI recommendation */}
-        <div className="rounded-xl border border-neon-green/20 bg-neon-green/5 p-5 space-y-4">
+        <div className="rv-panel rv-insight p-5 space-y-4" style={{ position: 'relative' }}>
+          <span className="rv-tick rv-tick-tl" />
+          <span className="rv-tick rv-tick-br" style={{ borderColor: 'color-mix(in srgb, var(--signal) 48%, transparent)' }} />
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
-              <Brain size={18} className="text-neon-green" />
+              <Brain size={18} className="text-[#2DE3CE]" />
               <h2 className="text-base font-semibold text-foreground">
                 {selectedOpponent ? `Veto Order vs ${selectedOpponent.name}` : 'Map Pool Analysis'}
               </h2>

@@ -317,10 +317,10 @@ function PlaybookListInner() {
             <div
               key={pb.id}
               className={cn(
-                'group relative rounded-xl border bg-card p-4 transition-all duration-150',
+                'rv-panel group relative p-4 transition-all duration-150',
                 pb.opponent_name
-                  ? 'border-orange-500/25 hover:border-orange-500/50 hover:bg-orange-500/[0.02]'
-                  : 'border-border hover:border-[rgba(0,255,200,0.3)] hover:bg-[rgba(0,255,200,0.02)]'
+                  ? 'hover:border-orange-500/50'
+                  : 'hover:border-[rgba(0,255,200,0.3)]'
               )}
             >
               <Link href={`/playbook/${pb.id}`} className="block mb-3">

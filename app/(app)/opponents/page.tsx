@@ -5,7 +5,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
@@ -129,9 +128,7 @@ export default async function OpponentsPage() {
 
       {/* ── Stats row ── */}
       <div className="grid grid-cols-3 gap-3 animate-fade-in-up animate-fade-in-up-delay-1">
-        <div className={cn(
-          'relative rounded-xl bg-card border border-border p-4 card-hover overflow-hidden stat-card-red'
-        )}>
+        <div className="rv-panel p-4 card-hover overflow-hidden stat-card-red">
           <div className="flex items-start justify-between gap-2 mb-3">
             <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Opponents</p>
             <div className="p-1.5 rounded-lg bg-red-500/10 shrink-0">
@@ -141,9 +138,7 @@ export default async function OpponentsPage() {
           <p className="text-[28px] font-bold tabular-nums text-foreground font-mono leading-none">{totalOpponents}</p>
         </div>
 
-        <div className={cn(
-          'relative rounded-xl bg-card border border-border p-4 card-hover overflow-hidden stat-card-blue'
-        )}>
+        <div className="rv-panel p-4 card-hover overflow-hidden stat-card-blue">
           <div className="flex items-start justify-between gap-2 mb-3">
             <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Uploaded</p>
             <div className="p-1.5 rounded-lg bg-blue-500/10 shrink-0">
@@ -153,9 +148,7 @@ export default async function OpponentsPage() {
           <p className="text-[28px] font-bold tabular-nums text-foreground font-mono leading-none">{totalDemos}</p>
         </div>
 
-        <div className={cn(
-          'relative rounded-xl bg-card border border-border p-4 card-hover overflow-hidden stat-card-green'
-        )}>
+        <div className="rv-panel p-4 card-hover overflow-hidden stat-card-green">
           <div className="flex items-start justify-between gap-2 mb-3">
             <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Analyzed</p>
             <div className="p-1.5 rounded-lg bg-[rgba(0,255,200,0.1)] shrink-0">

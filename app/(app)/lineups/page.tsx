@@ -479,7 +479,7 @@ export default function LineupsPage() {
               const effectiveMediaType = lineup.media_type ?? 'draw'
 
               return (
-                <div key={lineup.id} className="rounded-xl border border-border bg-card overflow-hidden">
+                <div key={lineup.id} className="rv-panel overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3">
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: typeInfo.color }} />
                     <div className="flex-1 min-w-0">

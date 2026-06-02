@@ -623,7 +623,7 @@ export default function ProfilePage() {
               )}
 
               {/* Recent Matches */}
-              <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="rv-panel overflow-hidden">
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <FileVideo size={14} className="text-neon-green" />
@@ -689,7 +689,7 @@ export default function ProfilePage() {
 
               {/* Teams */}
               {teamsData.length > 0 && (
-                <div className="rounded-xl border border-border bg-card overflow-hidden">
+                <div className="rv-panel overflow-hidden">
                   <div className="px-4 py-3 border-b border-border">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                       <Users size={14} className="text-neon-green" />
@@ -716,7 +716,7 @@ export default function ProfilePage() {
 
               {/* No activity empty state */}
               {teamsData.length === 0 && recentMatches.length === 0 && (
-                <div className="rounded-xl border border-border bg-card p-10 text-center">
+                <div className="rv-panel p-10 text-center">
                   <Users size={32} className="text-muted-foreground/20 mx-auto mb-3" />
                   <p className="text-sm font-medium text-foreground mb-1">No activity yet</p>
                   <p className="text-xs text-muted-foreground">Join a team and upload demos to see your profile come alive.</p>
@@ -749,7 +749,7 @@ export default function ProfilePage() {
             )}
 
             {/* Profile info */}
-            <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+            <div className="rv-panel p-5 space-y-5">
               <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <User size={14} className="text-neon-green" />
                 Profile Information
@@ -796,7 +796,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Roles & Maps */}
-            <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+            <div className="rv-panel p-5 space-y-5">
               <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Target size={14} className="text-neon-green" />
                 Roles & Maps
@@ -812,7 +812,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Linked accounts */}
-            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+            <div className="rv-panel p-5 space-y-4">
               <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Link2 size={14} className="text-neon-green" />
                 Linked Accounts
@@ -922,7 +922,7 @@ function Divider() {
 
 function SideCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rv-panel p-4">
       <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
         {icon}{title}
       </h3>
