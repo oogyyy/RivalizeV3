@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import { getPlayerMatchHistory, isFaceitConfigured } from '@/lib/faceit'
+import { getPlayerMatchHistory, getMatchDetail, isFaceitConfigured } from '@/lib/faceit'
 
 /**
  * GET /api/matches/recent-faceit
@@ -50,11 +50,18 @@ export async function GET() {
       )
     }
 
-    const matches = history.items.map(m => {
-      // Determine which faction the player is on
+    // Fetch match details in parallel to get map names
+    const details = await Promise.allSettled(
+      history.items.map(m => getMatchDetail(m.match_id))
+    )
+
+    const matches = history.items.map((m, i) => {
       const inF1 = m.teams.faction1.roster?.some(p => p.player_id === playerId) ?? false
       const myFaction = inF1 ? 'faction1' : 'faction2'
       const oppFaction = inF1 ? 'faction2' : 'faction1'
+
+      const detail = details[i].status === 'fulfilled' ? details[i].value : null
+      const map = detail?.voting?.map?.pick?.[0] ?? null
 
       return {
         match_id: m.match_id,
@@ -66,6 +73,7 @@ export async function GET() {
         winner: m.results?.winner ?? null,
         my_faction: myFaction,
         match_url: m.match_url,
+        map,
         imported: importedIds.has(m.match_id),
       }
     })

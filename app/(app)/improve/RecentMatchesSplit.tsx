@@ -45,6 +45,7 @@ interface FaceitRecentMatch {
   winner: string | null
   my_faction: 'faction1' | 'faction2'
   match_url: string
+  map: string | null
   imported: boolean
 }
 
@@ -82,7 +83,7 @@ function FaceitRow({ match }: { match: FaceitRecentMatch }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <p className="text-[12px] font-medium text-foreground leading-tight truncate">
-            {match.opponent ?? 'Unknown'}
+            {mapLabel(match.map)}
           </p>
           {scoreStr && (
             <span className={cn(
