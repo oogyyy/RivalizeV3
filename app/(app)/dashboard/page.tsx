@@ -365,9 +365,9 @@ export default async function DashboardPage() {
         <div className="space-y-4">
 
           {/* Quick actions */}
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="px-5 pt-4 pb-3 border-b border-border/50">
-              <p className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-[0.12em]">
+          <div className="rv-panel overflow-hidden">
+            <div className="px-5 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--faint)' }}>
                 Quick Actions
               </p>
             </div>
@@ -381,8 +381,8 @@ export default async function DashboardPage() {
 
           {/* Opponent mini-list */}
           {folders.length > 0 && (
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border/50">
+            <div className="rv-panel overflow-hidden">
+              <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="flex items-center gap-2">
                   <Target size={13} className="text-red-400" />
                   <p className="text-[13px] font-semibold text-foreground">Opponents</p>
@@ -439,23 +439,22 @@ export default async function DashboardPage() {
 
           {/* AI CTA card */}
           {totalDemos > 0 && (
-            <div className="relative rounded-xl border border-[rgba(0,255,200,0.2)] bg-card overflow-hidden">
-              {/* Brand glow bg */}
-              <div className="absolute inset-0 bg-gradient-to-br from-[rgba(0,255,200,0.06)] to-transparent pointer-events-none" />
-              <div className="accent-line-green w-full" />
-              <div className="relative p-5 text-center">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center mx-auto mb-3 shadow-[0_0_12px_rgba(0,255,200,0.12)]">
-                  <Brain size={18} className="text-[#00ffc8]" />
+            <div className="rv-panel rv-insight overflow-hidden" style={{ position: 'relative' }}>
+              <span className="rv-tick rv-tick-tl" />
+              <span className="rv-tick rv-tick-br" style={{ borderColor: 'color-mix(in srgb, var(--signal) 48%, transparent)' }} />
+              <div className="relative p-5">
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, background: 'rgba(45,227,206,0.1)', border: '1px solid rgba(45,227,206,0.28)', color: 'var(--signal)', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.08em', marginBottom: 14 }}>
+                  ✦ AI INSIGHT
                 </div>
-                <p className="text-[13px] font-bold text-foreground mb-1">Ready to prep?</p>
-                <p className="text-[12px] text-muted-foreground mb-4">
-                  {analyzedDemos} demo{analyzedDemos !== 1 ? 's' : ''} analyzed
+                <p className="font-semibold mb-1" style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--text)' }}>Pre-match brief ready</p>
+                <p className="mb-4" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+                  {analyzedDemos} demo{analyzedDemos !== 1 ? 's' : ''} analyzed and ready for AI scouting.
                 </p>
                 <Link href="/ai-coach">
-                  <Button variant="neon" size="sm" className="w-full gap-2">
+                  <button className="rv-btn rv-btn-signal w-full gap-2" style={{ width: '100%', justifyContent: 'center' }}>
                     <Brain size={14} />
-                    Open AI Scout
-                  </Button>
+                    Open AI Scout →
+                  </button>
                 </Link>
               </div>
             </div>
@@ -463,7 +462,7 @@ export default async function DashboardPage() {
 
           {/* First-time empty CTA */}
           {totalDemos === 0 && (
-            <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-center">
+            <div className="rv-panel p-5 text-center" style={{ borderStyle: 'dashed' }}>
               <TrendingUp size={24} className="text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-[13px] font-medium text-foreground mb-1">Upload your first demo</p>
               <p className="text-[12px] text-muted-foreground mb-4 leading-relaxed">
@@ -494,20 +493,20 @@ function StatCard({ label, value, icon, iconBg, accent, sub }: {
   sub?: string
 }) {
   return (
-    <div className={cn('relative bg-card border border-border rounded-xl p-4 md:p-5 card-hover overflow-hidden', accent)}>
+    <div className={cn('rv-panel p-4 md:p-5 card-hover', accent)}>
       <div className="flex items-start justify-between gap-2 mb-3">
-        <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--faint)' }}>
           {label}
         </p>
         <div className={cn('p-1.5 rounded-lg shrink-0', iconBg)}>
           {icon}
         </div>
       </div>
-      <p className="text-[28px] md:text-3xl font-bold text-foreground tabular-nums font-mono leading-none">
+      <p className="text-[28px] md:text-3xl font-bold tabular-nums leading-none" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
         {value}
       </p>
       {sub && (
-        <p className="text-[10px] text-muted-foreground/50 font-mono mt-1">{sub}</p>
+        <p className="text-[10px] mt-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--faint)' }}>{sub}</p>
       )}
     </div>
   )
@@ -534,9 +533,9 @@ function DemoCard({
 }) {
   const hasContent = children !== undefined && children !== false && children !== null
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
+    <div className="rv-panel overflow-hidden">
       <div className={cn(accentClass, 'w-full')} />
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/50">
+      <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex items-center gap-2">
           <div className={cn('w-6 h-6 rounded-md flex items-center justify-center', iconBg)}>
             {icon}
@@ -592,7 +591,7 @@ function DemoRow({
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 px-5 py-3 hover:bg-accent/40 transition-colors group"
+      className="rv-row flex items-center gap-3 px-5 py-3 group"
     >
       <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', initialBg)}>
         <span className={cn('text-[11px] font-bold', initialColor)}>{initial}</span>
