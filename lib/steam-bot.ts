@@ -93,9 +93,10 @@ export function fetchRecentCS2Matches(steamId64: string): Promise<CS2GCMatchData
       password:    process.env.STEAM_BOT_PASSWORD,
     })
 
-    // Once Steam confirms app ownership, start playing CS2 so the GC accepts us
-    client.on('appOwnershipCached', () => {
-      client.gamesPlayed([STEAM_APPID], true)
+    // Start playing CS2 as soon as we're logged in so the GC accepts us.
+    // appOwnershipCached can be slow/absent on fresh accounts; loggedOn is reliable.
+    client.on('loggedOn', () => {
+      client.gamesPlayed([STEAM_APPID])
     })
 
     csgo.on('connectedToGC', () => {
