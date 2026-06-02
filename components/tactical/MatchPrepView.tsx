@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { CheckCircle2, Circle, Flag, Calendar, MapPin, Swords } from 'lucide-react';
+import { CheckCircle2, Circle, Flag, Calendar, MapPin, Swords, ArrowRight } from 'lucide-react';
 import type { TeamReminder, MapStat } from '@/types/tactical';
 import { INITIAL_REMINDERS, MAPS_POOL } from '@/lib/tactical-data';
 
@@ -13,7 +13,11 @@ const STATUS_STYLE: Record<NonNullable<MapStat['status']>, { label: string; cls:
   undecided:   { label: 'UNDECIDED',     cls: 'text-gray-600   border-brand-border   bg-brand-bg' },
 };
 
-export default function MatchPrepView() {
+interface Props {
+  onNavigate?: (tab: string) => void;
+}
+
+export default function MatchPrepView({ onNavigate }: Props) {
   const [reminders, setReminders] = useState<TeamReminder[]>(INITIAL_REMINDERS);
   const [maps] = useState<MapStat[]>(MAPS_POOL);
 
@@ -171,7 +175,17 @@ export default function MatchPrepView() {
             </div>
           </div>
 
-          <div className="bg-brand-card rounded-xl border border-brand-border/60 p-4">
+          {onNavigate && (
+          <button
+            onClick={() => onNavigate('veto')}
+            className="w-full flex items-center justify-center gap-2 bg-brand-purple/20 hover:bg-brand-purple/30 border border-brand-purple/40 text-brand-purple text-sm font-semibold py-2.5 rounded-xl transition"
+          >
+            <Swords className="w-4 h-4" /> Launch Veto Simulator
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </button>
+        )}
+
+        <div className="bg-brand-card rounded-xl border border-brand-border/60 p-4">
             <div className="text-[11px] font-mono uppercase tracking-widest text-gray-400 mb-3">Side Win Rates</div>
             {[
               { side: 'CT Side', ct: 58, t: 42 },

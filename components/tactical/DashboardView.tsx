@@ -27,7 +27,12 @@ function StatCard({ label, value, delta, color }: { label: string; value: string
   );
 }
 
-export default function DashboardView({ currentUser = 'Coach' }: { currentUser?: string }) {
+interface Props {
+  currentUser?: string;
+  onNavigate?: (tab: string) => void;
+}
+
+export default function DashboardView({ currentUser = 'Coach', onNavigate }: Props) {
   const pendingReminders = INITIAL_REMINDERS.filter(r => !r.completed).length;
   const topPlayer = INITIAL_ROSTER[0];
   const nextOpp   = INITIAL_OPPONENTS[0];
@@ -190,12 +195,16 @@ export default function DashboardView({ currentUser = 'Coach' }: { currentUser?:
           <div className="bg-brand-card rounded-xl border border-brand-border/60 p-4">
             <div className="text-[11px] font-mono uppercase tracking-widest text-gray-400 mb-3">Quick Actions</div>
             <div className="space-y-2">
-              {[
-                { label: 'Run Veto Simulation',  color: 'brand-purple' },
-                { label: 'Scout Next Opponent',  color: 'brand-cyan' },
-                { label: 'Review Playbook',       color: 'amber-400' },
-              ].map(({ label, color }) => (
-                <button key={label} className="w-full flex items-center justify-between px-3 py-2.5 bg-brand-bg border border-brand-border/60 hover:border-brand-border rounded-lg text-xs text-gray-300 hover:text-white transition group">
+              {([
+                { label: 'Run Veto Simulation', tab: 'veto' },
+                { label: 'Scout Next Opponent', tab: 'opponents' },
+                { label: 'Review Playbook',      tab: 'playbook' },
+              ] as const).map(({ label, tab }) => (
+                <button
+                  key={label}
+                  onClick={() => onNavigate?.(tab)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-brand-bg border border-brand-border/60 hover:border-brand-border rounded-lg text-xs text-gray-300 hover:text-white transition group"
+                >
                   <span>{label}</span>
                   <ArrowRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-gray-300 transition" />
                 </button>

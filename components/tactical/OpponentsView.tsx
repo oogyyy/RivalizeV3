@@ -6,6 +6,7 @@ import { INITIAL_OPPONENTS } from '@/lib/tactical-data';
 
 interface Props {
   onSeededScouting?: (name: string) => void;
+  onNavigate?: (tab: string) => void;
 }
 
 function WinRateBadge({ rate }: { rate: number }) {
@@ -13,7 +14,7 @@ function WinRateBadge({ rate }: { rate: number }) {
   return <span className={`font-mono font-bold text-sm ${color}`}>{rate}%</span>;
 }
 
-export default function OpponentsView({ onSeededScouting }: Props) {
+export default function OpponentsView({ onSeededScouting, onNavigate }: Props) {
   const [opponents] = useState<Opponent[]>(INITIAL_OPPONENTS);
   const [query, setQuery]       = useState('');
   const [selected, setSelected] = useState<Opponent | null>(null);

@@ -1,7 +1,7 @@
-import DashboardView from '@/components/tactical/DashboardView';
+import ScoutShell from '@/components/tactical/ScoutShell';
 
-export const metadata = { title: 'Scout Dashboard' };
+export const metadata = { title: 'Pro Scout' };
 
-export default function ScoutDashboardPage() {
-  return <DashboardView />;
+export default function ScoutPage() {
+  return <ScoutShell />;
 }
