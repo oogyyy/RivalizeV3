@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Rivalize Demo Importer",
+  "description": "Import FACEIT CS2 match demos to Rivalize — personal library, team, or opponents.",
+  "version": "1.0.0",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.faceit.com/*",
+    "https://rivalize.gg/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Rivalize Demo Importer"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.faceit.com/*"],
+      "js": ["content-faceit.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://rivalize.gg/*"],
+      "js": ["content-rivalize.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
