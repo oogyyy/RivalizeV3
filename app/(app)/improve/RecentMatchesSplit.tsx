@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { ExternalLink, Loader2, Zap } from 'lucide-react'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 import CS2MatchPanel from '@/app/(app)/improve/CS2MatchPanel'
+import { MAP_THUMBS } from '@/lib/map-config'
 
 // ── Map display name helper ─────────────────────────────────────────────────
 
@@ -63,6 +64,8 @@ function FaceitRow({ match }: { match: FaceitRecentMatch }) {
   }
   if (myScore !== null && oppScore !== null) scoreStr = `${myScore}–${oppScore}`
 
+  const thumbUrl = match.map ? MAP_THUMBS[match.map.toLowerCase()] : undefined
+
   return (
     <a
       href={match.match_url}
@@ -70,14 +73,23 @@ function FaceitRow({ match }: { match: FaceitRecentMatch }) {
       rel="noopener noreferrer"
       className="flex items-center gap-3 rounded-lg border border-border bg-background/40 px-3 py-2.5 hover:bg-background/70 hover:border-border/80 transition-colors group"
     >
-      <div className={cn(
-        'w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0',
-        result === 'W' ? 'bg-[rgba(0,255,200,0.12)] text-[#00ffc8]' :
-        result === 'L' ? 'bg-red-500/10 text-red-400' :
-        result === 'D' ? 'bg-yellow-500/10 text-yellow-400' :
-        'bg-muted/50 text-muted-foreground'
-      )}>
-        {result ?? '?'}
+      {/* Map thumbnail with W/L badge overlay */}
+      <div className="relative shrink-0 w-[52px] h-[34px] rounded-md overflow-hidden bg-muted/40">
+        {thumbUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumbUrl} alt={mapLabel(match.map)} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full" />
+        )}
+        <div className={cn(
+          'absolute bottom-0 left-0 right-0 flex items-center justify-center text-[9px] font-bold leading-none py-[3px]',
+          result === 'W' ? 'bg-[rgba(0,255,200,0.75)] text-black' :
+          result === 'L' ? 'bg-red-500/75 text-white' :
+          result === 'D' ? 'bg-yellow-500/75 text-black' :
+          'bg-black/50 text-muted-foreground'
+        )}>
+          {result ?? '?'}
+        </div>
       </div>
 
       <div className="flex-1 min-w-0">
