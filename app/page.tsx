@@ -200,41 +200,11 @@ export default function LandingPage() {
               <Link className="lp-btn lp-btn-accent" href="/signup">Start for free</Link>
               <a className="lp-btn lp-btn-ghost" href="#how">See how it works →</a>
             </div>
-            <div className="lp-proof">
-              <span className="lp-proof-label">Trusted by 120+ rosters</span>
-              <div className="lp-tags">
-                {['VEX', 'NOVA', 'AURA', 'K7', 'FL0W'].map(t => (
-                  <span key={t} className="lp-tag">{t}</span>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Right column — chat widget */}
           <ChatWidget />
         </section>
-      </div>
-
-      {/* ── STAT BAND ── */}
-      <div className="lp-wrap" style={{ marginTop: 0 }}>
-        <div className="lp-panel lp-stats">
-          <div className="lp-stat">
-            <div className="lp-stat-v">2.4M</div>
-            <div className="lp-stat-l">Rounds parsed</div>
-          </div>
-          <div className="lp-stat">
-            <div className="lp-stat-v">94<span style={{ fontSize: 20 }}>%</span></div>
-            <div className="lp-stat-l">Demos auto-tagged</div>
-          </div>
-          <div className="lp-stat">
-            <div className="lp-stat-v">18<span style={{ fontSize: 20 }}>s</span></div>
-            <div className="lp-stat-l">Median scout time</div>
-          </div>
-          <div className="lp-stat">
-            <div className="lp-stat-v">120+</div>
-            <div className="lp-stat-l">Competitive rosters</div>
-          </div>
-        </div>
       </div>
 
       {/* ── HOW IT WORKS ── */}
@@ -247,7 +217,9 @@ export default function LandingPage() {
           </div>
           <div className="lp-feats" id="features">
             {/* Feature 1 */}
-            <div className="lp-panel lp-feat">
+            <div className="lp-panel lp-feat" style={{ position: 'relative' }}>
+              <span className="lp-tick lp-tick-tl" />
+              <span className="lp-tick lp-tick-br" />
               <div className="lp-feat-ix">01</div>
               <div className="lp-feat-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -258,7 +230,9 @@ export default function LandingPage() {
               <p>Drop a .dem and Scout reconstructs every round — utility, economy, positions and timings. Every CS2 competitive format supported.</p>
             </div>
             {/* Feature 2 */}
-            <div className="lp-panel lp-feat">
+            <div className="lp-panel lp-feat" style={{ position: 'relative' }}>
+              <span className="lp-tick lp-tick-tl" />
+              <span className="lp-tick lp-tick-br" />
               <div className="lp-feat-ix">02</div>
               <div className="lp-feat-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -269,7 +243,9 @@ export default function LandingPage() {
               <p>Question an opponent like a coach. Scout reads their patterns across every demo and answers with the receipts — in plain language.</p>
             </div>
             {/* Feature 3 */}
-            <div className="lp-panel lp-feat">
+            <div className="lp-panel lp-feat" style={{ position: 'relative' }}>
+              <span className="lp-tick lp-tick-tl" />
+              <span className="lp-tick lp-tick-br" />
               <div className="lp-feat-ix">03</div>
               <div className="lp-feat-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -319,13 +295,58 @@ export default function LandingPage() {
         </section>
       </div>
 
+      {/* ── INSIGHT CARDS ── */}
+      <div className="lp-wrap">
+        <section className="lp-section" style={{ paddingTop: 0 }}>
+          <div className="lp-section-head" style={{ marginBottom: 32 }}>
+            <span className="lp-eyebrow"><span className="ln" /><b>03</b> · AI insights</span>
+            <h2>Scout surfaces what matters, automatically.</h2>
+          </div>
+          <div className="lp-feats">
+            <div className="lp-panel" style={{ position: 'relative', padding: '22px 24px 26px' }}>
+              <span className="lp-topbar" style={{ background: 'linear-gradient(90deg, var(--signal), color-mix(in srgb, var(--signal) 35%, transparent) 42%, transparent 70%)' }} />
+              <span className="lp-tick lp-tick-tl" style={{ borderColor: 'color-mix(in srgb, var(--signal) 48%, transparent)' }} />
+              <span className="lp-tick lp-tick-br" style={{ borderColor: 'color-mix(in srgb, var(--signal) 48%, transparent)' }} />
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, background: 'rgba(45,227,206,0.1)', border: '1px solid rgba(45,227,206,0.28)', color: 'var(--signal)', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.08em', marginBottom: 14 }}>
+                ✦ AI INSIGHT
+              </div>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, margin: '0 0 10px', color: 'var(--text)' }}>Pistol Round Tendency</h3>
+              <p style={{ fontSize: 13.5, lineHeight: 1.65, color: 'var(--muted)', margin: '0 0 16px' }}>They layer fast mid control on Mirage CT side: pistols, fast tunnels rush, zero utility. Counter: single B anchor + 4-man A execute punishes it cleanly.</p>
+              <a href="/signup" style={{ fontSize: 13, color: 'var(--signal)', textDecoration: 'none', fontWeight: 500 }}>View full analysis →</a>
+            </div>
+            <div className="lp-panel" style={{ position: 'relative', padding: '22px 24px 26px', borderColor: 'rgba(230,165,61,0.22)' }}>
+              <span className="lp-topbar" style={{ background: 'linear-gradient(90deg, #E6A53D, color-mix(in srgb, #E6A53D 35%, transparent) 42%, transparent 70%)' }} />
+              <span className="lp-tick lp-tick-tl" style={{ borderColor: 'rgba(230,165,61,0.4)' }} />
+              <span className="lp-tick lp-tick-br" style={{ borderColor: 'rgba(230,165,61,0.4)' }} />
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, background: 'rgba(230,165,61,0.1)', border: '1px solid rgba(230,165,61,0.3)', color: '#E6A53D', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.08em', marginBottom: 14 }}>
+                PATTERN
+              </div>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, margin: '0 0 10px', color: 'var(--text)' }}>Eco Force-Buy on Round 6</h3>
+              <p style={{ fontSize: 13.5, lineHeight: 1.65, color: 'var(--muted)', margin: '0 0 16px' }}>After losing two consecutive buy rounds, they force buy with MP9s and Deagles on eco rounds — especially on CT-side stacking A-site or pushing Underpass to disrupt B executes.</p>
+              <a href="/signup" style={{ fontSize: 13, color: '#E6A53D', textDecoration: 'none', fontWeight: 500 }}>View full analysis →</a>
+            </div>
+            <div className="lp-panel" style={{ position: 'relative', padding: '22px 24px 26px', borderColor: 'rgba(255,92,108,0.22)' }}>
+              <span className="lp-topbar" style={{ background: 'linear-gradient(90deg, var(--loss), color-mix(in srgb, var(--loss) 35%, transparent) 42%, transparent 70%)' }} />
+              <span className="lp-tick lp-tick-tl" style={{ borderColor: 'rgba(255,92,108,0.4)' }} />
+              <span className="lp-tick lp-tick-br" style={{ borderColor: 'rgba(255,92,108,0.4)' }} />
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, background: 'rgba(255,92,108,0.1)', border: '1px solid rgba(255,92,108,0.28)', color: 'var(--loss)', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.08em', marginBottom: 14 }}>
+                WARNING
+              </div>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, margin: '0 0 10px', color: 'var(--text)' }}>AWPer Position Rotated</h3>
+              <p style={{ fontSize: 13.5, lineHeight: 1.65, color: 'var(--muted)', margin: '0 0 16px' }}>Their primary AWPer has shifted from long to mid-doors in recent demos. Your mid-push setups may need adjustment — check the new angle data.</p>
+              <a href="/signup" style={{ fontSize: 13, color: 'var(--loss)', textDecoration: 'none', fontWeight: 500 }}>View full analysis →</a>
+            </div>
+          </div>
+        </section>
+      </div>
+
       {/* ── FINAL CTA ── */}
       <div className="lp-wrap" style={{ paddingBottom: 0 }}>
         <div className="lp-panel lp-cta-panel" id="start">
           <span className="lp-tick lp-tick-tl" />
           <span className="lp-tick lp-tick-br" />
           <span className="lp-eyebrow" style={{ justifyContent: 'center' }}>
-            <span className="ln" /><b>03</b> · Get started
+            <span className="ln" /><b>04</b> · Get started
           </span>
           <h2>Ready to walk in prepared?</h2>
           <p>Scout your next opponent free. Upload five demos, get the full anti-strat — no card required.</p>
