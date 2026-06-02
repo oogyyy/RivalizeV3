@@ -484,6 +484,15 @@ export default async function DashboardPage() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+const STAT_TOPBAR: Record<string, string> = {
+  'stat-card-red':    'linear-gradient(90deg, rgba(255,64,64,0.9), rgba(255,64,64,0.15) 42%, transparent 70%)',
+  'stat-card-blue':   'linear-gradient(90deg, rgba(59,130,246,0.9), rgba(59,130,246,0.15) 42%, transparent 70%)',
+  'stat-card-green':  'linear-gradient(90deg, rgba(0,200,100,0.9), rgba(0,200,100,0.15) 42%, transparent 70%)',
+  'stat-card-amber':  'linear-gradient(90deg, rgba(255,185,50,0.9), rgba(255,185,50,0.15) 42%, transparent 70%)',
+  'stat-card-purple': 'linear-gradient(90deg, rgba(155,29,255,0.9), rgba(155,29,255,0.15) 42%, transparent 70%)',
+  'stat-card-teal':   'linear-gradient(90deg, rgba(0,255,200,0.9), rgba(0,255,200,0.15) 42%, transparent 70%)',
+}
+
 function StatCard({ label, value, icon, iconBg, accent, sub }: {
   label: string
   value: number | string
@@ -494,6 +503,7 @@ function StatCard({ label, value, icon, iconBg, accent, sub }: {
 }) {
   return (
     <div className={cn('rv-panel p-4 md:p-5 card-hover', accent)}>
+      <span className="rv-topbar-accent" style={{ background: STAT_TOPBAR[accent] }} />
       <div className="flex items-start justify-between gap-2 mb-3">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--faint)' }}>
           {label}

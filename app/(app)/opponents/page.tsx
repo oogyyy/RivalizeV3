@@ -129,6 +129,7 @@ export default async function OpponentsPage() {
       {/* ── Stats row ── */}
       <div className="grid grid-cols-3 gap-3 animate-fade-in-up animate-fade-in-up-delay-1">
         <div className="rv-panel p-4 card-hover overflow-hidden stat-card-red">
+          <span className="rv-topbar-accent" style={{ background: 'linear-gradient(90deg, rgba(255,64,64,0.9), rgba(255,64,64,0.15) 42%, transparent 70%)' }} />
           <div className="flex items-start justify-between gap-2 mb-3">
             <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Opponents</p>
             <div className="p-1.5 rounded-lg bg-red-500/10 shrink-0">
@@ -139,6 +140,7 @@ export default async function OpponentsPage() {
         </div>
 
         <div className="rv-panel p-4 card-hover overflow-hidden stat-card-blue">
+          <span className="rv-topbar-accent" style={{ background: 'linear-gradient(90deg, rgba(59,130,246,0.9), rgba(59,130,246,0.15) 42%, transparent 70%)' }} />
           <div className="flex items-start justify-between gap-2 mb-3">
             <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Uploaded</p>
             <div className="p-1.5 rounded-lg bg-blue-500/10 shrink-0">
@@ -149,6 +151,7 @@ export default async function OpponentsPage() {
         </div>
 
         <div className="rv-panel p-4 card-hover overflow-hidden stat-card-green">
+          <span className="rv-topbar-accent" style={{ background: 'linear-gradient(90deg, rgba(0,200,100,0.9), rgba(0,200,100,0.15) 42%, transparent 70%)' }} />
           <div className="flex items-start justify-between gap-2 mb-3">
             <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Analyzed</p>
             <div className="p-1.5 rounded-lg bg-[rgba(0,255,200,0.1)] shrink-0">
