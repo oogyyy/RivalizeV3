@@ -5,9 +5,12 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Target, Shield, Brain,
-  ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Settings, Activity,
+  ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Settings, Activity, Puzzle,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
+
+const EXTENSION_URL = 'https://github.com/oogyyy/rivalizev3/tree/main/extension'
+const DETECTED_KEY  = 'rv-ext-detected'
 
 const NAV_GROUPS = [
   {
@@ -220,6 +223,7 @@ interface SidebarProps {
 
 export default function Sidebar({ profile: _profile }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const [extInstalled, setExtInstalled] = useState(true) // optimistic: hide until we know
   const pathname = usePathname()
   const W = collapsed ? 62 : 220
 
@@ -228,6 +232,18 @@ export default function Sidebar({ profile: _profile }: SidebarProps) {
   useEffect(() => {
     const stored = localStorage.getItem('rv-sidebar-collapsed')
     if (stored === '1') setCollapsed(true)
+
+    // Show button unless extension is already detected
+    if (localStorage.getItem(DETECTED_KEY) !== '1') setExtInstalled(false)
+
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'RIVALIZE_EXT_INSTALLED') {
+        localStorage.setItem(DETECTED_KEY, '1')
+        setExtInstalled(true)
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
   }, [])
 
   const toggle = () => {
@@ -310,6 +326,40 @@ export default function Sidebar({ profile: _profile }: SidebarProps) {
       <nav style={{ flex: 1, padding: '14px 12px', overflowY: 'auto' }}>
         <SidebarNav collapsed={collapsed} />
       </nav>
+
+      {/* Extension button */}
+      {!extInstalled && (
+        <div style={{ padding: '0 12px 8px' }}>
+          <a
+            href={EXTENSION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Get the Rivalize browser extension"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: collapsed ? '9px 0' : '8px 10px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              borderRadius: 8,
+              border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+              background: 'color-mix(in srgb, var(--accent) 6%, transparent)',
+              color: 'var(--accent)',
+              textDecoration: 'none',
+              fontSize: 12.5,
+              fontWeight: 600,
+              transition: 'background 0.14s',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 12%, transparent)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 6%, transparent)' }}
+          >
+            <Puzzle size={14} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+            {!collapsed && 'Get Extension'}
+          </a>
+        </div>
+      )}
 
       {/* Settings footer */}
       <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>

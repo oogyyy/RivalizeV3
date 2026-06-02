@@ -9,6 +9,7 @@ import TopBar from '@/components/layout/TopBar'
 import SocialPanel from '@/components/layout/SocialPanel'
 import FeedbackBubble from '@/components/feedback/FeedbackBubble'
 import { NavigationRefresh } from '@/components/layout/NavigationRefresh'
+import ExtensionModal from '@/components/extension/ExtensionModal'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
@@ -53,6 +54,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Global Feedback Bubble */}
       <FeedbackBubble />
+
+      {/* Extension install prompt (first-time only, auto-hides if installed) */}
+      <ExtensionModal />
 
       {/* Refresh server data on every navigation to prevent stale RSC cache */}
       <NavigationRefresh />
