@@ -3,6 +3,8 @@
  * recent match data (map, scores, timestamps) for a given SteamID64.
  *
  * Requires STEAM_BOT_USERNAME + STEAM_BOT_PASSWORD env vars.
+ * Set STEAM_BOT_SHARED_SECRET to the account's mobile authenticator
+ * shared secret so the bot can generate 2FA codes automatically.
  * The bot account does NOT need to own CS2.
  */
 
@@ -10,6 +12,8 @@
 const SteamUser = require('steam-user')
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const GlobalOffensive = require('globaloffensive')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const SteamTotp = require('steam-totp')
 
 const STEAM_APPID = 730
 const GC_TIMEOUT_MS = 45_000
@@ -64,6 +68,25 @@ export function fetchRecentCS2Matches(steamId64: string): Promise<CS2GCMatchData
     }
 
     client.on('error', fail)
+
+    // Handle Steam Guard — required on first login from a new IP.
+    // If STEAM_BOT_SHARED_SECRET is set we compute the TOTP code automatically.
+    // Without it, email-guard accounts will block here and eventually time out.
+    client.on('steamGuard', (domain: string | null, callback: (code: string) => void) => {
+      const sharedSecret = process.env.STEAM_BOT_SHARED_SECRET
+      if (!sharedSecret) {
+        // No shared secret — can't generate code. Abort with a clear message.
+        fail(new Error(
+          domain
+            ? `Steam Guard email code required (sent to *@${domain}). Set STEAM_BOT_SHARED_SECRET or disable Steam Guard on the bot account.`
+            : 'Steam Guard (mobile authenticator) required. Set STEAM_BOT_SHARED_SECRET env var.'
+        ))
+        return
+      }
+      // Generate TOTP code from the shared secret
+      const code = SteamTotp.generateAuthCode(sharedSecret) as string
+      callback(code)
+    })
 
     client.logOn({
       accountName: process.env.STEAM_BOT_USERNAME,

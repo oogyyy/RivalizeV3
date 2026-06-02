@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   },
   // Keep steam-user + globaloffensive as Node.js externals — they load native
   // files (system.pem, protobuf schemas) at runtime and cannot be bundled.
-  serverExternalPackages: ['steam-user', 'globaloffensive', 'bytebuffer', 'protobufjs'],
+  serverExternalPackages: ['steam-user', 'globaloffensive', 'bytebuffer', 'protobufjs', 'steam-totp'],
   // Force-include steam packages in standalone output — Next.js file tracing
   // misses dynamic require() calls and non-JS assets (system.pem, .proto files).
   outputFileTracingIncludes: {
@@ -32,6 +32,7 @@ const nextConfig: NextConfig = {
       './node_modules/steamid/**/*',
       './node_modules/websocket13/**/*',
       './node_modules/zstddec/**/*',
+      './node_modules/steam-totp/**/*',
     ],
   },
   // Optimizes lucide-react icon imports (heavily used across the app)
