@@ -1,8 +1,9 @@
-chrome.runtime.sendMessage({ type: 'GET_AUTH' }, (auth) => {
-  const dot        = document.getElementById('dot')
-  const title      = document.getElementById('status-title')
-  const sub        = document.getElementById('status-sub')
-  const helpText   = document.getElementById('help-text')
+const api = typeof browser !== 'undefined' ? browser : chrome
+api.runtime.sendMessage({ type: 'GET_AUTH' }, (auth) => {
+  const dot      = document.getElementById('dot')
+  const title    = document.getElementById('status-title')
+  const sub      = document.getElementById('status-sub')
+  const helpText = document.getElementById('help-text')
 
   if (auth?.connected && auth.user) {
     dot.classList.add('dot-green')

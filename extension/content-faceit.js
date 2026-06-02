@@ -1,5 +1,6 @@
 // Inject Rivalize import UI on FACEIT CS2 match room pages.
 // Handles SPA navigation by observing URL changes.
+const api = typeof browser !== 'undefined' ? browser : chrome
 
 let currentMatchId = null
 
@@ -105,7 +106,7 @@ function openPanel(matchId) {
   document.getElementById('rvz-import-btn').onclick = () => doImport(matchId)
 
   // Load auth + teams
-  chrome.runtime.sendMessage({ type: 'GET_AUTH' }, (auth) => {
+  api.runtime.sendMessage({ type: 'GET_AUTH' }, (auth) => {
     document.getElementById('rvz-loading').classList.add('rvz-hidden')
     if (!auth?.connected) {
       document.getElementById('rvz-not-connected').classList.remove('rvz-hidden')
@@ -113,7 +114,7 @@ function openPanel(matchId) {
     }
     document.getElementById('rvz-form').classList.remove('rvz-hidden')
 
-    chrome.runtime.sendMessage({ type: 'FETCH_TEAMS' }, (data) => {
+    api.runtime.sendMessage({ type: 'FETCH_TEAMS' }, (data) => {
       if (data?.error) {
         showStatus('Failed to load teams: ' + data.error, 'error')
         return
@@ -175,7 +176,7 @@ async function doImport(matchId) {
     }),
   }
 
-  chrome.runtime.sendMessage({ type: 'IMPORT_DEMO', payload }, (res) => {
+  api.runtime.sendMessage({ type: 'IMPORT_DEMO', payload }, (res) => {
     btn.disabled = false
     btn.textContent = 'Import demo'
     if (res?.ok) {

@@ -1,12 +1,13 @@
+const api = typeof browser !== 'undefined' ? browser : chrome
 const RIVALIZE_URL = 'https://rivalize.gg'
 
 // Restore auth state from storage on startup
 let authState = { connected: false, access_token: null, user: null }
-chrome.storage.local.get(['auth'], (result) => {
+api.storage.local.get(['auth'], (result) => {
   if (result.auth) authState = result.auth
 })
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'GET_AUTH') {
     sendResponse(authState)
     return true
@@ -14,14 +15,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'SET_AUTH') {
     authState = { connected: true, access_token: message.access_token, user: message.user }
-    chrome.storage.local.set({ auth: authState })
+    api.storage.local.set({ auth: authState })
     sendResponse({ ok: true })
     return true
   }
 
   if (message.type === 'CLEAR_AUTH') {
     authState = { connected: false, access_token: null, user: null }
-    chrome.storage.local.remove('auth')
+    api.storage.local.remove('auth')
     sendResponse({ ok: true })
     return true
   }
