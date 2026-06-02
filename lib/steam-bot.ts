@@ -93,9 +93,10 @@ export function fetchRecentCS2Matches(steamId64: string): Promise<CS2GCMatchData
       password:    process.env.STEAM_BOT_PASSWORD,
     })
 
-    // Start playing CS2 as soon as we're logged in so the GC accepts us.
-    // appOwnershipCached can be slow/absent on fresh accounts; loggedOn is reliable.
+    // Set persona to Online then start playing CS2.
+    // The GC will not respond unless the client has an Online persona state.
     client.on('loggedOn', () => {
+      client.setPersona(1 /* EPersonaState.Online */)
       client.gamesPlayed([STEAM_APPID])
     })
 
