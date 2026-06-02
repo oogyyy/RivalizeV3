@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Target, Shield, Brain,
-  ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Settings, Activity, Puzzle,
+  ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Settings, Activity, Puzzle, Compass,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
@@ -44,6 +44,13 @@ const NAV_GROUPS = [
     label: 'Improve',
     items: [
       { href: '/improve', label: 'My Matches', Icon: Activity },
+    ],
+  },
+  {
+    index: '05',
+    label: 'Pro Scout',
+    items: [
+      { href: '/scout', label: 'Tactical Hub', Icon: Compass, live: true },
     ],
   },
 ]
