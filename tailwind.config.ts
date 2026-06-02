@@ -46,14 +46,21 @@ const config: Config = {
 
         /* ── Brand tokens ─────────────────────────────────────────── */
         brand: {
-          DEFAULT: '#ff2d78',
-          dim:     '#cc0060',
-          dark:    '#880040',
+          DEFAULT: '#f43f5e',
+          dim:     '#d03050',
+          dark:    '#8a1f33',
         },
         /* Accent palette */
-        pink:   '#ff2d78',
-        purple: '#9b1dff',
-        teal:   '#00ffc8',
+        pink:   '#f43f5e',
+        purple: '#7047eb',
+        teal:   '#14b8a6',
+        'brand-bg':           '#07080e',
+        'brand-card':         '#0f111e',
+        'brand-purple':       '#7047eb',
+        'brand-purple-hover': '#8862ff',
+        'brand-cyan':         '#14b8a6',
+        'brand-pink':         '#f43f5e',
+        'brand-border':       '#1e2238',
 
         /* CS2-specific semantic colors */
         tside:  '#F59E0B',
@@ -67,13 +74,13 @@ const config: Config = {
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'brand-gradient':  'linear-gradient(135deg, #ff2d78 0%, #9b1dff 100%)',
+        'brand-gradient':  'linear-gradient(135deg, #f43f5e 0%, #7047eb 100%)',
       },
       boxShadow: {
-        'brand':    '0 0 18px rgba(255,45,120,0.32)',
-        'brand-lg': '0 0 30px rgba(255,45,120,0.4)',
-        'purple':   '0 0 18px rgba(155,29,255,0.3)',
-        'teal':     '0 0 18px rgba(0,255,200,0.25)',
+        'brand':    '0 0 18px rgba(244,63,94,0.32)',
+        'brand-lg': '0 0 30px rgba(244,63,94,0.4)',
+        'purple':   '0 0 18px rgba(112,71,235,0.3)',
+        'teal':     '0 0 18px rgba(20,184,166,0.25)',
       },
       animation: {
         'pulse-neon':    'pulse-neon 2s ease-in-out infinite',
@@ -86,8 +93,8 @@ const config: Config = {
       },
       keyframes: {
         'pulse-neon': {
-          '0%, 100%': { boxShadow: '0 0 8px rgba(255,45,120,0.4), 0 0 16px rgba(255,45,120,0.15)' },
-          '50%':       { boxShadow: '0 0 20px rgba(255,45,120,0.6), 0 0 40px rgba(255,45,120,0.25)' },
+          '0%, 100%': { boxShadow: '0 0 8px rgba(244,63,94,0.4), 0 0 16px rgba(244,63,94,0.15)' },
+          '50%':       { boxShadow: '0 0 20px rgba(244,63,94,0.6), 0 0 40px rgba(244,63,94,0.25)' },
         },
         'slide-in': {
           from: { transform: 'translateX(-100%)' },
