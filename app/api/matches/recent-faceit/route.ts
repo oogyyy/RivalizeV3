@@ -76,7 +76,7 @@ export async function GET() {
         score: m.results?.score ?? null,
         winner: m.results?.winner ?? null,
         my_faction: myFaction,
-        match_url: m.match_url,
+        match_url: m.match_url || `https://www.faceit.com/en/cs2/room/${m.match_id}`,
         map,
         imported: importedIds.has(m.match_id),
       }
