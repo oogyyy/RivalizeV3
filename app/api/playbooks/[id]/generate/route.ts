@@ -6,6 +6,7 @@ import { streamText } from 'ai'
 import { z } from 'zod'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
+import { retrieve, formatContext } from '@/lib/knowledge/retrieval'
 
 const bodySchema = z.object({
   sectionType: z.enum(['t_side', 'ct_side', 'a_execute', 'b_execute', 'roles', 'economy']),
@@ -445,6 +446,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     demoContext = buildDemoContext(selfDemos ?? [], playbook.map, 'Team')
   }
 
+  // ── Knowledge base retrieval (best-effort; degrades gracefully if model not warm) ─
+  const KB_QUERIES: Record<string, string> = {
+    t_side:    `T-side default starting positions utility sequence execute ${playbook.map}`,
+    ct_side:   `CT-side defensive positions rotation rules crossfires retake ${playbook.map}`,
+    a_execute: `A site execute utility smokes flashes entry plan post-plant ${playbook.map}`,
+    b_execute: `B site execute utility smokes flashes entry plan post-plant ${playbook.map}`,
+    roles:     `team roles entry AWPer support lurker IGL responsibilities ${playbook.map}`,
+    economy:   `economy buy thresholds force eco pistol round save ${playbook.map}`,
+  }
+  let knowledgeContext = ''
+  try {
+    const kbResult = await Promise.race([
+      retrieve({ query: KB_QUERIES[sectionType] ?? sectionType, map: playbook.map, topK: 6 }),
+      new Promise<null>((_, rej) => setTimeout(() => rej(new Error('kb timeout')), 8000)),
+    ])
+    if (kbResult) knowledgeContext = formatContext(kbResult)
+  } catch (err) {
+    console.warn('[generate] knowledge retrieval skipped:', (err as Error).message)
+  }
+
   const prompts    = isAntistrat ? ANTISTRAT_PROMPTS : SELF_PROMPTS
   const promptTmpl = prompts[sectionType] ?? prompts.t_side
   const prompt     = promptTmpl.replace(/{map}/g, playbook.map)
@@ -484,6 +505,7 @@ ${demoContext}
 ${rosterInstruction}
 ${sharedRules}
 ${utilityInstruction}
+${knowledgeContext ? `\n${knowledgeContext}\nUse the knowledge base above as your ground truth for ${playbook.map} callouts, timings, and utility positions. Combine it with the opponent demo data to produce a targeted counter-strategy.` : ''}
 Base every recommendation directly on the opponent demo data provided. Reference their specific tendencies and positions. Keep it practical — coaches should be able to read this to players in a team meeting.`
     : `You are an expert CS2 tactical coach writing a structured competitive playbook.
 Map: ${playbook.map}
@@ -492,6 +514,7 @@ ${demoContext}
 ${rosterInstruction}
 ${sharedRules}
 ${utilityInstruction}
+${knowledgeContext ? `\n${knowledgeContext}\nUse the knowledge base above as your ground truth for ${playbook.map} callouts, timings, and utility positions. Do not invent positions not present in the knowledge base.` : ''}
 ${demoContext ? 'Where relevant, incorporate the team demo data above to tailor recommendations.' : ''}
 Keep it practical and specific — every position, throw, and timing must be named with real ${playbook.map} callouts.`
 
