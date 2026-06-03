@@ -7,7 +7,6 @@ import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import FaceitImportButton from '@/components/teams/FaceitImportButton'
 import MyTeamStatsAndDemos from '@/components/teams/MyTeamStatsAndDemos'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
-import { PageHeader } from '@/components/layout/PageHeader'
 import CreateTeamDialog from '@/app/(app)/teams/CreateTeamDialog'
 import InviteFriendsDialog from '@/app/(app)/teams/[teamId]/InviteFriendsDialog'
 import EditTeamNameDialog from '@/app/(app)/my-team/EditTeamNameDialog'
@@ -52,13 +51,24 @@ export default async function MyTeamPage({
   if (allTeams.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
-        <div className="animate-fade-in-up">
-          <PageHeader
-            label="My Teams"
-            title="No team yet"
-            description="Create a team to start tracking your performance"
-            actions={<CreateTeamDialog />}
-          />
+        <div
+          className="flex items-start justify-between gap-4 pb-5 animate-fade-in-up"
+          style={{ borderBottom: '1px solid rgba(30,34,56,0.8)' }}
+        >
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest mb-0.5" style={{ color: '#4b5563' }}>
+              My Teams
+            </p>
+            <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
+              No team yet
+            </h1>
+            <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>
+              Create a team to start tracking your performance
+            </p>
+          </div>
+          <div className="shrink-0">
+            <CreateTeamDialog />
+          </div>
         </div>
       </div>
     )
@@ -97,40 +107,48 @@ export default async function MyTeamPage({
     <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
 
       {/* ── Header ── */}
-      <div className="animate-fade-in-up">
-        <PageHeader
-          label="My Teams"
-          title={teamName}
-          description="Your team's performance overview"
-          actions={
-            <div className="flex items-center gap-2">
-              {/* Team switcher — only shown when user is in multiple teams */}
-              {allTeams.length > 1 && (
-                <TeamSwitcher teams={allTeams} selectedTeamId={selectedTeamId} />
-              )}
-              {canEdit && (
-                <EditTeamNameDialog teamId={selectedTeamId} currentName={teamName} />
-              )}
-              {canInvite && (
-                <InviteFriendsDialog teamId={selectedTeamId} existingMemberIds={memberIds} />
-              )}
-              {myFaceitId && (
-                <FaceitImportButton teamId={selectedTeamId} faceitNickname={myFaceitId} />
-              )}
-              <DemoUploadButton teamId={selectedTeamId} demoType="self" />
-              <CreateTeamDialog />
-              {canDelete && (
-                <DeleteTeamDialog teamId={selectedTeamId} teamName={teamName} />
-              )}
-            </div>
-          }
-        />
+      <div
+        className="flex items-start justify-between gap-4 pb-5 animate-fade-in-up"
+        style={{ borderBottom: '1px solid rgba(30,34,56,0.8)' }}
+      >
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-widest mb-0.5" style={{ color: '#4b5563' }}>
+            My Teams
+          </p>
+          <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
+            My Team
+          </h1>
+          <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>
+            Manage competitive team rosters, players, parameters, and form logs
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          {allTeams.length > 1 && (
+            <TeamSwitcher teams={allTeams} selectedTeamId={selectedTeamId} />
+          )}
+          {canEdit && (
+            <EditTeamNameDialog teamId={selectedTeamId} currentName={teamName} />
+          )}
+          {canInvite && (
+            <InviteFriendsDialog teamId={selectedTeamId} existingMemberIds={memberIds} />
+          )}
+          {myFaceitId && (
+            <FaceitImportButton teamId={selectedTeamId} faceitNickname={myFaceitId} />
+          )}
+          <DemoUploadButton teamId={selectedTeamId} demoType="self" />
+          <CreateTeamDialog />
+          {canDelete && (
+            <DeleteTeamDialog teamId={selectedTeamId} teamName={teamName} />
+          )}
+        </div>
       </div>
 
       <MyTeamStatsAndDemos
         initialDemos={demos}
         primaryTeamId={selectedTeamId}
         faceitNickname={myFaceitId}
+        teamName={teamName}
+        memberCount={memberIds.length}
       />
     </div>
   )
