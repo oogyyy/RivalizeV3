@@ -15,29 +15,285 @@ const bodySchema = z.object({
 // ── Prompt sets ──────────────────────────────────────────────────────────────
 
 const UTILITY_FORMAT_INSTRUCTION = `
-UTILITY FORMATTING RULES (follow for every grenade/molotov/flash mentioned):
-1. Name the EXACT throw position using the map's standard callout (e.g. "B Apps", "Top Mid", "CT Spawn").
-2. Name the EXACT target/landing callout — never say "towards the site". Say "CT smoke", "Van smoke", "Market Window smoke", "Short corner flash", etc.
-3. After each utility entry append a markdown link: [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+{map}+UTILITY_TYPE+FROM_CALLOUT+to+LANDING_CALLOUT) — substitute real callout names, lowercase, spaces replaced with +.
+UTILITY FORMATTING RULES (apply to every grenade/molotov/flash):
+1. Name the EXACT throw position using the map's real callout (e.g. "B Apps", "Top Mid", "CT Spawn").
+2. Name the EXACT landing/target callout — never say "towards the site". Be specific: "CT smoke", "Van smoke", "Jungle smoke", "Short flash", etc.
+3. After each utility line add: [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+{map}+UTILITY_TYPE+FROM_CALLOUT+to+LANDING_CALLOUT) — substitute real callouts, lowercase, spaces as +.
 Example: [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+mirage+smoke+b+apps+to+ct)
 `
 
+// ─── Self-improvement prompts ─────────────────────────────────────────────────
+// Each prompt opens with a side-lock header so the model never drifts.
+
 const SELF_PROMPTS: Record<string, string> = {
-  t_side:    'Generate a detailed T-Side default for {map}. Cover: opening utility usage, info-gathering positions for each player, default split routes, timing breakpoints (first 30s / mid-round / late), and how to adapt when CT reads develop. Be specific with player positions and roles. Use exact {map} callouts throughout.',
-  ct_side:   'Generate a detailed CT-Side default for {map}. Cover: anchor positions for each player, initial utility (smokes/flashes for aggressive info denial), rotation triggers (when to rotate based on info), crossfire setups, and late-round retake coordination. Use exact {map} callouts throughout.',
-  a_execute: 'Generate a complete A site execute for {map}. Cover: full utility sequence (who throws what, from which exact callout, landing on which exact callout, and at what time), entry player role, trading partners, post-plant positions, and how to adjust if the execute is read early.',
-  b_execute: 'Generate a complete B site execute for {map}. Cover: full utility sequence (who throws what, from which exact callout, landing on which exact callout, and at what time), entry player role, trading partners, post-plant positions, and fake potential to draw rotations.',
-  roles:     'Define clear role assignments for a 5-player team on {map}. Cover: Entry Fragger, AWPer, Support, Lurker, IGL — specific to T and CT side on this map.',
-  economy:   'Create detailed economy rules for {map}. Cover: full buy threshold, force buy triggers, eco discipline, pistol round strategy, save rules, and weapon priority.',
+  t_side: `[T-SIDE / ATTACKER SECTION — describe ONLY what the Terrorist side does. Do NOT mention CT positions, CT setups, or what defenders should do.]
+
+Write the T-side attacking default for {map}. Use exactly these sections:
+
+## Starting Positions
+Name the exact {map} callout where each of the 5 players begins the round and their immediate first-5-second job (e.g. smoke, flash, aggressive peek, passive info).
+
+## Default Phase (1:40 → 1:00 on clock)
+- Per-player info assignments and map-control positions
+- Utility used to create early pressure or gather info (name throw spot and landing callout)
+- Decision checkpoints: what info triggers a mid-round read
+
+## Site Selection (1:00 → 0:50)
+List the specific conditions that make you commit to A, B, or a mid-fight. Be concrete — "if AWPer gets a pick at [callout], rotate to A".
+
+## Execute Entry (0:50 → 0:40)
+- Exact utility sequence: player → throws from [callout] → lands at [callout] → timing
+- Who enters first, who trades, who cleans up
+- How to adjust if CTs pre-aim the common entry angle
+
+## Post-Plant (0:40 and below)
+Where each player positions after the bomb drops, using exact {map} callouts. Cover both A and B plant scenarios.`,
+
+  ct_side: `[CT-SIDE / DEFENDER SECTION — describe ONLY what the Counter-Terrorist side does. Do NOT mention T-side attack routes, T positions, or how to attack.]
+
+Write the CT-side defensive default for {map}. Use exactly these sections:
+
+## Starting Positions
+Name the exact {map} callout for each of the 5 players at round start, their anchor role, and any opening utility they throw.
+
+## Early Map Control (1:40 → 1:10)
+- Which players peek aggression and where
+- Smokes/flashes to contest T early map control (name throw callout and landing callout)
+- Information positions that give the most rotation value
+
+## Mid-Round Rotation Rules (1:10 → 0:45)
+Define clear triggers: "if [player] hears X at [callout], AWPer rotates from [callout] to [callout]". At least 3 specific trigger-and-response rules.
+
+## Crossfire Setups
+2–3 two-man crossfire positions specific to {map} that are difficult for Ts to clear cleanly. Name both players' positions.
+
+## Retake Coordination
+If bomb is planted at A: which players come from which callouts, in what order, with what utility.
+If bomb is planted at B: same detail for B site retake.`,
+
+  a_execute: `[T-SIDE A EXECUTE — the team is attacking A site as Terrorists. Do NOT describe CT defender actions or what happens on B site.]
+
+Write a complete step-by-step A site execute for {map}. Use exactly these sections:
+
+## When to Run This Execute
+Specific conditions that make A the right call (info gathered, clock time, opponent reaction seen).
+
+## Utility Sequence (numbered, in order)
+For each throw: Step N — [Player/Role] throws [utility type] FROM [exact callout] TO [exact landing callout] at [clock time].
+Cover all smokes needed to safely enter A, any flashes for the entry fragger, and a molotov for common CT anchor spots.
+
+## Entry & Trade Plan
+1. Who pushes entry first, from which angle, and when
+2. Who stands ready to trade immediately if entry dies
+3. Who follows to clean remaining angles
+Name the exact angles being cleared at each step.
+
+## Post-Plant Positions
+Where each player holds after bomb is planted — exact callouts, covering both the plant position and retake prevention angles.
+
+## Abort / Counter-Read
+If CTs read the execute early (fast rotate heard, smoke cleared), what does the caller say and what does the team do?`,
+
+  b_execute: `[T-SIDE B EXECUTE — the team is attacking B site as Terrorists. Do NOT describe CT defender actions or what happens on A site.]
+
+Write a complete step-by-step B site execute for {map}. Use exactly these sections:
+
+## When to Run This Execute
+Specific conditions that make B the right call (info gathered, clock time, opponent reaction seen).
+
+## Utility Sequence (numbered, in order)
+For each throw: Step N — [Player/Role] throws [utility type] FROM [exact callout] TO [exact landing callout] at [clock time].
+Cover smokes for the key B site angles, flashes to blind defenders, and a molotov for common CT boost or anchor positions.
+
+## Entry & Trade Plan
+1. Who pushes entry first, from which angle, and when
+2. Who trades immediately if entry dies
+3. Who cleans up remaining angles
+Name the exact angles cleared at each step.
+
+## Post-Plant Positions
+Where each player holds after bomb is planted — exact callouts for both plant position and watching retake paths.
+
+## B Fake Option
+How to use this execute as a fake to draw CT rotations and open A. Specify: how much utility to commit before aborting, at what clock time, and where the team redirects.`,
+
+  roles: `Write role assignments for a 5-player competitive team on {map}. For EACH role, list T-side duties and CT-side duties separately in that order. Do not mix the two sides.
+
+## Entry Fragger
+**T-side:** First into site — list 2–3 specific {map} entry angles and the utility they need cleared ahead of them.
+**CT-side:** Aggressive early peek positions on {map} where they trade info and apply pressure.
+**Key {map} positions:** [list 2–3 callouts]
+
+## AWPer
+**T-side:** Holding crossmap picks and supporting mid-control — specific {map} AWP positions for T-side default.
+**CT-side:** Opening AWP positions on {map} that cover the most T-entry paths.
+**Key {map} positions:** [list 2–3 callouts]
+
+## Support
+**T-side:** Utility assignments — which smokes and flashes they own, from which callouts, at what timings.
+**CT-side:** Lurk-deterrent flashes, crossfire partner, rotation support role.
+**Key {map} positions:** [list 2–3 callouts]
+
+## Lurker
+**T-side:** Where they apply late pressure or cut off rotations on {map} while the execute happens elsewhere.
+**CT-side:** Passive information position that monitors the T route least watched by anchors.
+**Key {map} positions:** [list 2–3 callouts]
+
+## IGL
+**T-side:** Calling position — where they stay to gather info and make the mid-round call safely.
+**CT-side:** Anchor or rotator role, and what information they call for before committing.
+**Key {map} positions:** [list 2–3 callouts]`,
+
+  economy: `Write economy rules for a competitive team on {map}. Cover each scenario with clear thresholds.
+
+## Full Buy Threshold
+Minimum $ per role to buy a proper rifle round. List: Entry (AK/M4 + armor + flash), AWPer (AWP + pistol + armor), Support (rifle + smokes + flash), Lurker (rifle + armor), IGL (rifle + armor + smoke). State the team-wide floor.
+
+## Force Buy Rules
+When to force despite being below threshold:
+- After pistol round win (anti-eco): what to buy to maximize the 2-round advantage
+- After losing 3+ rounds in a row: pistol force or half-buy conditions
+- When 1 teammate is significantly richer: drop priority order
+
+## Eco Round Strategy
+- Full save vs. pistol-only decision (what triggers each)
+- Best pistol for eco (and why for this map specifically)
+- Whether to buy armor or skip it on eco
+
+## Pistol Rounds
+**T pistol:** recommended load-out (pistol, armor y/n, utility y/n) and opening strategy for {map}.
+**CT pistol:** recommended load-out and defensive approach for {map}.
+
+## Save Threshold
+The $ amount below which a player saves their primary weapon rather than dying with it. Any exceptions for AWPers.
+
+## Drop Priority
+Order in which players receive drops when 1-2 teammates are poor: who gets the rifle first and why.`,
 }
 
+// ─── Anti-strat prompts ───────────────────────────────────────────────────────
+
 const ANTISTRAT_PROMPTS: Record<string, string> = {
-  t_side:    'Based on this opponent\'s CT-side patterns on {map}, design our T-side attack plan to exploit their weaknesses. Cover: their typical CT anchor positions and rotations, which site is most attackable and why, specific utility to neutralise their setups, timing windows when their rotations are slow, and fake options to open up the map. Use exact {map} callouts throughout.',
-  ct_side:   'Based on this opponent\'s T-side tendencies on {map}, design our CT-side setup to shut them down. Cover: their most common executes and default routes, CT positions that counter their entry paths, utility to deny their setups, rotation triggers based on their patterns, and how to stop their key bomb plant locations. Use exact {map} callouts throughout.',
-  a_execute: 'Analyse how this opponent defends A site on {map} and build our A execute to beat their setup. Cover: their A anchor positions and utility stack, our smoke/flash sequence (from which exact callout, landing on which exact callout) to clear those positions, entry angles that bypass their crossfires, trading setups, and post-plant positioning against their retake patterns.',
-  b_execute: 'Analyse how this opponent defends B site on {map} and build our B execute to beat their setup. Cover: their B defensive positions and timings, our utility (from which exact callout, landing on which exact callout) to clear their setup, coordinated entry plan, and how to use a B fake to draw their CT rotations and create an opening.',
-  roles:     'Based on this opponent\'s player tendencies and stats on {map}, assign our team roles to maximise counter-play. For each role (Entry Fragger, AWPer, Support, Lurker, IGL) explain how they should specifically play against this opponent\'s personnel and patterns to gain maximum advantage.',
-  economy:   'Based on this opponent\'s economic patterns on {map}, build our economy counter-strategy. Cover: when they typically force buy and how we punish it, how we play against their eco rounds, their buy preferences on CT vs T side, when we should drop weapons vs. save, and how to create economic pressure through consistent round wins.',
+  t_side: `[T-SIDE / ATTACKER SECTION — describe ONLY what OUR Terrorist side does to attack. Do NOT describe what the opponent's CTs do in general; only reference their tendencies to explain WHY our attack plan works.]
+
+Based on the opponent's CT-side patterns on {map}, write our T-side attack plan. Use exactly these sections:
+
+## Exploitable Weakness
+Which site is most attackable and why — reference their specific CT tendencies from the demo data (slow rotations, predictable anchors, weak utility).
+
+## Opening Play (1:40 → 1:00)
+- Our 5 starting positions and early utility to apply pressure where they are weakest
+- Which player gathers info at the site we plan to hit and how
+
+## Execute Trigger & Plan (1:00 → 0:40)
+- The information or timing that confirms our attack
+- Utility sequence to neutralise their typical anchor setup: Step N — [Role] FROM [callout] TO [callout] at [time]
+- Entry order and trade plan against their likely defensive positions
+
+## Post-Plant (0:40 and below)
+Where our 5 players hold after the plant to defeat their retake pattern. Reference their known retake paths from demo data.
+
+## Fake Option
+Use the weaker site as a fake to trigger their rotation and create an opening on the main target. Include timing and commitment level.`,
+
+  ct_side: `[CT-SIDE / DEFENDER SECTION — describe ONLY what OUR Counter-Terrorist side does to defend. Reference opponent T-side tendencies only to explain why our setup counters them.]
+
+Based on the opponent's T-side tendencies on {map}, write our CT-side defensive setup. Use exactly these sections:
+
+## Their Main T-Side Threat
+Their most common execute or default route on {map} from the demo data, and the 1–2 positions that make it dangerous.
+
+## Counter Setup — Starting Positions
+Our 5 player positions designed specifically to pre-empt their tendencies. Name exact callouts and explain what each player watches.
+
+## Pre-emptive Utility
+Smokes and flashes we use at round start to neutralise their typical opening positions: [Role] FROM [callout] TO [callout].
+
+## Rotation Triggers
+3 specific opponent actions (heard or seen) and our exact rotation response each time.
+
+## Retake Plan
+If they successfully execute to A or B, how we retake — player order, entry callouts, utility used, coordinated timing.`,
+
+  a_execute: `[T-SIDE A EXECUTE — we are attacking A site. Reference opponent's A defence only to explain how our execute beats it. Do NOT describe CT-side defensive plays.]
+
+Based on how this opponent defends A on {map}, write our A execute designed to beat their setup. Use exactly these sections:
+
+## Their A Defence (from demo data)
+Their typical A anchor position(s) and any utility they pre-use at A. 1–2 sentences max.
+
+## Our Utility Sequence to Beat It (numbered)
+Step N — [Role] throws [type] FROM [exact callout] TO [exact callout] at [time]. Each smoke and flash directly addresses their specific defensive positions above.
+
+## Entry Against Their Crossfires
+Which angle our entry takes, why it bypasses their typical crossfire, and who is ready to trade.
+
+## Post-Plant vs Their Retake
+Where each player positions to defeat their known retake pattern. Name the exact callouts covering their retake routes.
+
+## Adjustment If They Adapt
+If they shift their A setup in response, what is our one-change counter?`,
+
+  b_execute: `[T-SIDE B EXECUTE — we are attacking B site. Reference opponent's B defence only to explain how our execute beats it. Do NOT describe CT-side defensive plays.]
+
+Based on how this opponent defends B on {map}, write our B execute designed to beat their setup. Use exactly these sections:
+
+## Their B Defence (from demo data)
+Their typical B anchor position(s) and common utility. 1–2 sentences max.
+
+## Our Utility Sequence to Beat It (numbered)
+Step N — [Role] throws [type] FROM [exact callout] TO [exact callout] at [time]. Each utility item directly targets their defensive positions above.
+
+## Entry Against Their Setup
+Who enters, from which angle, why it bypasses their typical positioning, and the trade plan.
+
+## Post-Plant vs Their Retake
+Positions for all 5 players targeting the retake paths they most commonly use. Exact callouts.
+
+## B Fake to Open A
+Commit enough utility to force their CT rotate, then abort at [clock time] and redirect to A. Specify the tipping point.`,
+
+  roles: `Based on this opponent's player tendencies and stats on {map}, assign our team roles to maximise counter-play. For EACH role cover T-side and CT-side duties separately.
+
+## Entry Fragger
+**T-side:** Which of the opponent's anchor players they must out-duel and at which callout. How to enter given the opponent's typical first-contact position.
+**CT-side:** Early aggression spots that shut down the opponent's most common early T-side move on {map}.
+
+## AWPer
+**T-side:** Which long-range pick opportunities exist based on opponent CT positions. Specific {map} callouts for AWP impact.
+**CT-side:** AWP position(s) that directly neutralise the opponent's primary entry path based on their demo data.
+
+## Support
+**T-side:** The specific smokes and flashes required to clear this opponent's defensive setup at the targeted site.
+**CT-side:** Utility to deny the opponent's most used T-side opening positions.
+
+## Lurker
+**T-side:** Which rotation path to cut off based on how quickly this opponent rotates in their demos.
+**CT-side:** Passive info position that monitors the T-side approach they use most.
+
+## IGL
+**T-side:** Calling reads based on this opponent's most predictable mid-round habits. What to listen and look for.
+**CT-side:** When to commit a rotation against this opponent's favoured execute — specific triggers from their demo patterns.`,
+
+  economy: `Based on this opponent's economic patterns on {map}, write our economy counter-strategy. Use exactly these sections:
+
+## Their Buy Patterns (from demo data)
+When they typically full buy, force, and eco — and on which side.
+
+## Punishing Their Force Buys
+How we play when we know they are force buying — aggressive play, specific setups that punish half-equipment opponents on {map}.
+
+## Playing Against Their Eco Rounds
+Do they full-save or pistol-force? How aggressively do we push, and do we risk our rifles?
+
+## Creating Economic Pressure
+Round-win sequences that keep them in eco longer. Should we push aggressive T-side to deny them resets?
+
+## Our Drop Priority Against Them
+Given their weapon preferences, which of our roles most needs a rifle drop to survive their force buys?
+
+## Save Threshold
+The $ amount below which individuals save. Does anything about their playstyle change this calculus?`,
 }
 
 // ── Demo context helpers ─────────────────────────────────────────────────────
@@ -129,7 +385,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: playbook } = await supabase
     .from('playbooks')
-    .select('map, name, folder_id, opponent_name, team_id, players')
+    .select('map, name, folder_id, opponent_name, team_id, players, player_roles')
     .eq('id', id)
     .single()
 
@@ -211,27 +467,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const utilityInstruction = UTILITY_FORMAT_INSTRUCTION.replace(/{map}/g, playbook.map.replace('de_', ''))
 
+  const sharedRules = `
+CRITICAL RULES — violating any of these invalidates the entire response:
+1. SIDE PURITY: Each section is locked to one side. T-side and execute sections describe ONLY what the Terrorist (attacking) team does. CT-side sections describe ONLY what the Counter-Terrorist (defending) team does. Never include instructions for the opposing side in the same section.
+2. PLAYER COUNT: A team has exactly 5 players. Never assign more than 5 players to positions.
+3. CALLOUTS: Use ONLY real, established callouts for ${playbook.map}. Never invent position names.
+4. ROUND TIMING: CS2 rounds are 1:55. Default phase runs 1:40→1:00. Execute window is 1:00→0:40. Post-plant is 0:40 and below.
+5. REALISM: Strategies must be physically executable. A player cannot be in two places at once. Splits require time to travel.
+6. STRUCTURE: Follow the section headers in the prompt exactly. Do not add extra sections or skip required ones.`
+
   const systemPrompt = isAntistrat
-    ? `You are an expert CS2 anti-strat analyst building a pre-match counter-strategy playbook against a specific opponent.
+    ? `You are an expert CS2 anti-strat analyst building a structured pre-match counter-strategy playbook.
 Map: ${playbook.map}
 Playbook: ${playbook.name}
 ${demoContext}
 ${rosterInstruction}
+${sharedRules}
 ${utilityInstruction}
-Write tactical anti-strat content for the requested section. Use markdown with headers and bullet points.
-Be specific to ${playbook.map} callouts and positions — never use vague phrases like "towards the site".
-Base your analysis directly on the opponent demo data above — reference their specific tendencies, players, and patterns.
-Every recommendation should directly counter what this opponent does.`
-    : `You are an expert CS2 tactical coach writing a structured playbook for a competitive team.
+Base every recommendation directly on the opponent demo data provided. Reference their specific tendencies and positions. Keep it practical — coaches should be able to read this to players in a team meeting.`
+    : `You are an expert CS2 tactical coach writing a structured competitive playbook.
 Map: ${playbook.map}
 Playbook: ${playbook.name}
 ${demoContext}
 ${rosterInstruction}
+${sharedRules}
 ${utilityInstruction}
-Write clear, structured tactical content. Use markdown with headers and bullet points.
-Be specific to ${playbook.map} — use real callout names for every position, throw point, and landing spot. Never use vague phrases like "towards the site".
-${demoContext ? 'Incorporate the team demo data above to tailor recommendations.' : ''}
-Keep it practical — coaches should be able to read this to players directly.`
+${demoContext ? 'Where relevant, incorporate the team demo data above to tailor recommendations.' : ''}
+Keep it practical and specific — every position, throw, and timing must be named with real ${playbook.map} callouts.`
 
   const groq = createOpenAI({
     apiKey: process.env.GROQ_API_KEY,
@@ -242,8 +504,8 @@ Keep it practical — coaches should be able to read this to players directly.`
     model: groq('llama-3.3-70b-versatile'),
     system: systemPrompt,
     prompt,
-    maxTokens: 1600,
-    temperature: 0.6,
+    maxTokens: 2000,
+    temperature: 0.35,
   })
 
   return new Response(
