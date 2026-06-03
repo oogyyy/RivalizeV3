@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
-/* ── Lightning bolt SVG ── */
+/* ── Bolt SVG ── */
 function Bolt({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
@@ -13,11 +13,11 @@ function Bolt({ size = 16 }: { size?: number }) {
   )
 }
 
-/* ── Logo lockup ── */
+/* ── Logo ── */
 function Logo() {
   return (
     <a className="lp-logo" href="#top">
-      <span className="lp-logo-tile" style={{ color: '#fff' }}>
+      <span className="lp-logo-tile">
         <Bolt size={16} />
       </span>
       <span>
@@ -33,7 +33,7 @@ type Msg = { role: 'ai' | 'user'; text: string; isTyping?: boolean }
 
 const SEED_MESSAGES: Msg[] = [
   { role: 'user', text: 'How do they play eco rounds?' },
-  { role: 'ai', text: '68% of ecos: stack B with pistols, fast tunnels rush, zero utility. Counter: single B anchor + 4-man A execute punishes it cleanly.' },
+  { role: 'ai',   text: '68% of ecos: stack B with pistols, fast tunnels rush, zero utility. Counter: single B anchor + 4-man A execute punishes it cleanly.' },
 ]
 
 const AI_RESPONSES = [
@@ -75,11 +75,9 @@ function ChatWidget() {
     if (!v) return
     setInput('')
     setMessages(m => [...m, { role: 'user', text: v }])
-
     setTimeout(() => {
       setMessages(m => [...m, { role: 'ai', text: '', isTyping: true }])
     }, 280)
-
     setTimeout(() => {
       const reply = AI_RESPONSES[respIdx % AI_RESPONSES.length]
       setRespIdx(i => i + 1)
@@ -99,9 +97,7 @@ function ChatWidget() {
       {/* Header */}
       <div className="lp-chat-head">
         <span className="lp-chat-aitile">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/>
-          </svg>
+          <Bolt size={13} />
         </span>
         <span>
           <span className="lp-chat-title">AI Scout</span>
@@ -111,7 +107,9 @@ function ChatWidget() {
           </span>
         </span>
         <span className="lp-chat-win">
-          <span /><span /><span />
+          <span style={{ background: 'var(--loss)', opacity: 0.7 }} />
+          <span style={{ background: 'var(--tside)', opacity: 0.7 }} />
+          <span style={{ background: 'var(--win)', opacity: 0.7 }} />
         </span>
       </div>
 
@@ -120,18 +118,12 @@ function ChatWidget() {
         {messages.map((msg, i) => (
           <div key={i} className={`lp-msg ${msg.role}`}>
             <span className="lp-msg-av">
-              {msg.role === 'ai' ? (
-                <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M4 3h8L9 9h7L7 18l2-6H5L4 3z"/>
-                </svg>
-              ) : 'M'}
+              {msg.role === 'ai' ? <Bolt size={12} /> : 'M'}
             </span>
             <div className="lp-bubble">
               <span className="who">{msg.role === 'ai' ? 'AI Scout' : 'You'}</span>
               {msg.isTyping ? (
-                <span className="lp-typing">
-                  <i/><i/><i/>
-                </span>
+                <span className="lp-typing"><i /><i /><i /></span>
               ) : msg.role === 'ai' ? renderAiBubble(msg.text) : msg.text}
             </div>
           </div>
@@ -149,7 +141,7 @@ function ChatWidget() {
           autoComplete="off"
         />
         <button className="lp-send" onClick={submit} aria-label="Send">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>
           </svg>
         </button>
@@ -182,7 +174,7 @@ export default function LandingPage() {
       <a id="top" />
       <div className="lp-wrap">
         <section className="lp-hero">
-          {/* Left column */}
+          {/* Left */}
           <div>
             <span className="lp-eyebrow">
               <span className="ln" />
@@ -191,7 +183,7 @@ export default function LandingPage() {
             <h1 className="lp-h1">
               Know your<br />
               <em>enemy</em> before<br />
-              the match starts.
+              the match.
             </h1>
             <p className="lp-sub">
               Upload CS2 demos and let Scout build the anti-strat — every tendency, every map, every eco round. Walk onto the server already three rounds ahead.
@@ -202,7 +194,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Right column — chat widget */}
+          {/* Right — chat widget */}
           <ChatWidget />
         </section>
       </div>
@@ -215,9 +207,11 @@ export default function LandingPage() {
             <h2>From raw demo to a scripted anti-strat in three steps.</h2>
             <p>No spreadsheets, no rewatching VODs at 2am. Drop the files and Scout does the reading for you.</p>
           </div>
+
           <div className="lp-feats" id="features">
-            {/* Feature 1 */}
-            <div className="lp-panel lp-feat" style={{ position: 'relative' }}>
+            {/* Feature 1 — violet */}
+            <div className="lp-panel lp-feat lp-feat-v1">
+              <span className="lp-topbar" />
               <span className="lp-tick lp-tick-tl" />
               <span className="lp-tick lp-tick-br" />
               <div className="lp-feat-ix">01</div>
@@ -229,8 +223,10 @@ export default function LandingPage() {
               <h3>Demo parsing</h3>
               <p>Drop a .dem and Scout reconstructs every round — utility, economy, positions and timings. Every CS2 competitive format supported.</p>
             </div>
-            {/* Feature 2 */}
-            <div className="lp-panel lp-feat" style={{ position: 'relative' }}>
+
+            {/* Feature 2 — signal/cyan */}
+            <div className="lp-panel lp-feat lp-feat-v2">
+              <span className="lp-topbar" />
               <span className="lp-tick lp-tick-tl" />
               <span className="lp-tick lp-tick-br" />
               <div className="lp-feat-ix">02</div>
@@ -242,8 +238,10 @@ export default function LandingPage() {
               <h3>AI scouting</h3>
               <p>Question an opponent like a coach. Scout reads their patterns across every demo and answers with the receipts — in plain language.</p>
             </div>
-            {/* Feature 3 */}
-            <div className="lp-panel lp-feat" style={{ position: 'relative' }}>
+
+            {/* Feature 3 — loss/red */}
+            <div className="lp-panel lp-feat lp-feat-v3">
+              <span className="lp-topbar" />
               <span className="lp-tick lp-tick-tl" />
               <span className="lp-tick lp-tick-br" />
               <div className="lp-feat-ix">03</div>
@@ -272,9 +270,9 @@ export default function LandingPage() {
             <span className="lp-glow" />
             <div className="lp-window-bar">
               <span className="lp-traffic">
-                <span style={{ background: 'var(--loss)' }} />
-                <span style={{ background: '#E6A53D' }} />
-                <span style={{ background: 'var(--win)' }} />
+                <span style={{ background: 'var(--loss)', opacity: 0.7 }} />
+                <span style={{ background: 'var(--tside)', opacity: 0.7 }} />
+                <span style={{ background: 'var(--win)', opacity: 0.7 }} />
               </span>
               <span className="lp-url">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -285,7 +283,7 @@ export default function LandingPage() {
             </div>
             <Image
               src="/product-dashboard.png"
-              alt="Rivalize Pro dashboard — Next Match command center"
+              alt="Rivalize Pro dashboard"
               width={1240}
               height={780}
               style={{ display: 'block', width: '100%', height: 'auto' }}
@@ -295,7 +293,7 @@ export default function LandingPage() {
         </section>
       </div>
 
-      {/* ── INSIGHT CARDS ── */}
+      {/* ── AI INSIGHTS ── */}
       <div className="lp-wrap">
         <section className="lp-section" style={{ paddingTop: 0 }}>
           <div className="lp-section-head" style={{ marginBottom: 32 }}>
@@ -303,38 +301,43 @@ export default function LandingPage() {
             <h2>Scout surfaces what matters, automatically.</h2>
           </div>
           <div className="lp-feats">
-            <div className="lp-panel" style={{ position: 'relative', padding: '22px 24px 26px' }}>
-              <span className="lp-topbar" style={{ background: 'linear-gradient(90deg, var(--signal), color-mix(in srgb, var(--signal) 35%, transparent) 42%, transparent 70%)' }} />
-              <span className="lp-tick lp-tick-tl" style={{ borderColor: 'color-mix(in srgb, var(--signal) 48%, transparent)' }} />
-              <span className="lp-tick lp-tick-br" style={{ borderColor: 'color-mix(in srgb, var(--signal) 48%, transparent)' }} />
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, background: 'rgba(45,227,206,0.1)', border: '1px solid rgba(45,227,206,0.28)', color: 'var(--signal)', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.08em', marginBottom: 14 }}>
+            {/* Signal insight */}
+            <div className="lp-panel" style={{ position: 'relative', padding: '24px 24px 28px', borderColor: 'color-mix(in srgb, var(--signal) 20%, var(--border))' }}>
+              <span className="lp-topbar" style={{ background: 'linear-gradient(90deg, var(--signal), color-mix(in srgb, var(--signal) 28%, transparent) 42%, transparent 70%)' }} />
+              <span className="lp-tick lp-tick-tl" style={{ borderColor: 'color-mix(in srgb, var(--signal) 45%, transparent)' }} />
+              <span className="lp-tick lp-tick-br" style={{ borderColor: 'color-mix(in srgb, var(--signal) 45%, transparent)' }} />
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 5, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 28%, transparent)', color: 'var(--signal)', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 16 }}>
                 ✦ AI INSIGHT
               </div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, margin: '0 0 10px', color: 'var(--text)' }}>Pistol Round Tendency</h3>
-              <p style={{ fontSize: 13.5, lineHeight: 1.65, color: 'var(--muted)', margin: '0 0 16px' }}>They layer fast mid control on Mirage CT side: pistols, fast tunnels rush, zero utility. Counter: single B anchor + 4-man A execute punishes it cleanly.</p>
-              <a href="/signup" style={{ fontSize: 13, color: 'var(--signal)', textDecoration: 'none', fontWeight: 500 }}>View full analysis →</a>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, margin: '0 0 10px', color: 'var(--text)', letterSpacing: '-0.01em' }}>Pistol Round Tendency</h3>
+              <p style={{ fontSize: 13.5, lineHeight: 1.68, color: 'var(--muted)', margin: '0 0 18px' }}>They layer fast mid control on Mirage CT side: pistols, fast tunnels rush, zero utility. Counter: single B anchor + 4-man A execute punishes it cleanly.</p>
+              <a href="/signup" style={{ fontSize: 13, color: 'var(--signal)', textDecoration: 'none', fontWeight: 600 }}>View full analysis →</a>
             </div>
-            <div className="lp-panel" style={{ position: 'relative', padding: '22px 24px 26px', borderColor: 'rgba(230,165,61,0.22)' }}>
-              <span className="lp-topbar" style={{ background: 'linear-gradient(90deg, #E6A53D, color-mix(in srgb, #E6A53D 35%, transparent) 42%, transparent 70%)' }} />
-              <span className="lp-tick lp-tick-tl" style={{ borderColor: 'rgba(230,165,61,0.4)' }} />
-              <span className="lp-tick lp-tick-br" style={{ borderColor: 'rgba(230,165,61,0.4)' }} />
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, background: 'rgba(230,165,61,0.1)', border: '1px solid rgba(230,165,61,0.3)', color: '#E6A53D', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.08em', marginBottom: 14 }}>
+
+            {/* Amber insight */}
+            <div className="lp-panel" style={{ position: 'relative', padding: '24px 24px 28px', borderColor: 'color-mix(in srgb, var(--tside) 20%, var(--border))' }}>
+              <span className="lp-topbar" style={{ background: 'linear-gradient(90deg, var(--tside), color-mix(in srgb, var(--tside) 28%, transparent) 42%, transparent 70%)' }} />
+              <span className="lp-tick lp-tick-tl" style={{ borderColor: 'color-mix(in srgb, var(--tside) 45%, transparent)' }} />
+              <span className="lp-tick lp-tick-br" style={{ borderColor: 'color-mix(in srgb, var(--tside) 45%, transparent)' }} />
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 5, background: 'color-mix(in srgb, var(--tside) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--tside) 28%, transparent)', color: 'var(--tside)', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 16 }}>
                 PATTERN
               </div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, margin: '0 0 10px', color: 'var(--text)' }}>Eco Force-Buy on Round 6</h3>
-              <p style={{ fontSize: 13.5, lineHeight: 1.65, color: 'var(--muted)', margin: '0 0 16px' }}>After losing two consecutive buy rounds, they force buy with MP9s and Deagles on eco rounds — especially on CT-side stacking A-site or pushing Underpass to disrupt B executes.</p>
-              <a href="/signup" style={{ fontSize: 13, color: '#E6A53D', textDecoration: 'none', fontWeight: 500 }}>View full analysis →</a>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, margin: '0 0 10px', color: 'var(--text)', letterSpacing: '-0.01em' }}>Eco Force-Buy on Round 6</h3>
+              <p style={{ fontSize: 13.5, lineHeight: 1.68, color: 'var(--muted)', margin: '0 0 18px' }}>After losing two consecutive buy rounds, they force buy with MP9s and Deagles — stacking A-site or pushing Underpass to disrupt B executes.</p>
+              <a href="/signup" style={{ fontSize: 13, color: 'var(--tside)', textDecoration: 'none', fontWeight: 600 }}>View full analysis →</a>
             </div>
-            <div className="lp-panel" style={{ position: 'relative', padding: '22px 24px 26px', borderColor: 'rgba(255,92,108,0.22)' }}>
-              <span className="lp-topbar" style={{ background: 'linear-gradient(90deg, var(--loss), color-mix(in srgb, var(--loss) 35%, transparent) 42%, transparent 70%)' }} />
-              <span className="lp-tick lp-tick-tl" style={{ borderColor: 'rgba(255,92,108,0.4)' }} />
-              <span className="lp-tick lp-tick-br" style={{ borderColor: 'rgba(255,92,108,0.4)' }} />
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, background: 'rgba(255,92,108,0.1)', border: '1px solid rgba(255,92,108,0.28)', color: 'var(--loss)', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.08em', marginBottom: 14 }}>
+
+            {/* Loss insight */}
+            <div className="lp-panel" style={{ position: 'relative', padding: '24px 24px 28px', borderColor: 'color-mix(in srgb, var(--loss) 20%, var(--border))' }}>
+              <span className="lp-topbar" style={{ background: 'linear-gradient(90deg, var(--loss), color-mix(in srgb, var(--loss) 28%, transparent) 42%, transparent 70%)' }} />
+              <span className="lp-tick lp-tick-tl" style={{ borderColor: 'color-mix(in srgb, var(--loss) 45%, transparent)' }} />
+              <span className="lp-tick lp-tick-br" style={{ borderColor: 'color-mix(in srgb, var(--loss) 45%, transparent)' }} />
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 5, background: 'color-mix(in srgb, var(--loss) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--loss) 28%, transparent)', color: 'var(--loss)', fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 16 }}>
                 WARNING
               </div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, margin: '0 0 10px', color: 'var(--text)' }}>AWPer Position Rotated</h3>
-              <p style={{ fontSize: 13.5, lineHeight: 1.65, color: 'var(--muted)', margin: '0 0 16px' }}>Their primary AWPer has shifted from long to mid-doors in recent demos. Your mid-push setups may need adjustment — check the new angle data.</p>
-              <a href="/signup" style={{ fontSize: 13, color: 'var(--loss)', textDecoration: 'none', fontWeight: 500 }}>View full analysis →</a>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, margin: '0 0 10px', color: 'var(--text)', letterSpacing: '-0.01em' }}>AWPer Position Rotated</h3>
+              <p style={{ fontSize: 13.5, lineHeight: 1.68, color: 'var(--muted)', margin: '0 0 18px' }}>Their primary AWPer has shifted from long to mid-doors in recent demos. Your mid-push setups may need adjustment — check the new angle data.</p>
+              <a href="/signup" style={{ fontSize: 13, color: 'var(--loss)', textDecoration: 'none', fontWeight: 600 }}>View full analysis →</a>
             </div>
           </div>
         </section>
@@ -352,7 +355,7 @@ export default function LandingPage() {
           <p>Scout your next opponent free. Upload five demos, get the full anti-strat — no card required.</p>
           <div className="lp-cta-actions">
             <Link className="lp-btn lp-btn-accent" href="/signup">Start scouting free</Link>
-            <a className="lp-btn lp-btn-ghost" href="#product">Book a demo</a>
+            <a className="lp-btn lp-btn-ghost" href="#product">See the product</a>
           </div>
           <div className="lp-cta-note">NO CARD REQUIRED · 5 DEMOS FREE · CANCEL ANYTIME</div>
         </div>

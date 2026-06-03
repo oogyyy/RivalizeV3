@@ -15,7 +15,7 @@ const DETECTED_KEY  = 'rv-ext-detected'
 const NAV_GROUPS = [
   {
     index: '01',
-    label: 'Overview',
+    label: 'Analyze',
     items: [
       { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
     ],
@@ -26,14 +26,15 @@ const NAV_GROUPS = [
     items: [
       { href: '/opponents',           label: 'Opponents', Icon: Target },
       { href: '/opponents/pro-demos', label: 'Pro Demos', Icon: Film },
+      { href: '/scout',               label: 'Tactical Hub', Icon: Compass, live: true },
     ],
   },
   {
     index: '03',
     label: 'Prepare',
     items: [
-      { href: '/my-team',  label: 'My Teams', Icon: Shield },
       { href: '/ai-coach', label: 'AI Scout', Icon: Brain, live: true },
+      { href: '/my-team',  label: 'My Teams', Icon: Shield },
       { href: '/playbook', label: 'Playbook', Icon: BookOpen },
       { href: '/veto',     label: 'Veto',     Icon: Swords },
       { href: '/lineups',  label: 'Lineups',  Icon: BookMarked },
@@ -44,13 +45,6 @@ const NAV_GROUPS = [
     label: 'Improve',
     items: [
       { href: '/improve', label: 'My Matches', Icon: Activity },
-    ],
-  },
-  {
-    index: '05',
-    label: 'Pro Scout',
-    items: [
-      { href: '/scout', label: 'Tactical Hub', Icon: Compass, live: true },
     ],
   },
 ]
@@ -180,23 +174,17 @@ export function SidebarNav({ onLinkClick, collapsed }: SidebarNavProps) {
           {/* Group heading */}
           {!collapsed && (
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '0 12px', marginBottom: 7,
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '0 12px', marginBottom: 6,
             }}>
               <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--faint)',
-                fontWeight: 500,
-              }}>
-                {group.index}
-              </span>
-              <span style={{
-                fontSize: 9.5, fontWeight: 600, letterSpacing: '0.2em',
+                fontSize: 9, fontWeight: 700, letterSpacing: '0.18em',
                 textTransform: 'uppercase', color: 'var(--faint)',
-                fontFamily: 'var(--font-ui)',
+                fontFamily: 'var(--font-mono)',
               }}>
                 {group.label}
               </span>
-              <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              <span style={{ flex: 1, height: 1, background: 'var(--hairline)' }} />
             </div>
           )}
 
