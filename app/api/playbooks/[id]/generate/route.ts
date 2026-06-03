@@ -29,6 +29,8 @@ Example: [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+mir
 const SELF_PROMPTS: Record<string, string> = {
   t_side: `[T-SIDE / ATTACKER SECTION — describe ONLY what the Terrorist side does. Do NOT mention CT positions, CT setups, or what defenders should do.]
 
+CRITICAL: T-side players CANNOT physically reach CT-only areas in the first 30 seconds. Never place a T-side player at positions like Jungle, Short (CT side), CT Spawn, Window Room, or any area that requires crossing the bombsite first. T-side starting positions must be reachable from T Spawn without passing through a bombsite.
+
 Write the T-side attacking default for {map}. Use exactly these sections:
 
 ## Starting Positions
@@ -176,6 +178,8 @@ Order in which players receive drops when 1-2 teammates are poor: who gets the r
 
 const ANTISTRAT_PROMPTS: Record<string, string> = {
   t_side: `[T-SIDE / ATTACKER SECTION — describe ONLY what OUR Terrorist side does to attack. Do NOT describe what the opponent's CTs do in general; only reference their tendencies to explain WHY our attack plan works.]
+
+CRITICAL: T-side players CANNOT physically reach CT-only areas in the first 30 seconds. Never place a T-side player at positions like Jungle, Short (CT side), CT Spawn, Window Room, or any area that requires crossing the bombsite first. T-side starting positions must be reachable from T Spawn without passing through a bombsite.
 
 Based on the opponent's CT-side patterns on {map}, write our T-side attack plan. Use exactly these sections:
 
