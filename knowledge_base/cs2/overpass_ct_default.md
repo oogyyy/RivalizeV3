@@ -1,39 +1,51 @@
 # CT-Side Default for de_overpass
 
 #### Introduction
-Our CT-side default on Overpass is built around an aggressive Connector AWP to punish T A Short attempts, solid dual B anchoring at Fountain and Playground, and a roaming IGL in Sewer to read which side is committed. Connector control is the primary information source each round.
+Overpass is heavily CT-favored (~55% CT win rate), built around Bathrooms AWP dominance and fast B-to-A rotation via Short. The Bathrooms position on Long is the single most dominant defensive AWP position in all of CS2 — one player simultaneously watches Fountain, Long A, and the Party approach at extreme range. Heaven at B gives the most complete site overview of any single position on any active duty map. Core principle: AWP rushes to Bathrooms immediately, Monster gets molotov'd every round, and CTs rotate from B to A via Short — one of the fastest cross-map rotations in CS2.
 
 #### Opening Utility Usage (0-5s)
-▸ [AWPer]: Flash Connector from Short position to support an aggressive early Connector peek ▶ Watch lineup.
-▸ [B Anchor 1]: Molly B Main (Monster corner) from Fountain to slow T B Main aggression ▶ Watch lineup.
-▸ [B Anchor 2]: HE grenade into Monster from Playground to punish a fast T B push ▶ Watch lineup.
+▸ [B Anchor]: Throw Monster molotov from CT B area landing inside Monster tunnel — stops the most common early B rush and forces Ts to either wait or push through fire damage; mandatory every round ▶ Watch lineup.
+▸ [Mid / Support]: Throw Short smoke from CT B or B Heaven area landing on Short bridge — prevents early T Short pushes; gives CTs safety when moving between B and A ▶ Watch lineup.
+▸ [AWPer]: Rush to Front Bathrooms or Divider immediately at round start — take an aggressive wide-peek toward Fountain within the first 3 seconds to catch Ts still running before retreating to cover ▶ Watch lineup.
 
 #### Default Positions
-▸ [AWPer]: Play Connector (Short side) — open an early Connector duel, threaten A Short, then reposition to A Site if needed.
-▸ [Rifler 1]: Anchor A Site from Bank side, holding Connector drop and Short entry.
-▸ [Rifler 2]: Anchor B Site from Fountain, watching Monster entry and B Main approach.
-▸ [Support]: Anchor B Site from Playground — hold CT B side and provide crossfire with Fountain anchor.
-▸ [IGL]: Play CT Spawn / Sewer area — read T commitment direction and rotate via Sewer or Short.
+▸ [AWPer]: Play Front Bathrooms or Divider — the single most dominant defensive position in CS2; simultaneously covers Fountain, Long A, and Party approach at extreme range; Divider (inside Bathrooms, set back) catches Ts trying to peek aggressively into Party from different angles.
+▸ [A Anchor]: Hold A Site at Bank or Truck — watches Long A approach and Short-to-A cross; Bank is the strongest A anchor position and the first A-site smoke Ts deploy in any A execute.
+▸ [B Anchor]: Play Heaven (B Site) — the most complete site overview of any single position on any active duty map; watches full B Site and Monster exit; never leave Heaven without trading a kill first.
+▸ [Mid / Rotator]: Hold Short or B Short (bridge area) — rotates between B and A; pops Short bridge push with flash + peek for early B-side information in the first 10 seconds; fastest rotation path on the map.
+▸ [IGL / Support]: Hold CT Spawn or Bank — flexible support; monitors Monster push information and supports either site; uses Sewer for B-side retakes.
 
 #### Rotation Rules
-▸ If AWPer picks T at Connector: AWPer repositions to Short or A Site. A rifler maintains Bank side hold.
-▸ If B Main is smoked + flashed (B execute coming): IGL rotates B via Sewer. AWPer holds A Short solo short-term.
-▸ If A Short + Bank smokes appear: AWPer falls back to A Site; IGL calls "rotating A" via CT Spawn.
-▸ If both sides are smoked simultaneously: pick the side with more sound or entry confirmation. Do not rotate blind.
+▸ If Monster smoke heard (B execute incoming): Heaven player stays high — do NOT descend prematurely; B anchor tightens; IGL moves from Bank toward B Heaven as support.
+▸ If Fountain push confirmed (Long A): AWP engages at maximum range from Bathrooms; A anchor tightens for a Short-to-A split.
+▸ If Short bridge pressure: Mid / Rotator holds Short with HE or flash delay; calls which site T is committing for IGL.
+▸ If bomb planted B: AWP rotates from Bathrooms via Short (fastest path); Heaven player provides post-plant hold information; second CT enters from CT Spawn side simultaneously.
+▸ If bomb planted A: B players use Short rotation to A — arrive in 5–6 seconds (fastest CT rotation on any active duty map).
 
 #### Crossfire Setups
-▸ Connector + Short: AWPer at Connector (long-range); rifler at Bank (close angle into A Short exit). T committing A Short faces both angles simultaneously.
-▸ Fountain + Playground: Support at Fountain watches Monster entry; rifler at Playground holds CT B side. Classic B crossfire that covers all B Main approaches.
-▸ Sewer + Short (B Retake): IGL from Sewer (underground); AWPer from Short (above ground). Two-pronged B retake that T cannot cover with one player.
+▸ Bathrooms + Bank (A Site): AWP in Bathrooms watches Fountain / Long at extreme range; Bank player watches Short-to-A at mid range. T approaching A must deal with the Bathrooms AWP at maximum range AND the Bank rifler — almost no viable approach without T-side smokes on both angles.
+▸ Heaven + Pillar / Water edge (B Site): Heaven player holds full site visibility from above; Pillar or Water edge player watches the right side of B Site from ground level. T winning Monster still faces two angles — one from 20 metres above and one from ground level; one flash cannot blind both.
+▸ Short + CT Spawn (rotation crossfire): Mid player holds Short bridge; CT-side player holds the CT-to-B or CT-to-A corridor. Any T attempting a mid push faces two contact points before reaching either site.
 
 #### Retake Coordination
-▸ A Site Retake: AWPer (from Connector) re-enters A Short → A Site. IGL rotates via CT Spawn → Short. Flash into A Site from Short. Clear Bank angle first.
-▸ B Site Retake: B anchors hold Fountain (do not push into smokes). IGL pushes through Sewer into B Site from CT side. AWPer rotates via Short. Flash from Sewer exit into B Site.
+▸ A Site Retake: Short player pushes through Short-to-A immediately — fastest A access from mid. AWPer (if alive) advances from Bathrooms toward Long-to-A to catch Ts looking inward at the plant. Flash thrown into A Site from Short wall. Molotov Truck area (most common A plant position). Short entry clears left side; Long / Bathroom entry clears right side — two distinct entry angles.
+▸ B Site Retake: Heaven player holds position and calls intel on T positions — does NOT immediately drop. CT Spawn player rotates through Short (5–6 second arrival). Flash thrown into B Site from Short bridge or Pillar area before entry. Molotov Pillar / Barrels area (most common B plant position). Heaven player drops as a distractor while Short player and CT player push simultaneously.
 
 #### Adapting to T Reads
-▸ If Ts are fast rushing B Main with 4+ players:
-- B anchors hold deep (do not peek Monster). IGL rotates B immediately.
-- AWPer stays Connector to delay T from freely opening A.
-▸ If Ts are slow-defaulting the Connector:
-- AWPer must contest early and win the Connector duel.
-- If AWPer loses Connector, IGL peeks from Short to slow T Connector control while B anchors hold B.
+▸ If Ts are fast rushing B Main with 4+ players (Monster rush):
+- B anchors (Heaven + Pillar) hold deep — do NOT peek Monster. Heaven player calls T numbers from above.
+- IGL rotates B via Sewer immediately. AWPer stays Bathrooms to delay T from freely opening Long A.
+▸ If Ts are running the 4:1 Monster execute + Long A lurk:
+- AWPer must NOT leave Bathrooms to chase the Long A lurk — the lurk exists to bait AWPer off Bathrooms.
+- Mid player covers Long A lurk from Short. AWPer holds for the actual 4-man Monster execute.
+▸ If Ts are slow-defaulting Connector / A Short:
+- AWPer must contest early from Bathrooms — wide-peek Fountain at round start as standard opener.
+- If AWPer loses Bathrooms, IGL peeks from Short to slow T Short control; Bathrooms must be recaptured before A execute window opens.
+
+#### Pro-Level Nuances
+▸ Bathrooms AWP is the game: At pro level, every A-side game plan is built around the AWPer's ability to hold Bathrooms. Losing Bathrooms early collapses A completely. Rush to Bathrooms at round start — do not walk.
+▸ Short is the fastest B-to-A rotation in CS2: Pro CTs use Short to double-stack A after B information almost instantly. The Short path (5–6 seconds) is one of the shortest cross-map rotations in the entire active pool.
+▸ Monster molotov mandatory every round: Pro teams spend 1 molotov on Monster every round. No molotov = free B rush every round. Amateur CTs skip it and get rushed with full HP.
+▸ Heaven dominance: B Heaven gives the most complete site overview of any position on any map. Pro CTs never abandon Heaven without trading a kill first.
+▸ Do NOT let AWPer chase Long A lurk: The Long A lurk exists specifically to bait the Bathrooms AWP off position. Pro CTs assign the Mid / Short player to handle the lurk — AWPer stays Bathrooms.
+▸ Monster utility is non-negotiable: Pro teams spend 2 utility pieces on B in the first 5 seconds (molotov + Short smoke). No utility on B = a free Monster rush every round.
