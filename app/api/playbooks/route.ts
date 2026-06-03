@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 
+const VALID_ROLES = ['AWPer', 'Entry', 'Support', 'Lurker', 'IGL', 'Rifler'] as const
+
 const createSchema = z.object({
   teamId:       z.string().uuid(),
   map:          z.string().min(1).max(64),
@@ -10,6 +12,7 @@ const createSchema = z.object({
   folderId:     z.string().uuid().optional(),
   opponentName: z.string().max(128).optional(),
   players:      z.array(z.string().max(64)).max(5).optional(),
+  playerRoles:  z.record(z.string().max(64), z.enum(VALID_ROLES)).optional(),
 })
 
 export async function GET() {
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
   const parsed = createSchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body', details: parsed.error.flatten() }, { status: 400 })
 
-  const { teamId, map, name, folderId, opponentName, players } = parsed.data
+  const { teamId, map, name, folderId, opponentName, players, playerRoles } = parsed.data
 
   const { data, error } = await supabase
     .from('playbooks')
@@ -62,6 +65,7 @@ export async function POST(request: Request) {
       folder_id:     folderId ?? null,
       opponent_name: opponentName ?? null,
       players:       players ?? [],
+      player_roles:  playerRoles ?? {},
     })
     .select('id, team_id, map, name, created_at, updated_at')
     .single()

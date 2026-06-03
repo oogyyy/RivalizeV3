@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
+const VALID_ROLES = ['AWPer', 'Entry', 'Support', 'Lurker', 'IGL', 'Rifler'] as const
+
 const updateSchema = z.object({
-  name:     z.string().min(1).max(128).optional(),
-  sections: z.record(z.string()).optional(),
-  notes:    z.string().max(4000).optional(),
+  name:        z.string().min(1).max(128).optional(),
+  sections:    z.record(z.string()).optional(),
+  notes:       z.string().max(4000).optional(),
+  playerRoles: z.record(z.string().max(64), z.enum(VALID_ROLES)).optional(),
 })
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -38,9 +41,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const parsed = updateSchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
+  const { playerRoles, ...rest } = parsed.data
+  const update: Record<string, unknown> = { ...rest, updated_at: new Date().toISOString() }
+  if (playerRoles !== undefined) update.player_roles = playerRoles
+
   const { data, error } = await supabase
     .from('playbooks')
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
+    .update(update)
     .eq('id', id)
     .select('*')
     .single()

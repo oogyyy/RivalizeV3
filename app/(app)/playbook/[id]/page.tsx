@@ -23,6 +23,17 @@ const SECTIONS: { id: SectionId; label: string; antiLabel: string; icon: React.R
   { id: 'economy',   label: 'Economy Rules',     antiLabel: 'Economy Counter-Play',  icon: <Coins size={14} />,     desc: 'Eco thresholds, force buy, weapons',               antiDesc: 'Exploit their buy patterns and eco rounds' },
 ]
 
+type PlayerRole = 'AWPer' | 'Entry' | 'Support' | 'Lurker' | 'IGL' | 'Rifler'
+
+const ROLE_OPTIONS: { value: PlayerRole; label: string; color: string }[] = [
+  { value: 'Entry',   label: 'Entry',   color: 'text-orange-400' },
+  { value: 'AWPer',   label: 'AWPer',   color: 'text-purple-400' },
+  { value: 'Support', label: 'Support', color: 'text-blue-400' },
+  { value: 'Lurker',  label: 'Lurker',  color: 'text-yellow-400' },
+  { value: 'IGL',     label: 'IGL',     color: 'text-pink-400' },
+  { value: 'Rifler',  label: 'Rifler',  color: 'text-muted-foreground' },
+]
+
 type Playbook = {
   id: string
   team_id: string
@@ -32,6 +43,8 @@ type Playbook = {
   notes?: string
   folder_id?: string | null
   opponent_name?: string | null
+  players?: string[]
+  player_roles?: Record<string, PlayerRole>
   created_at: string
   updated_at: string
 }
@@ -87,6 +100,7 @@ export default function PlaybookBuilderPage() {
   const [notFound, setNotFound]   = useState(false)
   const [sections, setSections]   = useState<Record<string, string>>({})
   const [pbName, setPbName]       = useState('')
+  const [playerRoles, setPlayerRoles] = useState<Record<string, PlayerRole>>({})
   const [activeSection, setActiveSection] = useState<SectionId>('t_side')
   const [generating, setGenerating]       = useState<SectionId | null>(null)
   const [saving, setSaving]               = useState(false)
@@ -108,6 +122,7 @@ export default function PlaybookBuilderPage() {
       setPlaybook(pb)
       setPbName(pb.name)
       setSections(pb.sections ?? {})
+      setPlayerRoles(pb.player_roles ?? {})
       if (teams.length > 0) setMyTeamId(teams[0].id)
       else setMyTeamId(pb.team_id)
     }).finally(() => setLoading(false))
@@ -195,7 +210,7 @@ export default function PlaybookBuilderPage() {
     const res = await fetch(`/api/playbooks/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: pbName, sections }),
+      body: JSON.stringify({ name: pbName, sections, playerRoles }),
     })
     setSaving(false)
     if (res.ok) {
@@ -327,6 +342,42 @@ export default function PlaybookBuilderPage() {
                 })}
               </div>
             </div>
+
+            {/* Roster role assignments */}
+            {playbook?.players && playbook.players.length > 0 && (
+              <div className="p-3 border-t border-border mt-auto">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Roster</p>
+                <div className="space-y-1.5">
+                  {playbook.players.map(name => {
+                    const role = playerRoles[name]
+                    const roleInfo = ROLE_OPTIONS.find(r => r.value === role)
+                    return (
+                      <div key={name} className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-foreground truncate flex-1 min-w-0">{name}</span>
+                        <select
+                          value={role ?? ''}
+                          onChange={e => setPlayerRoles(prev => {
+                            const val = e.target.value as PlayerRole | ''
+                            if (!val) { const next = { ...prev }; delete next[name]; return next }
+                            return { ...prev, [name]: val as PlayerRole }
+                          })}
+                          className={cn(
+                            'bg-background border border-border rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-neon-green/50 shrink-0',
+                            roleInfo ? roleInfo.color : 'text-muted-foreground'
+                          )}
+                        >
+                          <option value="">Role…</option>
+                          {ROLE_OPTIONS.map(r => (
+                            <option key={r.value} value={r.value}>{r.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-[10px] text-muted-foreground/50 mt-2">Roles are saved with the playbook</p>
+              </div>
+            )}
           </div>
 
           {/* Section content */}
