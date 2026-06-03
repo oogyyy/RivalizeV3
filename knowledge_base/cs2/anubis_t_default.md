@@ -1,115 +1,34 @@
-# Anubis — T-Side Default
+# T-Side Default for de_anubis
 
-**Map overview (T-perspective):** Anubis rewards mid control heavily. Teams that take Canal and Mid force CT to play reactively. A-Main is a tight funnel but opens fast; B-Main via Fountain is slower. The optimal T default is mid + A pressure with Lurker on B for information.
+#### Introduction
+Our T-side default on Anubis focuses on B Main pressure and Mid / Connector control to split CT attention between both sites. B Main is the dominant T route and primary information source, while A is held as an alternative to punish any CT over-rotation toward B.
 
----
+#### Opening Utility Usage (0-5s)
+▸ [Support 1]: Throw a CT B smoke from T Spawn / B Main to block CT B-side vision and allow safe B Main movement early ▶ Watch lineup.
+▸ [Support 2]: Throw a Mid / Connector smoke from T side to safely contest Mid and limit CT vision through the Connector area ▶ Watch lineup.
+▸ [Entry]: Flash B Main entry from T Spawn to assist the team entering B Main corridor ▶ Watch lineup.
+▸ [IGL]: Molly the B Site Flowers corner or CT side position to deny aggressive CT B anchor positioning ▶ Watch lineup.
 
-## Starting Positions
+#### Info-Gathering Positions
+▸ [Lurker]: Push A Main to gauge CT numbers on A Site and apply enough threat so CTs cannot fully stack B.
+▸ [AWPer]: Hold B Main entrance or take a Connector peek for an early cross-map pick.
+▸ [Support 1]: Advance into B Main alongside Entry, applying steady pressure and keeping B threat alive.
+▸ [Entry]: Lead B Main and call CT commitment levels once inside the B Main corridor.
+▸ [IGL]: Read information from both sides — Lurker's A report and Entry's B report — before making the site call.
 
-| Role | Callout | Opening Job |
-|---|---|---|
-| AWPer | T-Spawn → A-Main | Contest the A-Main entry; open A early with a pick |
-| Entry | T-Spawn → Mid (Canal) | Pushes Canal for mid control; threatens B from mid |
-| Support | T-Spawn → Mid (with Entry) | Smokes Palace angle; enables Canal control |
-| Lurker | T-Spawn → B-Main | Slow B-Main walk; gathers info; threatens B entry |
-| IGL | T-Spawn → A-Main (with AWPer) | Calls A vs B based on mid + A info |
+#### Default Split Routes
+▸ Default B Main Split: Entry + two Supports execute B Main with CT B + Flowers smokes. Lurker fakes A or cuts CT rotation via Connector. AWPer provides Mid / Connector support and delays CT pivot.
+▸ Default A Main Split: Entry + AWPer push A Main under flash support from T side. Support holds B Main to maintain threat. IGL provides utility from Mid / Connector. Lurker enters from A Short to split the site.
 
-**Default split: 2 A-Main, 2 Mid/Canal, 1 B-Main**
+#### Timing Breakpoints
+▸ First 30s: Apply B Main pressure. Lurker establishes A Main presence. Mid / Connector is contested to reduce CT rotation speed.
+▸ Mid-Round (30s-45s): If B Main is controlled and CT numbers are low on B, execute B. If CTs are stacking B, pivot to a coordinated A execute with full site smokes.
+▸ Late Round (45s+): Slow down. AWPer looks for a B Main entrance pick. If nothing is available, set up a late B execute with remaining utility.
 
----
-
-## Default Phase (1:40 → 1:00)
-
-AWPer peeks A-Main at 1:42; if CT AWP is playing aggressively, Support flashes the angle. Entry and Support push Canal with the Palace angle smoked. Lurker slow-walks B-Main for a count.
-
-**Utility in this phase:**
-- **Support** smokes **Palace** from **Canal** at 1:40 to enable safe Canal crossing — [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+anubis+smoke+canal+palace)
-- **Support** flashes **A-Main** from **T-Spawn** at 1:42 for AWPer's peek — [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+anubis+flash+t+spawn+a+main)
-- **Entry** throws HE into **Canal** at 1:45 to deny CT aggression there — [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+anubis+he+canal)
-
----
-
-## Mid-Round Reads (1:00 → 0:55)
-
-| Information | Call |
-|---|---|
-| AWPer picks A-Main CT | "A open — execute A" |
-| Entry confirms Canal control, only 1 CT mid | "Mid control — execute A via mid + ruins" |
-| Lurker confirms 1 CT B-Main | "Execute B — 3 B" |
-| No info | "Default A — execute A with smokes" |
-
----
-
-## A Execute
-
-**Trigger:** AWPer picks A-Main CT OR Canal control confirmed.
-
-### Utility Sequence
-| Step | Role | Utility | From | Lands At | Clock |
-|---|---|---|---|---|---|
-| 1 | Support | Smoke | A-Main | CT (back of A site) | 0:57 |
-| 2 | IGL | Smoke | A-Main | Fountain angle | 0:56 |
-| 3 | AWPer | Smoke | Ruins area | Back-site angle | 0:55 |
-| 4 | Entry | Flash | A-Main | A-Site pop flash | 0:53 |
-| 5 | Support | Molotov | A-Main | Default A plant | 0:51 |
-
-- [▶ CT Smoke A](https://www.youtube.com/results?search_query=cs2+anubis+smoke+a+main+ct)
-- [▶ Fountain Smoke](https://www.youtube.com/results?search_query=cs2+anubis+smoke+a+fountain)
-- [▶ Back Site Smoke](https://www.youtube.com/results?search_query=cs2+anubis+smoke+ruins+back+site)
-- [▶ A Site Pop Flash](https://www.youtube.com/results?search_query=cs2+anubis+flash+a+main+pop)
-- [▶ A Plant Molotov](https://www.youtube.com/results?search_query=cs2+anubis+molotov+a+default+plant)
-
-### Entry & Trade Plan
-1. CT + Fountain smokes up (0:55)
-2. **Entry** pops flash and enters at 0:52 — clears left (CT smoked)
-3. **IGL** enters right side via Ruins
-4. **AWPer** follows Entry, holds long-angle across site
-5. **Support** plants at Default; **Lurker** cuts B rotation
-
-### Post-Plant
-- **Entry** → A-Main exit (close hold)
-- **IGL** → Ruins side (crossfire into A retake)
-- **AWPer** → Back-site (long crossfire)
-- **Support** → Near plant (time-waste)
-- **Lurker** → B-Main (cuts rotation)
-
----
-
-## B Execute
-
-**Trigger:** Lurker confirms B is light or Canal gives B access.
-
-### Utility Sequence
-| Step | Role | Utility | From | Lands At | Clock |
-|---|---|---|---|---|---|
-| 1 | Support | Smoke | B-Main | CT (back of B) | 0:55 |
-| 2 | IGL | Smoke | B-Main | Pillar/Connector | 0:54 |
-| 3 | Entry | Flash | B-Main | B-Site pop flash | 0:52 |
-| 4 | AWPer | Molotov | B-Main | Default B plant | 0:50 |
-
-- [▶ CT Back Smoke B](https://www.youtube.com/results?search_query=cs2+anubis+smoke+b+main+ct+back)
-- [▶ Pillar Smoke B](https://www.youtube.com/results?search_query=cs2+anubis+smoke+b+main+pillar)
-- [▶ B Pop Flash](https://www.youtube.com/results?search_query=cs2+anubis+flash+b+main+pop)
-- [▶ B Plant Molotov](https://www.youtube.com/results?search_query=cs2+anubis+molotov+b+default+plant)
-
-### Entry & Trade Plan
-1. CT + Pillar smokes up (0:53)
-2. **Entry** pops flash, enters at 0:51
-3. **IGL** follows, clears right side
-4. **Lurker** enters from Canal side, plants at Default
-5. **AWPer** holds B-Main for CT retake
-6. **Support** applies A-Main pressure
-
-### Post-Plant
-- **Entry** → B-Site close hold
-- **IGL** → B connector (cuts CT B rotation)
-- **AWPer** → B-Main (holds retake)
-- **Lurker** → Back of B (time-waste)
-- **Support** → A-Main (denies rotation)
-
----
-
-## Economy Considerations
-
-- **Pistol T:** 4 push A-Main together; 1 lurk Canal. Execute A at 0:50.
-- **Force Buy:** A-Main rush with AKs — tight corridor favors force buys.
+#### Adapting to CT Reads
+▸ If CTs are aggressive in B Main (early CT peek or rush through B Main):
+- Use double B Main smokes. Entry holds the corridor and lets them come to the crossfire.
+- Flash from the CT B smoke position to punish the peeking CT.
+▸ If CTs are stacking B with 3+ players:
+- Push 3 players through A Main with Palace + CT A smokes.
+- Keep 2 players in B Main as a delayed threat to prevent a mid-round CT rotation back to A.

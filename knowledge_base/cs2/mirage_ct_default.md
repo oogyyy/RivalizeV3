@@ -1,114 +1,42 @@
-# Mirage — CT-Side Default
+# CT-Side Default for de_mirage
 
-**Map overview (CT-perspective):** CTs win Mirage by controlling mid (denying Window/Connector to T) and having the AWPer generate early picks at CT or Short. A standard 2-1-2 setup (2 A, 1 mid, 2 B) is the foundation; rotate based on information, never on guesswork.
+#### Introduction
+Our CT-side default on Mirage relies on Window / Sniper's Nest AWP dominance, aggressive Short control to limit T Mid access, and solid dual anchoring on both sites. Information from Sniper's Nest and Short dictates all rotations.
 
----
+#### Opening Utility Usage (0-5s)
+▸ [Support 1]: Throw a Jungle smoke from CT Spawn to block Connector and limit T flank timing onto A site ▶ Watch lineup.
+▸ [AWPer]: Flash Stairs or Short from Jungle to punish early T Mid aggression ▶ Watch lineup.
+▸ [B Anchor]: Molly top of B Apps from B Site to deny a fast B Apps rush and gather early sound info ▶ Watch lineup.
 
-## Starting Positions
+#### Default Positions
+▸ [AWPer]: Play Window (Sniper's Nest) or Jungle — aggressively punish T Mid / Short movement.
+▸ [Rifler 1]: Hold Short from CT / Ticket Booth to catch Ts coming through Catwalk.
+▸ [Support 1]: Anchor A Site from CT / Jungle side, crossfire with AWPer, ready to hold Ramp and Short simultaneously.
+▸ [Support 2]: Anchor B Site from Van / Market watching B Apps entry and ready to deny a fast push.
+▸ [IGL]: Play CT Spawn / Stairs — gather rotational information and be the first responder to either site.
 
-| Role | Callout | Anchor Responsibility |
-|---|---|---|
-| AWPer | CT (behind van/default AWP position) | Opens CT angle toward Short; can reposition to Window |
-| Entry | Short (aggressive short peek OR catwalk hold) | Watches Short and Connector; calls T mid presence |
-| Support | A-Site (Ticket Booth / Jungle side) | Anchors A; supports AWPer with flashes; holds Jungle angle |
-| Lurker | B-Site (Van side) | Anchors B; calls B-Apps push timing |
-| IGL | B-Site (Market side) OR Mid (Connector/Window) | Calls B timing; can play mid for information |
+#### Rotation Rules
+▸ If AWPer picks a T in Mid / Short: AWPer repositions to Ticket Booth or CT side; IGL reads for a follow-up second T and calls.
+▸ If B Apps smoke appears: B anchor alerts the team immediately. IGL rotates toward B through Short. AWPer stays Window to delay T rotation read.
+▸ If Palace + Ramp are smoked simultaneously (A execute): IGL rotates A immediately; AWPer holds Short solo temporarily.
+▸ If heavy Mid commitment is seen (Top Mid + Window smokes): IGL peeks from Jungle side, A riflers hold Ramp and Short angles.
 
-**Standard setup: 2-1-2** — Support + AWPer on A-side, IGL mid, Entry + Lurker on B-side.
+#### Crossfire Setups
+▸ Window + Short: AWPer in Window watches Short entry while a rifler holds from CT. Any T committing Short is caught from two angles simultaneously.
+▸ Van + Apps: B anchor holds Van watching B Apps entry; second player covers B Site from behind boxes. T entering B must clear both angles at once.
+▸ Jungle + CT: One player holds from Jungle, another holds from CT — T executing A Site faces a split crossfire that is nearly impossible to clear with one flash.
 
----
+#### Retake Coordination
+▸ A Site Retake: AWPer re-enters from Jungle / Short after smoke begins clearing. Rifler re-enters from CT Spawn. Flash into A Site from Short position. IGL trails and watches Palace / Ramp exit.
+▸ B Site Retake: B anchor holds from Van (does not push into Apps). IGL rotates through Stairs / CT Spawn. Flash B Site from Mid Market / Short position. Clear Van angle first, then the B Site platform.
 
-## Early Map Control (1:40 → 1:10)
-
-CTs do not give up Short or Connector for free. Entry plays aggressive Short at 1:40 — if no contact by 1:30, they fall back to CT or hold Catwalk. AWPer peeks CT angle at 1:42 to punish any T committing through Short.
-
-**Opening utility:**
-- **Support** smokes **Jungle** from **A-Site** (pre-round smoke at 1:55) to prevent T Jungle control — [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+mirage+smoke+a+site+to+jungle+ct+side)
-- **IGL** can flash **Connector** from **Window** at 1:40 to help Entry safely hold Short — [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+mirage+flash+window+to+connector)
-- **Lurker** throws HE into **B-Apps** at 1:52 to punish a fast B rush and delay T map control — [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+mirage+he+b+apps+ct+side)
-
----
-
-## Rotation Rules
-
-| Trigger | Response |
-|---|---|
-| Entry calls "2+ T short" OR AWPer picks T at Short | Entry falls back to CT; AWPer holds Window; no A rotation needed yet |
-| Lurker calls "smoke + flash B-Apps" | IGL rotates from Mid to B; Lurker holds B-Site; call "leaving mid" |
-| Support calls "A main smoke + Palace smoke up simultaneously" | AWPer rotates from CT to Jungle (short A retake angle); Support stays CT side |
-| IGL takes a pick at Connector | IGL calls whether to stay mid or fall back to CT or B based on T pressure direction |
-| Both sites getting simultaneous utility | This is a B fake — **do not rotate A**; IGL calls "hold, it's a fake" |
-
-**Golden rule:** Never rotate from A to B on sound alone. Require a smoke + flash combination before committing a full CT from A.
-
----
-
-## Crossfire Setups
-
-**Setup 1 — CT + Jungle (A-Site):**
-- **AWPer** holds from **CT** (long angle toward Ramp)
-- **Support** holds from **Jungle** (close angle, clearing Ramp-side)
-- Forces T to peek both simultaneously; Jungle player is almost impossible to flash out without blinding CT too
-
-**Setup 2 — Van + CT-B (B-Site):**
-- **Lurker** holds from behind **Van** (covers B-Apps entry)
-- **IGL** holds from **CT-B** (covers back-site angle)
-- Makes it impossible for a single T entry to clear both angles without a teammate following
-
-**Setup 3 — Catwalk + Ticket Booth (A-Site retake crossfire):**
-- **Entry** re-enters via **Catwalk** (after a rotation)
-- **Support** holds **Ticket Booth** with a scout/rifle
-- Effective for retaking after A execute; Entry absorbs the first shot, Support trades
-
----
-
-## Mid-Round Adjustments (1:10 → 0:45)
-
-- **If T wins mid (Connector taken):** IGL immediately announces "connector lost" — AWPer rotates to cover Short from CT Spawn; Support watches Jungle for a split
-- **If T commits Ramp pressure:** Support drops back from Jungle to Ticket Booth + Stairs; AWPer holds CT angle and waits for entry peek before repositioning
-- **If B is slow (quiet B side):** Lurker can creep toward B-Apps for information peek; report back, do not over-commit
-
----
-
-## Retake — A Site
-
-**Scenario:** T executes Ramp + Palace with CT, Stairs, and Ticket Booth smoked.
-
-1. **AWPer** waits for smoke to clear at CT or throws a pop flash from **CT Spawn** into site — [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+mirage+flash+ct+spawn+a+retake)
-2. **Support** enters from **Jungle** (smoke clears from Jungle first), clears Stairs angle
-3. **AWPer** follows from CT (now behind Support), clears Ticket Booth angle
-4. **Entry** rotates from B via Short — enters through **Catwalk into Ramp side** of A
-5. **IGL** follows last, defuses from Default plant area; Entry covers Ramp, Support covers Palace
-
-**Retake rule:** Never rush retake before smoke clears. Wait for the 3-second clock window; then pop a flash and retake.
-
----
-
-## Retake — B Site
-
-**Scenario:** T executes B-Apps with Van smoke and CT smoke.
-
-1. **IGL** (mid) pushes through **Connector → Short → Catwalk** into **B-Short side** — fastest rotation — [▶ Watch lineup](https://www.youtube.com/results?search_query=cs2+mirage+b+retake+short+side)
-2. **Lurker** holds **B-Site** from **Van side** — does not push into site, waits for IGL to enter first
-3. **Entry** rotates from **Short** (if already there) into **B-Apps exit** to cut off T lurk
-4. IGL calls "flash for me" — **Support** throws a pop flash from CT Spawn into B-Site
-5. IGL + Lurker retake together; **Entry** denies any T exit through Apps
-
----
-
-## AWP Positioning Guide
-
-| Round Phase | Primary Position | Secondary Option |
-|---|---|---|
-| Round start (1:55) | CT (default van line) | Window (if IGL confirms T mid pressure) |
-| After Short pick (1:20) | CT → reposition to Jungle or Window | Short (to deny T consolidating) |
-| T commits Ramp | Jungle (tight angle; AWP lethal at Ramp entry) | Ticket Booth (with Support crossfire) |
-| T commits B | CT Spawn (hold Short; do not rotate to B solo) | Window (crossmap to B) |
-
----
-
-## Economy
-
-- **CT pistol:** Entry buys armor + P250; Lurker buys armor + P250; others buy HE grenades. Hold B passively — do not fast-peek B-Apps without armor.
-- **Anti-eco:** AWPer full buys; others buy SMGs or Galils. Play default with extra aggression on eco round to capitalize on T's weak weapons.
-- **After losing 3+ rounds:** Coordinate a full-team buy — no one plays with pistols while 3 teammates have rifles.
+#### Adapting to T Reads
+▸ If Ts are fast rushing B Apps:
+- B anchor holds deep in B Site — do not aggress Apps corridor. IGL rotates through CT Spawn.
+- AWPer drops from Window and uses the Jungle-to-Short shortcut to assist B rotation.
+▸ If Ts are slow defaulting with Mid control:
+- AWPer must win the Window duel or fall back to Short immediately.
+- Apply early CT aggression: flash and peek Jungle / Connector to disrupt T timing and force a slow play.
+▸ If Ts are stacking A with Palace + Ramp pressure:
+- IGL calls early A rotation. AWPer drops Window immediately and assists from Ticket Booth.
+- Smoke B Site entry from CT Spawn to prevent a last-second B redirect.
