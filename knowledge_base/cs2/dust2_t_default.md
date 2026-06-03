@@ -1,34 +1,43 @@
 # T-Side Default for de_dust2
 
 #### Introduction
-Our T-side default on Dust2 focuses on taking Long control and applying simultaneous B Tunnel pressure, using Mid as the information hub. Early Long control forces CTs into difficult retake scenarios while keeping B as a viable fast option at any point in the round.
+Our T-side default on Dust2 is built around denying CT Mid Doors vision with an XBox smoke every round, then splitting CTs between Long A control and B Tunnel pressure. Long A control forces CTs into reactive retake scenarios, while Mid Doors control unlocks the B short split — the most damaging two-angle A take on the map.
 
 #### Opening Utility Usage (0-5s)
-▸ [Support 1]: Throw a Long Door smoke from T Spawn / Long to cover T entry and deny early CT Long Doors aggression ▶ Watch lineup.
-▸ [Support 2]: Throw an Xbox smoke from T Spawn to block CT vision from Short and safely contest Mid ▶ Watch lineup.
-▸ [Entry/AWPer]: Flash Long from T Long to support the team pushing through Long Doors safely ▶ Watch lineup.
-▸ [IGL]: Pop flash through Mid Doors to force CTs into defensive positioning and slow B rotation timing.
+▸ [Support 1]: Throw XBox smoke from T Spawn toward Mid (stand at T Spawn, aim at specific pole / edge above Mid arch, running or jump-throw) — non-negotiable first smoke every round; prevents CT AWPer from picking through Mid Doors ▶ Watch lineup.
+▸ [Support 2]: Throw Long Doors smoke from T Long to cover T entry through Long Doors and deny early CT Long Doors aggression ▶ Watch lineup.
+▸ [Entry/AWPer]: Flash Long from T Long position to support the AWPer pushing through Long Doors safely ▶ Watch lineup.
+▸ [Lurker]: Pop-flash Upper Tunnels exit from T Tunnels to blind B Site CT before Tunnels push — thrown immediately before advancing.
 
 #### Info-Gathering Positions
-▸ [AWPer]: Push Long aggressively for an early Pit / Car pick, or play defensively from behind Long Doors.
-▸ [Lurker]: Take B Tunnels (Upper or Lower) to gauge CT numbers at B Site and apply entry threat.
-▸ [Entry]: Pair with AWPer on Long — be the second body through Long Corner once the path is clear.
-▸ [Support]: Take Catwalk to gather Mid information and stay ready to Short-execute or redirect to B.
-▸ [IGL]: Hold back at T Spawn / T Mid, reading information from all players before committing to a site.
+▸ [AWPer]: Push Long Doors and advance toward Pit / Car — win the long-range duel for Long control or hold at Long Doors corner for an info pick.
+▸ [Entry]: Pair with AWPer on Long — second body through Long Corner after AWPer clears the primary angle; calls CT car / pit positioning.
+▸ [Support]: Take Catwalk after XBox smoke lands — gathers Mid and Short information; ready to cross to B Short or continue supporting A.
+▸ [IGL]: Hold T Spawn / T Mid — reads incoming information from Long and Tunnels; does not commit until two independent reads confirm a site direction.
+▸ [Lurker]: Take Upper or Lower B Tunnels — applies B Site pressure, gauges CT B numbers, and provides the B vs. A decision input to the IGL.
 
 #### Default Split Routes
-▸ Default A Long Split: AWPer + Entry + one Support take Long, clear Pit and Car, then push CT Cross. IGL or Support flashes from Catwalk. Lurker applies B Tunnel sound pressure as a distraction.
-▸ Default B Tunnel Split: Entry + Lurker push B Tunnels while Support + IGL maintain Mid / Short pressure. AWPer holds Long for a possible AWP pick on a rotating CT.
+▸ Default A Long Split (primary): AWPer + Entry + one Support take Long, clear Pit and Car, push CT Cross. IGL or Support flashes from Catwalk. Lurker applies B Tunnel sound pressure to prevent a full CT stack on A. Smokes: CT Spawn cross (from Pit, aimed at metal antenna) + B Window (if CT Short reinforcement is anticipated).
+▸ Default B Tunnel Split: Entry + Lurker push B Tunnels simultaneously while Support and IGL maintain Mid / Short presence. AWPer holds Long for a pick on any CT rotating from Long to B. Smokes: XBox (already up) + CT cross (from Mid, running throw) + B Window (from Upper Tunnels box, jump-throw).
 
 #### Timing Breakpoints
-▸ First 30s: Take Long Doors and establish Upper Tunnel B presence. Do not peek Long Corner or B Site early without proper utility.
-▸ Mid-Round (30s-45s): Decide between a Long A execute (Pit + CT smoked), a B Tunnel rush, or a Short A execute based on information gathered from both routes.
-▸ Late Round (45s+): Force rotations through Long AWP picks or commit to a slow B setup. Avoid unnecessary coin-flip duels.
+▸ First 30s: XBox smoke lands immediately. AWPer advances Long Doors and establishes presence in Long. Lurker secures Upper Tunnel B. Do not peek Long Corner or B Site without utility — trade duels at this stage feed CT economy.
+▸ Mid-Round (30s-45s): If Long control is won and Pit is cleared — call A execute with CT Spawn + Short smokes. If Lurker reports passive or low CT numbers on B — immediate B Tunnel rush with three smokes. If mid is contested — Support crosses from Catwalk to B Short for a simultaneous two-angle B take.
+▸ Late Round (45s+): Force rotations through Long AWP picks from Pit. Commit to a slow B setup with Upper Tunnels players or a last-second A Short cross. Avoid coin-flip rifle duels in open spaces.
 
 #### Adapting to CT Reads
-▸ If CTs are playing aggressive Long Doors or Long Corner:
-- Smoke Pit / Long Corner early. AWPer peeks from T Long cover after the smoke lands.
-- Send a secondary player to flash and peek from T Long to create a trade opportunity.
-▸ If CTs are stacking B Site or over-rotating B:
-- AWPer takes a free Long pick. Entry pushes up to CT Cross unopposed.
-- Fake B Tunnels then fully commit Long A with all three site smokes (CT, Short, Goose).
+▸ If CTs are playing aggressive at Long Doors or Long Corner early:
+- Smoke Long Corner / Pit early (additional smoke from T Long, aimed at Long Corner). AWPer peeks after smoke lands from behind T Long cover.
+- Send a second player to flash and peek from T Long to force a trade — do not let AWPer die alone.
+▸ If CTs are stacking B or over-rotating B (3+ at B):
+- AWPer gets a free Long pick with CT Short abandoned. Entry pushes up to CT Cross unopposed.
+- Fake B Tunnels with 2 players making noise, then fully commit Long A with CT Spawn + Short + Goose smokes.
+▸ If CTs rush Long or push Catwalk aggressively:
+- AWPer retreats behind Long Doors. Support at Catwalk peeks for a trade then re-pops.
+- Rotate 3 players to B Tunnels — CT aggression on A side almost always leaves B shorthanded.
+
+#### Key Smoke Lineups (Pro Reference)
+▸ XBox smoke: T Spawn — aim at specific pole or edge above Mid arch — running or jump-throw. Lands on Mid XBox box, blocks all Mid Doors CT vision.
+▸ B Window smoke (B execute): Stand on top box in Upper Tunnels — aim at dome of B Window — jump-throw. Cuts B Short sight line for all players exiting Upper Tunnels.
+▸ CT Spawn cross smoke (A execute): From Pit or T Short — aim at metal antenna on roof beyond A cross — running throw. Stops CT Spawn AWPer from watching the A long cross.
+▸ CT cross smoke (B execute): Front of XBox / Mid position — running throw toward CT Spawn entrance. Denies CT support from spawning into B retake.
