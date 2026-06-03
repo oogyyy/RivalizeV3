@@ -44,6 +44,7 @@ function PlaybookListInner() {
   const [deleting, setDeleting]       = useState<string | null>(null)
   const [availablePlayers, setAvailablePlayers] = useState<string[]>([])
   const [selectedPlayers, setSelectedPlayers]   = useState<string[]>([])
+  const [playerRoles, setPlayerRoles]           = useState<Record<string, string>>({})
 
   useEffect(() => {
     Promise.all([
@@ -85,6 +86,7 @@ function PlaybookListInner() {
       .then((names: string[]) => {
         setAvailablePlayers(names)
         setSelectedPlayers([])
+        setPlayerRoles({})
       })
   }, [selectedTeam])
 
@@ -105,6 +107,7 @@ function PlaybookListInner() {
         folderId:     selectedFolder || undefined,
         opponentName: opponentName || undefined,
         players:      selectedPlayers.length > 0 ? selectedPlayers : undefined,
+        playerRoles:  Object.keys(playerRoles).length > 0 ? playerRoles : undefined,
       }),
     })
     if (res.ok) {
@@ -226,38 +229,64 @@ function PlaybookListInner() {
                 No self demos uploaded yet — AI will use role labels (Entry Fragger, AWPer, etc.)
               </p>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {availablePlayers.slice(0, 10).map(name => {
-                  const on = selectedPlayers.includes(name)
-                  return (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => {
-                        if (on) {
-                          setSelectedPlayers(prev => prev.filter(n => n !== name))
-                        } else if (selectedPlayers.length < 5) {
-                          setSelectedPlayers(prev => [...prev, name])
-                        }
-                      }}
-                      className={cn(
-                        'text-xs px-2.5 py-1 rounded-full border transition-colors',
-                        on
-                          ? 'bg-neon-green/15 border-neon-green/50 text-neon-green'
-                          : 'bg-background border-border text-muted-foreground hover:border-neon-green/30 hover:text-foreground',
-                        !on && selectedPlayers.length >= 5 && 'opacity-40 cursor-not-allowed'
-                      )}
-                    >
-                      {name}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            {selectedPlayers.length > 0 && (
-              <p className="text-[10px] text-muted-foreground/60 mt-1">
-                {selectedPlayers.length}/5 selected · AI will use these names in all tactics
-              </p>
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {availablePlayers.slice(0, 10).map(name => {
+                    const on = selectedPlayers.includes(name)
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => {
+                          if (on) {
+                            setSelectedPlayers(prev => prev.filter(n => n !== name))
+                            setPlayerRoles(prev => { const next = { ...prev }; delete next[name]; return next })
+                          } else if (selectedPlayers.length < 5) {
+                            setSelectedPlayers(prev => [...prev, name])
+                          }
+                        }}
+                        className={cn(
+                          'text-xs px-2.5 py-1 rounded-full border transition-colors',
+                          on
+                            ? 'bg-neon-green/15 border-neon-green/50 text-neon-green'
+                            : 'bg-background border-border text-muted-foreground hover:border-neon-green/30 hover:text-foreground',
+                          !on && selectedPlayers.length >= 5 && 'opacity-40 cursor-not-allowed'
+                        )}
+                      >
+                        {name}
+                      </button>
+                    )
+                  })}
+                </div>
+                {selectedPlayers.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground/60">
+                      {selectedPlayers.length}/5 selected · Assign roles so AI knows each player&apos;s responsibilities
+                    </p>
+                    {selectedPlayers.map(name => (
+                      <div key={name} className="flex items-center gap-2">
+                        <span className="text-xs text-neon-green font-medium w-28 truncate">{name}</span>
+                        <select
+                          value={playerRoles[name] ?? ''}
+                          onChange={e => setPlayerRoles(prev => {
+                            if (!e.target.value) { const next = { ...prev }; delete next[name]; return next }
+                            return { ...prev, [name]: e.target.value }
+                          })}
+                          className="flex-1 bg-background border border-border rounded px-2 py-0.5 text-xs text-foreground focus:outline-none focus:border-neon-green/50"
+                        >
+                          <option value="">No role assigned</option>
+                          <option value="Entry">Entry Fragger</option>
+                          <option value="AWPer">AWPer</option>
+                          <option value="Support">Support</option>
+                          <option value="Lurker">Lurker</option>
+                          <option value="IGL">IGL</option>
+                          <option value="Rifler">Rifler</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
 

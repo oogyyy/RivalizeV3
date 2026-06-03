@@ -193,11 +193,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const promptTmpl = prompts[sectionType] ?? prompts.t_side
   const prompt     = promptTmpl.replace(/{map}/g, playbook.map)
 
-  // Build roster instruction — use stored names, or role labels, never invented names
+  // Build roster instruction — use stored names+roles, or role labels, never invented names
   const storedPlayers: string[] = (playbook as { players?: string[] }).players ?? []
-  const rosterInstruction = storedPlayers.length > 0
-    ? `\nTeam roster — use ONLY these exact names for players, never invent names:\n${storedPlayers.map((n, i) => `${i + 1}. ${n}`).join('\n')}`
-    : `\nDo NOT invent player names. Refer to players by role only (Entry Fragger, AWPer, Support, Lurker, IGL).`
+  const storedRoles: Record<string, string> = (playbook as { player_roles?: Record<string, string> }).player_roles ?? {}
+  let rosterInstruction: string
+  if (storedPlayers.length > 0) {
+    const lines = storedPlayers.map((n, i) => {
+      const role = storedRoles[n]
+      return role ? `${i + 1}. ${n} (${role})` : `${i + 1}. ${n}`
+    })
+    const hasRoles = storedPlayers.some(n => storedRoles[n])
+    rosterInstruction = `\nTeam roster — use ONLY these exact names for players, never invent names:\n${lines.join('\n')}`
+    if (hasRoles) rosterInstruction += `\nRole labels are shown in parentheses — use them when referencing each player's responsibilities.`
+  } else {
+    rosterInstruction = `\nDo NOT invent player names. Refer to players by role only (Entry Fragger, AWPer, Support, Lurker, IGL).`
+  }
 
   const utilityInstruction = UTILITY_FORMAT_INSTRUCTION.replace(/{map}/g, playbook.map.replace('de_', ''))
 
