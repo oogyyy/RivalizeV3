@@ -26,7 +26,6 @@ const NAV_GROUPS = [
     items: [
       { href: '/opponents',           label: 'Opponents', Icon: Target },
       { href: '/opponents/pro-demos', label: 'Pro Demos', Icon: Film },
-      { href: '/scout',               label: 'Tactical Hub', Icon: Compass, live: true },
     ],
   },
   {
