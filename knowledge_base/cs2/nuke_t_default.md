@@ -1,34 +1,43 @@
 # T-Side Default for de_nuke
 
 #### Introduction
-Our T-side default on Nuke focuses on controlling Outside (Ramp and Silo area) and applying simultaneous Secret pressure toward Lower Site. We use Heaven and Ramp utility to deny CT aggression from elevated positions before committing to a site execute.
+Nuke is the most CT-sided map in CS2 (~55–60% CT win rate at pro level). Our T-side default is built around establishing Outside / Yard control with a Garage smoke thrown the instant the round starts, then using a Vent / Secret lurk to create a genuine two-level dilemma for CTs. Upper A is the preferred execute target in full-buy rounds — the post-plant positions (Rafters, Hatch) make defusing extremely difficult.
 
 #### Opening Utility Usage (0-5s)
-▸ [Support 1]: Throw a Heaven smoke from T Spawn / Ramp area to block CT Heaven angle and allow safe Outside movement without being picked from above ▶ Watch lineup.
-▸ [Support 2]: Throw a Ramp Door smoke to cover T advance through Outside and deny the CT holding the Ramp door angle ▶ Watch lineup.
-▸ [IGL]: Molly the Ramp door area or Outside right corner to clear any aggressive CT holding in that position ▶ Watch lineup.
-▸ [Entry]: Flash Outside from T Spawn to assist teammates pushing through the Ramp area ▶ Watch lineup.
+▸ [Support 1]: Throw Garage smoke from T Spawn (stand at right fence near truck, aim at top-left metal part of Silo structure above Garage, jump-throw) — every round without exception; blocks CT Garage AWPer watching yard crossing ▶ Watch lineup.
+▸ [Support 2]: Throw Red Container / Outside Catwalk smoke from yard approach to block CT Catwalk AWP from watching the Secret entrance approach ▶ Watch lineup.
+▸ [Entry]: Flash Outside from T Spawn (overhand pop-flash) to blind any CT holding aggressively in the open yard area ▶ Watch lineup.
+▸ [IGL]: Molly the Ramp door area or Outside right corner to clear any aggressive CT sitting in that position before the team crosses yard.
 
 #### Info-Gathering Positions
-▸ [Lurker]: Take the Secret route toward Lower Site to apply pressure and call CT numbers defending Lower.
-▸ [AWPer]: Hold Ramp or Silo position for long-range Outside picks or to contest the Heaven AWP angle.
-▸ [Support]: Advance through Ramp / Outside together with Entry to control the exterior before committing.
-▸ [Entry + Support]: Push Outside as a pair, taking Ramp control and gathering information on CT aggression from Heaven, Trophy, and Hut.
-▸ [IGL]: Coordinate Outside control timing with Lurker's Secret report before calling Upper or Lower commit.
+▸ [Entry]: Push through Garage smoke into Yard and take Ramp — fights for outside control and gathers info on CT Hut / Trophy aggression.
+▸ [AWPer]: Advance through Yard toward Squeaky Door / Secret area — takes aggressive peek from Yard toward A site via Secret approach or holds Outside for a counter-duel against CT Heaven AWPer.
+▸ [Support]: Advance through Ramp / Outside alongside Entry — provides Yard depth, calls CT aggression from Above and Catwalk, ready to throw Hut smoke.
+▸ [IGL]: Hold Lobby → Ramp area — coordinates Outside timing with Lurker's Secret report before calling Upper (A) or Lower (B) commit; does NOT cross Yard until decision is made.
+▸ [Lurker]: Enter Lobby → Squeaky Door → Vent — drops into Secret as pressure / distraction; checks if CT is holding Secret; sound cue forces CT to decide between defending Secret or retaking Main.
 
 #### Default Split Routes
-▸ Default Upper Split: Entry + AWPer + one Support push Ramp and Outside into Upper Site through the main Ramp entrance. Smokes cover Heaven and Trophy / Rafters angles. IGL provides secondary utility.
-▸ Default Lower Split: Entry + Lurker push through Secret into Lower Site. Smokes cover Vents drop and CT lower positions. Remaining players hold Outside to cut Heaven rotation.
+▸ Default Upper A Execute: Entry + AWPer + one Support push through Yard and Ramp into Upper A via Main entrance. Smokes cover Garage (already up) + Hut + Heaven/Rafters. IGL enters last with secondary utility. Lurker times Secret arrival simultaneously with Main entry. Smokes needed: Garage, Hut, Heaven, Lobby/Red.
+▸ Default Lower B Execute: Entry + Lurker push Ramp + Secret simultaneously into Lower B. Smokes cover Silo (CT B position) + Garage rotation path. Remaining players hold Outside to cut Heaven rotation. Fastest B option — Lurker arrives via Vent drop at the same time Entry reaches Ramp drop.
 
 #### Timing Breakpoints
-▸ First 30s: Take Ramp and Outside control. Lurker advances to Secret. Do not peek Heaven without utility in place.
-▸ Mid-Round (30s-45s): Based on CT numbers heard in Heaven vs Secret, decide: full Upper execute via Ramp or Lower push via Secret + Vents.
-▸ Late Round (45s+): Use remaining utility for a late Upper push or force a Secret entry if CT defensive positions are predictable.
+▸ First 30s: Garage smoke lands as Ts cross yard. Outside control established. Lurker advances to Squeaky — performs vent sound check (listen for CT movement) before committing. Do not peek Heaven without a Heaven smoke in place.
+▸ Mid-Round (30s-45s): If outside is controlled and Lurker's Secret check shows no CT → commit Upper A with 4 smokes (Garage, Hut, Heaven, Lobby). If CT Ramp defence is passive and Lurker hears B Lower is quiet → drop 3 onto B via Ramp + 1 via Vent simultaneously.
+▸ Late Round (45s+): Use remaining utility for a late Upper push from Ramp or force a Secret entry if CT defensive positions are predictable. Never split 3/2 without proper smokes for either site — Nuke punishes uncoordinated splits harder than any other map.
 
 #### Adapting to CT Reads
-▸ If CTs are aggressive from Heaven or Ramp door:
-- Smoke Heaven early. AWPer takes the Silo angle to punish any peek.
-- Do not advance Ramp until the Heaven smoke has fully landed and settled.
-▸ If CTs are stacking Lower (heavy Secret / Vent sound):
-- Three players commit Upper through Ramp with Trophy + Heaven + Hut smokes.
-- Lurker delays from Secret as a distraction only — does not fully commit to Lower alone.
+▸ If CTs are aggressive from Heaven or holding Ramp door aggressively:
+- Smoke Heaven early (already part of execute); AWPer holds Silo angle to counter-peek any CT aggressive from Heaven.
+- Do not advance Ramp until Heaven smoke has fully settled — commit Upper only after smoke confirms.
+▸ If CTs are stacking Lower B (heavy Secret / Vent sound, 2+ Lower):
+- All three Outside players commit Upper through Ramp with Trophy + Heaven + Hut smokes.
+- Lurker delays from Secret as distraction only — does NOT fully commit to Lower alone with CTs stacked.
+▸ If CTs split Outside + Secret simultaneously (aggressive both levels):
+- Do not rotate too early. Keep 2 Upper, 2 Lower, AWPer at Heaven until primary threat is confirmed by sound.
+- IGL calls which side is primary after receiving Lurker's Secret sound report and Entry's Outside commitment report.
+
+#### Key Smoke Lineups (Pro Reference)
+▸ Garage smoke: T Spawn right fence near truck — aim at top-left metal part of Silo above Garage — jump-throw. Lands in Garage door, blocks CT AWPer every round.
+▸ Hut smoke (Upper A execute): From Yard / Outside position — aim at top of Hut structure — lands on Hut top, blocks CT exiting Hut toward Squeaky area during A execute.
+▸ Heaven/Rafters smoke (Upper A execute): From Main entrance / Upper entry — aim at Heaven or Rafters — blocks AWPer above watching Main entry during site take.
+▸ Silo smoke (Lower B execute): From Ramp approach — aimed at Silo structure on B site — blinds CT holding Silo while Ts drop down Ramp to B.

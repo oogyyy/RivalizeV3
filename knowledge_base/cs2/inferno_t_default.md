@@ -1,33 +1,43 @@
 # T-Side Default for de_inferno
 
 #### Introduction
-Our T-side default on Inferno focuses on Banana control and simultaneous Apartment pressure to divide CT attention between both sites. We use early Banana utility to deny aggressive CT pushes and keep the path to B open throughout the default phase.
+Our T-side default on Inferno prioritises Banana control above everything else — a Car molotov thrown at round start is the single most impactful T-side action on this map. Combined with simultaneous 2nd Mid / Apartments pressure, it forces CTs to split attention between both sites and prevents the CT Car anchor from setting up for free.
 
 #### Opening Utility Usage (0-5s)
-▸ [Support 1]: Throw a Top of Banana smoke from T Spawn / Second to block CT aggression at Banana top and deny the early peek ▶ Watch lineup.
-▸ [Support 2]: Throw an Arch smoke from T Spawn to cover mid-Banana movement and allow safe passage to Second ▶ Watch lineup.
-▸ [Entry/IGL]: Molly Top of Banana or the CT back corner of B Site to flush out aggressive CT positions ▶ Watch lineup.
-▸ [Entry on A side]: Flash Arch entry from T side to assist the team pushing through Apartments toward A ▶ Watch lineup.
+▸ [Entry/Banana player]: Throw Car molotov from T Spawn toward Car / Sandbags at round start — throw it the instant the round begins while running toward Banana. Forces the CT off Car position before they can set up ▶ Watch lineup.
+▸ [Support 1]: Throw CT Banana cross smoke from Banana (align at flower pots corner, aim at overhead light bulb, normal throw) to block CT vision across Banana and allow safe Banana advancement ▶ Watch lineup.
+▸ [Support 2]: Throw Arch smoke from 2nd Mid / Alley approach to cover Apartments-to-A movement and delay CT Arch aggression ▶ Watch lineup.
+▸ [IGL]: HE grenade or molotov toward Balcony / CT Apartments Window from 2nd Mid to delay CT Apps player from setting up an early AWP angle.
 
 #### Info-Gathering Positions
-▸ [Lurker]: Play Second (mid-Banana) to gather CT numbers on B Site, then decide to commit or rotate to A.
-▸ [AWPer]: Hold Second or take an Arch peek to apply pressure and gather A / Mid CT positioning information.
-▸ [Support 1]: Push to Top of Banana behind utility to confirm CT presence and report back for the B commit call.
-▸ [Entry + Support 2]: Move through T Apartments and CT Apartments (CT App entry) toward A Site to apply pressure and gather defensive information.
+▸ [Entry]: Push Banana after Car molotov lands — contest Top of Banana and advance toward Second; calls CT Banana commitment level.
+▸ [Support 1]: Second body on Banana — provides flashes for Entry; holds depth of Banana if CT wins the opening duel; does not over-commit solo.
+▸ [AWPer]: Hold T Ramp / Ledge or advance to 2nd Mid — takes aggressive Arch peek from Ledge for early CT cross-map pick, or duels from Second on Banana once Entry has won the smoke duel.
+▸ [IGL]: Take 2nd Mid (Alt Mid / Alley) — monitors CT Apartments positioning and A site numbers; reads whether CTs are stacking A or rotating toward Banana.
+▸ [Lurker]: Take T Ramp → Mid → Arch approach — slow lurk through Mid toward Dark Stairs; aims to arrive behind B defenders as Banana execute commits.
 
 #### Default Split Routes
-▸ Default B Banana Split: Entry + two Supports commit Banana with Top of Banana and CT-back smokes. IGL or Lurker holds Second to manage rotations. AWPer provides Arch / Second support and cuts rotation timing.
-▸ Default A Apartments Split: Entry + one Support push CT App and Arch, ready to execute A with Library + Graveyard smokes. AWPer fakes Banana then joins A. Lurker or IGL holds Banana to prevent a free CT rotation to A.
+▸ Default B Banana Split (most common): Entry + Support commit Banana with Car molotov + CT cross smoke + Coffins smoke. AWPer holds Second / Arch for cross-map support and to cut CT Banana rotation timing. IGL calls B commit once Entry reports Banana controlled. Remaining player lurks Mid to delay CT rotation.
+▸ Default A Apartments Split: Entry + IGL push 2nd Mid → CT App → Arch toward A Site with Library + Arch smokes simultaneously. AWPer fakes Banana with grenade noise then repositions to A. Support holds Banana to prevent a free CT rotation from B to A.
 
 #### Timing Breakpoints
-▸ First 30s: Use Banana utility to secure Second control without fully committing. Establish sound pressure through Apartments simultaneously.
-▸ Mid-Round (30s-45s): If CTs are squeezed between Banana and Apartments pressure, call the execute on whichever site appears lighter based on CT sound and movement.
-▸ Late Round (45s+): If no clean execute is ready, try to win a 1v1 AWP duel at Arch or force B short with remaining players and utility.
+▸ First 30s: Car molotov in at round start. Entry + Support advance Banana behind smoke. IGL gathers Apartments information from 2nd Mid. Do not commit B without Coffins smoke — CT sitting Coffins alone stops the execute.
+▸ Mid-Round (30s-45s): If Banana is controlled (Entry at Second) and CT Apartments seems passive — call B execute with CT cross + Coffins + CT Spawn smokes. If Apartments has 3+ CTs based on IGL's read — commit B immediately while CTs are stacked wrong.
+▸ Late Round (45s+): If no clean execute is available, AWPer duels from Arch / Second for a 1v1 pick. Force a last-second B push through Banana with remaining players or reset and play for the next round.
 
 #### Adapting to CT Reads
-▸ If CTs are aggressive on Banana (rushing Second or Top):
-- Use two Banana smokes immediately. Molly forces them back behind cover.
-- Lurker peeks Second once the smoke clears. Redirect to a fast A Apartments execute while B is over-committed.
+▸ If CTs are aggressive on Banana (rushing Second or Top of Banana):
+- Two Banana smokes immediately seal the entire corridor. Car molotov already forces them back.
+- Lurker peeks Second from Arch direction once smoke clears. Redirect 3 players to A Apartments execute while B over-commits.
 ▸ If CTs are stacking A with 3+ players:
-- Commit 3 players to Banana with full B site utility (CT, Coffin, CT Back smokes).
-- Entry rushes B through Banana after smokes land. Remaining players hold Arch to block CT rotation back to B.
+- Commit 3 players to Banana with full B site utility (CT cross + Coffins + CT Spawn B smokes).
+- Entry executes B through Banana after smokes land. Remaining players hold Arch to block CT rotation from A to B.
+▸ If CTs are playing passive / 2-2-1 standard setup:
+- Use the Banana fake: dump 2 mollies + 1 smoke on Banana with sound, draw rotation, then execute A through Apartments with Library + Arch + CT smokes simultaneously.
+
+#### Key Smoke Lineups (Pro Reference)
+▸ CT Banana cross smoke: Stand at Banana flower pots corner (right wall) — aim at overhead light bulb — normal standing throw. Blocks CT vision at Banana exit near CT cross.
+▸ Coffins smoke: Banana corridor (crouch near opposite corner) — aim at second light bulb from left on overhead wire — standing/crouching throw. Blocks Coffins area for B entry.
+▸ Library smoke (A execute): Stand at 2nd Mid near magazine stand — aim at roof pillar above the "S" in CASA sign — jump-throw. Blocks Library exit completely.
+▸ Arch smoke (A execute): Stand at 2nd Mid near magazine stand — aim slightly left of center knot on overhead wire — jump-throw. Combines with Library smoke to seal A execute entry path.
+▸ CT Spawn B cross smoke: Banana exit / Logs area — thrown toward CT Spawn rotation path — prevents CT flanking through CT Spawn onto B during execute.
