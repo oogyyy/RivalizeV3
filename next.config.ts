@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   },
   // Keep steam-user + globaloffensive as Node.js externals — they load native
   // files (system.pem, protobuf schemas) at runtime and cannot be bundled.
-  serverExternalPackages: ['steam-user', 'globaloffensive', 'bytebuffer', 'protobufjs', 'steam-totp'],
+  serverExternalPackages: ['steam-user', 'globaloffensive', 'bytebuffer', 'protobufjs', 'steam-totp', '@xenova/transformers'],
   // Force-include steam packages in standalone output — Next.js file tracing
   // misses dynamic require() calls and non-JS assets (system.pem, .proto files).
   outputFileTracingIncludes: {
