@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Target, Shield, Brain,
-  ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Settings, Activity, Puzzle, Compass,
+  ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Settings, Activity, Puzzle,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
