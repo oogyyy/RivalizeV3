@@ -13,10 +13,15 @@ export interface MapConfig {
   pos_x: number
   pos_y: number
   scale: number
+  // Optional 3D GLB model.  When present, the flat radar plane is replaced by
+  // the real geometry.  Transform is auto-computed from pos_x/pos_y/scale but
+  // yOffset lets you nudge the model up/down if needed.
+  glbUrl?: string
+  glbYOffset?: number
 }
 
 export const MAP_CONFIGS: Record<string, MapConfig> = {
-  de_mirage:   { imageUrl: `${RAW}/de_mirage_radar_psd.png`,   pos_x: -3230, pos_y:  1713, scale: 5.00 },
+  de_mirage:   { imageUrl: `${RAW}/de_mirage_radar_psd.png`,   pos_x: -3230, pos_y:  1713, scale: 5.00, glbUrl: '/maps/de_mirage.glb' },
   de_inferno:  { imageUrl: `${RAW}/de_inferno_radar_psd.png`,  pos_x: -2087, pos_y:  3870, scale: 4.90 },
   de_dust2:    { imageUrl: `${RAW}/de_dust2_radar_psd.png`,    pos_x: -2476, pos_y:  3239, scale: 4.40 },
   de_nuke:     { imageUrl: `${RAW}/de_nuke_radar_psd.png`,     pos_x: -3453, pos_y:  2887, scale: 7.00 },

@@ -9,6 +9,8 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { Loader2, RotateCcw, Play, Pause, Volume2, VolumeX, Bookmark, BookmarkCheck } from 'lucide-react'
 import { MAP_CONFIGS, loadMapImage, worldToCanvas, type MapConfig } from '@/lib/map-config'
 import { MAP_GEO_DATA, getMapFloorHeight } from '@/lib/map-geometries'
@@ -1059,6 +1061,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
   const heatmapObjsRef     = useRef<THREE.Mesh[]>([])
   const autoDirTimerRef    = useRef(0)
   const xrayEnabledRef     = useRef(false)
+  const glbLoadedRef       = useRef(false)
 
   const togglePlay = useCallback(() => {
     const pb = pbRef.current
@@ -1271,8 +1274,70 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
       if (!cancelled) setLoaded(true)
     })
 
-    // ── 3D map geometry (platforms + walls) ───────────────────────────────────
+    // ── 3D map geometry (platforms + walls) — fallback when no GLB ───────────
     const mapGeoObjs = buildMapGeometry(mapName, scene)
+
+    // ── GLB model ─────────────────────────────────────────────────────────────
+    // Coordinate transform (CS2 Z-up → Three.js Y-up):
+    //   rotation.x = -π/2  (maps CS2 X→X, Y→-Z, Z→Y)
+    //   uniform scale  s  = MAP_PLANE / (cfg.scale × 1024)
+    //   position.x = -cfg.pos_x × s − MAP_PLANE/2
+    //   position.z =  cfg.pos_y × s − MAP_PLANE/2
+    // This is the exact inverse of worldTo3D so player markers stay aligned.
+    glbLoadedRef.current = false
+    let glbRoot: THREE.Group | null = null
+
+    const glbMapCfg = MAP_CONFIGS[mapName]
+    if (glbMapCfg?.glbUrl) {
+      const s3d = MAP_PLANE / (glbMapCfg.scale * 1024)
+
+      const dracoLoader = new DRACOLoader()
+      // Use the versioned Google CDN — no need to copy decoder files to /public
+      dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/')
+
+      const gltfLoader = new GLTFLoader()
+      gltfLoader.setDRACOLoader(dracoLoader)
+
+      gltfLoader.load(
+        glbMapCfg.glbUrl,
+        (gltf: { scene: THREE.Group }) => {
+          if (cancelled) return
+          glbRoot = gltf.scene
+
+          // Apply coordinate-space transform
+          glbRoot.rotation.x = -Math.PI / 2
+          glbRoot.scale.setScalar(s3d)
+          glbRoot.position.set(
+            -glbMapCfg.pos_x * s3d - MAP_PLANE / 2,
+            glbMapCfg.glbYOffset ?? 0,
+            glbMapCfg.pos_y * s3d - MAP_PLANE / 2,
+          )
+
+          glbRoot.traverse((child: THREE.Object3D) => {
+            const mesh = child as THREE.Mesh
+            if (!mesh.isMesh) return
+            mesh.receiveShadow = true
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+            for (const mat of mats) {
+              const stdMat = mat as THREE.MeshStandardMaterial
+              if (stdMat.isMeshStandardMaterial) {
+                stdMat.roughness    = Math.max(stdMat.roughness ?? 0.8, 0.65)
+                stdMat.envMapIntensity = 0.35
+                stdMat.needsUpdate  = true
+              }
+            }
+          })
+
+          // Replace flat radar plane and fake geometry with the real model
+          mapMesh.visible = false
+          for (const o of mapGeoObjs) o.visible = false
+          scene.add(glbRoot)
+          glbLoadedRef.current = true
+        },
+        undefined,
+        (err: unknown) => console.warn('[Replay3D] GLB load failed, using radar fallback:', err),
+      )
+    }
 
     // ── Border ────────────────────────────────────────────────────────────────
     const half = MAP_PLANE / 2, bY = 0.06
@@ -1566,9 +1631,13 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
             const po = players.get(sn.n); if (!po) continue
             const [x3d, z3d] = worldTo3D(sn.x, sn.y, cfg)
             po.group.visible = true
-            // Use actual Z from parser when available, else infer from map geometry regions
+            // Use actual Z from parser when available, else infer from map geometry regions.
+            // With a real GLB model use 1:1 scale (MAP_PLANE / scale*1024) so players
+            // stand on actual surfaces.  The 2.5× exaggeration is kept only for the fake
+            // procedural geometry used as a fallback when no GLB is loaded.
+            const s3d = MAP_PLANE / (cfg.scale * 1024)
             const floorY = sn.z !== undefined
-              ? (sn.z / (1024 * cfg.scale)) * MAP_PLANE * 2.5
+              ? sn.z * s3d * (glbLoadedRef.current ? 1.0 : 2.5)
               : getMapFloorHeight(x3d, z3d, mapName)
             po.group.position.set(x3d, floorY, z3d)
             // CS2 yaw: 0=east(+X), 90=south(+Y source→Three.js +Z)
@@ -1905,6 +1974,16 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
             : (m.material as THREE.Material).dispose()
         }
       }
+      if (glbRoot) {
+        glbRoot.traverse((child: THREE.Object3D) => {
+          const m = child as THREE.Mesh
+          if (!m.isMesh) return
+          m.geometry?.dispose()
+          const mats = Array.isArray(m.material) ? m.material : [m.material]
+          mats.forEach((mt: THREE.Material) => mt?.dispose())
+        })
+      }
+      glbLoadedRef.current = false
     }
   }, [mapName, parsed, team1, team2])
 
