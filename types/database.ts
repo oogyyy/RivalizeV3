@@ -110,6 +110,7 @@ export interface PlayerSnapshot {
   a: boolean   // alive
   h?: number   // health (0-100)
   w?: number   // yaw angle in degrees (-180 to 180)
+  t?: string   // team: "CT" or "T"
 }
 
 export interface PositionFrame {
