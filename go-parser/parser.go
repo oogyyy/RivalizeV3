@@ -48,6 +48,7 @@ type PlayerSnapshot struct {
 	A bool   `json:"a"` // alive
 	H int    `json:"h"` // health (0-100)
 	W int    `json:"w"` // yaw angle in degrees (-180 to 180)
+	T string `json:"t"` // team: "CT" or "T"
 }
 
 type PositionFrame struct {
@@ -620,6 +621,10 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 				continue
 			}
 			pos := pl.Position()
+			team := "T"
+			if pl.Team == common.TeamCounterTerrorists {
+				team = "CT"
+			}
 			snaps = append(snaps, PlayerSnapshot{
 				N: pl.Name,
 				X: int(math.Round(float64(pos.X))),
@@ -628,6 +633,7 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 				A: pl.IsAlive(),
 				H: pl.Health(),
 				W: int(math.Round(float64(pl.ViewDirectionX()))),
+				T: team,
 			})
 		}
 		if len(snaps) > 0 {
