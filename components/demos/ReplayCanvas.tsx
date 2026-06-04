@@ -1,45 +1,69 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, useMemo, useLayoutEffect } from 'react'
+import type { ReactNode } from 'react'
 import {
-  Play, Pause, RotateCcw, Tag, Video, StopCircle,
-  ChevronLeft, ChevronRight, Skull, Wind, Zap, Flame, Circle,
+  Play, Pause, RotateCcw, Video, StopCircle,
+  ChevronLeft, ChevronRight, Skull,
+  Wind, Zap, Flame, Circle, Activity,
+  MousePointer, Pencil, Minus, ArrowRight, Trash2,
+  Eye, EyeOff, Tag, Crosshair,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useVideoCapture } from '@/hooks/useVideoCapture'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
 import type { Round, PlayerStats, PositionFrame } from '@/types/database'
 
-const CANVAS_SIZE = 560
-const T1_COLOR    = '#00ff87'
-const T2_COLOR    = '#ff4466'
-const KILL_FLASH  = 1.4
-const TRAIL_SECS  = 1.0
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-const SMOKE_DUR   = 18
-const HE_DUR      = 1.8
-const FLASH_DUR   = 0.6
-const MOLOTOV_DUR = 7
+const CANVAS_SIZE  = 580
+const T1_COLOR     = '#22d3ee'   // cyan
+const T2_COLOR     = '#fb923c'   // orange
+const KILL_FLASH   = 1.4
+const TRAIL_SECS   = 1.0
+const FOCUS_ZOOM   = 2.2
+const SMOKE_DUR    = 18
+const HE_DUR       = 1.8
+const FLASH_DUR    = 0.6
+const MOLOTOV_DUR  = 7
 
 const GREN_COLORS: Record<string, string> = {
-  smoke: '#c0c0d0', flash: '#ffff88', he: '#ff9900', molotov: '#ff4400', decoy: '#8888ff',
+  smoke: '#b8b8cc', flash: '#ffee55', he: '#ff8800', molotov: '#ff3300', decoy: '#8888ff',
 }
 
 const WEAPON_ABBR: Record<string, string> = {
   'AK-47': 'AK47', 'M4A4': 'M4A4', 'M4A1-S': 'M4A1', 'AWP': 'AWP',
-  'Desert Eagle': 'DEAGLE', 'Glock-18': 'GLOCK', 'USP-S': 'USP',
-  'HE Grenade': 'HE', 'Molotov': 'MOLOTOV', 'Knife': 'KNIFE',
-  'P250': 'P250', 'Five-SeveN': '5-7', 'Tec-9': 'TEC9',
-  'SG 553': 'SG553', 'AUG': 'AUG', 'FAMAS': 'FAMAS', 'Galil AR': 'GALIL',
-  'SSG 08': 'SSG08', 'G3SG1': 'G3', 'SCAR-20': 'SCAR', 'M249': 'M249',
-  'Negev': 'NEGEV', 'Nova': 'NOVA', 'XM1014': 'XM', 'MAG-7': 'MAG7',
-  'Sawed-Off': 'SAWED', 'MAC-10': 'MAC10', 'PP-Bizon': 'BIZON',
-  'MP5-SD': 'MP5', 'MP9': 'MP9', 'MP7': 'MP7', 'P90': 'P90',
-  'UMP-45': 'UMP', 'CZ75-Auto': 'CZ75', 'R8 Revolver': 'R8',
+  'Desert Eagle': 'DEagle', 'Glock-18': 'Glock', 'USP-S': 'USP',
+  'HE Grenade': 'HE', 'Molotov': 'Molotov', 'Knife': 'Knife',
+  'P250': 'P250', 'Five-SeveN': '5-7', 'Tec-9': 'Tec9',
+  'SG 553': 'SG553', 'AUG': 'AUG', 'FAMAS': 'FAMAS', 'Galil AR': 'Galil',
+  'SSG 08': 'Scout', 'MAC-10': 'MAC10', 'MP5-SD': 'MP5', 'MP9': 'MP9',
+  'MP7': 'MP7', 'P90': 'P90', 'UMP-45': 'UMP', 'CZ75-Auto': 'CZ75',
+  'R8 Revolver': 'R8', 'M249': 'M249', 'Negev': 'Negev',
 }
 
-function abbrevWeapon(w: string): string {
-  return WEAPON_ABBR[w] ?? w.slice(0, 7)
+function abbrevWeapon(w: string) { return WEAPON_ABBR[w] ?? w.slice(0, 8) }
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type AnnotationTool = 'select' | 'pen' | 'line' | 'arrow' | 'circle'
+type RoundFilter    = 'all' | 'pistol' | 'eco' | 'force' | 'full'
+type SpeedValue     = 0.5 | 1 | 2 | 4
+
+interface Annotation {
+  id: string
+  type: Exclude<AnnotationTool, 'select'>
+  points: { x: number; y: number }[]
+  color: string
+}
+
+interface CanvasPlayer {
+  x: number; y: number
+  alive: boolean
+  team: string
+  trail: { x: number; y: number }[]
+  yaw?: number
+  health?: number
 }
 
 interface Props {
@@ -51,14 +75,7 @@ interface Props {
   onPlaybackChange?: (time: number, playing: boolean) => void
 }
 
-interface CanvasPlayer {
-  x: number; y: number
-  alive: boolean
-  team: string
-  trail: Array<{ x: number; y: number }>
-}
-
-// ── Frame interpolation ───────────────────────────────────────────────────────
+// ── Frame helpers ─────────────────────────────────────────────────────────────
 
 function getFramePositions(
   frames: PositionFrame[],
@@ -68,47 +85,44 @@ function getFramePositions(
   toXY: (wx: number, wy: number) => [number, number],
 ): Map<string, CanvasPlayer> {
   const out = new Map<string, CanvasPlayer>()
-  if (frames.length === 0) return out
+  if (!frames.length) return out
 
   let lo = 0, hi = frames.length - 1
   if (t <= frames[0].t) { lo = 0; hi = 0 }
-  else if (t >= frames[hi].t) { lo = hi; hi = hi }
+  else if (t >= frames[hi].t) { lo = hi }
   else {
     while (lo < hi - 1) {
       const mid = (lo + hi) >> 1
       if (frames[mid].t <= t) lo = mid; else hi = mid
     }
   }
-
   const fA = frames[lo]
   const fB = frames[Math.min(hi, frames.length - 1)]
   const alpha = (fA === fB || fB.t === fA.t) ? 0 : Math.min(1, (t - fA.t) / (fB.t - fA.t))
-
   const bMap = new Map(fB.p.map(s => [s.n, s]))
-  const trailStart  = Math.max(0, t - TRAIL_SECS)
-  const trailFrames = frames.filter(f => f.t >= trailStart && f.t <= t)
+  const trailFrames = frames.filter(f => f.t >= Math.max(0, t - TRAIL_SECS) && f.t <= t)
 
   fA.p.forEach(sA => {
     const sB = bMap.get(sA.n)
     const wx = sA.x + (sB ? (sB.x - sA.x) * alpha : 0)
     const wy = sA.y + (sB ? (sB.y - sA.y) * alpha : 0)
     const [cx, cy] = toXY(wx, wy)
-
-    const diedAt    = deadAt.get(sA.n) ?? Infinity
-    const frameAlive = sB ? sB.a : sA.a
-    const alive     = diedAt > t && frameAlive
-
-    const trail: Array<{ x: number; y: number }> = []
+    const alive = (deadAt.get(sA.n) ?? Infinity) > t && (sB ? sB.a : sA.a)
+    const trail: { x: number; y: number }[] = []
     if (alive) {
       trailFrames.forEach(tf => {
         const ts = tf.p.find(s => s.n === sA.n)
         if (ts) { const [tx, ty] = toXY(ts.x, ts.y); trail.push({ x: tx, y: ty }) }
       })
     }
-
-    out.set(sA.n, { x: cx, y: cy, alive, team: teamOf.get(sA.n) ?? '', trail })
+    const yaw = sA.w !== undefined
+      ? sA.w + (sB?.w !== undefined ? (sB.w - sA.w) * alpha : 0)
+      : undefined
+    const health = sA.h !== undefined
+      ? sA.h + ((sB?.h ?? sA.h) - sA.h) * alpha
+      : undefined
+    out.set(sA.n, { x: cx, y: cy, alive, team: teamOf.get(sA.n) ?? '', trail, yaw, health })
   })
-
   return out
 }
 
@@ -128,37 +142,73 @@ function getKillPositions(
   return out
 }
 
+function getRoundType(r: Round, idx: number): 'pistol' | 'eco' | 'force' | 'full' {
+  if (idx === 0 || idx === 12) return 'pistol'
+  const minEco = Math.min(r.team1_economy || 0, r.team2_economy || 0)
+  if (minEco < 1200) return 'eco'
+  if (minEco < 3600) return 'force'
+  return 'full'
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ReplayCanvas({ rounds, players, team1Name, team2Name, mapName, onPlaybackChange }: Props) {
-  const canvasRef   = useRef<HTMLCanvasElement>(null)
-  const rafRef      = useRef<number>(0)
-  const lastTsRef   = useRef<number>(0)
-  const roundBarRef = useRef<HTMLDivElement>(null)
+  const canvasRef    = useRef<HTMLCanvasElement>(null)
+  const rafRef       = useRef<number>(0)
+  const lastTsRef    = useRef<number>(0)
+  const roundBarRef  = useRef<HTMLDivElement>(null)
+  const playerPosRef = useRef<Map<string, CanvasPlayer>>(new Map())
+  const heatmapRef   = useRef<HTMLCanvasElement | null>(null)
+  // in-progress drawing: stored in a ref to avoid re-renders during mouse drag
+  const inProgressRef = useRef<{
+    type: Exclude<AnnotationTool, 'select'>
+    start: { x: number; y: number }
+    current: { x: number; y: number }
+    path: { x: number; y: number }[]
+  } | null>(null)
+
   const { recordState, toggle: toggleRecord } = useVideoCapture(canvasRef)
 
-  const [roundIdx,     setRoundIdx]     = useState(0)
-  const [isPlaying,    setIsPlaying]    = useState(false)
-  const [time,         setTime]         = useState(0)
-  const [speed,        setSpeed]        = useState<1 | 2 | 4>(1)
-  const [bgImage,      setBgImage]      = useState<HTMLImageElement | null>(null)
-  const [showSmokes,   setShowSmokes]   = useState(true)
-  const [showFlashes,  setShowFlashes]  = useState(true)
-  const [showMolotovs, setShowMolotovs] = useState(true)
-  const [showHE,       setShowHE]       = useState(true)
-  const [showNames,    setShowNames]    = useState(true)
+  // ── Playback state ────────────────────────────────────────────────────────
+  const [roundIdx,  setRoundIdx]  = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [time,      setTime]      = useState(0)
+  const [speed,     setSpeed]     = useState<SpeedValue>(1)
+  const [bgImage,   setBgImage]   = useState<HTMLImageElement | null>(null)
 
+  // ── Layer toggles ─────────────────────────────────────────────────────────
+  const [showSmokes,     setShowSmokes]     = useState(true)
+  const [showFlashes,    setShowFlashes]    = useState(true)
+  const [showMolotovs,   setShowMolotovs]   = useState(true)
+  const [showHE,         setShowHE]         = useState(true)
+  const [showTrails,     setShowTrails]     = useState(true)
+  const [showNames,      setShowNames]      = useState(true)
+  const [showDeaths,     setShowDeaths]     = useState(true)
+  const [showDirections, setShowDirections] = useState(true)
+  const [showHeatmap,    setShowHeatmap]    = useState(false)
+
+  // ── Tools / annotations ───────────────────────────────────────────────────
+  const [activeTool,  setActiveTool]  = useState<AnnotationTool>('select')
+  const [annotColor,  setAnnotColor]  = useState('#ff4466')
+  const [annotations, setAnnotations] = useState<Record<number, Annotation[]>>({})
+  const [focusPlayer, setFocusPlayer] = useState<string | null>(null)
+  const [roundFilter, setRoundFilter] = useState<RoundFilter>('all')
+
+  // ── Hover tooltip ─────────────────────────────────────────────────────────
+  const [hoveredPlayer, setHoveredPlayer] = useState<string | null>(null)
+  const [mousePos,      setMousePos]      = useState({ x: 0, y: 0 })
+
+  // ── Data loading ──────────────────────────────────────────────────────────
   useEffect(() => {
     setBgImage(null)
     loadMapImage(mapName).then(img => setBgImage(img))
   }, [mapName])
 
-  // Scroll active round pill into view when roundIdx changes
   useLayoutEffect(() => {
     const bar = roundBarRef.current
     if (!bar) return
-    const active = bar.querySelector('[data-active="true"]') as HTMLElement | null
-    active?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
+    const el = bar.querySelector('[data-active="true"]') as HTMLElement | null
+    el?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
   }, [roundIdx])
 
   const teamOf = useMemo(() => {
@@ -168,17 +218,17 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   }, [players])
 
   const mapCfg = MAP_CONFIGS[mapName] ?? null
-
   const toXY = useCallback((wx: number, wy: number): [number, number] => {
     if (mapCfg) return worldToCanvas(wx, wy, mapCfg, CANVAS_SIZE)
     const s = CANVAS_SIZE
     return [((wx + 3500) / 7000) * s, ((3500 - wy) / 7000) * s]
   }, [mapCfg])
 
-  const currentRound   = rounds[roundIdx]
-  const kills          = useMemo(() => [...(currentRound?.kills ?? [])].sort((a, b) => a.time - b.time), [currentRound])
-  const frames         = useMemo(() => currentRound?.frames ?? [], [currentRound])
-  const grenades       = useMemo(() => currentRound?.grenades ?? [], [currentRound])
+  const currentRound = rounds[roundIdx]
+  const kills    = useMemo(() => [...(currentRound?.kills    ?? [])].sort((a, b) => a.time - b.time), [currentRound])
+  const frames   = useMemo(() => currentRound?.frames   ?? [], [currentRound])
+  const grenades = useMemo(() => currentRound?.grenades ?? [], [currentRound])
+  const hasFrames = frames.length > 0
 
   const visibleGrenades = useMemo(() => grenades.filter(g => {
     if (g.type === 'smoke'   && !showSmokes)   return false
@@ -190,7 +240,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
 
   const maxTime = useMemo(() => {
     if (frames.length > 0) return frames[frames.length - 1].t + 1
-    if (kills.length > 0)  return kills[kills.length - 1].time + 2
+    if (kills.length  > 0) return kills[kills.length - 1].time + 2
     return currentRound?.duration ?? 90
   }, [frames, kills, currentRound])
 
@@ -199,6 +249,61 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     kills.forEach(k => { if (!m.has(k.victim_name)) m.set(k.victim_name, k.time) })
     return m
   }, [kills])
+
+  const roundScore = useMemo(() => {
+    let t1 = 0, t2 = 0
+    rounds.slice(0, roundIdx).forEach(r => { if (r.winner === team1Name) t1++; else t2++ })
+    return { t1, t2 }
+  }, [rounds, roundIdx, team1Name])
+
+  const aliveStatus = useMemo(() => {
+    const m = new Map<string, boolean>()
+    players.forEach(p => m.set(p.name, true))
+    kills.filter(k => k.time <= time).forEach(k => m.set(k.victim_name, false))
+    return m
+  }, [players, kills, time])
+
+  const team1Players = useMemo(() => players.filter(p => p.team === team1Name), [players, team1Name])
+  const team2Players = useMemo(() => players.filter(p => p.team === team2Name), [players, team2Name])
+  const pastKills    = kills.filter(k => k.time <= time)
+
+  const grenadeCount = useMemo(() => ({
+    smoke:   grenades.filter(g => g.type === 'smoke').length,
+    flash:   grenades.filter(g => g.type === 'flash').length,
+    molotov: grenades.filter(g => g.type === 'molotov').length,
+    he:      grenades.filter(g => g.type === 'he').length,
+  }), [grenades])
+
+  // ── Heatmap precomputation ────────────────────────────────────────────────
+  useEffect(() => {
+    heatmapRef.current = null
+    if (!showHeatmap || !frames.length) return
+    const off = document.createElement('canvas')
+    off.width = CANVAS_SIZE; off.height = CANVAS_SIZE
+    const ctx = off.getContext('2d')!
+    const step = Math.max(1, Math.floor(frames.length / 300))
+    for (let i = 0; i < frames.length; i += step) {
+      frames[i].p.forEach(snap => {
+        if (!snap.a) return
+        const [cx, cy] = toXY(snap.x, snap.y)
+        const col = teamOf.get(snap.n) === team1Name ? T1_COLOR : T2_COLOR
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 14)
+        g.addColorStop(0, col + '22'); g.addColorStop(1, 'transparent')
+        ctx.fillStyle = g
+        ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.fill()
+      })
+    }
+    heatmapRef.current = off
+  }, [showHeatmap, frames, teamOf, team1Name, toXY])
+
+  // ── Canvas coordinate helper ──────────────────────────────────────────────
+  const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect()
+    return {
+      x: (e.clientX - rect.left) * (CANVAS_SIZE / rect.width),
+      y: (e.clientY - rect.top)  * (CANVAS_SIZE / rect.height),
+    }
+  }, [])
 
   // ── Draw ──────────────────────────────────────────────────────────────────
   const draw = useCallback((t: number) => {
@@ -212,146 +317,187 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     ctx.fillRect(0, 0, W, H)
 
     if (bgImage) {
-      // Brighter map: 0.78 alpha vs old 0.55
-      ctx.globalAlpha = 0.78
+      ctx.globalAlpha = 0.82
       ctx.drawImage(bgImage, 0, 0, W, H)
-      // Lighter dark overlay: 0.20 vs old 0.48
-      ctx.globalAlpha = 0.20
+      ctx.globalAlpha = 0.16
       ctx.fillStyle = '#07080e'
       ctx.fillRect(0, 0, W, H)
       ctx.globalAlpha = 1
     } else {
       ctx.strokeStyle = 'rgba(255,255,255,0.04)'
       ctx.lineWidth = 1
-      for (let x = 0; x <= W; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke() }
-      for (let y = 0; y <= H; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
+      for (let x = 0; x <= W; x += 64) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke() }
+      for (let y = 0; y <= H; y += 64) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke() }
     }
 
-    // ── Grenade effects ──────────────────────────────────────────────────────
+    // Heatmap layer
+    if (showHeatmap && heatmapRef.current) {
+      ctx.globalAlpha = 0.72
+      ctx.drawImage(heatmapRef.current, 0, 0)
+      ctx.globalAlpha = 1
+    }
+
+    // Compute player positions
+    const posMap = frames.length > 0
+      ? getFramePositions(frames, t, teamOf, deadAt, toXY)
+      : getKillPositions(kills, t, teamOf, toXY)
+    playerPosRef.current = posMap
+
+    // ── Focus player transform ────────────────────────────────────────────
+    const focusPos = focusPlayer ? posMap.get(focusPlayer) : null
+    if (focusPos?.alive) {
+      ctx.save()
+      ctx.translate(W / 2 - focusPos.x * FOCUS_ZOOM, H / 2 - focusPos.y * FOCUS_ZOOM)
+      ctx.scale(FOCUS_ZOOM, FOCUS_ZOOM)
+    }
+
+    // ── Grenades ──────────────────────────────────────────────────────────
     visibleGrenades.forEach(g => {
       if (g.time > t) return
       const [tx2, ty2] = toXY(g.throw_x, g.throw_y)
-      const [lx, ly]   = toXY(g.land_x,  g.land_y)
-      const col        = GREN_COLORS[g.type] ?? '#ffffff'
+      const [lx, ly]   = toXY(g.land_x, g.land_y)
+      const col        = GREN_COLORS[g.type] ?? '#fff'
       const inFlight   = t < g.land_time
 
       if (inFlight) {
-        const progress = Math.min(1, (t - g.time) / Math.max(0.01, g.land_time - g.time))
-        const px = tx2 + (lx - tx2) * progress
-        const py = ty2 + (ly - ty2) * progress
-        ctx.setLineDash([3, 5]); ctx.strokeStyle = col + '66'; ctx.lineWidth = 1.2
+        const prog = Math.min(1, (t - g.time) / Math.max(0.01, g.land_time - g.time))
+        const px = tx2 + (lx - tx2) * prog, py = ty2 + (ly - ty2) * prog
+        ctx.setLineDash([3, 5]); ctx.strokeStyle = col + '66'; ctx.lineWidth = 1.1
         ctx.beginPath(); ctx.moveTo(tx2, ty2); ctx.lineTo(px, py); ctx.stroke()
         ctx.setLineDash([])
-        ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill()
-        ctx.beginPath(); ctx.arc(tx2, ty2, 2.5, 0, Math.PI * 2); ctx.fillStyle = col + '80'; ctx.fill()
+        ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2)
+        ctx.fillStyle = col; ctx.fill()
       } else {
         const age = t - g.land_time
         if (g.type === 'smoke' && age < SMOKE_DUR) {
           const a = Math.min(1, age * 1.5) * Math.max(0, 1 - Math.max(0, age - (SMOKE_DUR - 3)) / 3)
-          ctx.globalAlpha = a * 0.52; ctx.fillStyle = '#b8b8cc'
-          ctx.beginPath(); ctx.arc(lx, ly, 32, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = a * 0.75; ctx.strokeStyle = '#8888a0'; ctx.lineWidth = 1.5
-          ctx.beginPath(); ctx.arc(lx, ly, 32, 0, Math.PI * 2); ctx.stroke()
+          ctx.globalAlpha = a * 0.50; ctx.fillStyle = '#b0b0cc'
+          ctx.beginPath(); ctx.arc(lx, ly, 30, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = a * 0.80; ctx.strokeStyle = '#888898'; ctx.lineWidth = 1.5
+          ctx.beginPath(); ctx.arc(lx, ly, 30, 0, Math.PI * 2); ctx.stroke()
           ctx.globalAlpha = a * 0.70; ctx.fillStyle = 'rgba(255,255,255,0.60)'; ctx.font = 'bold 7px monospace'
-          ctx.fillText('SMOKE', lx - 12, ly + 3); ctx.globalAlpha = 1
+          ctx.fillText('SMK', lx - 9, ly + 3); ctx.globalAlpha = 1
         } else if (g.type === 'flash' && age < FLASH_DUR) {
           const a = 1 - age / FLASH_DUR
-          ctx.globalAlpha = a * 0.88
-          const fg = ctx.createRadialGradient(lx, ly, 0, lx, ly, 24)
-          fg.addColorStop(0, '#ffffff'); fg.addColorStop(1, 'transparent')
-          ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(lx, ly, 24, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = a * 0.90
+          const fg = ctx.createRadialGradient(lx, ly, 0, lx, ly, 22)
+          fg.addColorStop(0, '#ffffcc'); fg.addColorStop(1, 'transparent')
+          ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(lx, ly, 22, 0, Math.PI * 2); ctx.fill()
           ctx.globalAlpha = 1
         } else if (g.type === 'he' && age < HE_DUR) {
-          const a = Math.pow(Math.max(0, 1 - age / HE_DUR), 0.6)
+          const a = Math.pow(Math.max(0, 1 - age / HE_DUR), 0.55)
           const r = 8 + age * 22
-          ctx.globalAlpha = a * 0.85; ctx.strokeStyle = '#ff9900'; ctx.lineWidth = 2.5
+          ctx.globalAlpha = a * 0.85; ctx.strokeStyle = '#ff8800'; ctx.lineWidth = 2.5
           ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.stroke()
           const ig = ctx.createRadialGradient(lx, ly, 0, lx, ly, r)
-          ig.addColorStop(0, '#ff990055'); ig.addColorStop(1, 'transparent')
+          ig.addColorStop(0, '#ff880044'); ig.addColorStop(1, 'transparent')
           ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.fill()
           ctx.globalAlpha = 1
         } else if (g.type === 'molotov' && age < MOLOTOV_DUR) {
           const a = Math.min(1, age * 2) * Math.max(0, 1 - Math.max(0, age - (MOLOTOV_DUR - 2)) / 2)
-          ctx.globalAlpha = a * 0.62; ctx.fillStyle = '#ff4400'
-          ctx.beginPath(); ctx.arc(lx, ly, 24, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = a * (Math.sin(t * 9) * 0.4 + 0.6) * 0.82; ctx.fillStyle = '#ffaa00'
-          ctx.beginPath(); ctx.arc(lx, ly, 13, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = a * 0.60; ctx.fillStyle = '#ff3300'
+          ctx.beginPath(); ctx.arc(lx, ly, 22, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = a * (Math.sin(t * 8) * 0.35 + 0.65) * 0.75; ctx.fillStyle = '#ff9900'
+          ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2); ctx.fill()
           ctx.globalAlpha = 1
         }
       }
     })
 
-    // ── Player positions ──────────────────────────────────────────────────────
-    const posMap = frames.length > 0
-      ? getFramePositions(frames, t, teamOf, deadAt, toXY)
-      : getKillPositions(kills, t, teamOf, toXY)
-
+    // ── Kill flash line ───────────────────────────────────────────────────
     const active = kills.find(k => k.time <= t && k.time > t - KILL_FLASH)
-
-    // Kill line
     if (active) {
       const [kx, ky] = toXY(active.killer_x, active.killer_y)
       const [vx, vy] = toXY(active.victim_x, active.victim_y)
       const fade = Math.max(0, 1 - (t - active.time) / KILL_FLASH)
-      ctx.globalAlpha = fade * 0.70; ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 1.5
+      ctx.globalAlpha = fade * 0.65; ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 1.5
       ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(vx, vy); ctx.stroke()
       ctx.setLineDash([]); ctx.globalAlpha = 1
     }
 
-    // Dead players — larger, more visible X markers
-    posMap.forEach(p => {
-      if (p.alive) return
-      const col = p.team === team1Name ? T1_COLOR : T2_COLOR
-      ctx.globalAlpha = 0.55; ctx.strokeStyle = col; ctx.lineWidth = 2.2
-      ctx.beginPath()
-      ctx.moveTo(p.x - 6, p.y - 6); ctx.lineTo(p.x + 6, p.y + 6)
-      ctx.moveTo(p.x + 6, p.y - 6); ctx.lineTo(p.x - 6, p.y + 6)
-      ctx.stroke(); ctx.globalAlpha = 1
-    })
+    // ── Dead players ──────────────────────────────────────────────────────
+    if (showDeaths) {
+      posMap.forEach(p => {
+        if (p.alive) return
+        const col = p.team === team1Name ? T1_COLOR : T2_COLOR
+        ctx.globalAlpha = 0.55; ctx.strokeStyle = col; ctx.lineWidth = 2.2
+        ctx.beginPath()
+        ctx.moveTo(p.x - 6, p.y - 6); ctx.lineTo(p.x + 6, p.y + 6)
+        ctx.moveTo(p.x + 6, p.y - 6); ctx.lineTo(p.x - 6, p.y + 6)
+        ctx.stroke(); ctx.globalAlpha = 1
+      })
+    }
 
-    // Alive players — trail + ring + dot + name
+    // ── Alive players ─────────────────────────────────────────────────────
     posMap.forEach((p, name) => {
       if (!p.alive) return
-      const col = p.team === team1Name ? T1_COLOR : T2_COLOR
+      const col      = p.team === team1Name ? T1_COLOR : T2_COLOR
+      const isFocused = focusPlayer === name
 
       // Trail
-      if (p.trail.length > 1) {
+      if (showTrails && p.trail.length > 1) {
         ctx.beginPath()
         ctx.moveTo(p.trail[0].x, p.trail[0].y)
         for (let i = 1; i < p.trail.length; i++) ctx.lineTo(p.trail[i].x, p.trail[i].y)
         ctx.lineTo(p.x, p.y)
-        ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.26; ctx.stroke()
+        ctx.strokeStyle = col; ctx.lineWidth = isFocused ? 2 : 1.5
+        ctx.globalAlpha = isFocused ? 0.40 : 0.22; ctx.stroke()
         ctx.globalAlpha = 1
         p.trail.forEach((pt, i) => {
-          ctx.beginPath(); ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2)
-          ctx.fillStyle = col; ctx.globalAlpha = ((i + 1) / p.trail.length) * 0.30; ctx.fill()
+          ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.8, 0, Math.PI * 2)
+          ctx.fillStyle = col; ctx.globalAlpha = ((i + 1) / p.trail.length) * 0.28; ctx.fill()
         })
         ctx.globalAlpha = 1
       }
 
       // Glow
-      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 15)
-      glow.addColorStop(0, col + '44'); glow.addColorStop(1, 'transparent')
-      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, 15, 0, Math.PI * 2); ctx.fill()
+      const glowR = isFocused ? 20 : 14
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR)
+      glow.addColorStop(0, col + '4a'); glow.addColorStop(1, 'transparent')
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2); ctx.fill()
+
+      // Direction arrow (uses yaw from frame data)
+      if (showDirections && p.yaw !== undefined) {
+        const rad = -(p.yaw * Math.PI / 180) // negate: canvas Y is flipped vs world Y
+        const len = 11
+        const dx = Math.cos(rad) * len, dy = Math.sin(rad) * len
+        const ax = p.x + dx, ay = p.y + dy
+        const hl = 5, ha = 0.48
+        const ang = Math.atan2(dy, dx)
+        ctx.strokeStyle = col + 'bb'; ctx.lineWidth = 1.4; ctx.globalAlpha = 0.80
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(ax, ay); ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(ax, ay)
+        ctx.lineTo(ax - hl * Math.cos(ang - ha), ay - hl * Math.sin(ang - ha))
+        ctx.lineTo(ax - hl * Math.cos(ang + ha), ay - hl * Math.sin(ang + ha))
+        ctx.closePath(); ctx.fillStyle = col + 'bb'; ctx.fill()
+        ctx.globalAlpha = 1
+      }
+
+      // Focused: extra outer ring
+      if (isFocused) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 9.5, 0, Math.PI * 2)
+        ctx.strokeStyle = col + '55'; ctx.lineWidth = 1.5; ctx.stroke()
+      }
 
       // Outer ring
       ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2)
-      ctx.strokeStyle = col + 'cc'; ctx.lineWidth = 1.5; ctx.stroke()
+      ctx.strokeStyle = col + 'cc'; ctx.lineWidth = isFocused ? 2 : 1.5; ctx.stroke()
 
-      // Dot
+      // Fill dot
       ctx.beginPath(); ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2)
       ctx.fillStyle = col; ctx.globalAlpha = 0.95; ctx.fill(); ctx.globalAlpha = 1
 
       // Inner highlight
       ctx.beginPath(); ctx.arc(p.x - 1.5, p.y - 1.5, 1.8, 0, Math.PI * 2)
-      ctx.fillStyle = 'rgba(255,255,255,0.60)'; ctx.fill()
+      ctx.fillStyle = 'rgba(255,255,255,0.58)'; ctx.fill()
 
-      // Death burst on victim
+      // Kill burst on victim
       if (active && name === active.victim_name) {
         const fade = Math.max(0, 1 - (t - active.time) / KILL_FLASH)
-        const r = 24 * fade
+        const r = 26 * fade
         const fg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r)
-        fg.addColorStop(0, '#ff446688'); fg.addColorStop(1, 'transparent')
+        fg.addColorStop(0, '#ff446680'); fg.addColorStop(1, 'transparent')
         ctx.globalAlpha = fade; ctx.fillStyle = fg
         ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill()
         ctx.globalAlpha = 1
@@ -360,23 +506,65 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       // Name label with dark backdrop
       if (showNames) {
         const label = name.length > 11 ? name.slice(0, 10) + '…' : name
-        ctx.font = '8px monospace'
+        ctx.font = isFocused ? 'bold 9px monospace' : '8px monospace'
         const tw = ctx.measureText(label).width
         const lx = p.x + 9, ly = p.y + 4
-        ctx.fillStyle = 'rgba(0,0,0,0.60)'
-        ctx.fillRect(lx - 2, ly - 8, tw + 4, 11)
-        ctx.fillStyle = col + 'ee'
-        ctx.fillText(label, lx, ly)
+        ctx.fillStyle = 'rgba(0,0,0,0.68)'; ctx.fillRect(lx - 2, ly - 9, tw + 4, 12)
+        ctx.fillStyle = col + 'ee'; ctx.fillText(label, lx, ly)
       }
     })
 
+    if (focusPos?.alive) ctx.restore()
+
+    // ── Annotations ───────────────────────────────────────────────────────
+    const savedAnnotations  = annotations[roundIdx] ?? []
+    const inProg            = inProgressRef.current
+    const allAnns: (Annotation | typeof inProg)[] = inProg
+      ? [...savedAnnotations, inProg as unknown as Annotation]
+      : savedAnnotations
+
+    allAnns.forEach(ann => {
+      if (!ann || !ann.points?.length) return
+      ctx.strokeStyle = ann.color; ctx.fillStyle = ann.color
+      ctx.lineWidth = 2.5; ctx.globalAlpha = 0.85; ctx.setLineDash([])
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+
+      if (ann.type === 'pen' && ann.points.length > 1) {
+        ctx.beginPath(); ctx.moveTo(ann.points[0].x, ann.points[0].y)
+        for (let i = 1; i < ann.points.length; i++) ctx.lineTo(ann.points[i].x, ann.points[i].y)
+        ctx.stroke()
+      } else if (ann.type === 'line' && ann.points.length >= 2) {
+        const p1 = ann.points[ann.points.length - 1]
+        ctx.beginPath(); ctx.moveTo(ann.points[0].x, ann.points[0].y)
+        ctx.lineTo(p1.x, p1.y); ctx.stroke()
+      } else if (ann.type === 'circle' && ann.points.length >= 2) {
+        const p0 = ann.points[0], p1 = ann.points[ann.points.length - 1]
+        const r = Math.hypot(p1.x - p0.x, p1.y - p0.y)
+        ctx.beginPath(); ctx.arc(p0.x, p0.y, Math.max(1, r), 0, Math.PI * 2); ctx.stroke()
+      } else if (ann.type === 'arrow' && ann.points.length >= 2) {
+        const p0 = ann.points[0], p1 = ann.points[ann.points.length - 1]
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke()
+        const ang = Math.atan2(p1.y - p0.y, p1.x - p0.x)
+        const hl = 14
+        ctx.beginPath()
+        ctx.moveTo(p1.x, p1.y)
+        ctx.lineTo(p1.x - hl * Math.cos(ang - 0.4), p1.y - hl * Math.sin(ang - 0.4))
+        ctx.lineTo(p1.x - hl * Math.cos(ang + 0.4), p1.y - hl * Math.sin(ang + 0.4))
+        ctx.closePath(); ctx.fill()
+      }
+      ctx.globalAlpha = 1; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'
+    })
+
     // Canvas border
-    ctx.strokeStyle = 'rgba(0,255,135,0.10)'; ctx.lineWidth = 1.5
+    ctx.strokeStyle = 'rgba(34,211,238,0.09)'; ctx.lineWidth = 1.5
     ctx.strokeRect(0.75, 0.75, W - 1.5, H - 1.5)
+  }, [
+    annotations, bgImage, deadAt, focusPlayer, frames, kills, roundIdx,
+    showDeaths, showDirections, showHeatmap, showNames, showTrails,
+    team1Name, teamOf, toXY, visibleGrenades,
+  ])
 
-  }, [bgImage, deadAt, frames, kills, showNames, teamOf, toXY, visibleGrenades])
-
-  // ── Animation loop ─────────────────────────────────────────────────────────
+  // ── Animation loop ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!isPlaying) return
     lastTsRef.current = 0
@@ -396,343 +584,507 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   }, [isPlaying, speed, maxTime])
 
   useEffect(() => { draw(time) }, [time, draw])
-  useEffect(() => { setTime(0); setIsPlaying(false) }, [roundIdx]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setTime(0); setIsPlaying(false); setFocusPlayer(null) }, [roundIdx]) // eslint-disable-line
   useEffect(() => { onPlaybackChange?.(time, isPlaying) }, [time, isPlaying, onPlaybackChange])
 
   const toggle  = useCallback(() => { if (time >= maxTime) setTime(0); setIsPlaying(p => !p) }, [time, maxTime])
   const restart = () => { setTime(0); setIsPlaying(false) }
 
-  // Keyboard shortcuts: Space = play/pause, ←→ = ±2s
+  // Keyboard shortcuts
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const h = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (e.code === 'Space') { e.preventDefault(); toggle() }
+      if (e.code === 'Space')      { e.preventDefault(); toggle() }
       if (e.code === 'ArrowLeft')  { e.preventDefault(); setIsPlaying(false); setTime(t => Math.max(0, t - 2)) }
       if (e.code === 'ArrowRight') { e.preventDefault(); setIsPlaying(false); setTime(t => Math.min(maxTime, t + 2)) }
+      if (e.code === 'ArrowUp')    { e.preventDefault(); setRoundIdx(i => Math.min(rounds.length - 1, i + 1)) }
+      if (e.code === 'ArrowDown')  { e.preventDefault(); setRoundIdx(i => Math.max(0, i - 1)) }
+      if (e.key  === 'Escape')     { setFocusPlayer(null); setActiveTool('select') }
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [toggle, maxTime])
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [toggle, maxTime, rounds.length])
 
-  const pastKills = kills.filter(k => k.time <= time)
-  const hasFrames = frames.length > 0
+  // ── Canvas mouse handlers ────────────────────────────────────────────────
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const pt = getCanvasPoint(e)
+    if (activeTool === 'select') {
+      let nearest: string | null = null, minDist = 12
+      playerPosRef.current.forEach((p, name) => {
+        if (!p.alive) return
+        const d = Math.hypot(p.x - pt.x, p.y - pt.y)
+        if (d < minDist) { minDist = d; nearest = name }
+      })
+      setFocusPlayer(nearest)
+    } else {
+      inProgressRef.current = { type: activeTool, start: pt, current: pt, path: [pt] }
+    }
+  }, [activeTool, getCanvasPoint])
 
-  // Player alive status at current time
-  const aliveStatus = useMemo(() => {
-    const s = new Map<string, boolean>()
-    players.forEach(p => s.set(p.name, true))
-    kills.filter(k => k.time <= time).forEach(k => s.set(k.victim_name, false))
-    return s
-  }, [players, kills, time])
+  const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const pt = getCanvasPoint(e)
+    setMousePos({ x: e.clientX, y: e.clientY })
 
-  const team1Players = useMemo(() => players.filter(p => p.team === team1Name), [players, team1Name])
-  const team2Players = useMemo(() => players.filter(p => p.team === team2Name), [players, team2Name])
+    if (inProgressRef.current) {
+      inProgressRef.current.current = pt
+      if (inProgressRef.current.type === 'pen') inProgressRef.current.path.push(pt)
+      draw(time)
+      return
+    }
+    if (activeTool === 'select') {
+      let nearest: string | null = null, minDist = 12
+      playerPosRef.current.forEach((p, name) => {
+        if (!p.alive) return
+        const d = Math.hypot(p.x - pt.x, p.y - pt.y)
+        if (d < minDist) { minDist = d; nearest = name }
+      })
+      setHoveredPlayer(nearest)
+    }
+  }, [activeTool, draw, getCanvasPoint, time])
 
-  // Cumulative score up to (but not including) current round
-  const roundScore = useMemo(() => {
-    let t1 = 0, t2 = 0
-    rounds.slice(0, roundIdx).forEach(r => { if (r.winner === team1Name) t1++; else t2++ })
-    return { t1, t2 }
-  }, [rounds, roundIdx, team1Name])
+  const handleCanvasMouseUp = useCallback(() => {
+    if (!inProgressRef.current) return
+    const ip = inProgressRef.current
+    const points = ip.type === 'pen' ? ip.path : [ip.start, ip.current]
+    if (points.length >= 2 && Math.hypot(ip.current.x - ip.start.x, ip.current.y - ip.start.y) > 3) {
+      const ann: Annotation = { id: crypto.randomUUID(), type: ip.type, points, color: annotColor }
+      setAnnotations(prev => ({ ...prev, [roundIdx]: [...(prev[roundIdx] ?? []), ann] }))
+    }
+    inProgressRef.current = null
+    draw(time)
+  }, [annotColor, draw, roundIdx, time])
 
+  const handleCanvasMouseLeave = useCallback(() => {
+    if (inProgressRef.current) handleCanvasMouseUp()
+    setHoveredPlayer(null)
+  }, [handleCanvasMouseUp])
+
+  // ── Guards ────────────────────────────────────────────────────────────────
   if (!rounds.length) return <p className="text-muted-foreground text-sm">No replay data available.</p>
 
-  const utilBtn = (
-    label: string,
-    active: boolean,
-    onToggle: () => void,
-    color: string,
-    icon: React.ReactNode,
-  ) => (
+  const annotCount = annotations[roundIdx]?.length ?? 0
+  const hoverStats = hoveredPlayer ? players.find(p => p.name === hoveredPlayer) : null
+  const hoverRoundKills = hoveredPlayer ? kills.filter(k => k.killer_name === hoveredPlayer && k.time <= time).length : 0
+
+  // ── Layer toggle button helper ────────────────────────────────────────────
+  const LayerBtn = ({
+    label, active, onToggle, color, icon, count,
+  }: { label: string; active: boolean; onToggle: () => void; color?: string; icon: ReactNode; count?: number }) => (
     <button
       onClick={onToggle}
       className={cn(
-        'flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-all duration-150',
-        active
-          ? 'border-transparent'
-          : 'border-border/30 text-muted-foreground/60 hover:text-muted-foreground',
+        'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all',
+        active ? 'bg-white/[0.07] text-foreground' : 'text-muted-foreground/50 hover:bg-white/[0.03] hover:text-muted-foreground',
       )}
-      style={active ? {
-        background: color + '1a',
-        borderColor: color + '50',
-        color,
-        boxShadow: `0 0 8px ${color}20`,
-      } : undefined}
     >
-      <span className="flex-shrink-0" style={{ color: active ? color : 'currentColor' }}>{icon}</span>
-      {label}
+      <span className="flex-shrink-0" style={{ color: active && color ? color : 'currentColor' }}>{icon}</span>
+      <span className="flex-1 text-left">{label}</span>
+      {count !== undefined && count > 0 && (
+        <span className="text-[9px] px-1.5 rounded tabular-nums"
+          style={{ color: color ? color + '99' : undefined, background: color ? color + '15' : 'rgba(255,255,255,0.06)' }}>
+          {count}
+        </span>
+      )}
+      {active ? <Eye size={9} className="flex-shrink-0 opacity-40" /> : <EyeOff size={9} className="flex-shrink-0 opacity-20" />}
+    </button>
+  )
+
+  // ── Tool button helper ────────────────────────────────────────────────────
+  const ToolBtn = ({ tool, icon, tip }: { tool: AnnotationTool; icon: ReactNode; tip: string }) => (
+    <button
+      onClick={() => setActiveTool(tool)}
+      title={tip}
+      className={cn(
+        'flex items-center justify-center h-8 rounded-md border transition-all text-xs',
+        activeTool === tool
+          ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+          : 'border-border/25 text-muted-foreground/55 hover:border-border/50 hover:text-foreground',
+      )}
+    >
+      {icon}
     </button>
   )
 
   return (
-    <div className="flex flex-col gap-3 select-none">
+    <div className="flex flex-col rounded-xl border border-white/[0.08] overflow-hidden bg-[#07080e] select-none">
 
-      {/* ── Header: map name · round number · score ───────────────────────────── */}
-      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-        <div className="flex items-center gap-2 min-w-0 flex-wrap">
-          <span className="text-[10px] font-mono font-bold tracking-widest text-muted-foreground uppercase bg-white/[0.06] px-2 py-0.5 rounded">
-            {mapName.replace('de_', '').toUpperCase()}
+      {/* ──────────────────────────────────────────────────────────────────────
+          HEADER: map · round · filters · score
+      ────────────────────────────────────────────────────────────────────── */}
+      <header className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.015]">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-[11px] font-black font-mono tracking-[0.14em] uppercase bg-white/[0.07] text-muted-foreground px-2.5 py-1 rounded-md">
+            {mapName.replace('de_', '')}
           </span>
-          <span className="text-[11px] text-muted-foreground">Round</span>
-          <span className="text-sm font-bold font-mono">{currentRound?.number ?? roundIdx + 1}</span>
+          <span className="font-mono text-sm font-semibold">
+            R<span className="text-foreground">{currentRound?.number ?? roundIdx + 1}</span>
+            <span className="text-muted-foreground/35 text-xs">/{rounds.length}</span>
+          </span>
           {currentRound?.bomb_planted && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 font-mono font-bold">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 font-mono animate-pulse">
               BOMB
             </span>
           )}
           {!hasFrames && (
-            <span className="text-[10px] text-amber-400/60 border border-amber-400/20 px-1.5 py-0.5 rounded font-mono">
+            <span className="text-[10px] text-amber-400/55 border border-amber-400/20 px-1.5 py-0.5 rounded font-mono">
               kill-only
             </span>
           )}
         </div>
 
+        {/* Round type filter */}
+        <div className="flex items-center gap-0.5 bg-white/[0.04] rounded-lg p-0.5">
+          {(['all', 'pistol', 'eco', 'force', 'full'] as RoundFilter[]).map(f => (
+            <button
+              key={f}
+              onClick={() => setRoundFilter(f)}
+              className={cn(
+                'px-2 py-0.5 text-[10px] font-mono rounded-md transition-all',
+                roundFilter === f
+                  ? 'bg-white/12 text-foreground font-bold'
+                  : 'text-muted-foreground/45 hover:text-muted-foreground',
+              )}
+            >
+              {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1" />
 
         {/* Match score */}
-        <div className="flex items-center gap-1.5 font-mono font-bold text-sm tabular-nums">
-          <span className="truncate max-w-[90px] text-[11px]" style={{ color: T1_COLOR + 'cc' }}>
-            {team1Name}
-          </span>
-          <span style={{ color: T1_COLOR }} className="text-base leading-none">{roundScore.t1}</span>
-          <span className="text-muted-foreground/40 text-xs px-0.5">–</span>
-          <span style={{ color: T2_COLOR }} className="text-base leading-none">{roundScore.t2}</span>
-          <span className="truncate max-w-[90px] text-[11px]" style={{ color: T2_COLOR + 'cc' }}>
-            {team2Name}
-          </span>
+        <div className="flex items-center gap-2 font-mono font-bold tabular-nums">
+          <span className="text-[11px] truncate max-w-[80px]" style={{ color: T1_COLOR + 'bb' }}>{team1Name}</span>
+          <span className="text-xl" style={{ color: T1_COLOR }}>{roundScore.t1}</span>
+          <span className="text-muted-foreground/35 text-sm">–</span>
+          <span className="text-xl" style={{ color: T2_COLOR }}>{roundScore.t2}</span>
+          <span className="text-[11px] truncate max-w-[80px]" style={{ color: T2_COLOR + 'bb' }}>{team2Name}</span>
         </div>
-      </div>
+      </header>
 
-      {/* ── Round selector: ‹ scrollable pills › ──────────────────────────────── */}
-      <div className="flex items-center gap-1">
+      {/* ──────────────────────────────────────────────────────────────────────
+          ROUND NAVIGATION
+      ────────────────────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-white/[0.04]">
         <button
           onClick={() => setRoundIdx(i => Math.max(0, i - 1))}
           disabled={roundIdx === 0}
-          className="p-1 rounded border border-border/40 text-muted-foreground hover:text-foreground disabled:opacity-25 transition-colors flex-shrink-0"
+          className="p-1 rounded border border-border/35 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex-shrink-0"
         >
-          <ChevronLeft size={13} />
+          <ChevronLeft size={12} />
         </button>
 
         <div
           ref={roundBarRef}
-          className="flex gap-1 overflow-x-auto flex-1 min-w-0"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          className="flex gap-0.5 overflow-x-auto flex-1 min-w-0 py-0.5"
+          style={{ scrollbarWidth: 'none' }}
         >
-          {rounds.map((r, i) => (
-            <button
-              key={i}
-              data-active={roundIdx === i ? 'true' : 'false'}
-              onClick={() => setRoundIdx(i)}
-              title={`Round ${r.number} — ${r.winner} won`}
-              className={cn(
-                'relative flex-shrink-0 w-7 h-7 text-[10px] font-mono rounded transition-all duration-150 border',
-                roundIdx === i
-                  ? 'border-neon-green/50 bg-neon-green/12 text-neon-green font-bold'
-                  : 'border-border/30 text-muted-foreground/60 hover:border-border/60 hover:text-foreground',
-              )}
-            >
-              {r.number}
-              {/* Win indicator dot at bottom */}
-              <span
-                className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-[3px] h-[3px] rounded-full"
-                style={{ background: r.winner === team1Name ? T1_COLOR + 'aa' : T2_COLOR + 'aa' }}
-              />
-            </button>
-          ))}
+          {rounds.map((r, i) => {
+            const type   = getRoundType(r, i)
+            const hidden = roundFilter !== 'all' && type !== roundFilter
+            return (
+              <button
+                key={i}
+                data-active={roundIdx === i ? 'true' : 'false'}
+                onClick={() => setRoundIdx(i)}
+                title={`R${r.number} (${type}) — ${r.winner}`}
+                className={cn(
+                  'relative flex-shrink-0 w-7 h-7 text-[10px] font-mono rounded transition-all duration-100 border',
+                  hidden && 'opacity-18',
+                  roundIdx === i
+                    ? 'border-white/30 bg-white/10 text-foreground font-bold shadow-sm'
+                    : 'border-border/22 text-muted-foreground/50 hover:border-border/50 hover:text-foreground',
+                  type === 'pistol' && roundIdx !== i && 'border-yellow-500/22',
+                )}
+              >
+                {r.number}
+                <span
+                  className="absolute bottom-[2px] left-1/2 -translate-x-1/2 w-[3px] h-[3px] rounded-full"
+                  style={{
+                    background: type === 'pistol'
+                      ? '#fbbf24'
+                      : r.winner === team1Name ? T1_COLOR + 'aa' : T2_COLOR + 'aa'
+                  }}
+                />
+              </button>
+            )
+          })}
         </div>
 
         <button
           onClick={() => setRoundIdx(i => Math.min(rounds.length - 1, i + 1))}
           disabled={roundIdx === rounds.length - 1}
-          className="p-1 rounded border border-border/40 text-muted-foreground hover:text-foreground disabled:opacity-25 transition-colors flex-shrink-0"
+          className="p-1 rounded border border-border/35 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex-shrink-0"
         >
-          <ChevronRight size={13} />
+          <ChevronRight size={12} />
         </button>
       </div>
 
-      {/* ── Utility toggles ───────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-widest">Utility</span>
-        {utilBtn('Smokes',   showSmokes,   () => setShowSmokes(v => !v),   '#c0c0d0', <Wind  size={9} />)}
-        {utilBtn('Flashes',  showFlashes,  () => setShowFlashes(v => !v),  '#ffff88', <Zap   size={9} />)}
-        {utilBtn('Molotovs', showMolotovs, () => setShowMolotovs(v => !v), '#ff4400', <Flame size={9} />)}
-        {utilBtn('HE',       showHE,       () => setShowHE(v => !v),       '#ff9900', <Circle size={9} />)}
+      {/* ──────────────────────────────────────────────────────────────────────
+          MAIN AREA: left panel | canvas | right sidebar
+      ────────────────────────────────────────────────────────────────────── */}
+      <div className="flex min-h-0">
 
-        <div className="ml-auto">
-          <button
-            onClick={() => setShowNames(v => !v)}
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-all',
-              showNames
-                ? 'bg-white/10 border-white/20 text-foreground'
-                : 'border-border/30 text-muted-foreground/50',
+        {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
+        <aside className="w-[172px] flex-shrink-0 border-r border-white/[0.06] flex flex-col gap-0 py-3 overflow-y-auto bg-white/[0.01]"
+          style={{ scrollbarWidth: 'none' }}>
+
+          <div className="px-3 mb-1">
+            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40 mb-2">Layers</p>
+            <LayerBtn label="Smokes"     active={showSmokes}     onToggle={() => setShowSmokes(v=>!v)}     color={GREN_COLORS.smoke}   icon={<Wind  size={9}/>} count={grenadeCount.smoke}   />
+            <LayerBtn label="Flashes"    active={showFlashes}    onToggle={() => setShowFlashes(v=>!v)}    color={GREN_COLORS.flash}   icon={<Zap   size={9}/>} count={grenadeCount.flash}   />
+            <LayerBtn label="Molotovs"   active={showMolotovs}   onToggle={() => setShowMolotovs(v=>!v)}   color={GREN_COLORS.molotov} icon={<Flame size={9}/>} count={grenadeCount.molotov} />
+            <LayerBtn label="HE Nades"   active={showHE}         onToggle={() => setShowHE(v=>!v)}         color={GREN_COLORS.he}      icon={<Circle size={9}/>} count={grenadeCount.he}     />
+            <LayerBtn label="Trails"     active={showTrails}     onToggle={() => setShowTrails(v=>!v)}     icon={<Minus size={9}/>}     />
+            <LayerBtn label="Names"      active={showNames}      onToggle={() => setShowNames(v=>!v)}      icon={<Tag size={9}/>}       />
+            <LayerBtn label="Deaths"     active={showDeaths}     onToggle={() => setShowDeaths(v=>!v)}     icon={<Skull size={9}/>}     />
+            <LayerBtn label="Directions" active={showDirections} onToggle={() => setShowDirections(v=>!v)} icon={<ArrowRight size={9}/>} />
+            <button
+              onClick={() => setShowHeatmap(v => !v)}
+              className={cn(
+                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all',
+                showHeatmap
+                  ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20'
+                  : 'text-muted-foreground/50 hover:bg-white/[0.03] hover:text-muted-foreground',
+              )}
+            >
+              <Activity size={9} className="flex-shrink-0" />
+              <span className="flex-1 text-left">Heatmap</span>
+              {!hasFrames && <span className="text-[8px] text-amber-400/40">no data</span>}
+            </button>
+          </div>
+
+          <div className="mx-3 border-t border-white/[0.05] my-2" />
+
+          <div className="px-3">
+            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40 mb-2">Draw</p>
+            <div className="grid grid-cols-3 gap-1 mb-2.5">
+              <ToolBtn tool="select" icon={<MousePointer size={12}/>} tip="Select / Focus player" />
+              <ToolBtn tool="pen"    icon={<Pencil size={12}/>}       tip="Freehand pen" />
+              <ToolBtn tool="line"   icon={<Minus size={12}/>}        tip="Straight line" />
+              <ToolBtn tool="arrow"  icon={<ArrowRight size={12}/>}   tip="Arrow" />
+              <ToolBtn tool="circle" icon={<Circle size={12}/>}       tip="Circle" />
+              <button
+                onClick={() => setAnnotations(prev => ({ ...prev, [roundIdx]: [] }))}
+                disabled={annotCount === 0}
+                title="Clear annotations"
+                className="flex items-center justify-center h-8 rounded-md border border-red-500/20 text-red-400/50 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-15 transition-all"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+
+            {/* Color swatches */}
+            <div className="flex gap-1.5 flex-wrap">
+              {['#ff4466', '#22d3ee', '#fbbf24', '#a3e635', '#e879f9', '#ffffff'].map(c => (
+                <button
+                  key={c}
+                  onClick={() => setAnnotColor(c)}
+                  className={cn(
+                    'w-5 h-5 rounded-full border-2 transition-all',
+                    annotColor === c ? 'border-white scale-110' : 'border-transparent opacity-55 hover:opacity-90',
+                  )}
+                  style={{ background: c }}
+                />
+              ))}
+            </div>
+
+            {annotCount > 0 && (
+              <p className="text-[9px] text-muted-foreground/35 mt-1.5 font-mono">
+                {annotCount} annotation{annotCount !== 1 ? 's' : ''}
+              </p>
             )}
-          >
-            <Tag size={9} />
-            Names
-          </button>
+          </div>
+
+          {/* Focus player badge */}
+          {focusPlayer && (
+            <>
+              <div className="mx-3 border-t border-white/[0.05] my-2" />
+              <div className="px-3">
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40 mb-1.5">Focus</p>
+                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-cyan-500/10 border border-cyan-500/20">
+                  <Crosshair size={10} className="text-cyan-400 flex-shrink-0" />
+                  <span className="text-[11px] font-mono text-cyan-300 truncate flex-1">{focusPlayer}</span>
+                  <button onClick={() => setFocusPlayer(null)} className="text-muted-foreground/40 hover:text-foreground text-xs leading-none">✕</button>
+                </div>
+              </div>
+            </>
+          )}
+        </aside>
+
+        {/* ── CANVAS ──────────────────────────────────────────────────────── */}
+        <div className="flex-1 flex items-center justify-center bg-[#07080e] relative overflow-hidden p-1.5 min-w-0">
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_SIZE}
+            height={CANVAS_SIZE}
+            className={cn(
+              'rounded-lg border border-white/[0.07] bg-[#07080e]',
+              activeTool !== 'select' ? 'cursor-crosshair' : 'cursor-default',
+            )}
+            style={{ maxWidth: '100%', maxHeight: '100%', aspectRatio: '1/1' }}
+            onMouseDown={handleCanvasMouseDown}
+            onMouseMove={handleCanvasMouseMove}
+            onMouseUp={handleCanvasMouseUp}
+            onMouseLeave={handleCanvasMouseLeave}
+          />
+
+          {/* Hover tooltip */}
+          {hoveredPlayer && (
+            <div
+              className="fixed z-50 bg-[#0d0f1c] border border-white/[0.12] rounded-xl px-3 py-2.5 pointer-events-none shadow-2xl"
+              style={{ left: mousePos.x + 14, top: mousePos.y - 64 }}
+            >
+              <div className="font-bold text-[12px] mb-0.5"
+                style={{ color: hoverStats?.team === team1Name ? T1_COLOR : T2_COLOR }}>
+                {hoveredPlayer}
+              </div>
+              {hoverStats && (
+                <div className="text-muted-foreground/65 font-mono text-[10px]">
+                  {hoverStats.kills}K / {hoverStats.deaths}D / {hoverStats.assists}A
+                  <span className="ml-1.5 text-muted-foreground/40">· {(hoverStats.adr ?? 0).toFixed(0)} ADR</span>
+                </div>
+              )}
+              <div className="text-[10px] mt-0.5 text-muted-foreground/45">
+                This round: <span className="font-mono text-foreground/70">{hoverRoundKills} kills</span>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* ── Canvas + sidebar ──────────────────────────────────────────────────── */}
-      <div className="flex gap-3 flex-col xl:flex-row">
+        {/* ── RIGHT SIDEBAR ────────────────────────────────────────────────── */}
+        <aside className="w-[216px] flex-shrink-0 border-l border-white/[0.06] flex flex-col overflow-hidden bg-white/[0.01]">
 
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_SIZE}
-          height={CANVAS_SIZE}
-          className="rounded-lg border border-white/[0.07] w-full xl:w-[560px] xl:flex-shrink-0 bg-[#07080e]"
-        />
-
-        {/* Sidebar: player status + kill feed */}
-        <div className="flex-1 min-w-0 flex flex-col gap-3">
-
-          {/* Player alive status */}
-          <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2.5">Players</p>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-              {/* Team 1 */}
-              <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: T1_COLOR }} />
-                  <span className="text-[10px] font-semibold truncate" style={{ color: T1_COLOR }}>
-                    {team1Name}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground ml-auto tabular-nums">
-                    {team1Players.filter(p => aliveStatus.get(p.name) !== false).length}
-                    <span className="opacity-40">/{team1Players.length}</span>
-                  </span>
+          {/* Player roster */}
+          <div className="p-3 border-b border-white/[0.05]">
+            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40 mb-2.5">Players</p>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-0">
+              {[
+                { list: team1Players, color: T1_COLOR, teamName: team1Name },
+                { list: team2Players, color: T2_COLOR, teamName: team2Name },
+              ].map(({ list, color, teamName }) => (
+                <div key={teamName}>
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                    <span className="text-[9px] font-semibold truncate flex-1" style={{ color: color + 'bb' }}>{teamName}</span>
+                    <span className="text-[9px] text-muted-foreground/40 tabular-nums">
+                      {list.filter(p => aliveStatus.get(p.name) !== false).length}
+                    </span>
+                  </div>
+                  {list.map(p => {
+                    const alive   = aliveStatus.get(p.name) !== false
+                    const focused = focusPlayer === p.name
+                    // show health bar from frame data if available
+                    const hp      = playerPosRef.current.get(p.name)?.health
+                    const hpPct   = hp !== undefined ? Math.max(0, Math.min(100, hp)) : alive ? 100 : 0
+                    const hpCol   = hpPct > 60 ? '#4ade80' : hpPct > 30 ? '#fbbf24' : '#f87171'
+                    return (
+                      <button
+                        key={p.name}
+                        onClick={() => setFocusPlayer(focused ? null : p.name)}
+                        className={cn(
+                          'w-full flex items-center gap-1 py-[3px] px-1 rounded text-left transition-all',
+                          !alive && 'opacity-22',
+                          focused && 'bg-cyan-500/10',
+                        )}
+                      >
+                        {alive
+                          ? <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                          : <Skull size={8} className="text-muted-foreground/50 flex-shrink-0" />
+                        }
+                        <span className="text-[10px] font-mono truncate flex-1 min-w-0"
+                          style={{ color: alive ? color + 'bb' : undefined }}>
+                          {p.name}
+                        </span>
+                        {hasFrames && alive && (
+                          <div className="w-7 h-[3px] rounded-full bg-white/10 flex-shrink-0 overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-300"
+                              style={{ width: `${hpPct}%`, background: hpCol }} />
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
-                {team1Players.map(p => {
-                  const alive = aliveStatus.get(p.name) !== false
-                  return (
-                    <div key={p.name} className={cn('flex items-center gap-1.5 py-0.5 transition-opacity', !alive && 'opacity-25')}>
-                      {alive
-                        ? <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: T1_COLOR }} />
-                        : <Skull size={9} className="text-muted-foreground flex-shrink-0" />
-                      }
-                      <span className="text-[11px] font-mono truncate" style={{ color: alive ? T1_COLOR + 'bb' : undefined }}>
-                        {p.name}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Team 2 */}
-              <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: T2_COLOR }} />
-                  <span className="text-[10px] font-semibold truncate" style={{ color: T2_COLOR }}>
-                    {team2Name}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground ml-auto tabular-nums">
-                    {team2Players.filter(p => aliveStatus.get(p.name) !== false).length}
-                    <span className="opacity-40">/{team2Players.length}</span>
-                  </span>
-                </div>
-                {team2Players.map(p => {
-                  const alive = aliveStatus.get(p.name) !== false
-                  return (
-                    <div key={p.name} className={cn('flex items-center gap-1.5 py-0.5 transition-opacity', !alive && 'opacity-25')}>
-                      {alive
-                        ? <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: T2_COLOR }} />
-                        : <Skull size={9} className="text-muted-foreground flex-shrink-0" />
-                      }
-                      <span className="text-[11px] font-mono truncate" style={{ color: alive ? T2_COLOR + 'bb' : undefined }}>
-                        {p.name}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
+              ))}
             </div>
           </div>
 
           {/* Kill feed */}
-          <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] p-3 flex-1">
-            <div className="flex items-center justify-between mb-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Kill Feed
-              </p>
-              <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
-                {pastKills.length}
-                <span className="opacity-40">/{kills.length}</span>
+          <div className="flex-1 overflow-hidden flex flex-col p-3 min-h-0">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40">Kill Feed</p>
+              <span className="text-[9px] font-mono text-muted-foreground/35 tabular-nums">
+                {pastKills.length}<span className="opacity-50">/{kills.length}</span>
               </span>
             </div>
-
-            <div className="flex flex-col gap-0.5 max-h-[300px] overflow-y-auto"
-              style={{ scrollbarWidth: 'thin' }}>
+            <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 min-h-0" style={{ scrollbarWidth: 'thin' }}>
               {kills.length === 0 ? (
-                <p className="text-xs text-muted-foreground/50">No kills this round.</p>
+                <p className="text-[11px] text-muted-foreground/35">No kills this round.</p>
               ) : kills.map((k, i) => {
                 const past     = k.time <= time
                 const isActive = k.time <= time && k.time > time - KILL_FLASH
-                const kTeam    = teamOf.get(k.killer_name) === team1Name
-                const vTeam    = teamOf.get(k.victim_name) === team1Name
+                const kT1      = teamOf.get(k.killer_name) === team1Name
+                const vT1      = teamOf.get(k.victim_name) === team1Name
                 return (
-                  <div
+                  <button
                     key={i}
+                    onClick={() => { setIsPlaying(false); setTime(k.time) }}
                     className={cn(
-                      'flex items-center gap-1 px-1.5 py-1 rounded text-[11px] font-mono border transition-all',
-                      isActive ? 'bg-yellow-500/10 border-yellow-500/20' : 'border-transparent',
+                      'w-full flex items-center gap-1 px-1.5 py-[3px] rounded text-[10px] font-mono border text-left transition-all',
+                      isActive ? 'bg-yellow-500/10 border-yellow-400/20' : 'border-transparent hover:bg-white/[0.04]',
                       past ? 'opacity-100' : 'opacity-15',
                     )}
                   >
-                    <span className="text-[9px] text-muted-foreground/50 w-6 flex-shrink-0 tabular-nums">
-                      {k.time.toFixed(1)}
-                    </span>
-                    <span className="truncate flex-1 min-w-0"
-                      style={{ color: kTeam ? T1_COLOR + 'cc' : T2_COLOR + 'cc' }}>
+                    <span className="text-[8px] text-muted-foreground/40 w-5 flex-shrink-0 tabular-nums">{k.time.toFixed(0)}s</span>
+                    <span className="truncate flex-1 min-w-0" style={{ color: kT1 ? T1_COLOR + 'cc' : T2_COLOR + 'cc' }}>
                       {k.killer_name}
                     </span>
-                    <span className="text-muted-foreground/40 flex-shrink-0 text-[9px] px-0.5">
-                      {k.headshot ? 'HS' : '→'}
+                    <span className="flex-shrink-0 text-[8px] text-muted-foreground/35 px-0.5">
+                      {k.headshot ? '⦿' : '›'}
                     </span>
-                    <span className="truncate flex-1 min-w-0"
-                      style={{ color: vTeam ? T1_COLOR + 'cc' : T2_COLOR + 'cc' }}>
+                    <span className="truncate flex-1 min-w-0" style={{ color: vT1 ? T1_COLOR + 'cc' : T2_COLOR + 'cc' }}>
                       {k.victim_name}
                     </span>
-                    <span className="ml-1 flex-shrink-0 text-[9px] text-muted-foreground/50 bg-white/[0.06] px-1 py-0.5 rounded">
+                    <span className="ml-0.5 flex-shrink-0 text-[8px] text-muted-foreground/40 bg-white/[0.05] px-1 rounded font-mono">
                       {abbrevWeapon(k.weapon)}
                     </span>
-                  </div>
+                  </button>
                 )
               })}
             </div>
           </div>
-
-        </div>
+        </aside>
       </div>
 
-      {/* ── Timeline with kill + grenade markers ──────────────────────────────── */}
-      <div className="space-y-1.5">
-        {/* Event markers row */}
-        <div className="relative h-3 mx-0.5">
-          {kills.map((k, i) => {
-            const pct  = (k.time / maxTime) * 100
-            const past = k.time <= time
-            return (
-              <div
-                key={i}
-                className="absolute top-0 w-0.5 h-2.5 rounded-full transition-opacity"
-                style={{
-                  left: `${pct}%`,
-                  background: past ? '#ff4466' : 'rgba(255,68,102,0.25)',
-                  transform: 'translateX(-50%)',
-                }}
-                title={`${k.killer_name} → ${k.victim_name} (${k.time.toFixed(1)}s)`}
-              />
-            )
-          })}
+      {/* ──────────────────────────────────────────────────────────────────────
+          TIMELINE + CONTROLS
+      ────────────────────────────────────────────────────────────────────── */}
+      <div className="border-t border-white/[0.06] bg-white/[0.01] px-4 pt-3 pb-3 space-y-2.5">
+
+        {/* Event markers */}
+        <div className="relative h-3">
+          {kills.map((k, i) => (
+            <button
+              key={i}
+              onClick={() => { setIsPlaying(false); setTime(k.time) }}
+              className="absolute top-0 w-0.5 h-full rounded-full cursor-pointer hover:scale-x-150 transition-transform"
+              style={{
+                left: `${(k.time / maxTime) * 100}%`,
+                background: k.time <= time ? '#ff4466' : 'rgba(255,68,102,0.22)',
+                transform: 'translateX(-50%)',
+              }}
+              title={`${k.killer_name} → ${k.victim_name} (${k.time.toFixed(1)}s)`}
+            />
+          ))}
           {visibleGrenades.filter(g => g.land_time > 0 && g.land_time <= maxTime).map((g, i) => (
             <div
               key={i}
-              className="absolute top-1 w-1 h-1 rounded-full"
+              className="absolute top-1 w-1 h-1 rounded-full pointer-events-none"
               style={{
                 left: `${(g.land_time / maxTime) * 100}%`,
-                background: (GREN_COLORS[g.type] ?? '#fff') + '80',
+                background: (GREN_COLORS[g.type] ?? '#fff') + '77',
                 transform: 'translateX(-50%)',
               }}
             />
@@ -747,90 +1099,77 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
           value={time}
           onChange={e => { setIsPlaying(false); setTime(parseFloat(e.target.value)) }}
           className="w-full h-1.5 cursor-pointer rounded-full"
-          style={{ accentColor: '#00ff87' }}
+          style={{ accentColor: T1_COLOR }}
         />
-      </div>
 
-      {/* ── Playback controls ─────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={restart}
-          className="p-1.5 rounded border border-border/40 text-muted-foreground hover:text-foreground transition-colors"
-          title="Restart"
-        >
-          <RotateCcw size={13} />
-        </button>
+        {/* Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={restart}
+            className="p-1.5 rounded-lg border border-border/35 text-muted-foreground hover:text-foreground transition-colors"
+            title="Restart"
+          >
+            <RotateCcw size={13} />
+          </button>
 
-        <button
-          onClick={toggle}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-neon-green/30 bg-neon-green/10 text-neon-green text-xs font-medium hover:bg-neon-green/20 transition-colors"
-        >
-          {isPlaying ? <Pause size={13} /> : <Play size={13} />}
-          {isPlaying ? 'Pause' : 'Play'}
-        </button>
+          <button
+            onClick={toggle}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold border transition-all"
+            style={{ background: 'rgba(34,211,238,0.12)', borderColor: 'rgba(34,211,238,0.28)', color: T1_COLOR }}
+          >
+            {isPlaying ? <Pause size={13} /> : <Play size={13} />}
+            {isPlaying ? 'Pause' : 'Play'}
+          </button>
 
-        <div className="flex border border-border/40 rounded-full overflow-hidden">
-          {([1, 2, 4] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setSpeed(s)}
-              className={cn(
-                'px-2.5 py-1 text-xs font-mono transition-colors',
-                speed === s ? 'bg-neon-green/20 text-neon-green' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {s}×
-            </button>
-          ))}
+          <div className="flex border border-border/35 rounded-full overflow-hidden text-xs font-mono">
+            {([0.5, 1, 2, 4] as SpeedValue[]).map(s => (
+              <button
+                key={s}
+                onClick={() => setSpeed(s)}
+                className={cn(
+                  'px-2.5 py-1 transition-colors',
+                  speed === s ? 'text-cyan-300' : 'text-muted-foreground hover:text-foreground',
+                )}
+                style={speed === s ? { background: 'rgba(34,211,238,0.15)' } : undefined}
+              >
+                {s}×
+              </button>
+            ))}
+          </div>
+
+          <span className="text-xs font-mono text-muted-foreground/55 tabular-nums ml-auto">
+            {time.toFixed(1)}s <span className="opacity-40">/</span> {maxTime.toFixed(1)}s
+          </span>
+
+          <button
+            onClick={toggleRecord}
+            disabled={recordState === 'processing'}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs transition-all',
+              recordState === 'recording'
+                ? 'border-red-400/35 bg-red-400/10 text-red-400'
+                : 'border-border/35 text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {recordState === 'recording' ? <><StopCircle size={11}/>Stop</> : <><Video size={11}/>Clip</>}
+          </button>
         </div>
 
-        <span className="text-xs font-mono text-muted-foreground tabular-nums ml-auto">
-          {time.toFixed(1)}s / {maxTime.toFixed(1)}s
-        </span>
-
-        <button
-          onClick={toggleRecord}
-          disabled={recordState === 'processing'}
-          className={cn(
-            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs transition-colors',
-            recordState === 'recording'
-              ? 'border-red-400/40 bg-red-400/10 text-red-400 hover:bg-red-400/20'
-              : 'border-border/40 text-muted-foreground hover:text-foreground',
-          )}
-          title={recordState === 'recording' ? 'Stop & save clip' : 'Record clip'}
-        >
-          {recordState === 'recording'
-            ? <><StopCircle size={11} /> Stop</>
-            : <><Video size={11} /> Clip</>
-          }
-        </button>
-      </div>
-
-      {/* ── Footer: legend + keyboard hints ───────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground/40">
-        <span>
-          <kbd className="font-mono bg-white/[0.06] px-1 rounded text-[9px] text-muted-foreground/60">Space</kbd>
-          {' '}play/pause
-        </span>
-        <span>
-          <kbd className="font-mono bg-white/[0.06] px-1 rounded text-[9px] text-muted-foreground/60">← →</kbd>
-          {' '}±2s
-        </span>
-
-        <div className="flex items-center gap-3 ml-auto">
-          <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full" style={{ background: T1_COLOR }} />
-            <span>{team1Name}</span>
+        {/* Keyboard hints + legend */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground/30">
+          {[['Space','play'],['← →','±2s'],['↑ ↓','rounds'],['Esc','reset']].map(([k,v]) => (
+            <span key={k}>
+              <kbd className="bg-white/[0.05] px-1 py-0.5 rounded text-[8px] text-muted-foreground/50">{k}</kbd> {v}
+            </span>
+          ))}
+          <div className="flex items-center gap-2.5 ml-auto">
+            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T1_COLOR }}/><span>{team1Name}</span></div>
+            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T2_COLOR }}/><span>{team2Name}</span></div>
+            {hasFrames
+              ? <span className="text-cyan-400/25">{frames.length} frames</span>
+              : <span className="text-amber-400/30">kill-only · re-parse for movement</span>
+            }
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full" style={{ background: T2_COLOR }} />
-            <span>{team2Name}</span>
-          </div>
-          <span className="opacity-70">● alive · ✕ dead</span>
-          {hasFrames
-            ? <span className="text-neon-green/40">{frames.length} frames</span>
-            : <span className="text-amber-400/40">kill-only mode · re-parse for movement</span>
-          }
         </div>
       </div>
 
