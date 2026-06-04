@@ -991,13 +991,12 @@ function computeHighlights(rounds: Round[]): HighlightMap {
     if (max >= 5) tags.push('ace')
     else if (max >= 4) tags.push('4k')
     else if (max >= 3) tags.push('3k')
-    // Clutch: a player was last alive on their side vs 2+ enemies
-    // Approximate: count alive CT vs T at each kill event
-    let ctAlive = 5, tAlive = 5
-    for (const k of rnd.kills) {
-      if (k.killer_team === 'CT') tAlive = Math.max(0, tAlive - 1)
-      else ctAlive = Math.max(0, ctAlive - 1)
-      if ((ctAlive === 1 && tAlive >= 2) || (tAlive === 1 && ctAlive >= 2)) {
+    // Clutch approximation: a player gets 2+ kills in ≤12s in the back half of the round
+    const lateKills = rnd.kills.slice(Math.floor(rnd.kills.length / 2))
+    const lateByPlayer: Record<string, number[]> = {}
+    for (const k of lateKills) { (lateByPlayer[k.killer_name] ??= []).push(k.time) }
+    for (const times of Object.values(lateByPlayer)) {
+      if (times.length >= 2 && times[times.length - 1] - times[0] < 12) {
         tags.push('clutch'); break
       }
     }
