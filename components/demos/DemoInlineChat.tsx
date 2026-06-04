@@ -5,11 +5,18 @@ import { useChat } from 'ai/react'
 import { Send, Brain, Loader2, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+interface ReplayState {
+  roundIdx: number; time: number; duration: number; mapName: string
+  aliveCT: number; aliveT: number; bombStatus: string | null
+  recentKills: { killer: string; victim: string; weapon: string; time: number }[]
+}
+
 interface Props {
   mode: 'opponent' | 'myteam'
   teamId?: string
   folderId?: string
   mapName?: string
+  replayContext?: ReplayState | null
 }
 
 const STARTERS: Record<Props['mode'], string[]> = {
@@ -50,7 +57,7 @@ function MessageContent({ content }: { content: string }) {
   )
 }
 
-export default function DemoInlineChat({ mode, teamId, folderId, mapName }: Props) {
+export default function DemoInlineChat({ mode, teamId, folderId, mapName, replayContext }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const { messages, input, setInput, isLoading, error, append, setMessages } = useChat({
@@ -68,7 +75,7 @@ export default function DemoInlineChat({ mode, teamId, folderId, mapName }: Prop
     setInput('')
     append(
       { role: 'user', content: text },
-      { body: { teamId, folderId, mode, mapName } },
+      { body: { teamId, folderId, mode, mapName, replayContext } },
     )
   }
 
@@ -92,6 +99,31 @@ export default function DemoInlineChat({ mode, teamId, folderId, mapName }: Prop
           </button>
         )}
       </div>
+
+      {/* Live replay context banner */}
+      {replayContext && (
+        <div className="px-3 py-1.5 bg-neon-green/5 border-b border-neon-green/10 shrink-0">
+          <div className="text-[9px] font-mono text-neon-green/60 flex items-center gap-2 flex-wrap">
+            <span>R{replayContext.roundIdx + 1}</span>
+            <span>·</span>
+            <span>{Math.floor(replayContext.time)}s / {Math.floor(replayContext.duration)}s</span>
+            <span>·</span>
+            <span className="text-blue-400/70">CT {replayContext.aliveCT}v{replayContext.aliveT} T</span>
+            {replayContext.bombStatus && (
+              <>
+                <span>·</span>
+                <span className="text-orange-400/80 uppercase">{replayContext.bombStatus}</span>
+              </>
+            )}
+            {replayContext.recentKills.length > 0 && (
+              <>
+                <span>·</span>
+                <span>{replayContext.recentKills.length} kill{replayContext.recentKills.length !== 1 ? 's' : ''} last 10s</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">

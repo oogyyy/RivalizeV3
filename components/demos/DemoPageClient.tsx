@@ -493,6 +493,11 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
   const [sharing, setSharing] = useState(false)
   const [replayTime, setReplayTime] = useState(0)
   const [replayPlaying, setReplayPlaying] = useState(false)
+  const [replayState, setReplayState] = useState<{
+    roundIdx: number; time: number; duration: number; mapName: string
+    aliveCT: number; aliveT: number; bombStatus: string | null
+    recentKills: { killer: string; victim: string; weapon: string; time: number }[]
+  } | null>(null)
 
   const handleShare = useCallback(async () => {
     if (sharing) return
@@ -772,6 +777,7 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
                     parsed={replayParsed}
                     team1={replayParsed.header.team1}
                     team2={replayParsed.header.team2}
+                    onStateChange={setReplayState}
                   />
                 </div>
                 <div className="w-full lg:w-[340px] lg:shrink-0 h-[548px]">
@@ -779,6 +785,7 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
                     mode="opponent"
                     folderId={folderId ?? undefined}
                     mapName={parsed.header.map}
+                    replayContext={replayState}
                   />
                 </div>
               </div>
