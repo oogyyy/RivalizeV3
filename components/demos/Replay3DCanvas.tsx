@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { Loader2, RotateCcw, Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { MAP_CONFIGS, loadMapImage, worldToCanvas, type MapConfig } from '@/lib/map-config'
 import { MAP_GEO_DATA, getMapFloorHeight } from '@/lib/map-geometries'
@@ -37,6 +41,43 @@ const MOLOTOV_DUR    = 7
 const KILL_SECS      = 2.5
 const BOMB_TIMER     = 40   // CS2 default bomb timer
 const GRENADE_LIFT   = 1.5  // parabola peak height multiplier
+
+// Per-map callout labels: [u, v, label] — u/v are 0-1 UV coords matching the radar image
+const MAP_CALLOUTS: Record<string, [number, number, string][]> = {
+  de_dust2: [
+    [0.25, 0.22, 'Long A'], [0.50, 0.22, 'A Site'], [0.72, 0.22, 'Short'],
+    [0.50, 0.50, 'Mid'],    [0.25, 0.78, 'B Tun'],  [0.50, 0.78, 'B Site'],
+    [0.72, 0.78, 'B Plat'],
+  ],
+  de_mirage: [
+    [0.22, 0.25, 'A Ramp'], [0.50, 0.22, 'A Site'],  [0.72, 0.22, 'CT'],
+    [0.50, 0.50, 'Mid'],    [0.22, 0.72, 'B Apps'],  [0.50, 0.75, 'B Site'],
+  ],
+  de_inferno: [
+    [0.20, 0.25, 'Banana'], [0.50, 0.22, 'A Site'],  [0.75, 0.22, 'Short'],
+    [0.50, 0.50, 'Mid'],    [0.22, 0.75, 'B Apps'],  [0.50, 0.75, 'B Site'],
+  ],
+  de_nuke: [
+    [0.22, 0.22, 'T Ramp'], [0.50, 0.22, 'A Site'],  [0.75, 0.22, 'CT'],
+    [0.50, 0.50, 'Secret'], [0.22, 0.75, 'B Ramp'],  [0.50, 0.75, 'B Site'],
+  ],
+  de_ancient: [
+    [0.22, 0.22, 'Mid'],    [0.50, 0.22, 'A Site'],  [0.75, 0.22, 'CT'],
+    [0.22, 0.75, 'C Hall'], [0.50, 0.75, 'B Site'],
+  ],
+  de_anubis: [
+    [0.22, 0.22, 'Canal'],  [0.50, 0.22, 'A Site'],  [0.75, 0.22, 'CT'],
+    [0.50, 0.50, 'Mid'],    [0.22, 0.75, 'B Apps'],  [0.50, 0.75, 'B Site'],
+  ],
+  de_overpass: [
+    [0.22, 0.25, 'B Apps'], [0.50, 0.22, 'A Site'],  [0.75, 0.22, 'CT'],
+    [0.50, 0.50, 'Canal'],  [0.22, 0.75, 'B Site'],  [0.50, 0.75, 'Long'],
+  ],
+  de_vertigo: [
+    [0.22, 0.22, 'T Spawn'], [0.50, 0.22, 'A Site'], [0.75, 0.22, 'CT'],
+    [0.22, 0.75, 'Mid'],     [0.50, 0.75, 'B Site'],
+  ],
+}
 
 // ── 3D Map Geometry ────────────────────────────────────────────────────────────
 // Builds simplified 3D map structures (platforms + walls) into the scene.
@@ -149,6 +190,7 @@ interface PlayerObj {
   hpBarBg:     THREE.Mesh
   hpBarMat:    THREE.MeshBasicMaterial
   hpBarBgMat:  THREE.MeshBasicMaterial
+  deathAnimT:  number   // time when death animation started, -1 if alive/done
 }
 
 interface UtilObj {
@@ -161,6 +203,7 @@ interface UtilObj {
   duration:   number
   tx: number; tz: number   // throw 3D coords
   lx: number; lz: number   // land 3D coords
+  smokePuffs?: THREE.Sprite[]
 }
 
 interface KillObj {
@@ -392,6 +435,7 @@ function makePlayer(
     trailHistory: [], teamR: rC, teamG: gC, teamB: bC,
     isMyTeam, alive: true,
     dirArrow, hpBarFg, hpBarBg, hpBarMat, hpBarBgMat,
+    deathAnimT: -1,
   }
 }
 
@@ -405,7 +449,13 @@ function setAlive(p: PlayerObj, alive: boolean) {
   p.ringMat.emissiveIntensity = alive ? 0.6 : 0
   p.ringMat.opacity = alive ? 0.85 : 0.3
   p.spriteMat.opacity = alive ? 1 : 0.35
-  p.group.scale.setScalar(alive ? 1 : 0.82)
+  if (alive) {
+    p.group.scale.setScalar(1)
+    p.group.rotation.z = 0
+    p.deathAnimT = -1
+  } else {
+    p.deathAnimT = 0  // mark as just died, animate in tick loop
+  }
   p.hpBarFg.visible = alive
   p.hpBarBg.visible = alive
   p.dirArrow.visible = alive
@@ -464,6 +514,42 @@ function makeGrenadeArc(
 
 // ── Utility objects ────────────────────────────────────────────────────────────
 
+function createSmokeTexture(): THREE.Texture {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 128
+  const ctx = canvas.getContext('2d')!
+  const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+  grad.addColorStop(0,   'rgba(170,185,215,0.95)')
+  grad.addColorStop(0.35,'rgba(140,158,198,0.55)')
+  grad.addColorStop(1,   'rgba(100,120,165,0)')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, 128, 128)
+  return new THREE.CanvasTexture(canvas)
+}
+
+function addCalloutLabels(mapName: string, scene: THREE.Scene) {
+  const callouts = MAP_CALLOUTS[mapName] ?? []
+  for (const [u, v, label] of callouts) {
+    const x3d = (u - 0.5) * MAP_PLANE
+    const z3d = (v - 0.5) * MAP_PLANE
+    const W = 128, H = 32
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H
+    const ctx = cv.getContext('2d')!
+    ctx.clearRect(0, 0, W, H)
+    ctx.font = 'bold 13px monospace'
+    ctx.fillStyle = 'rgba(255,255,255,0.28)'
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(label, W / 2, H / 2)
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(cv),
+      depthWrite: false, transparent: true, opacity: 0.55,
+    }))
+    sprite.scale.set(1.8, 0.45, 1)
+    sprite.position.set(x3d, 0.35, z3d)
+    scene.add(sprite)
+  }
+}
+
 function makeUtilObj(g: GrenadeEvent, cfg: MapConfig, scene: THREE.Scene): UtilObj | null {
   if (g.type === 'decoy') return null
   if (!isFinite(g.throw_x) || !isFinite(g.land_x)) return null
@@ -492,11 +578,34 @@ function makeUtilObj(g: GrenadeEvent, cfg: MapConfig, scene: THREE.Scene): UtilO
   // child[2]: landing effect
   let mainMat: THREE.MeshStandardMaterial
   let mainMesh: THREE.Mesh
+  let smokePuffs: THREE.Sprite[] | undefined
 
   if (type === 'smoke') {
-    mainMat  = new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: 0.3, roughness: 0.95, side: THREE.DoubleSide })
-    mainMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.6, 0.65, 14, 1, true), mainMat)
-    mainMesh.position.set(lx, 0.32, lz)
+    const smokeTex = createSmokeTexture()
+    smokePuffs = []
+    const NUM_PUFFS = 7
+    for (let i = 0; i < NUM_PUFFS; i++) {
+      const angle = (i / NUM_PUFFS) * Math.PI * 2
+      const r = 0.28 + Math.random() * 0.52
+      const mat = new THREE.SpriteMaterial({
+        map: smokeTex, color: 0x8899bb,
+        transparent: true, opacity: 0, depthWrite: false,
+      })
+      const sprite = new THREE.Sprite(mat)
+      sprite.position.set(
+        lx + Math.cos(angle) * r,
+        0.15 + Math.random() * 0.5,
+        lz + Math.sin(angle) * r,
+      )
+      sprite.scale.set(0.3, 0.3, 1)
+      group.add(sprite)
+      smokePuffs.push(sprite)
+    }
+    group.userData.smokePuffs = smokePuffs
+    // Invisible placeholder mesh for duration gating
+    mainMat  = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0, color: col })
+    mainMesh = new THREE.Mesh(new THREE.SphereGeometry(0.01, 3, 2), mainMat)
+    mainMesh.position.set(lx, 0, lz)
   } else if (type === 'flash') {
     mainMat  = new THREE.MeshStandardMaterial({ color: col, emissive: new THREE.Color(col), emissiveIntensity: 2.5, transparent: true, opacity: 0.8 })
     mainMesh = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), mainMat)
@@ -513,7 +622,7 @@ function makeUtilObj(g: GrenadeEvent, cfg: MapConfig, scene: THREE.Scene): UtilO
   group.add(mainMesh)
   scene.add(group)
 
-  return { group, mainMat, grenadeMat, type, throwT: g.time, landT: g.land_time, duration: dur, tx, tz, lx, lz }
+  return { group, mainMat, grenadeMat, type, throwT: g.time, landT: g.land_time, duration: dur, tx, tz, lx, lz, smokePuffs }
 }
 
 function updateUtilAnim(u: UtilObj, t: number) {
@@ -541,10 +650,21 @@ function updateUtilAnim(u: UtilObj, t: number) {
   if (!mainMesh.visible) return
 
   if (u.type === 'smoke') {
-    const grow    = Math.min(age / 1.5, 1)
-    const fadeEnd = Math.max(0, (age - (u.duration - 2)) / 2)
-    mainMesh.scale.setScalar(grow)
-    u.mainMat.opacity = 0.3 * grow * (1 - fadeEnd)
+    const puffs: THREE.Sprite[] = u.group.userData.smokePuffs ?? []
+    const inRange = age >= 0 && age < u.duration
+    puffs.forEach(s => { s.visible = inRange })
+    if (!inRange) return
+    const grow    = Math.min(age / 1.8, 1)
+    const fadeEnd = Math.max(0, (age - (u.duration - 2.5)) / 2.5)
+    const opacity = 0.65 * grow * (1 - fadeEnd)
+    puffs.forEach((sprite, i) => {
+      const offset = (i / puffs.length) * 0.25
+      const localT = Math.max(0, Math.min(grow - offset, 1))
+      ;(sprite.material as THREE.SpriteMaterial).opacity = localT * opacity
+      const sc = 0.4 + localT * 1.9
+      sprite.scale.set(sc, sc, 1)
+      ;(sprite.material as THREE.SpriteMaterial).rotation += 0.004
+    })
   } else if (u.type === 'flash') {
     mainMesh.scale.setScalar(1 + Math.min(age / 0.35, 1) * 5)
     u.mainMat.opacity           = 0.8 * (1 - age / u.duration)
@@ -833,7 +953,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
 
   const [loaded,       setLoaded]       = useState(false)
   const [uiPlaying,    setUiPlaying]    = useState(false)
-  const [uiSpeed,      setUiSpeed]      = useState<1 | 2 | 4>(1)
+  const [uiSpeed,      setUiSpeed]      = useState<0.25 | 0.5 | 1 | 2 | 4>(1)
   const [uiTime,       setUiTime]       = useState(0)
   const [uiDuration,   setUiDuration]   = useState(0)
   const [uiRound,      setUiRound]      = useState(0)
@@ -843,6 +963,9 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
   const [bombStatus,      setBombStatus]      = useState<'planted' | 'defused' | null>(null)
   const [followingPlayer, setFollowingPlayer] = useState<string | null>(null)
   const [soundEnabled,    setSoundEnabled]    = useState(true)
+  const [timelineEvents,  setTimelineEvents]  = useState<{time: number; type: string; side: string}[]>([])
+  const [camMode,         setCamMode]         = useState<'orbit' | 'follow' | 'topdown'>('orbit')
+  const camModeRef = useRef<'orbit' | 'follow' | 'topdown'>('orbit')
 
   const togglePlay = useCallback(() => {
     const pb = pbRef.current
@@ -857,7 +980,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     }
   }, [])
 
-  const handleSpeed = useCallback((s: 1 | 2 | 4) => {
+  const handleSpeed = useCallback((s: 0.25 | 0.5 | 1 | 2 | 4) => {
     pbRef.current.speed = s; setUiSpeed(s)
   }, [])
 
@@ -896,6 +1019,23 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     setSoundEnabled(soundEnabledRef.current)
   }, [])
 
+  const handleCamMode = useCallback((mode: 'orbit' | 'follow' | 'topdown') => {
+    setCamMode(mode)
+    camModeRef.current = mode
+    const cam = cameraRef.current, ctrl = controlsRef.current
+    if (!cam || !ctrl) return
+    if (mode === 'orbit') {
+      ctrl.enabled = true
+      cam.position.set(0, 22, 13)
+      ctrl.target.set(0, 0, 0)
+      ctrl.update()
+    } else if (mode === 'topdown') {
+      ctrl.enabled = false
+      cam.position.set(0, 35, 0)
+      cam.lookAt(0, 0, 0)
+    }
+  }, [])
+
   useEffect(() => {
     const el = mountRef.current
     if (!el) return
@@ -920,6 +1060,13 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15
     el.appendChild(renderer.domElement)
+
+    // ── Bloom post-processing ──────────────────────────────────────────────────
+    const composer = new EffectComposer(renderer)
+    composer.addPass(new RenderPass(scene, cam))
+    const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.40, 0.3, 0.85)
+    composer.addPass(bloom)
+    composer.addPass(new OutputPass())
 
     // ── Lighting ──────────────────────────────────────────────────────────────
     scene.add(new THREE.HemisphereLight(0x1e2b50, 0x040508, 0.7))
@@ -1074,6 +1221,9 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       for (const s of sites) makeSiteMarker(s.x3d, s.z3d, s.label, scene)
     }
 
+    // ── Map callout labels ─────────────────────────────────────────────────────
+    addCalloutLabels(mapName, scene)
+
     // ── Round init ─────────────────────────────────────────────────────────────
     function initRound(idx: number) {
       const rnd = rounds[idx]
@@ -1094,6 +1244,8 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       for (const p of players.values()) {
         p.alive = false  // force setAlive to run fully on next state change
         setAlive(p, true)
+        p.deathAnimT = -1
+        p.group.rotation.z = 0
         p.group.visible = false
         // Reset HP bar to full health
         p.hpBarFg.scale.x = 1; p.hpBarFg.position.x = 0
@@ -1122,6 +1274,22 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
 
       setUiTime(0); setUiDuration(dur); setUiRound(idx); setUiPlaying(false)
       setKillFeed([]); setRoundOutcome(null); setBombStatus(null)
+
+      // Build timeline events for this round
+      const evts: {time: number; type: string; side: string}[] = []
+      if (rnd) {
+        for (const k of rnd.kills) {
+          evts.push({ time: k.time, type: 'kill', side: k.killer_name ? 'ct' : 't' })
+        }
+        if (rnd.bomb_planted) {
+          evts.push({ time: Math.max(0, (rnd.duration ?? 0) - BOMB_TIMER), type: 'bomb', side: 't' })
+        }
+        for (const g of (rnd.grenades ?? [])) {
+          if (g.type === 'smoke') evts.push({ time: g.land_time, type: 'smoke', side: 't' })
+          if (g.type === 'molotov') evts.push({ time: g.land_time, type: 'molotov', side: 't' })
+        }
+      }
+      setTimelineEvents(evts)
 
       if (!cfg) return
 
@@ -1161,6 +1329,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
     controls.minDistance = 4; controls.maxDistance = 48
     controls.minPolarAngle = 0; controls.maxPolarAngle = Math.PI * 0.47
     controls.rotateSpeed = 0.55; controls.panSpeed = 0.6; controls.zoomSpeed = 1.2
+    controls.enablePan = true
     controls.update(); controlsRef.current = controls
 
     // ── Click-to-follow raycasting ─────────────────────────────────────────────
@@ -1246,6 +1415,18 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
             const deadT = deadAtRef.current[sn.n]
             const alive = deadT === undefined || pb.time < deadT
             setAlive(po, alive)
+            // Death collapse animation (0.5s)
+            if (!po.alive && po.deathAnimT >= 0) {
+              po.deathAnimT += delta
+              const t = Math.min(po.deathAnimT / 0.5, 1)
+              po.group.scale.set(1 - t * 0.18, 1 - t * 0.82, 1 - t * 0.18)
+              po.group.rotation.z = t * 0.4
+              if (po.deathAnimT >= 0.5) po.deathAnimT = -1  // done
+            } else if (!po.alive && po.deathAnimT === -1) {
+              // Final dead state
+              po.group.scale.set(0.82, 0.18, 0.82)
+              po.group.rotation.z = 0.4
+            }
             // Update HP bar width and color
             if (alive) {
               const frac = Math.max(0, Math.min(sn.h ?? 100, 100)) / 100
@@ -1352,22 +1533,48 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
       }
 
       controls.update()
-      renderer.render(scene, cam)
+      if (camModeRef.current === 'topdown') {
+        cam.lookAt(0, 0, 0)
+      }
+      composer.render()
     }
+    // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+    const onKeyDown = (e: KeyboardEvent) => {
+      const pb = pbRef.current
+      if (e.code === 'ArrowRight' && !e.shiftKey) {
+        e.preventDefault()
+        pb.playing = false
+        pb.time = Math.min(pb.time + 0.05, pb.duration)
+        setUiTime(pb.time); setUiPlaying(false)
+      } else if (e.code === 'ArrowLeft' && !e.shiftKey) {
+        e.preventDefault()
+        pb.playing = false
+        pb.time = Math.max(pb.time - 0.05, 0)
+        setUiTime(pb.time); setUiPlaying(false)
+      } else if (e.code === 'Space' && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault()
+        const pb2 = pbRef.current
+        if (!pb2.playing && pb2.duration > 0 && pb2.time >= pb2.duration) pb2.time = 0
+        pb2.playing = !pb2.playing; setUiPlaying(pb2.playing)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+
     requestAnimationFrame(tick)
 
     // ── Resize ─────────────────────────────────────────────────────────────────
     const ro = new ResizeObserver(() => {
       const nw = el.clientWidth, nh = el.clientHeight
       if (!nw || !nh) return
-      cam.aspect = nw / nh; cam.updateProjectionMatrix(); renderer.setSize(nw, nh)
+      cam.aspect = nw / nh; cam.updateProjectionMatrix(); renderer.setSize(nw, nh); composer.setSize(nw, nh)
     })
     ro.observe(el)
 
     return () => {
       cancelled = true; cancelAnimationFrame(animId)
       renderer.domElement.removeEventListener('click', onCanvasClick)
-      ro.disconnect(); controls.dispose(); renderer.dispose()
+      document.removeEventListener('keydown', onKeyDown)
+      ro.disconnect(); controls.dispose(); composer.dispose(); renderer.dispose()
       soundCtxRef.current?.close(); soundCtxRef.current = null
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
       for (const po of players.values()) {
@@ -1557,8 +1764,32 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
               {uiPlaying ? <Pause size={14} /> : <Play size={14} />}
             </button>
 
+            {/* Frame step buttons */}
+            <button
+              onClick={() => {
+                const pb = pbRef.current
+                pb.playing = false
+                pb.time = Math.max(pb.time - 0.05, 0)
+                setUiTime(pb.time); setUiPlaying(false)
+              }}
+              disabled={!hasFrames}
+              className="w-7 h-8 flex items-center justify-center rounded-md border border-border/40 text-muted-foreground hover:text-neon-green hover:border-neon-green/40 transition-colors disabled:opacity-30 shrink-0 text-[11px] font-mono"
+              title="Step back (←)"
+            >‹</button>
+            <button
+              onClick={() => {
+                const pb = pbRef.current
+                pb.playing = false
+                pb.time = Math.min(pb.time + 0.05, pb.duration)
+                setUiTime(pb.time); setUiPlaying(false)
+              }}
+              disabled={!hasFrames}
+              className="w-7 h-8 flex items-center justify-center rounded-md border border-border/40 text-muted-foreground hover:text-neon-green hover:border-neon-green/40 transition-colors disabled:opacity-30 shrink-0 text-[11px] font-mono"
+              title="Step forward (→)"
+            >›</button>
+
             <div className="flex items-center gap-1 shrink-0">
-              {([1, 2, 4] as const).map(s => (
+              {([0.25, 0.5, 1, 2, 4] as const).map(s => (
                 <button
                   key={s} onClick={() => handleSpeed(s)} disabled={!hasFrames}
                   className={cn(
@@ -1588,15 +1819,66 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
               {fmtTime(uiTime)} / {fmtTime(uiDuration)}
             </span>
 
-            <input
-              type="range" min={0} max={uiDuration || 1} step={0.05}
-              value={uiTime} onChange={handleScrub} disabled={!hasFrames}
-              className="flex-1 h-1.5 disabled:opacity-30"
-              style={{ accentColor: '#00ff87' }}
-            />
+            <div className="relative flex-1 flex flex-col justify-center" style={{ minWidth: 0 }}>
+              {/* Event markers */}
+              <div className="relative h-3 mb-0.5" style={{ pointerEvents: 'none' }}>
+                {uiDuration > 0 && timelineEvents.map((ev, i) => {
+                  const pct = (ev.time / uiDuration) * 100
+                  return (
+                    <div
+                      key={i}
+                      className="absolute top-0 -translate-x-1/2"
+                      style={{ left: `${pct}%` }}
+                      title={ev.type}
+                    >
+                      {ev.type === 'kill' && <div className="w-1 h-2 rounded-full bg-red-400/70" />}
+                      {ev.type === 'bomb' && <div className="w-1.5 h-2.5 rounded-sm bg-orange-400/80" />}
+                      {ev.type === 'smoke' && <div className="w-1 h-2 rounded-full bg-blue-400/60" />}
+                      {ev.type === 'molotov' && <div className="w-1 h-2 rounded-full bg-red-600/70" />}
+                    </div>
+                  )
+                })}
+              </div>
+              <input
+                type="range" min={0} max={uiDuration || 1} step={0.05}
+                value={uiTime} onChange={handleScrub} disabled={!hasFrames}
+                className="w-full h-1.5 disabled:opacity-30"
+                style={{ accentColor: '#00ff87' }}
+              />
+            </div>
           </div>
 
-          {/* Row 2: utility toggles + round selector */}
+          {/* Row 2: camera toolbar */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Camera mode toolbar */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[10px] text-muted-foreground/50 font-mono uppercase tracking-wider">Cam</span>
+              {(['orbit', 'topdown'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => handleCamMode(mode)}
+                  className={cn(
+                    'h-6 px-2 text-[10px] font-mono rounded border transition-colors capitalize',
+                    camMode === mode
+                      ? 'bg-neon-green/20 border-neon-green/40 text-neon-green'
+                      : 'border-border/50 text-muted-foreground hover:border-neon-green/30 hover:text-foreground',
+                  )}
+                >
+                  {mode === 'orbit' ? 'Free Orbit' : 'Top-Down'}
+                </button>
+              ))}
+              {followingPlayer && (
+                <button
+                  onClick={exitFollow}
+                  className="h-6 px-2 text-[10px] font-mono rounded border bg-neon-green/20 border-neon-green/40 text-neon-green"
+                >
+                  Following: {followingPlayer} ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Row 3: utility toggles + round selector */}
           <div className="flex items-center gap-4 flex-wrap">
 
             <div className="flex items-center gap-1.5 shrink-0">
@@ -1620,19 +1902,29 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2 }: Replay
                 <span className="text-[10px] text-muted-foreground/50 font-mono uppercase tracking-wider shrink-0">Round</span>
                 {rounds.map((rnd, i) => {
                   const hasData = !!(rnd.frames && rnd.frames.length > 0)
+                  const isWin  = rnd.winner === myTeamLabel
+                  const isLoss = rnd.winner && rnd.winner !== myTeamLabel
                   return (
                     <button
                       key={i} onClick={() => selectRound(i)} disabled={!hasData}
-                      title={`Round ${rnd.number}${hasData ? '' : ' — no frame data'}`}
+                      title={`Round ${rnd.number}${hasData ? (rnd.winner ? ` · ${isWin ? 'W' : 'L'}` : '') : ' — no frame data'}`}
                       className={cn(
-                        'h-6 min-w-[26px] px-1.5 text-[10px] font-mono rounded border transition-colors',
+                        'h-6 min-w-[26px] px-1.5 text-[10px] font-mono rounded border transition-colors relative',
                         uiRound === i
                           ? 'bg-neon-green/20 border-neon-green/50 text-neon-green'
                           : hasData
                             ? 'border-border/50 text-muted-foreground hover:border-neon-green/30 hover:text-foreground'
                             : 'border-border/20 text-muted-foreground/25 cursor-not-allowed',
                       )}
-                    >{rnd.number}</button>
+                    >
+                      {rnd.number}
+                      {hasData && rnd.winner && (
+                        <span className={cn(
+                          'absolute bottom-0 left-0 right-0 h-0.5 rounded-b',
+                          isWin ? 'bg-neon-green/70' : isLoss ? 'bg-red-500/60' : '',
+                        )} />
+                      )}
+                    </button>
                   )
                 })}
               </div>
