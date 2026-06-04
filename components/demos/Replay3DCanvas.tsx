@@ -609,6 +609,12 @@ function makeUtilObj(g: GrenadeEvent, cfg: MapConfig, scene: THREE.Scene): UtilO
       smokePuffs.push(sprite)
     }
     group.userData.smokePuffs = smokePuffs
+    // Ground coverage disc — shows smoke radius on the floor
+    const discMat = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.13, depthWrite: false, side: THREE.DoubleSide })
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), discMat)
+    disc.rotation.x = -Math.PI / 2; disc.position.set(lx, 0.015, lz)
+    group.userData.coverageDisc = disc
+    group.add(disc)
     // Invisible placeholder mesh for duration gating
     mainMat  = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0, color: col })
     mainMesh = new THREE.Mesh(new THREE.SphereGeometry(0.01, 3, 2), mainMat)
@@ -660,6 +666,16 @@ function updateUtilAnim(u: UtilObj, t: number) {
     const puffs: THREE.Sprite[] = u.group.userData.smokePuffs ?? []
     const inRange = age >= 0 && age < u.duration
     puffs.forEach(s => { s.visible = inRange })
+    const disc = u.group.userData.coverageDisc as THREE.Mesh | undefined
+    if (disc) {
+      disc.visible = inRange
+      if (inRange) {
+        const grow = Math.min(age / 1.8, 1)
+        const fadeEnd = Math.max(0, (age - (u.duration - 2.5)) / 2.5)
+        ;(disc.material as THREE.MeshBasicMaterial).opacity = 0.13 * grow * (1 - fadeEnd)
+        disc.scale.setScalar(grow)
+      }
+    }
     if (!inRange) return
     const grow    = Math.min(age / 1.8, 1)
     const fadeEnd = Math.max(0, (age - (u.duration - 2.5)) / 2.5)
@@ -957,6 +973,39 @@ function sndRoundEnd(ctx: AudioContext, win: boolean) {
   }
 }
 
+// ── Highlight detection ────────────────────────────────────────────────────────
+
+type HighlightTag = 'ace' | '4k' | '3k' | 'clutch' | 'force'
+type HighlightMap = Map<number, HighlightTag[]>
+
+function computeHighlights(rounds: Round[]): HighlightMap {
+  const out: HighlightMap = new Map()
+  rounds.forEach((rnd, i) => {
+    const tags: HighlightTag[] = []
+    // Multi-kill by any player
+    const killsByPlayer: Record<string, number> = {}
+    for (const k of rnd.kills) {
+      killsByPlayer[k.killer_name] = (killsByPlayer[k.killer_name] ?? 0) + 1
+    }
+    const max = Math.max(0, ...Object.values(killsByPlayer))
+    if (max >= 5) tags.push('ace')
+    else if (max >= 4) tags.push('4k')
+    else if (max >= 3) tags.push('3k')
+    // Clutch: a player was last alive on their side vs 2+ enemies
+    // Approximate: count alive CT vs T at each kill event
+    let ctAlive = 5, tAlive = 5
+    for (const k of rnd.kills) {
+      if (k.killer_team === 'CT') tAlive = Math.max(0, tAlive - 1)
+      else ctAlive = Math.max(0, ctAlive - 1)
+      if ((ctAlive === 1 && tAlive >= 2) || (tAlive === 1 && ctAlive >= 2)) {
+        tags.push('clutch'); break
+      }
+    }
+    if (tags.length) out.set(i, tags)
+  })
+  return out
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateChange }: Replay3DProps) {
@@ -993,19 +1042,24 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
   const [followingPlayer, setFollowingPlayer] = useState<string | null>(null)
   const [soundEnabled,    setSoundEnabled]    = useState(true)
   const [timelineEvents,  setTimelineEvents]  = useState<{time: number; type: string; side: string}[]>([])
-  const [camMode,         setCamMode]         = useState<'orbit' | 'follow' | 'topdown' | 'free'>('orbit')
+  const [camMode,         setCamMode]         = useState<'orbit' | 'follow' | 'topdown' | 'free' | 'auto'>('orbit')
   const [freeCamLocked,   setFreeCamLocked]   = useState(false)
   const [showHeatmap,     setShowHeatmap]     = useState(false)
   const [showScoreboard,  setShowScoreboard]  = useState(false)
   const [bookmarks,       setBookmarks]       = useState<{time: number; roundIdx: number; label: string}[]>([])
   const [scoreboardData,  setScoreboardData]  = useState<{name: string; isMyTeam: boolean; alive: boolean; hp: number; kills: number; deaths: number}[]>([])
-  const camModeRef         = useRef<'orbit' | 'follow' | 'topdown' | 'free'>('orbit')
+  const [xrayEnabled,     setXrayEnabled]     = useState(false)
+  const [cinematicMode,   setCinematicMode]   = useState(false)
+  const [highlightRounds, setHighlightRounds] = useState<HighlightMap>(new Map())
+  const camModeRef         = useRef<'orbit' | 'follow' | 'topdown' | 'free' | 'auto'>('orbit')
   const freeCamKeysRef     = useRef<Set<string>>(new Set())
   const freeCamYawRef      = useRef(0)
   const freeCamPitchRef    = useRef(-0.4)
   const freeCamLockedRef   = useRef(false)
   const heatmapEnabledRef  = useRef(false)
   const heatmapObjsRef     = useRef<THREE.Mesh[]>([])
+  const autoDirTimerRef    = useRef(0)
+  const xrayEnabledRef     = useRef(false)
 
   const togglePlay = useCallback(() => {
     const pb = pbRef.current
@@ -1059,7 +1113,7 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
     setSoundEnabled(soundEnabledRef.current)
   }, [])
 
-  const handleCamMode = useCallback((mode: 'orbit' | 'follow' | 'topdown' | 'free') => {
+  const handleCamMode = useCallback((mode: 'orbit' | 'follow' | 'topdown' | 'free' | 'auto') => {
     setCamMode(mode)
     camModeRef.current = mode
     const cam = cameraRef.current, ctrl = controlsRef.current
@@ -1075,6 +1129,9 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
       cam.lookAt(0, 0, 0)
     } else if (mode === 'free') {
       ctrl.enabled = false
+    } else if (mode === 'auto') {
+      ctrl.enabled = false
+      autoDirTimerRef.current = 0
     }
   }, [])
 
@@ -1102,6 +1159,40 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
   const removeBookmark = useCallback((idx: number) => {
     setBookmarks(prev => prev.filter((_, i) => i !== idx))
   }, [])
+
+  const toggleXray = useCallback(() => {
+    setXrayEnabled(prev => { xrayEnabledRef.current = !prev; return !prev })
+  }, [])
+
+  const toggleCinematic = useCallback(() => { setCinematicMode(p => !p) }, [])
+
+  // Compute highlight rounds when parsed data changes
+  useEffect(() => {
+    if (!parsed) { setHighlightRounds(new Map()); return }
+    const map = computeHighlights(parsed.rounds ?? [])
+    setHighlightRounds(map)
+    // Auto-bookmark highlight moments (multi-kills / clutches not already bookmarked)
+    setBookmarks(prev => {
+      const next = [...prev]
+      ;(parsed.rounds ?? []).forEach((rnd, ri) => {
+        const tags = map.get(ri)
+        if (!tags) return
+        const tag = tags[0]
+        for (const k of rnd.kills) {
+          const killsByPlayer: Record<string, number> = {}
+          for (const k2 of rnd.kills.filter(x => x.time <= k.time)) {
+            killsByPlayer[k2.killer_name] = (killsByPlayer[k2.killer_name] ?? 0) + 1
+          }
+          if ((killsByPlayer[k.killer_name] ?? 0) >= 3) {
+            const already = next.some(b => b.roundIdx === ri && Math.abs(b.time - k.time) < 1)
+            if (!already) next.push({ time: Math.max(0, k.time - 2), roundIdx: ri, label: `R${rnd.number} ${tag.toUpperCase()}` })
+            break
+          }
+        }
+      })
+      return next
+    })
+  }, [parsed])
 
   useEffect(() => {
     const el = mountRef.current
@@ -1660,6 +1751,52 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
         cam.rotation.set(pitch, yaw + Math.PI, 0, 'YXZ')
       }
 
+      // Auto-Director: score alive players and cut to best every ~4s
+      if (camModeRef.current === 'auto' && pb.playing) {
+        autoDirTimerRef.current += delta
+        if (autoDirTimerRef.current >= 4.0) {
+          autoDirTimerRef.current = 0
+          const rnd = roundsRef.current[pb.roundIdx]
+          let bestName = '', bestScore = -Infinity
+          for (const [name, po] of players) {
+            if (!po.group.visible || !po.alive) continue
+            let score = Math.random() * 0.5  // small jitter to vary cuts
+            // Recent kills
+            score += (rnd?.kills.filter(k => k.killer_name === name && k.time > pb.time - 4 && k.time <= pb.time).length ?? 0) * 12
+            // Low HP
+            const snapsNow = getPositions(framesRef.current, pb.time)
+            const snap = snapsNow?.find(s => s.n === name)
+            if ((snap?.h ?? 100) < 35) score += 8
+            // Near bomb
+            const bombObj = bombObjRef.current
+            if (bombObj && pb.time >= bombObj.plantTime) {
+              const dx = po.group.position.x - bombObj.group.position.x
+              const dz = po.group.position.z - bombObj.group.position.z
+              if (dx * dx + dz * dz < 9) score += 6
+            }
+            if (score > bestScore) { bestScore = score; bestName = name }
+          }
+          if (bestName) {
+            followPlayerRef.current = bestName
+            setFollowingPlayer(bestName)
+          }
+        }
+      }
+
+      // X-ray: toggle depthTest on all player meshes
+      const xray = xrayEnabledRef.current
+      for (const po of players.values()) {
+        const needsUpdate = (po.bodyMat.depthTest === xray)  // xray means depthTest=false
+        if (needsUpdate) {
+          po.bodyMat.depthTest = !xray; po.ringMat.depthTest = !xray
+          po.bodyMat.needsUpdate = true; po.ringMat.needsUpdate = true
+          po.group.traverse(o => {
+            const m = o as THREE.Mesh
+            if (m.isMesh) m.renderOrder = xray ? 999 : 0
+          })
+        }
+      }
+
       // Heatmap visibility toggle
       const heatEnabled = heatmapEnabledRef.current
       if (heatEnabled && heatmapObjsRef.current.length === 0 && cfg) {
@@ -1860,6 +1997,24 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
                   {freeCamLocked ? 'ESC to unlock · WASD/Space/Shift to fly' : 'Double-click to lock mouse · WASD/Space/Shift to fly'}
                 </span>
               </div>
+            )}
+
+            {/* Cinematic letterbox */}
+            {cinematicMode && (camMode === 'follow' || camMode === 'auto') && (
+              <>
+                <div className="absolute top-0 left-0 right-0 h-[10%] bg-black pointer-events-none select-none z-10" />
+                <div className="absolute bottom-0 left-0 right-0 h-[10%] bg-black pointer-events-none select-none z-10" />
+                {followingPlayer && (
+                  <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 pointer-events-none select-none z-10">
+                    <span className="text-[11px] font-mono font-semibold text-white/80 tracking-widest uppercase">{followingPlayer}</span>
+                  </div>
+                )}
+                {camMode === 'auto' && (
+                  <div className="absolute top-[12%] right-3 pointer-events-none select-none z-10">
+                    <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest">AUTO-DIRECTOR</span>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Reset camera */}
@@ -2085,18 +2240,18 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
             {/* Camera mode toolbar */}
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-[10px] text-muted-foreground/50 font-mono uppercase tracking-wider">Cam</span>
-              {(['orbit', 'topdown', 'free'] as const).map(mode => (
+              {(['orbit', 'topdown', 'free', 'auto'] as const).map(mode => (
                 <button
                   key={mode}
                   onClick={() => handleCamMode(mode)}
                   className={cn(
-                    'h-6 px-2 text-[10px] font-mono rounded border transition-colors capitalize',
+                    'h-6 px-2 text-[10px] font-mono rounded border transition-colors',
                     camMode === mode
                       ? 'bg-neon-green/20 border-neon-green/40 text-neon-green'
                       : 'border-border/50 text-muted-foreground hover:border-neon-green/30 hover:text-foreground',
                   )}
                 >
-                  {mode === 'orbit' ? 'Orbit' : mode === 'topdown' ? 'Top-Down' : 'Fly'}
+                  {mode === 'orbit' ? 'Orbit' : mode === 'topdown' ? 'Top-Down' : mode === 'free' ? 'Fly' : 'Auto-Dir'}
                 </button>
               ))}
               {followingPlayer && (
@@ -2134,6 +2289,29 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
               >
                 Kill Heatmap
               </button>
+              <button
+                onClick={toggleXray}
+                className={cn(
+                  'h-6 px-2 text-[10px] font-mono rounded border transition-colors',
+                  xrayEnabled
+                    ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+                    : 'border-border/50 text-muted-foreground hover:border-cyan-400/30 hover:text-foreground',
+                )}
+              >
+                X-Ray
+              </button>
+              <button
+                onClick={toggleCinematic}
+                className={cn(
+                  'h-6 px-2 text-[10px] font-mono rounded border transition-colors',
+                  cinematicMode
+                    ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300'
+                    : 'border-border/50 text-muted-foreground hover:border-yellow-400/30 hover:text-foreground',
+                )}
+                title="Cinematic bars (follow/auto mode)"
+              >
+                Cinematic
+              </button>
             </div>
           </div>
 
@@ -2163,10 +2341,11 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
                   const hasData = !!(rnd.frames && rnd.frames.length > 0)
                   const isWin  = rnd.winner === myTeamLabel
                   const isLoss = rnd.winner && rnd.winner !== myTeamLabel
+                  const hlTags = highlightRounds.get(i)
                   return (
                     <button
                       key={i} onClick={() => selectRound(i)} disabled={!hasData}
-                      title={`Round ${rnd.number}${hasData ? (rnd.winner ? ` · ${isWin ? 'W' : 'L'}` : '') : ' — no frame data'}`}
+                      title={`Round ${rnd.number}${hasData ? (rnd.winner ? ` · ${isWin ? 'W' : 'L'}` : '') : ' — no frame data'}${hlTags ? ` · ${hlTags.join('/')}` : ''}`}
                       className={cn(
                         'h-6 min-w-[26px] px-1.5 text-[10px] font-mono rounded border transition-colors relative',
                         uiRound === i
@@ -2177,6 +2356,9 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
                       )}
                     >
                       {rnd.number}
+                      {hlTags && (
+                        <span className="absolute -top-1 -right-1 text-[7px] text-yellow-400 leading-none" title={hlTags.join(', ')}>★</span>
+                      )}
                       {hasData && rnd.winner && (
                         <span className={cn(
                           'absolute bottom-0 left-0 right-0 h-0.5 rounded-b',
