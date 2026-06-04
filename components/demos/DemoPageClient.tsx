@@ -19,6 +19,7 @@ import StrategyBoard from '@/components/demos/StrategyBoard'
 import VoiceCommsPlayer from '@/components/demos/VoiceCommsPlayer'
 import RoutinesPanel from '@/components/demos/RoutinesPanel'
 import AiMatchReport from '@/components/demos/AiMatchReport'
+import { useFullParsedDemo } from '@/components/demos/useFullParsedDemo'
 import { MAP_THUMBS } from '@/lib/map-config'
 
 const Replay3DCanvas = dynamic(
@@ -536,6 +537,8 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
   }, [fetchDemo])
 
   const parsed = demo.parsed_data as ParsedDemoData | null
+  const replayData = useFullParsedDemo(demo.id, parsed, activeTab === 'replay' || activeTab === '3d')
+  const replayParsed = replayData.parsed ?? parsed
   const backHref = folderId ? `/opponents/${folderId}` : '/opponents'
   const aiScoutHref = folderId ? `/ai-coach?folder=${folderId}` : '/ai-coach'
 
@@ -721,7 +724,7 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
 
             {activeTab === 'economy' && <EconomyTab parsed={parsed} />}
 
-            {activeTab === 'replay' && (
+            {activeTab === 'replay' && replayParsed && (
               <div className="space-y-4">
                 <Card>
                   <CardHeader className="pb-3">
@@ -731,12 +734,18 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {replayData.loading && (
+                      <p className="text-xs text-muted-foreground mb-3">Loading movement data...</p>
+                    )}
+                    {replayData.error && (
+                      <p className="text-xs text-amber-400 mb-3">{replayData.error}</p>
+                    )}
                     <ReplayCanvas
-                      rounds={parsed.rounds ?? []}
-                      players={parsed.players ?? []}
-                      team1Name={parsed.header.team1}
-                      team2Name={parsed.header.team2}
-                      mapName={parsed.header.map}
+                      rounds={replayParsed.rounds ?? []}
+                      players={replayParsed.players ?? []}
+                      team1Name={replayParsed.header.team1}
+                      team2Name={replayParsed.header.team2}
+                      mapName={replayParsed.header.map}
                       onPlaybackChange={(t, playing) => { setReplayTime(t); setReplayPlaying(playing) }}
                     />
                   </CardContent>
@@ -755,14 +764,14 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
               </div>
             )}
 
-            {activeTab === '3d' && parsed && (
+            {activeTab === '3d' && replayParsed && (
               <div className="flex flex-col lg:flex-row gap-4 items-start">
                 <div className="w-full lg:flex-1 min-w-0">
                   <Replay3DCanvas
-                    mapName={parsed.header.map}
-                    parsed={parsed}
-                    team1={parsed.header.team1}
-                    team2={parsed.header.team2}
+                    mapName={replayParsed.header.map}
+                    parsed={replayParsed}
+                    team1={replayParsed.header.team1}
+                    team2={replayParsed.header.team2}
                   />
                 </div>
                 <div className="w-full lg:w-[340px] lg:shrink-0 h-[548px]">

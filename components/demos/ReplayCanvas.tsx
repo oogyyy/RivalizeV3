@@ -1175,7 +1175,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
             <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T2_COLOR }}/><span>{team2Name}</span></div>
             {hasFrames
               ? <span className="text-cyan-400/25">{frames.length} frames</span>
-              : <span className="text-amber-400/30">kill-only · re-parse for movement</span>
+              : <span className="text-amber-400/30">kill-only replay</span>
             }
           </div>
         </div>
