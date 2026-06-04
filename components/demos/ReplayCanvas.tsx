@@ -517,10 +517,18 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     if (focusPos?.alive) ctx.restore()
 
     // ── Annotations ───────────────────────────────────────────────────────
-    const savedAnnotations  = annotations[roundIdx] ?? []
-    const inProg            = inProgressRef.current
-    const allAnns: (Annotation | typeof inProg)[] = inProg
-      ? [...savedAnnotations, inProg as unknown as Annotation]
+    const savedAnnotations = annotations[roundIdx] ?? []
+    const inProg = inProgressRef.current
+    const previewAnnotation: Annotation | null = inProg
+      ? {
+          id: 'preview',
+          type: inProg.type,
+          points: inProg.type === 'pen' ? inProg.path : [inProg.start, inProg.current],
+          color: annotColor,
+        }
+      : null
+    const allAnns = previewAnnotation
+      ? [...savedAnnotations, previewAnnotation]
       : savedAnnotations
 
     allAnns.forEach(ann => {
@@ -559,7 +567,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     ctx.strokeStyle = 'rgba(34,211,238,0.09)'; ctx.lineWidth = 1.5
     ctx.strokeRect(0.75, 0.75, W - 1.5, H - 1.5)
   }, [
-    annotations, bgImage, deadAt, focusPlayer, frames, kills, roundIdx,
+    annotations, annotColor, bgImage, deadAt, focusPlayer, frames, kills, roundIdx,
     showDeaths, showDirections, showHeatmap, showNames, showTrails,
     team1Name, teamOf, toXY, visibleGrenades,
   ])
