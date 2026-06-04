@@ -165,6 +165,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     start: { x: number; y: number }
     current: { x: number; y: number }
     path: { x: number; y: number }[]
+    color: string
   } | null>(null)
 
   const { recordState, toggle: toggleRecord } = useVideoCapture(canvasRef)
@@ -517,11 +518,15 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     if (focusPos?.alive) ctx.restore()
 
     // ── Annotations ───────────────────────────────────────────────────────
-    const savedAnnotations  = annotations[roundIdx] ?? []
-    const inProg            = inProgressRef.current
-    const allAnns: (Annotation | typeof inProg)[] = inProg
-      ? [...savedAnnotations, inProg as unknown as Annotation]
-      : savedAnnotations
+    const savedAnnotations = annotations[roundIdx] ?? []
+    const inProg           = inProgressRef.current
+    const inProgAnn: Annotation | null = inProg ? {
+      id: '__ip',
+      type: inProg.type,
+      points: inProg.type === 'pen' ? inProg.path : [inProg.start, inProg.current],
+      color: inProg.color,
+    } : null
+    const allAnns: Annotation[] = inProgAnn ? [...savedAnnotations, inProgAnn] : savedAnnotations
 
     allAnns.forEach(ann => {
       if (!ann || !ann.points?.length) return
@@ -618,9 +623,9 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       })
       setFocusPlayer(nearest)
     } else {
-      inProgressRef.current = { type: activeTool, start: pt, current: pt, path: [pt] }
+      inProgressRef.current = { type: activeTool, start: pt, current: pt, path: [pt], color: annotColor }
     }
-  }, [activeTool, getCanvasPoint])
+  }, [activeTool, annotColor, getCanvasPoint])
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const pt = getCanvasPoint(e)
