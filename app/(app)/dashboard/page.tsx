@@ -82,7 +82,7 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
 
   type MembershipRow = { role: string; team_id: string; teams: { is_personal: boolean } | null }
-  const typedMemberships = (memberships ?? []) as MembershipRow[]
+  const typedMemberships = (memberships ?? []) as unknown as MembershipRow[]
 
   const teamIds          = typedMemberships.map((m) => m.team_id).filter(Boolean)
   // Exclude personal teams from dashboard "My Team Demos" — those belong to the My Matches page
