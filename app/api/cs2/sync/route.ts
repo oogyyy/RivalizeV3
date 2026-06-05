@@ -98,9 +98,13 @@ export async function POST() {
 
       return NextResponse.json({ newMatches, configured: true, linked: true, source: 'gc' })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'GC sync failed'
-      // Fall through to sharecode method if bot fails
-      console.error('Steam bot sync failed:', msg)
+      botError = err instanceof Error ? err.message : 'GC sync failed'
+      console.error('Steam bot sync failed:', botError)
+      // Return the error directly — don't silently fall through
+      return NextResponse.json({
+        newMatches: 0, configured: true, linked: true, source: 'gc',
+        error: botError,
+      })
     }
   }
 
