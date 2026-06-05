@@ -1304,9 +1304,23 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
           if (cancelled) return
           glbRoot = gltf.scene
 
-          // Apply coordinate-space transform
-          glbRoot.rotation.x = -Math.PI / 2
-          glbRoot.scale.setScalar(s3d)
+          // Apply coordinate-space transform.
+          // The GLB nodes store raw CS2 world vertices in inches and bake a
+          // quaternion that maps CS2 axes → glTF Y-up:
+          //   CS2 X(east)  → glTF Z
+          //   CS2 Y(north) → glTF X
+          //   CS2 Z(up)    → glTF Y
+          //   scale 0.0254 = inches → metres
+          //
+          // We therefore need:
+          //   rotation.y = +π/2  → swaps (x,y,z) to (z,y,-x), giving:
+          //                         scene_x = CS2_X × s
+          //                         scene_z = -CS2_Y × s
+          //   scale = s / 0.0254 (convert metres back to scene units)
+          //   position derived as the inverse of worldTo3D (unchanged)
+          const INCH_TO_M = 0.0254
+          glbRoot.rotation.set(0, Math.PI / 2, 0)
+          glbRoot.scale.setScalar(s3d / INCH_TO_M)
           glbRoot.position.set(
             -glbMapCfg.pos_x * s3d - MAP_PLANE / 2,
             glbMapCfg.glbYOffset ?? 0,
