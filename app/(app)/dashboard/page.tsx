@@ -78,11 +78,20 @@ export default async function DashboardPage() {
 
   const { data: memberships } = await admin
     .from('team_members')
-    .select('role, team_id')
+    .select('role, team_id, teams(is_personal)')
     .eq('user_id', user.id)
 
-  const teamIds       = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
-  const primaryTeamId = teamIds[0] ?? null
+  type MembershipRow = { role: string; team_id: string; teams: { is_personal: boolean } | null }
+  const typedMemberships = (memberships ?? []) as MembershipRow[]
+
+  const teamIds          = typedMemberships.map((m) => m.team_id).filter(Boolean)
+  // Exclude personal teams from dashboard "My Team Demos" — those belong to the My Matches page
+  const teamTeamIds      = typedMemberships
+    .filter(m => !m.teams?.is_personal)
+    .map(m => m.team_id)
+    .filter(Boolean)
+
+  const primaryTeamId = teamTeamIds[0] ?? null
 
   const { data: primaryTeam } = primaryTeamId
     ? await admin.from('teams').select('name').eq('id', primaryTeamId).single()
@@ -128,11 +137,11 @@ export default async function DashboardPage() {
         .limit(4)
     : { data: [] }
 
-  const { data: recentSelfDemos } = teamIds.length
+  const { data: recentSelfDemos } = teamTeamIds.length
     ? await admin
         .from('demos')
         .select('id, team_id, opponent_name, opponent_slug, map, match_date, status, created_at, parsed_data')
-        .in('team_id', teamIds)
+        .in('team_id', teamTeamIds)
         .eq('demo_type', 'self')
         .order('created_at', { ascending: false })
         .limit(4)
@@ -145,12 +154,12 @@ export default async function DashboardPage() {
         .in('team_id', teamIds)
     : { data: [] }
 
-  // Fetch all completed self-demos to compute win rate + avg K/D
-  const { data: allSelfDemosData } = teamIds.length
+  // Fetch all completed self-demos to compute win rate + avg K/D (personal team excluded)
+  const { data: allSelfDemosData } = teamTeamIds.length
     ? await admin
         .from('demos')
         .select('parsed_data')
-        .in('team_id', teamIds)
+        .in('team_id', teamTeamIds)
         .eq('demo_type', 'self')
         .eq('status', 'completed')
     : { data: [] }
