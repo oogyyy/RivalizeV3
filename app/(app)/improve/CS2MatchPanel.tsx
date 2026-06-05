@@ -370,7 +370,7 @@ export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props
         setSyncError(json.error ?? 'Sync failed')
       } else {
         setNewCount(json.newMatches)
-        if (json.newMatches > 0) await load()
+        await load()  // always refresh so existing matches show up
       }
     } catch {
       setSyncError('Sync failed — check your connection')
@@ -495,6 +495,11 @@ export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props
             <p className="text-[11px] text-muted-foreground">
               {isBotMode ? 'Click Sync to pull your recent matches.' : 'Play a match or sync to discover history.'}
             </p>
+            {isBotMode && newCount === 0 && (
+              <p className="text-[10px] text-muted-foreground/70 max-w-[220px] leading-relaxed">
+                Tip: your Steam profile&apos;s <strong>Game details</strong> must be set to <strong>Public</strong> for match history to sync.
+              </p>
+            )}
             <Button variant="outline" size="sm" className="mt-2 gap-1.5" onClick={sync} disabled={syncing}>
               <RefreshCw size={11} className={cn(syncing && 'animate-spin')} /> Sync Now
             </Button>

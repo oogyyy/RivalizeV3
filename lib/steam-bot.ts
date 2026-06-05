@@ -105,7 +105,9 @@ export function fetchRecentCS2Matches(steamId64: string): Promise<CS2GCMatchData
     })
 
     csgo.on('matchList', (matches: unknown[]) => {
+      console.log(`[steam-bot] matchList received: ${(matches ?? []).length} raw entries`)
       const parsed = (matches ?? []).map(parseMatch).filter(Boolean) as CS2GCMatchData[]
+      console.log(`[steam-bot] parsed ${parsed.length} valid matches`)
       done(parsed)
     })
   })
