@@ -5,7 +5,6 @@ import { Plus, Loader2, X, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent } from '@/components/ui/card'
 import { slugify } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
@@ -61,17 +60,16 @@ export default function CreateTeamDialog({ asCard }: CreateTeamDialogProps) {
   }
 
   const trigger = asCard ? (
-    <button onClick={() => setOpen(true)} className="w-full h-full text-left group">
-      <Card className="bg-card border-border border-dashed hover:border-neon-green/40 transition-all duration-200 cursor-pointer h-full min-h-[160px]">
-        <CardContent className="p-5 flex flex-col items-center justify-center h-full">
-          <div className="w-12 h-12 rounded-lg bg-neon-green/5 border border-neon-green/20 border-dashed flex items-center justify-center mb-3 group-hover:border-neon-green/50 transition-colors">
-            <Plus size={20} className="text-neon-green/60 group-hover:text-neon-green transition-colors" />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-            Create new team
-          </p>
-        </CardContent>
-      </Card>
+    <button
+      onClick={() => setOpen(true)}
+      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-dashed border-border hover:border-neon-green/40 hover:bg-card/60 transition-all duration-150 group cursor-pointer"
+    >
+      <div className="w-9 h-9 rounded-md bg-neon-green/5 border border-dashed border-neon-green/20 flex items-center justify-center shrink-0 group-hover:border-neon-green/50 transition-colors">
+        <Plus size={16} className="text-neon-green/50 group-hover:text-neon-green transition-colors" />
+      </div>
+      <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+        Create new team
+      </span>
     </button>
   ) : (
     <Button variant="neon" onClick={() => setOpen(true)} className="gap-2">
