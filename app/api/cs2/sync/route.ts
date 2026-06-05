@@ -11,12 +11,9 @@ import { decodeMatchShareCode } from '@/lib/cs2-sharecode'
 /**
  * POST /api/cs2/sync
  *
- * When STEAM_BOT_USERNAME/PASSWORD are set: connects to CS2 GC to fetch
- * the user's recent matches (up to 8) including map, scores, and timestamps.
- * Also probes Valve's CDN to find demo download URLs.
- *
- * Falls back to sharecode-chain traversal (requires STEAM_API_KEY +
- * user's steam_auth_token) when the bot is not configured.
+ * Tries Steam bot GC first (if configured). If the GC times out (common on
+ * cloud servers due to Valve IP rate-limiting), falls through to the sharecode
+ * chain method if the user has that configured too.
  */
 export async function POST() {
   const supabase = await createClient()
@@ -36,6 +33,7 @@ export async function POST() {
   const lastSharecode = profile?.cs2_last_sharecode as string | null
 
   // ── Path 1: Steam bot (full GC access) ──────────────────────────────────────
+  let botError: string | null = null
   if (isSteamBotConfigured() && steamId) {
     try {
       const gcMatches = await fetchRecentCS2Matches(steamId)
@@ -44,8 +42,6 @@ export async function POST() {
       for (const m of gcMatches) {
         if (!m.matchId) continue
 
-        // Synthesise a stable unique key: we don't always have a sharecode,
-        // so use matchId as the canonical identifier.
         const { data: existing } = await admin
           .from('cs2_matches')
           .select('id, demo_url')
@@ -58,10 +54,9 @@ export async function POST() {
           : new Date().toISOString()
 
         if (!existing) {
-          // New match — insert it
           await admin.from('cs2_matches').insert({
             user_id:        user.id,
-            sharecode:      `gc-${m.matchId}`, // placeholder; real sharecode not from GC
+            sharecode:      `gc-${m.matchId}`,
             match_id:       m.matchId,
             reservation_id: m.reservationId,
             tv_port:        m.tvPort,
@@ -73,7 +68,6 @@ export async function POST() {
           })
           newMatches++
 
-          // Async demo URL probe — fire and don't wait (best effort)
           if (m.matchTime) {
             findDemoUrl(m.matchId, m.matchTime).then(async (url) => {
               if (url) {
@@ -85,7 +79,6 @@ export async function POST() {
             }).catch(() => { /* silent */ })
           }
         } else if (!existing.demo_url && m.matchTime) {
-          // Match exists but no demo URL yet — probe in background
           findDemoUrl(m.matchId, m.matchTime).then(async (url) => {
             if (url) {
               await admin.from('cs2_matches')
@@ -98,21 +91,28 @@ export async function POST() {
 
       return NextResponse.json({ newMatches, configured: true, linked: true, source: 'gc' })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'GC sync failed'
-      console.error('Steam bot sync failed:', msg)
-      return NextResponse.json({
-        newMatches: 0, configured: true, linked: true, source: 'gc',
-        error: msg,
-      })
+      botError = err instanceof Error ? err.message : 'GC sync failed'
+      console.error('Steam bot sync failed, trying sharecode fallback:', botError)
+      // Fall through to sharecode chain instead of returning immediately
     }
   }
 
-  // ── Path 2: Sharecode chain traversal (fallback) ─────────────────────────────
+  // ── Path 2: Sharecode chain traversal ────────────────────────────────────────
   if (!isSteamApiConfigured()) {
-    return NextResponse.json({ newMatches: 0, configured: false })
+    return NextResponse.json({
+      newMatches: 0, configured: false,
+      ...(botError ? { error: botError } : {}),
+    })
   }
 
   if (!steamId || !authToken || !lastSharecode) {
+    // Bot failed and sharecode not configured — surface the bot error
+    if (botError) {
+      return NextResponse.json({
+        newMatches: 0, configured: true, linked: true, source: 'gc',
+        error: `Steam GC unavailable (${botError}). Set up sharecode sync below as an alternative.`,
+      })
+    }
     return NextResponse.json({ newMatches: 0, configured: true, linked: false })
   }
 
