@@ -1232,7 +1232,8 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
     composer.addPass(fxaaPass)
 
     // ── Lighting ──────────────────────────────────────────────────────────────
-    scene.add(new THREE.HemisphereLight(0x1e2b50, 0x040508, 0.7))
+    const hemLight = new THREE.HemisphereLight(0x1e2b50, 0x040508, 0.7)
+    scene.add(hemLight)
     const sun = new THREE.DirectionalLight(0xffffff, 1.8)
     sun.position.set(8, 25, 10); sun.castShadow = true
     sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.001
@@ -1331,16 +1332,18 @@ export default function Replay3DCanvas({ mapName, parsed, team1, team2, onStateC
             const mesh = child as THREE.Mesh
             if (!mesh.isMesh) return
             mesh.receiveShadow = true
-            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-            for (const mat of mats) {
-              const stdMat = mat as THREE.MeshStandardMaterial
-              if (stdMat.isMeshStandardMaterial) {
-                stdMat.roughness    = Math.max(stdMat.roughness ?? 0.8, 0.65)
-                stdMat.envMapIntensity = 0.35
-                stdMat.needsUpdate  = true
-              }
-            }
+            mesh.castShadow = true
           })
+
+          // Switch to bright neutral lighting for the real 3D model
+          hemLight.color.set(0xd6e8ff)
+          hemLight.groundColor.set(0x8899aa)
+          hemLight.intensity = 2.2
+          sun.intensity = 2.8
+          fillLight.color.set(0xc8d8f0)
+          fillLight.intensity = 1.4
+          bloom.strength = 0.08
+          scene.fog = null
 
           // Replace flat radar plane and fake geometry with the real model
           mapMesh.visible = false
