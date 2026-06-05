@@ -476,12 +476,18 @@ export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props
             <RefreshCw size={10} className={cn(syncing && 'animate-spin')} />
             {syncing ? 'Syncing…' : 'Sync'}
           </button>
-          {!isBotMode && (
+          {(!isBotMode || syncError) && (
             <>
               <span className="text-border">·</span>
-              <button onClick={disconnect} className="text-[10px] text-muted-foreground hover:text-red-400 transition-colors">
-                Disconnect
-              </button>
+              {!isBotMode ? (
+                <button onClick={disconnect} className="text-[10px] text-muted-foreground hover:text-red-400 transition-colors">
+                  Disconnect
+                </button>
+              ) : (
+                <button onClick={() => setShowSetup(true)} className="text-[10px] text-[#00ffc8] hover:underline transition-colors">
+                  Set up sharecode
+                </button>
+              )}
             </>
           )}
         </div>
