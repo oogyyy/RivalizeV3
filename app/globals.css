@@ -6,13 +6,13 @@
   --font-display: var(--font-space), "Space Grotesk", sans-serif;
   --font-mono: var(--font-mono-var, "JetBrains Mono"), "JetBrains Mono", ui-monospace, monospace;
 
-  --color-brand-bg: #07080e;
-  --color-brand-card: #0f111e;
-  --color-brand-purple: #7047eb;
-  --color-brand-purple-hover: #8862ff;
-  --color-brand-cyan: #14b8a6;
-  --color-brand-pink: #f43f5e;
-  --color-brand-border: #1e2238;
+  --color-brand-bg: hsl(226 30% 8.5%);
+  --color-brand-card: hsl(226 24% 14%);
+  --color-brand-purple: #8B7CFF;
+  --color-brand-purple-hover: #a394ff;
+  --color-brand-cyan: #22D3EE;
+  --color-brand-pink: #ff3d8a;
+  --color-brand-border: rgba(255,255,255,0.10);
 
   --animate-fade-in: fade-in 0.3s ease-out;
   --animate-glow: glow 2s ease-in-out infinite;
@@ -109,18 +109,18 @@ input:focus, textarea:focus, select:focus { outline: none; }
 /* ── Rivalize Pro Design System — Violet / Glass ────────────────────────────── */
 :root {
   /* Surface scale */
-  --bg:       #07080e;
-  --panel:    #090b13;
-  --card:     #0f111e;
-  --card-2:   #131526;
-  --elevated: #181b2e;
+  --bg:       hsl(226 30% 8.5%);
+  --panel:    hsl(226 27% 10.5%);
+  --card:     hsl(226 24% 14%);
+  --card-2:   hsl(226 22% 18%);
+  --elevated: hsl(226 20% 23%);
 
   /* Borders */
-  --border:        #1e2238;
-  --border-2:      rgba(40,47,80,0.85);
-  --border-strong: rgba(112,71,235,0.22);
-  --track:         rgba(30,34,56,0.5);
-  --hairline:      rgba(30,34,56,0.25);
+  --border:        rgba(255,255,255,0.10);
+  --border-2:      rgba(255,255,255,0.165);
+  --border-strong: rgba(139,124,255,0.22);
+  --track:         rgba(255,255,255,0.07);
+  --hairline:      rgba(255,255,255,0.055);
 
   /* Text hierarchy */
   --text:  #F0F0F6;
@@ -128,27 +128,32 @@ input:focus, textarea:focus, select:focus { outline: none; }
   --faint: rgba(240,240,246,0.32);
 
   /* Accent — Violet (default; easily overridable) */
-  --accent:      #7047eb;
-  --accent-deep: #5438c4;
+  --accent:      #8B7CFF;
+  --accent-deep: color-mix(in srgb, #8B7CFF 74%, #0a0a12);
   --accent-fg:   #ffffff;
-  --accent-soft: rgba(112,71,235,0.13);
-  --accent-line: rgba(112,71,235,0.30);
+  --accent-soft: color-mix(in srgb, #8B7CFF 16%, transparent);
+  --accent-line: color-mix(in srgb, #8B7CFF 40%, transparent);
 
   /* Semantic colors */
-  --signal: #14b8a6;
-  --win:    #36D49E;
-  --loss:   #f43f5e;
-  --ct:     #5B8DEF;
-  --tside:  #E6A53D;
+  --signal: #22D3EE;
+  --win:    #34E2A0;
+  --loss:   #FF6B7A;
+  --ct:     #5C9BFF;
+  --tside:  #FFB13E;
+
+  /* Brand colors */
+  --pink:   #ff3d8a;
+  --purple: #b14dff;
+  --teal:   #22D3EE;
 
   /* Brand-* aliases — Stitch design tokens */
-  --brand-bg:           #07080e;
-  --brand-card:         #0f111e;
-  --brand-purple:       #7047eb;
-  --brand-purple-hover: #8862ff;
-  --brand-cyan:         #14b8a6;
-  --brand-pink:         #f43f5e;
-  --brand-border:       #1e2238;
+  --brand-bg:           hsl(226 30% 8.5%);
+  --brand-card:         hsl(226 24% 14%);
+  --brand-purple:       #8B7CFF;
+  --brand-purple-hover: #a394ff;
+  --brand-cyan:         #22D3EE;
+  --brand-pink:         #ff3d8a;
+  --brand-border:       rgba(255,255,255,0.10);
 
   /* Font stacks */
   --font-ui:      var(--font-inter, 'Inter'), system-ui, sans-serif;
@@ -200,6 +205,30 @@ input:focus, textarea:focus, select:focus { outline: none; }
   -webkit-backdrop-filter: blur(20px) saturate(1.3);
   box-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 18px 44px -26px rgba(0,0,0,0.8);
 }
+
+/* Stat card left-border accents */
+.s-red    { border-left: 3px solid rgba(255,107,122,0.5) !important; }
+.s-blue   { border-left: 3px solid rgba(92,155,255,0.5) !important; }
+.s-green  { border-left: 3px solid rgba(52,226,160,0.5) !important; }
+.s-amber  { border-left: 3px solid rgba(255,177,62,0.5) !important; }
+.s-purple { border-left: 3px solid rgba(155,29,255,0.5) !important; }
+.s-signal { border-left: 3px solid rgba(34,211,238,0.5) !important; }
+.s-pink   { border-left: 3px solid rgba(255,61,138,0.5) !important; }
+
+/* Accent top-line gradients */
+.al-red    { height: 2px; background: linear-gradient(90deg, rgba(255,107,122,.9), rgba(255,107,122,.15) 50%, transparent); }
+.al-blue   { height: 2px; background: linear-gradient(90deg, rgba(92,155,255,.9), rgba(92,155,255,.15) 50%, transparent); }
+.al-green  { height: 2px; background: linear-gradient(90deg, rgba(52,226,160,.9), rgba(52,226,160,.15) 50%, transparent); }
+.al-signal { height: 2px; background: linear-gradient(90deg, rgba(34,211,238,.9), rgba(34,211,238,.15) 50%, transparent); }
+.al-accent { height: 2px; background: linear-gradient(90deg, rgba(139,124,255,.9), rgba(139,124,255,.15) 50%, transparent); }
+.al-amber  { height: 2px; background: linear-gradient(90deg, rgba(255,177,62,.9), rgba(255,177,62,.15) 50%, transparent); }
+.al-pink   { height: 2px; background: linear-gradient(90deg, rgba(255,61,138,.9), rgba(255,61,138,.15) 50%, transparent); }
+.al-purple { height: 2px; background: linear-gradient(90deg, rgba(177,77,255,.9), rgba(177,77,255,.15) 50%, transparent); }
+.al-loss   { height: 2px; background: linear-gradient(90deg, rgba(255,107,122,.9), rgba(255,107,122,.15) 50%, transparent); }
+
+/* Glow hover lift effect */
+.lift { transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease; }
+.lift:hover { transform: translateY(-1px); }
 
 .rv-sheen {
   background: linear-gradient(180deg, rgba(255,255,255,0.022), transparent 90px), var(--card);

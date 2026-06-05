@@ -9,9 +9,23 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import OpponentCardWithDelete from '@/components/teams/OpponentCardWithDelete'
-import { Target, Brain, Upload, Layers, Activity, Zap, Trophy } from 'lucide-react'
+import { Target, Brain, Upload, Zap, Trophy } from 'lucide-react'
 import type { AggregatedStats } from '@/types/database'
-import { PageHeader } from '@/components/layout/PageHeader'
+
+function TeamAvatar({ name, color = 'var(--accent)', size = 42 }: { name: string; color?: string; size?: number }) {
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: `linear-gradient(135deg, color-mix(in srgb, ${color} 80%, #000), color-mix(in srgb, ${color} 40%, #0c0f1a))`,
+      border: `1.5px solid color-mix(in srgb, ${color} 55%, transparent)`,
+      fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: size * 0.34, color: '#fff'
+    }}>
+      {initials}
+    </div>
+  )
+}
 
 export default async function OpponentsPage() {
   const user = await getCurrentUser()
@@ -93,73 +107,48 @@ export default async function OpponentsPage() {
     <div className="p-5 md:p-7 space-y-6 max-w-7xl mx-auto">
 
       {/* ── Header ── */}
-      <div className="animate-fade-in-up">
-        <PageHeader
-          label="Scouting"
-          title="Opponents"
-          description="Your scouting library — teams you're preparing to face"
-          actions={
-            <div className="flex items-center gap-2 flex-wrap">
-              <Link href="/ai-coach">
-                <Button variant="secondary" className="gap-2">
-                  <Brain size={15} />
-                  AI Scout
-                </Button>
-              </Link>
-              <Link href="/opponents/import">
-                <Button variant="secondary" className="gap-2">
-                  <Zap size={15} className="text-orange-400" />
-                  Import FaceIt
-                </Button>
-              </Link>
-              <Link href="/opponents/pro-demos">
-                <Button variant="secondary" className="gap-2">
-                  <Trophy size={15} className="text-yellow-400" />
-                  Pro Library
-                </Button>
-              </Link>
-              {primaryTeamId && (
-                <DemoUploadButton teamId={primaryTeamId} />
-              )}
-            </div>
-          }
-        />
+      <div className="animate-fade-in-up flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 8 }}>Scouting</p>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Opponents</h1>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>Your scouting library — teams you&apos;re preparing to face</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/ai-coach">
+            <Button variant="secondary" className="gap-2">
+              <Brain size={15} />
+              AI Scout
+            </Button>
+          </Link>
+          <Link href="/opponents/import">
+            <Button variant="secondary" className="gap-2">
+              <Zap size={15} className="text-orange-400" />
+              Import FaceIt
+            </Button>
+          </Link>
+          <Link href="/opponents/pro-demos">
+            <Button variant="secondary" className="gap-2">
+              <Trophy size={15} className="text-yellow-400" />
+              Pro Library
+            </Button>
+          </Link>
+          <DemoUploadButton teamId={primaryTeamId ?? ''} />
+        </div>
       </div>
 
       {/* ── Stats row ── */}
-      <div className="grid grid-cols-3 gap-3 animate-fade-in-up animate-fade-in-up-delay-1">
-        <div className="rv-panel p-4 card-hover overflow-hidden stat-card-red">
-          <span className="rv-topbar-accent" style={{ background: 'linear-gradient(90deg, rgba(255,64,64,0.9), rgba(255,64,64,0.15) 42%, transparent 70%)' }} />
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Opponents</p>
-            <div className="p-1.5 rounded-lg bg-red-500/10 shrink-0">
-              <Target size={14} className="text-red-400" />
-            </div>
+      <div className="grid grid-cols-3 gap-4 animate-fade-in-up">
+        {[
+          { label: 'Opponents', value: totalOpponents, accent: 'var(--pink)', border: 's-pink', sub: 'In scouting library' },
+          { label: 'Demos', value: totalDemos, accent: 'var(--signal)', border: 's-signal', sub: 'Total uploaded' },
+          { label: 'Analyzed', value: analyzedDemos, accent: 'var(--win)', border: 's-green', sub: 'Fully processed' },
+        ].map(({ label, value, accent, border, sub }) => (
+          <div key={label} className={`rv-panel lift p-5 ${border}`} style={{ cursor: 'default' }}>
+            <p style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: 8 }}>{label}</p>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 38, fontWeight: 600, color: accent, lineHeight: 1, letterSpacing: '-0.03em', marginBottom: 8, textShadow: `0 0 22px color-mix(in srgb, ${accent} 35%, transparent)` }}>{value}</p>
+            <p style={{ fontSize: 11.5, color: 'var(--faint)' }}>{sub}</p>
           </div>
-          <p className="text-[28px] font-bold tabular-nums text-foreground font-mono leading-none">{totalOpponents}</p>
-        </div>
-
-        <div className="rv-panel p-4 card-hover overflow-hidden stat-card-blue">
-          <span className="rv-topbar-accent" style={{ background: 'linear-gradient(90deg, rgba(59,130,246,0.9), rgba(59,130,246,0.15) 42%, transparent 70%)' }} />
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Uploaded</p>
-            <div className="p-1.5 rounded-lg bg-blue-500/10 shrink-0">
-              <Layers size={14} className="text-blue-400" />
-            </div>
-          </div>
-          <p className="text-[28px] font-bold tabular-nums text-foreground font-mono leading-none">{totalDemos}</p>
-        </div>
-
-        <div className="rv-panel p-4 card-hover overflow-hidden stat-card-green">
-          <span className="rv-topbar-accent" style={{ background: 'linear-gradient(90deg, rgba(0,200,100,0.9), rgba(0,200,100,0.15) 42%, transparent 70%)' }} />
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <p className="text-[11px] text-muted-foreground/60 font-semibold uppercase tracking-[0.12em]">Analyzed</p>
-            <div className="p-1.5 rounded-lg bg-[rgba(0,255,200,0.1)] shrink-0">
-              <Activity size={14} className="text-[#00ffc8]" />
-            </div>
-          </div>
-          <p className="text-[28px] font-bold tabular-nums text-[#00ffc8] font-mono leading-none">{analyzedDemos}</p>
-        </div>
+        ))}
       </div>
 
       {/* ── Opponent grid ── */}
@@ -177,7 +166,7 @@ export default async function OpponentsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-fade-in-up animate-fade-in-up-delay-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in-up animate-fade-in-up-delay-2">
           {(folders ?? []).map((folder) => {
             const demos = demosBySlug[folder.opponent_slug] ?? []
             const lastActivity = demos

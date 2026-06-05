@@ -597,7 +597,10 @@ export default function AIScoutPage() {
         </div>
       </div>
 
-      {/* ── Right panel: Chat ── */}
+      {/* ── Right side: Chat + Insights ── */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minWidth: 0 }}>
+
+      {/* ── Chat panel ── */}
       <div className="flex-1 flex flex-col overflow-hidden bg-background min-w-0">
         {/* Chat header */}
         <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b border-border bg-[hsl(229,23%,9%)] shrink-0">
@@ -877,6 +880,26 @@ export default function AIScoutPage() {
           </p>
         </div>
       </div>
+
+      {/* ── Insights side panel ── */}
+      <div style={{ width: 320, minWidth: 320, borderLeft: '1px solid var(--border)', background: 'var(--panel)', overflowY: 'auto', padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Insights</p>
+        </div>
+        {[
+          { title: 'Mid-control weakness', text: 'The opponent consistently fails to hold mid on Mirage CT-side, often over-rotating. Exploit with quick mid-pushes or splits.' },
+          { title: 'Eco round force pattern', text: 'Expect aggressive force buys with MP9s and Deagles on eco rounds. They stack A-site or push Underpass to disrupt B executes.' },
+          { title: 'AWP positioning', text: 'Primary AWPer favors Connector and Ticket Booth on Mirage CT-side. Flash these angles early to neutralize their impact.' },
+        ].map((insight, i) => (
+          <div key={i} style={{ padding: '15px 16px', borderRadius: 16, position: 'relative', overflow: 'hidden', border: '1px solid color-mix(in srgb, var(--signal) 24%, transparent)', background: 'radial-gradient(480px 250px at 8% -24%, color-mix(in srgb, var(--signal) 11%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--signal) 2.5%, var(--card)), var(--card))' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'rgba(34,211,238,.1)', border: '1px solid rgba(34,211,238,.3)', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.06em', marginBottom: 10 }}>✦ AI INSIGHT</span>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 7 }}>{insight.title}</p>
+            <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>{insight.text}</p>
+          </div>
+        ))}
+      </div>
+
+      </div>{/* end right-side wrapper */}
     </div>
   )
 }
