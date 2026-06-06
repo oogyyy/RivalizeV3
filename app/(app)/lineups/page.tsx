@@ -254,7 +254,7 @@ export default function LineupsPage() {
                 <BookMarked size={18} className="text-purple-400" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-foreground">Lineup Library</h1>
+                <h1 className="text-xl font-bold text-foreground">Utility Hub</h1>
                 <p className="text-sm text-muted-foreground">Smoke, flash and molotov lineups per map</p>
               </div>
             </div>

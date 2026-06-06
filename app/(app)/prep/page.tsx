@@ -138,7 +138,7 @@ export default async function PrepPage() {
               { href: '/ai-coach', Icon: Brain,    color: 'var(--signal)',  label: 'AI Scout',         desc: 'Ask about your opponent' },
               { href: '/veto',     Icon: Swords,   color: 'var(--accent)',  label: 'Veto Simulator',   desc: 'Practice map vetoing' },
               { href: '/playbook', Icon: BookOpen, color: 'var(--tside)',   label: 'Playbook',         desc: 'Review your strategies' },
-              { href: '/lineups',  Icon: Sparkles, color: 'var(--ct)',      label: 'Lineups',          desc: 'Utility lineup library' },
+              { href: '/lineups',  Icon: Sparkles, color: 'var(--ct)',      label: 'Utility Hub',      desc: 'Utility lineup library' },
             ].map(({ href, Icon, color, label, desc }) => (
               <Link key={href} href={href}>
                 <div className="rv-row" style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px', borderRadius: 10 }}>

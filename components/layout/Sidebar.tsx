@@ -37,7 +37,7 @@ const NAV_GROUPS = [
       { href: '/ai-coach', label: 'AI Scout', Icon: Brain, live: true },
       { href: '/playbook', label: 'Playbook', Icon: BookOpen },
       { href: '/veto',     label: 'Veto',     Icon: Swords },
-      { href: '/lineups',  label: 'Lineups',  Icon: BookMarked },
+      { href: '/lineups',  label: 'Utility Hub',  Icon: BookMarked },
     ],
   },
   {

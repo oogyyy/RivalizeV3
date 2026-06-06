@@ -77,7 +77,7 @@ export default function CommunityLineupsPage() {
           <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
             <Link href="/lineups" className="hover:text-foreground flex items-center gap-1">
               <BookOpen size={13} />
-              My Lineups
+              Utility Hub
             </Link>
             <span>/</span>
             <span className="text-foreground font-medium">Community</span>
