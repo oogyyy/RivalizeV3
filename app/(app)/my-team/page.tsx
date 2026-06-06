@@ -6,7 +6,6 @@ import { redirect } from 'next/navigation'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import FaceitImportButton from '@/components/teams/FaceitImportButton'
 import MyTeamStatsAndDemos from '@/components/teams/MyTeamStatsAndDemos'
-import TeamStatsCards from '@/components/teams/TeamStatsCards'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 import { PageHeader } from '@/components/layout/PageHeader'
 import CreateTeamDialog from '@/app/(app)/teams/CreateTeamDialog'
@@ -127,10 +126,6 @@ export default async function MyTeamPage({
           }
         />
 
-        {/* Stats cards */}
-        <div className="mt-4">
-          <TeamStatsCards demos={demos} />
-        </div>
       </div>
 
       <MyTeamStatsAndDemos
