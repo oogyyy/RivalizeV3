@@ -389,15 +389,37 @@ export default function MyTeamDashboard({
 
       {/* Demos */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <Film size={16} style={{ color: 'var(--signal)' }} />
-          <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>My Team's Demos</p>
-          <span style={{ fontSize: 10, color: 'var(--muted)' }}>0 • 0 maps</span>
-        </div>
-        <div style={{ padding: 20, textAlign: 'center', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--muted)' }}>
-          <Film size={32} style={{ margin: '0 auto 12px', color: 'var(--faint)' }} />
-          <p style={{ fontSize: 13 }}>No demos yet. Upload your team's demos to see them here.</p>
-        </div>
+        {demos.length > 0 ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Film size={16} style={{ color: 'var(--signal)' }} />
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>My Team's Demos</p>
+              <span style={{ fontSize: 10, color: 'var(--muted)' }}>{demos.length} • {new Set(demos.map(d => d.map)).size} maps</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+              {demos.map((demo, i) => (
+                <div key={i} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{demo.map}</span>
+                    <span style={{ fontSize: 10, textTransform: 'capitalize', padding: '2px 6px', borderRadius: 4, background: demo.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' : demo.status === 'processing' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: demo.status === 'completed' ? 'var(--win)' : demo.status === 'processing' ? 'var(--signal)' : 'var(--loss)' }}>{demo.status}</span>
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>Uploaded: {demo.created_at ? new Date(demo.created_at).toLocaleDateString() : 'N/A'}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Film size={16} style={{ color: 'var(--signal)' }} />
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>My Team's Demos</p>
+            </div>
+            <div style={{ padding: 20, textAlign: 'center', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--muted)' }}>
+              <Film size={32} style={{ margin: '0 auto 12px', color: 'var(--faint)' }} />
+              <p style={{ fontSize: 13 }}>No demos yet. Upload your team's demos to see them here.</p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
