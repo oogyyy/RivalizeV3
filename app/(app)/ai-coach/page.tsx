@@ -456,7 +456,7 @@ export default function AIScoutPage() {
                   >
                     <span style={{ color: active ? 'var(--win)' : 'var(--faint)', flexShrink: 0 }}>{area.icon}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--win)' : 'var(--text)', truncate: true }}>{area.label}</p>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--win)' : 'var(--text)' }}>{area.label}</p>
                       <p style={{ fontSize: 10, color: 'var(--faint)', marginTop: 1 }}>{area.description}</p>
                     </div>
                     {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)', flexShrink: 0 }} />}
@@ -543,7 +543,7 @@ export default function AIScoutPage() {
                 width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10,
                 padding: '10px 11px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
                 background: includeProDataset ? 'color-mix(in srgb, var(--signal) 6%, var(--card))' : 'var(--card)',
-                border: `1px solid ${includeProDataset ? 'color-mix(in srgb, var(--signal) 28%, transparent)' : 'var(--border)'}`,
+                border: `1px solid ${includeProDataset ? 'color-mix(in srgb, var(--signal) 28%, transparent)' : 'var(--border)' }`,
                 transition: 'all 0.12s',
               }}
             >

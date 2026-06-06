@@ -450,7 +450,7 @@ export default async function TeamPage({
                 {isOwnerOrAdmin && myFaceitId && (
                   <FaceitImportButton teamId={resolvedTeamId} faceitNickname={myFaceitId} />
                 )}
-                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
+                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />
               </div>
             </div>
 
@@ -463,7 +463,7 @@ export default async function TeamPage({
                 <p className="text-xs text-muted-foreground mb-4">
                   Upload demos of upcoming opponents to start scouting
                 </p>
-                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
+                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />
               </div>
             ) : (
               <Card className="bg-card border-border overflow-hidden">
