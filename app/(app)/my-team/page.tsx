@@ -5,7 +5,12 @@ import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import MyTeamDashboard from '@/components/teams/MyTeamDashboard'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
-import type { TeamOption } from '@/app/(app)/my-team/TeamSwitcher'
+
+interface TeamOption {
+  id: string
+  name: string
+  role: 'owner' | 'admin' | 'member'
+}
 
 export default async function MyTeamPage({
   searchParams,
@@ -38,19 +43,15 @@ export default async function MyTeamPage({
 
   const allTeams: TeamOption[] = membershipList
     .filter(m => teamMap.has(m.team_id))
-    .map(m => ({ id: m.team_id, name: teamMap.get(m.team_id)!, role: m.role }))
+    .map(m => ({ id: m.team_id, name: teamMap.get(m.team_id)!, role: m.role as 'owner' | 'admin' | 'member' }))
 
   // No real teams yet (user might only have a personal /improve team)
   if (allTeams.length === 0) {
     return (
-      <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
-        <div className="animate-fade-in-up">
-          <PageHeader
-            label="My Teams"
-            title="No team yet"
-            description="Create a team to start tracking your performance"
-            actions={<CreateTeamDialog />}
-          />
+      <div className="flex-1 overflow-y-auto p-5 md:p-7">
+        <div style={{ marginTop: '60px', textAlign: 'center', opacity: 0.7 }}>
+          <p style={{ fontSize: '18px', fontWeight: 500, marginBottom: '8px' }}>No teams yet</p>
+          <p style={{ fontSize: '14px', marginBottom: '24px' }}>Create a team to start tracking your performance</p>
         </div>
       </div>
     )
