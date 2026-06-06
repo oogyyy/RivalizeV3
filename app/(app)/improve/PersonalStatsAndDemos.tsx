@@ -4,55 +4,18 @@ import { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Trophy, TrendingUp, Crosshair, BarChart3,
-  FileVideo, Info,
+  FileVideo, Info, X,
 } from 'lucide-react'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import MapFolderList, { type MapGroup } from '@/components/teams/MapFolderList'
-import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
+import DemoListMultiSelect, { type DemoRowData } from '@/components/teams/DemoListMultiSelect'
 import RecentMatchesSplit from '@/app/(app)/improve/RecentMatchesSplit'
 
-const ACTIVE_DUTY_MAPS = [
-  'de_ancient', 'de_anubis', 'de_dust2', 'de_inferno',
-  'de_mirage', 'de_nuke', 'de_overpass',
-]
-
-function buildMapGroups(demos: DemoRowData[]): MapGroup[] {
-  const map = new Map<string, { demos: DemoRowData[]; wins: number; losses: number; draws: number; lastActivity: string }>()
-  for (const m of ACTIVE_DUTY_MAPS) {
-    map.set(m, { demos: [], wins: 0, losses: 0, draws: 0, lastActivity: '' })
-  }
-
-  for (const demo of demos) {
-    const rawMap = (demo.parsed_data?.header?.map ?? demo.map ?? 'unknown').toLowerCase()
-    const key = rawMap === 'processing' || rawMap === '' ? 'unknown' : rawMap
-    if (!map.has(key)) map.set(key, { demos: [], wins: 0, losses: 0, draws: 0, lastActivity: demo.created_at })
-    const g = map.get(key)!
-    g.demos.push(demo)
-    if (demo.created_at > g.lastActivity) g.lastActivity = demo.created_at
-    if (demo.status === 'completed') {
-      const h = demo.parsed_data?.header
-      const os = demo.parsed_data?.opponentSide ?? 'team2'
-      if (h) {
-        const ours   = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
-        const theirs = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
-        if (ours > theirs) g.wins++
-        else if (ours === theirs) g.draws++
-        else g.losses++
-      }
-    }
-  }
-
-  return [...map.entries()]
-    .map(([m, data]) => ({ map: m, ...data }))
-    .sort((a, b) => {
-      if (a.demos.length !== b.demos.length) return b.demos.length - a.demos.length ? -1 : 1
-      if (a.demos.length > 0) return b.lastActivity.localeCompare(a.lastActivity)
-      const ai = ACTIVE_DUTY_MAPS.indexOf(a.map), bi = ACTIVE_DUTY_MAPS.indexOf(b.map)
-      if (ai !== -1 && bi !== -1) return ai - bi
-      if (ai !== -1) return -1
-      if (bi !== -1) return 1
-      return 0
-    })
+function mapDisplayName(map: string): string {
+  return map
+    .replace(/^(de_|cs_|ar_)/, '')
+    .split('_')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
 }
 
 function computeStats(
@@ -138,8 +101,30 @@ export default function PersonalStatsAndDemos({
   faceitPlayerId: string | null
 }) {
   const [demos] = useState(initialDemos)
-  const stats    = useMemo(() => computeStats(demos, steamId), [demos, steamId])
-  const mapGroups = useMemo(() => buildMapGroups(demos), [demos])
+  const [mapFilter, setMapFilter] = useState<string | null>(null)
+  const stats = useMemo(() => computeStats(demos, steamId), [demos, steamId])
+
+  const uniqueMaps = useMemo(() => {
+    const seen = new Set<string>()
+    for (const d of demos) {
+      const m = (d.parsed_data?.header?.map ?? d.map ?? '').toLowerCase()
+      if (m && m !== 'processing') seen.add(m)
+    }
+    return [...seen].sort()
+  }, [demos])
+
+  const filteredDemos = useMemo(() => {
+    const sorted = [...demos].sort((a, b) => {
+      const da = a.match_date ?? a.created_at
+      const db = b.match_date ?? b.created_at
+      return db.localeCompare(da)
+    })
+    if (!mapFilter) return sorted
+    return sorted.filter(d => {
+      const m = (d.parsed_data?.header?.map ?? d.map ?? '').toLowerCase()
+      return m === mapFilter
+    })
+  }, [demos, mapFilter])
 
   return (
     <>
@@ -207,16 +192,55 @@ export default function PersonalStatsAndDemos({
 
         <RecentMatchesSplit demos={demos} faceitPlayerId={faceitPlayerId} personalTeamId={personalTeamId} />
 
-        {/* Detailed demo browser — shown when uploads exist */}
+        {/* Demo Browser — flat recent list with map filter */}
         {demos.length > 0 && (
           <div className="mt-6">
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">Demo Browser</h2>
-              <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
-                {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').length} maps
-              </span>
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">Demo Browser</h2>
+                <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
+                  {filteredDemos.length} demos
+                </span>
+              </div>
+              {/* Map filter pills */}
+              {uniqueMaps.length > 1 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => setMapFilter(null)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors',
+                      mapFilter === null
+                        ? 'bg-[#00ffc8]/15 text-[#00ffc8] border border-[#00ffc8]/30'
+                        : 'bg-accent/40 text-muted-foreground hover:text-foreground border border-transparent',
+                    )}
+                  >
+                    All
+                  </button>
+                  {uniqueMaps.map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setMapFilter(mapFilter === m ? null : m)}
+                      className={cn(
+                        'px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors flex items-center gap-1',
+                        mapFilter === m
+                          ? 'bg-[#00ffc8]/15 text-[#00ffc8] border border-[#00ffc8]/30'
+                          : 'bg-accent/40 text-muted-foreground hover:text-foreground border border-transparent',
+                      )}
+                    >
+                      {mapDisplayName(m)}
+                      {mapFilter === m && <X size={10} />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <MapFolderList mapGroups={mapGroups} onSideChange={() => {}} />
+            <DemoListMultiSelect
+              demos={filteredDemos}
+              demoHrefPrefix="/my-team/demos"
+              showSideSelector
+              showReparse
+              canDelete
+            />
           </div>
         )}
       </div>

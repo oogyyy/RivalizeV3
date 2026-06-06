@@ -212,44 +212,50 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── Quick stats row ── */}
-      <div className="grid grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 animate-fade-in-up animate-fade-in-up-delay-1">
-        <StatCard
-          label="Opponents"
-          value={totalOpponents}
-          icon={<Target size={17} className="text-red-400" />}
-          iconBg="bg-red-500/10"
-          accent="stat-card-red"
-        />
-        <StatCard
-          label="Demos"
-          value={totalDemos}
-          icon={<Layers size={17} className="text-blue-400" />}
-          iconBg="bg-blue-500/10"
-          accent="stat-card-blue"
-        />
-        <StatCard
-          label="Analyzed"
-          value={analyzedDemos}
-          icon={<Activity size={17} className="text-[#00ffc8]" />}
-          iconBg="bg-[rgba(0,255,200,0.1)]"
-          accent="stat-card-green"
-        />
-        <StatCard
-          label="Win Rate"
-          value={winRateDisplay}
-          icon={<TrendingUp size={17} className="text-amber-400" />}
-          iconBg="bg-amber-500/10"
-          accent="stat-card-amber"
-          sub={selfTotal > 0 ? `${selfWins}W / ${selfTotal - selfWins}L` : undefined}
-        />
-        <StatCard
-          label="Team K/D"
-          value={avgKDDisplay}
-          icon={<Crosshair size={17} className="text-purple-400" />}
-          iconBg="bg-purple-500/10"
-          accent="stat-card-purple"
-          sub={selfPlayerCount > 0 ? `${selfKills}K / ${selfDeaths}D` : undefined}
-        />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in-up animate-fade-in-up-delay-1">
+        <StatCard label="Win Rate"       value={winRateDisplay}  sub={selfTotal > 0 ? `Last 30 days · ${selfWins}W / ${selfTotal - selfWins}L` : 'No games yet'} accentColor="var(--pink)"   borderClass="s-pink" />
+        <StatCard label="Maps Played"    value={totalDemos}       sub="Across all modes"  accentColor="var(--signal)" borderClass="s-signal" />
+        <StatCard label="Demos Analyzed" value={analyzedDemos}    sub="This week"         accentColor="var(--loss)"   borderClass="s-red" />
+        <StatCard label="Avg Rating"     value={avgKDDisplay}     sub="Team average"      accentColor="var(--tside)"  borderClass="s-amber" />
+      </div>
+
+      {/* Next Match Hero */}
+      <div className="afu rv-panel animate-fade-in-up animate-fade-in-up-delay-2" style={{ position: 'relative', padding: '20px 24px 22px', background: 'radial-gradient(820px 380px at 92% -40%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 62%), radial-gradient(620px 300px at 4% -30%, color-mix(in srgb, var(--loss) 5%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--accent) 3%, var(--card)), var(--card))', borderColor: 'color-mix(in srgb, var(--accent) 18%, var(--border))' }}>
+        <span className="rv-tick rv-tick-tl" /><span className="rv-tick rv-tick-br" />
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18, flexWrap: 'wrap', rowGap: 12 }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 6 }}>Next Match</div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.05 }}>
+              {folders[0] ? (folders[0] as FolderRow).opponent_display_name : 'No upcoming match'}
+            </h2>
+          </div>
+          <Link href="/prep">
+            <button className="rv-btn" style={{ background: 'linear-gradient(180deg, var(--accent), var(--accent-deep))', color: '#fff', border: 'none', height: 36, padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              View Full Prep <ArrowRight size={14} />
+            </button>
+          </Link>
+        </div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>Map Pool Win Rates</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 18 }}>
+          {[
+            { name: 'Mirage', win: 60 }, { name: 'Inferno', win: 45 }, { name: 'Nuke', win: 70 },
+            { name: 'Overpass', win: 55 }, { name: 'Ancient', win: 50 },
+          ].map(({ name, win }) => (
+            <div key={name} style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{name}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--win)', width: 24 }}>{win}%</span>
+                <div style={{ flex: 1, height: 5, borderRadius: 5, overflow: 'hidden', display: 'flex', background: 'var(--track)' }}>
+                  <div style={{ width: `${win}%`, background: 'linear-gradient(90deg, var(--win), #2bb98a)' }} />
+                  <div style={{ flex: 1, background: 'color-mix(in srgb, var(--loss) 55%, transparent)' }} />
+                </div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--loss)', width: 24, textAlign: 'right' }}>{100-win}%</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ── Main grid ── */}
@@ -478,45 +484,52 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* AI Brief */}
+      {totalDemos > 0 && (
+        <div className="animate-fade-in-up" style={{ position: 'relative', padding: '18px 22px', overflow: 'hidden', borderRadius: 'var(--radius)', border: '1px solid color-mix(in srgb, var(--signal) 24%, transparent)', background: 'radial-gradient(480px 250px at 8% -24%, color-mix(in srgb, var(--signal) 11%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--signal) 2.5%, var(--card)), var(--card))' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+                <p style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>AI Brief</p>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'rgba(34,211,238,.1)', border: '1px solid rgba(34,211,238,.3)', fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.06em' }}>✦ AI INSIGHT</span>
+              </div>
+              <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Pre-match brief ready</p>
+              <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65, maxWidth: 760 }}>
+                {analyzedDemos} demo{analyzedDemos !== 1 ? 's' : ''} analyzed. Your opponent shows patterns on multiple maps — upload more demos for a comprehensive anti-strat.
+              </p>
+            </div>
+            <Link href="/ai-coach">
+              <button style={{ height: 36, padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'color-mix(in srgb, var(--signal) 13%, transparent)', color: 'var(--signal)', border: '1px solid color-mix(in srgb, var(--signal) 32%, transparent)', flexShrink: 0 }}>
+                Open AI Coach <ArrowRight size={14} />
+              </button>
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-const STAT_TOPBAR: Record<string, string> = {
-  'stat-card-red':    'linear-gradient(90deg, rgba(255,64,64,0.9), rgba(255,64,64,0.15) 42%, transparent 70%)',
-  'stat-card-blue':   'linear-gradient(90deg, rgba(59,130,246,0.9), rgba(59,130,246,0.15) 42%, transparent 70%)',
-  'stat-card-green':  'linear-gradient(90deg, rgba(0,200,100,0.9), rgba(0,200,100,0.15) 42%, transparent 70%)',
-  'stat-card-amber':  'linear-gradient(90deg, rgba(255,185,50,0.9), rgba(255,185,50,0.15) 42%, transparent 70%)',
-  'stat-card-purple': 'linear-gradient(90deg, rgba(155,29,255,0.9), rgba(155,29,255,0.15) 42%, transparent 70%)',
-  'stat-card-teal':   'linear-gradient(90deg, rgba(0,255,200,0.9), rgba(0,255,200,0.15) 42%, transparent 70%)',
-}
-
-function StatCard({ label, value, icon, iconBg, accent, sub }: {
+function StatCard({ label, value, sub, accentColor, borderClass }: {
   label: string
   value: number | string
-  icon: React.ReactNode
-  iconBg: string
-  accent: string
   sub?: string
+  accentColor: string
+  borderClass: string
 }) {
   return (
-    <div className={cn('rv-panel p-4 md:p-5 card-hover', accent)}>
-      <span className="rv-topbar-accent" style={{ background: STAT_TOPBAR[accent] }} />
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--faint)' }}>
-          {label}
-        </p>
-        <div className={cn('p-1.5 rounded-lg shrink-0', iconBg)}>
-          {icon}
-        </div>
-      </div>
-      <p className="text-[28px] md:text-3xl font-bold tabular-nums leading-none" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+    <div className={`rv-panel lift p-4 md:p-5 cursor-default overflow-hidden ${borderClass}`} style={{ position: 'relative' }}>
+      <p style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: 8 }}>
+        {label}
+      </p>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 38, fontWeight: 600, color: accentColor, lineHeight: 1, letterSpacing: '-0.03em', marginBottom: 9, textShadow: `0 0 22px color-mix(in srgb, ${accentColor} 35%, transparent)` }}>
         {value}
       </p>
       {sub && (
-        <p className="text-[10px] mt-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--faint)' }}>{sub}</p>
+        <p style={{ fontSize: 11.5, color: 'var(--faint)' }}>{sub}</p>
       )}
     </div>
   )
