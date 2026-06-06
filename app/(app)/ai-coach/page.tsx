@@ -11,7 +11,7 @@ import {
   Target, Crosshair, Shield, Users,
   Sparkles, MessageSquare, ChevronRight, ExternalLink, Database,
   SlidersHorizontal, X, ChevronDown, BarChart3, AlertCircle, RefreshCw,
-  BookOpen,
+  BookOpen, Zap,
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
 import { CS2_MAPS } from '@/types/database'
@@ -23,20 +23,20 @@ type Mode = 'opponent' | 'myteam'
 type FocusArea = 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player' | 'executes' | 'rounds' | 'drills'
 
 const OPPONENT_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
-  { id: 'general',   label: 'Scouting Report', icon: <Brain size={14} />,     description: 'Full opponent overview' },
-  { id: 'weakness',  label: 'Weak Spots',       icon: <Target size={14} />,    description: 'Exploitable patterns' },
-  { id: 'antistrat', label: 'Anti-Strat',        icon: <Shield size={14} />,    description: 'Counter their strategies' },
-  { id: 'strategy',  label: 'Match Prep',        icon: <Crosshair size={14} />, description: 'Map-specific counter-plays' },
-  { id: 'player',    label: 'Player Focus',      icon: <Users size={14} />,     description: 'Opponent player deep-dive' },
+  { id: 'general',   label: 'Scouting Report', icon: <Brain size={13} />,     description: 'Full opponent overview' },
+  { id: 'weakness',  label: 'Weak Spots',       icon: <Target size={13} />,    description: 'Exploitable patterns' },
+  { id: 'antistrat', label: 'Anti-Strat',        icon: <Shield size={13} />,    description: 'Counter their strategies' },
+  { id: 'strategy',  label: 'Match Prep',        icon: <Crosshair size={13} />, description: 'Map-specific counter-plays' },
+  { id: 'player',    label: 'Player Focus',      icon: <Users size={13} />,     description: 'Opponent player deep-dive' },
 ]
 
 const MY_TEAM_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
-  { id: 'general',  label: 'Team Overview',   icon: <Brain size={14} />,     description: 'Strengths, weaknesses, roadmap' },
-  { id: 'weakness', label: 'Weak Spots',      icon: <Target size={14} />,    description: 'Patterns costing you rounds' },
-  { id: 'executes', label: 'Executes',        icon: <Crosshair size={14} />, description: 'Improve execute quality' },
-  { id: 'rounds',   label: 'Round Review',    icon: <BarChart3 size={14} />, description: 'Key rounds deep-dive' },
-  { id: 'drills',   label: 'Practice Drills', icon: <Sparkles size={14} />, description: 'Tailored drill recommendations' },
-  { id: 'strategy', label: 'Playbook',        icon: <Shield size={14} />,    description: 'Build your team playbook' },
+  { id: 'general',  label: 'Team Overview',   icon: <Brain size={13} />,     description: 'Strengths, weaknesses, roadmap' },
+  { id: 'weakness', label: 'Weak Spots',      icon: <Target size={13} />,    description: 'Patterns costing you rounds' },
+  { id: 'executes', label: 'Executes',        icon: <Crosshair size={13} />, description: 'Improve execute quality' },
+  { id: 'rounds',   label: 'Round Review',    icon: <BarChart3 size={13} />, description: 'Key rounds deep-dive' },
+  { id: 'drills',   label: 'Practice Drills', icon: <Sparkles size={13} />, description: 'Tailored drill recommendations' },
+  { id: 'strategy', label: 'Playbook',        icon: <Shield size={13} />,    description: 'Build your team playbook' },
 ]
 
 const OPPONENT_QUESTIONS = [
@@ -114,12 +114,12 @@ const FOLLOW_UP_PROMPTS: Record<string, { label: string; prompt: string }[]> = {
 function MarkdownContent({ content }: { content: string }) {
   const rendered = content.split('\n').map((line, i) => {
     if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold text-foreground mt-4 mb-2">{line.slice(4)}</h3>
-    if (line.startsWith('## '))  return <h2 key={i} className="text-base font-bold text-[#00ffc8] mt-5 mb-2">{line.slice(3)}</h2>
+    if (line.startsWith('## '))  return <h2 key={i} style={{ fontSize: 14, fontWeight: 700, color: 'var(--win)', marginTop: 20, marginBottom: 8 }}>{line.slice(3)}</h2>
     if (line.startsWith('# '))   return <h1 key={i} className="text-xl font-bold text-foreground mt-5 mb-3">{line.slice(2)}</h1>
     if (line.startsWith('- ') || line.startsWith('* ')) {
       return (
         <div key={i} className="flex gap-2 my-0.5">
-          <span className="text-[#00ffc8] mt-1.5 shrink-0 text-xs">▸</span>
+          <span style={{ color: 'var(--win)', marginTop: 6, flexShrink: 0, fontSize: 10 }}>▸</span>
           <span>{renderInline(line.slice(2))}</span>
         </div>
       )
@@ -128,7 +128,7 @@ function MarkdownContent({ content }: { content: string }) {
     if (numbered) {
       return (
         <div key={i} className="flex gap-2 my-0.5">
-          <span className="text-[#00ffc8] shrink-0 font-mono text-xs min-w-[1.2rem]">{numbered[1]}.</span>
+          <span style={{ color: 'var(--win)', flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 11, minWidth: '1.2rem' }}>{numbered[1]}.</span>
           <span>{renderInline(numbered[2])}</span>
         </div>
       )
@@ -146,7 +146,7 @@ function renderInline(text: string): React.ReactNode {
     if (part.startsWith('***') && part.endsWith('***')) return <strong key={i}><em>{part.slice(3, -3)}</em></strong>
     if (part.startsWith('**') && part.endsWith('**'))   return <strong key={i} className="font-bold text-foreground">{part.slice(2, -2)}</strong>
     if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i} className="italic text-muted-foreground">{part.slice(1, -1)}</em>
-    if (part.startsWith('`') && part.endsWith('`'))     return <code key={i} className="px-1 py-0.5 bg-muted rounded text-xs font-mono text-[#00ffc8]">{part.slice(1, -1)}</code>
+    if (part.startsWith('`') && part.endsWith('`'))     return <code key={i} style={{ padding: '1px 5px', background: 'var(--elevated)', borderRadius: 5, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--win)' }}>{part.slice(1, -1)}</code>
     return part
   })
 }
@@ -154,13 +154,13 @@ function renderInline(text: string): React.ReactNode {
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-3 mb-4">
-      <div className="w-8 h-8 rounded-xl bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center shrink-0">
-        <Brain size={14} className="text-[#00ffc8]" />
+      <div style={{ width: 32, height: 32, borderRadius: 10, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Brain size={14} style={{ color: 'var(--win)' }} />
       </div>
-      <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3">
+      <div className="rv-panel px-4 py-3">
         <div className="flex gap-1 items-center h-4">
           {[0, 1, 2].map(i => (
-            <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#00ffc8] animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+            <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)' }} className="animate-bounce" style2={{ animationDelay: `${i * 150}ms` }} />
           ))}
         </div>
       </div>
@@ -185,7 +185,6 @@ export default function AIScoutPage() {
   const textareaRef       = useRef<HTMLTextAreaElement>(null)
   const lastSentMessageRef = useRef<string>('')
 
-  // Refs so the sendMessage closure always reads the latest context values
   const modeRef             = useRef(mode)
   const selectedFolderIdRef = useRef(selectedFolderId)
   const focusAreaRef        = useRef(focusArea)
@@ -204,7 +203,6 @@ export default function AIScoutPage() {
 
   const selectedFolder = opponents.find(f => f.id === selectedFolderId)
 
-  // useChat handles all streaming — append() sends messages with per-call body overrides
   const {
     messages,
     input,
@@ -219,7 +217,6 @@ export default function AIScoutPage() {
     onError: (err) => console.error('[AI Coach]', err),
   })
 
-  // Fetch user's own teams for myteam mode
   useEffect(() => {
     fetch('/api/teams')
       .then(r => r.ok ? r.json() : [])
@@ -229,14 +226,12 @@ export default function AIScoutPage() {
       .catch(() => {})
   }, [])
 
-  // Fetch opponent folders
   useEffect(() => {
     const load = async () => {
       const res = await fetch('/api/opponents')
       if (res.ok) {
         const data = (await res.json()) as TeamFolder[]
         setOpponents(data)
-        // Fallback team ID from opponents if teams API returned nothing
         if (!myTeamId && data.length > 0) setMyTeamId(data[0].user_team_id)
       }
       setLoadingOpponents(false)
@@ -244,7 +239,6 @@ export default function AIScoutPage() {
     load()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Read URL params
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -256,12 +250,10 @@ export default function AIScoutPage() {
     if (f) setFocusArea(f as FocusArea)
   }, [])
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
 
-  // Build context body from current refs (called inside sendMessage so it always reads latest)
   const buildBody = useCallback(() => {
     const currentFolder = opponents.find(f => f.id === selectedFolderIdRef.current)
     return {
@@ -295,7 +287,6 @@ export default function AIScoutPage() {
   const retryLastMessage = useCallback(() => {
     const text = lastSentMessageRef.current
     if (!text) return
-    // Strip the failed user message so append doesn't duplicate it
     setMessages(prev => {
       const idx = [...prev].reverse().findIndex(m => m.role === 'user' && m.content === text)
       if (idx === -1) return prev
@@ -317,7 +308,6 @@ export default function AIScoutPage() {
     ?.top_players?.map(p => p.name) ?? []
 
   const isEmpty     = messages.length === 0 && !isLoading
-  // useChat streams into the last assistant message live — show cursor while loading and last msg is assistant
   const lastMsg     = messages[messages.length - 1]
   const isThinking  = isLoading && (!lastMsg || lastMsg.role === 'user')
 
@@ -325,83 +315,93 @@ export default function AIScoutPage() {
   const followUpChips  = FOLLOW_UP_PROMPTS[followUpKey] ?? []
   const showFollowUps  = !isLoading && !error && lastMsg?.role === 'assistant' && followUpChips.length > 0
 
+  const sidebarStyle: React.CSSProperties = {
+    background: 'var(--panel)',
+    borderRight: '1px solid var(--border)',
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    overflowY: 'auto',
+    flexShrink: 0,
+    width: 260,
+  }
+
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* ── Left panel: Context sidebar ── */}
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+
+      {/* ── Left sidebar ── */}
       <div
+        style={sidebarStyle}
         className={cn(
-          'shrink-0 border-r border-border bg-[hsl(228,22%,8%)] flex flex-col h-full overflow-y-auto',
-          'md:w-72 md:flex',
+          'md:flex',
           isContextOpen
-            ? 'fixed inset-0 z-40 w-full flex flex-col md:relative md:inset-auto md:w-72'
+            ? 'fixed inset-0 z-40 flex flex-col md:relative md:inset-auto'
             : 'hidden md:flex'
         )}
       >
         {/* Mobile close */}
-        <div className="md:hidden flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
-          <span className="text-sm font-semibold text-foreground">Scout Settings</span>
-          <button onClick={() => setIsContextOpen(false)} className="text-muted-foreground hover:text-foreground">
-            <X size={18} />
+        <div className="md:hidden flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Scout Settings</span>
+          <button onClick={() => setIsContextOpen(false)} style={{ color: 'var(--muted)' }}>
+            <X size={16} />
           </button>
         </div>
 
-        {/* Panel header */}
-        <div className="p-5 border-b border-border">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center">
-              <Brain size={14} className="text-[#00ffc8]" />
+        {/* Header */}
+        <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          {/* Title row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Brain size={13} style={{ color: 'var(--win)' }} />
             </div>
-            <h1 className="text-[13px] font-bold text-foreground tracking-wide">AI Scout</h1>
-            <Badge variant="neon" className="text-[10px] ml-auto">Llama 3.3</Badge>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>AI Scout</span>
+            <span style={{ marginLeft: 'auto', padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', fontSize: 10, fontWeight: 700, color: 'var(--win)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Llama 3.3</span>
           </div>
+
           {/* Mode toggle */}
-          <div className="flex rounded-lg border border-border bg-[hsl(228,25%,6%)] p-0.5 gap-0.5">
-            <button
-              onClick={() => { setMode('opponent'); setFocusArea('general'); setMessages([]) }}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                mode === 'opponent'
-                  ? 'bg-[rgba(0,255,200,0.1)] text-[#00ffc8] border border-[rgba(0,255,200,0.2)]'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Target size={12} />
-              Opponent
-            </button>
-            <button
-              onClick={() => { setMode('myteam'); setFocusArea('general'); setMessages([]) }}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-                mode === 'myteam'
-                  ? 'bg-[rgba(0,255,200,0.1)] text-[#00ffc8] border border-[rgba(0,255,200,0.2)]'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Shield size={12} />
-              My Team
-            </button>
+          <div style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 9, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+            {(['opponent', 'myteam'] as const).map(m => {
+              const active = mode === m
+              return (
+                <button
+                  key={m}
+                  onClick={() => { setMode(m); setFocusArea('general'); setMessages([]) }}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    padding: '6px 8px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    background: active ? 'color-mix(in srgb, var(--win) 10%, var(--card))' : 'transparent',
+                    color: active ? 'var(--win)' : 'var(--muted)',
+                    border: active ? '1px solid color-mix(in srgb, var(--win) 22%, transparent)' : '1px solid transparent',
+                    transition: 'all 0.13s',
+                  }}
+                >
+                  {m === 'opponent' ? <Target size={11} /> : <Shield size={11} />}
+                  {m === 'opponent' ? 'Opponent' : 'My Team'}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        <div className="p-4 space-y-5 flex-1">
+        {/* Body */}
+        <div style={{ padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
+
           {/* Opponent selector */}
           {mode === 'opponent' && (
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
-                Opponent
-              </label>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 7 }}>Opponent</p>
               {loadingOpponents ? (
-                <div className="h-9 bg-muted/30 rounded-md animate-pulse" />
+                <div style={{ height: 36, background: 'var(--elevated)', borderRadius: 8 }} className="animate-pulse" />
               ) : opponents.length === 0 ? (
-                <div className="rounded-md border border-border bg-background/50 px-3 py-2.5 text-xs text-muted-foreground">
+                <div style={{ borderRadius: 9, border: '1px solid var(--border)', background: 'var(--card)', padding: '10px 12px', fontSize: 12, color: 'var(--muted)' }}>
                   No opponents yet —{' '}
-                  <a href="/opponents" className="text-neon-green hover:underline">upload a demo first</a>
+                  <a href="/opponents" style={{ color: 'var(--win)' }}>upload a demo first</a>
                 </div>
               ) : (
                 <select
                   value={selectedFolderId}
                   onChange={e => { setSelectedFolderId(e.target.value); setSelectedPlayer('') }}
-                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50 transition-colors"
+                  style={{ width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
                 >
                   <option value="">Select an opponent…</option>
                   {opponents.map(f => (
@@ -411,9 +411,9 @@ export default function AIScoutPage() {
               )}
 
               {selectedFolder && (
-                <div className="mt-2 p-2.5 bg-[rgba(0,255,200,0.05)] rounded-md border border-[rgba(0,255,200,0.2)] text-xs">
-                  <p className="text-[#00ffc8] font-semibold">{selectedFolder.opponent_display_name}</p>
-                  <p className="text-muted-foreground mt-0.5">
+                <div style={{ marginTop: 7, padding: '8px 10px', borderRadius: 8, background: 'color-mix(in srgb, var(--win) 5%, var(--card))', border: '1px solid color-mix(in srgb, var(--win) 18%, transparent)', fontSize: 12 }}>
+                  <p style={{ fontWeight: 600, color: 'var(--win)' }}>{selectedFolder.opponent_display_name}</p>
+                  <p style={{ color: 'var(--muted)', marginTop: 2 }}>
                     {(selectedFolder.aggregated_stats as { total_matches?: number } | null)?.total_matches ?? 0} matches ·{' '}
                     {Math.round(((selectedFolder.aggregated_stats as { win_rate?: number } | null)?.win_rate ?? 0) * 100)}% win rate
                   </p>
@@ -422,13 +422,13 @@ export default function AIScoutPage() {
             </div>
           )}
 
-          {/* My team indicator */}
+          {/* My team banner */}
           {mode === 'myteam' && (
-            <div className="p-2.5 bg-[rgba(0,255,200,0.05)] rounded-md border border-[rgba(0,255,200,0.2)] text-xs">
-              <p className="text-[#00ffc8] font-semibold flex items-center gap-1.5">
+            <div style={{ padding: '9px 11px', borderRadius: 9, background: 'color-mix(in srgb, var(--win) 5%, var(--card))', border: '1px solid color-mix(in srgb, var(--win) 18%, transparent)', fontSize: 12 }}>
+              <p style={{ fontWeight: 600, color: 'var(--win)', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <Shield size={11} /> My Team Analysis
               </p>
-              <p className="text-muted-foreground mt-0.5">
+              <p style={{ color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>
                 AI will analyse your own demos to help you improve.
               </p>
             </div>
@@ -436,45 +436,45 @@ export default function AIScoutPage() {
 
           {/* Focus area */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
-              Focus Area
-            </label>
-            <div className="space-y-1.5">
-              {activeFocusAreas.map(area => (
-                <button
-                  key={area.id}
-                  onClick={() => setFocusArea(area.id)}
-                  className={cn(
-                    'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm font-medium transition-all text-left',
-                    focusArea === area.id
-                      ? 'bg-[rgba(0,255,200,0.08)] text-[#00ffc8] border border-[rgba(0,255,200,0.2)]'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent'
-                  )}
-                >
-                  <span className={focusArea === area.id ? 'text-[#00ffc8]' : 'text-muted-foreground'}>
-                    {area.icon}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate">{area.label}</p>
-                    <p className="text-xs text-muted-foreground truncate font-normal">{area.description}</p>
-                  </div>
-                  {focusArea === area.id && <div className="w-1.5 h-1.5 rounded-full bg-[#00ffc8] shrink-0" />}
-                </button>
-              ))}
+            <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 7 }}>Focus Area</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {activeFocusAreas.map(area => {
+                const active = focusArea === area.id
+                return (
+                  <button
+                    key={area.id}
+                    onClick={() => setFocusArea(area.id)}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+                      padding: '8px 10px', borderRadius: 9, cursor: 'pointer', textAlign: 'left',
+                      background: active ? 'color-mix(in srgb, var(--win) 8%, var(--card))' : 'transparent',
+                      border: active ? '1px solid color-mix(in srgb, var(--win) 22%, transparent)' : '1px solid transparent',
+                      transition: 'all 0.12s',
+                    }}
+                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'var(--hairline)' }}
+                    onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+                  >
+                    <span style={{ color: active ? 'var(--win)' : 'var(--faint)', flexShrink: 0 }}>{area.icon}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--win)' : 'var(--text)', truncate: true }}>{area.label}</p>
+                      <p style={{ fontSize: 10, color: 'var(--faint)', marginTop: 1 }}>{area.description}</p>
+                    </div>
+                    {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)', flexShrink: 0 }} />}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           {/* Player selector */}
           {mode === 'opponent' && focusArea === 'player' && (
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
-                Player
-              </label>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 7 }}>Player</p>
               {availablePlayers.length > 0 ? (
                 <select
                   value={selectedPlayer}
                   onChange={e => setSelectedPlayer(e.target.value)}
-                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50 transition-colors"
+                  style={{ width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
                 >
                   <option value="">All players…</option>
                   {availablePlayers.map(p => (
@@ -482,7 +482,7 @@ export default function AIScoutPage() {
                   ))}
                 </select>
               ) : (
-                <p className="text-xs text-muted-foreground">
+                <p style={{ fontSize: 11, color: 'var(--faint)' }}>
                   {selectedFolder ? 'No player data yet.' : 'Select an opponent to see their players.'}
                 </p>
               )}
@@ -492,13 +492,11 @@ export default function AIScoutPage() {
           {/* Map selector */}
           {(focusArea === 'strategy' || focusArea === 'executes') && (
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
-                Map
-              </label>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 7 }}>Map</p>
               <select
                 value={selectedMap}
                 onChange={e => setSelectedMap(e.target.value)}
-                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50 transition-colors"
+                style={{ width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
               >
                 <option value="">Any map</option>
                 {CS2_MAPS.map(m => (
@@ -508,398 +506,431 @@ export default function AIScoutPage() {
             </div>
           )}
 
-          {/* Playbook builder CTA */}
+          {/* Playbook CTA */}
           {(focusArea === 'strategy' || focusArea === 'executes') && (
-            <div className="border-t border-border pt-4">
-              <button
-                onClick={() => {
-                  const params = new URLSearchParams()
-                  if (selectedMap) params.set('map', selectedMap)
-                  if (myTeamId)    params.set('team', myTeamId)
-                  router.push(`/playbook?${params.toString()}`)
-                }}
-                className="w-full flex items-center gap-3 p-3 rounded-lg border border-[rgba(0,255,200,0.25)] bg-[rgba(0,255,200,0.05)] hover:border-[rgba(0,255,200,0.45)] hover:bg-[rgba(0,255,200,0.08)] text-left transition-all group"
-              >
-                <div className="w-7 h-7 rounded flex items-center justify-center shrink-0 bg-[rgba(0,255,200,0.12)] group-hover:bg-[rgba(0,255,200,0.18)] transition-colors">
-                  <BookOpen size={13} className="text-[#00ffc8]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-[#00ffc8]">Build a Playbook</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {selectedMap ? `Create a saved ${selectedMap} playbook` : 'Create a structured playbook with AI'}
-                  </p>
-                </div>
-                <ChevronRight size={13} className="text-[#00ffc8]/50 group-hover:text-[#00ffc8] group-hover:translate-x-0.5 transition-all shrink-0" />
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                const params = new URLSearchParams()
+                if (selectedMap) params.set('map', selectedMap)
+                if (myTeamId)    params.set('team', myTeamId)
+                router.push(`/playbook?${params.toString()}`)
+              }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 11px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                background: 'color-mix(in srgb, var(--win) 5%, var(--card))',
+                border: '1px solid color-mix(in srgb, var(--win) 22%, transparent)',
+                transition: 'all 0.12s',
+              }}
+            >
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'color-mix(in srgb, var(--win) 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <BookOpen size={13} style={{ color: 'var(--win)' }} />
+              </div>
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--win)' }}>Build a Playbook</p>
+                <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                  {selectedMap ? `Create a ${selectedMap} playbook` : 'Create a structured playbook with AI'}
+                </p>
+              </div>
+            </button>
           )}
 
           {/* Pro dataset toggle */}
           {mode === 'opponent' && (
-            <div className="border-t border-border pt-4">
-              <button
-                onClick={() => setIncludeProDataset(v => !v)}
-                className={cn(
-                  'w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-all',
-                  includeProDataset
-                    ? 'bg-blue-500/10 border-blue-500/30'
-                    : 'bg-background border-border hover:border-border/80 hover:bg-accent/40'
-                )}
-              >
-                <div className={cn('w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5', includeProDataset ? 'bg-blue-500/20' : 'bg-muted')}>
-                  <Database size={13} className={includeProDataset ? 'text-blue-400' : 'text-muted-foreground'} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className={cn('text-xs font-semibold', includeProDataset ? 'text-blue-300' : 'text-foreground')}>
-                      Pro Dataset Insights
-                    </p>
-                    <div className={cn('w-7 h-4 rounded-full transition-colors shrink-0', includeProDataset ? 'bg-blue-500' : 'bg-muted-foreground/30')}>
-                      <div className={cn('w-3 h-3 rounded-full bg-white shadow transition-transform mt-0.5', includeProDataset ? 'translate-x-3.5' : 'translate-x-0.5')} />
-                    </div>
+            <button
+              onClick={() => setIncludeProDataset(v => !v)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: '10px 11px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                background: includeProDataset ? 'color-mix(in srgb, var(--signal) 6%, var(--card))' : 'var(--card)',
+                border: `1px solid ${includeProDataset ? 'color-mix(in srgb, var(--signal) 28%, transparent)' : 'var(--border)'}`,
+                transition: 'all 0.12s',
+              }}
+            >
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: includeProDataset ? 'color-mix(in srgb, var(--signal) 15%, transparent)' : 'var(--elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                <Database size={13} style={{ color: includeProDataset ? 'var(--signal)' : 'var(--faint)' }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: includeProDataset ? 'var(--signal)' : 'var(--text)' }}>Pro Dataset Insights</p>
+                  {/* Toggle pill */}
+                  <div style={{ width: 28, height: 16, borderRadius: 8, background: includeProDataset ? 'var(--signal)' : 'var(--elevated)', flexShrink: 0, position: 'relative', transition: 'background 0.12s' }}>
+                    <div style={{ position: 'absolute', top: 2, left: includeProDataset ? 12 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.12s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
-                    Cross-reference pro meta from a public dataset.
-                  </p>
                 </div>
-              </button>
-              {includeProDataset && (
-                <div className="mt-2 px-3 py-2 rounded-md bg-blue-500/5 border border-blue-500/15">
-                  <p className="text-[10px] text-blue-400/80 leading-relaxed">
-                    AI will reference pro-level meta from the{' '}
-                    <a href="https://huggingface.co/datasets/blanchon/opencs2_dataset" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300 inline-flex items-center gap-0.5">
-                      OpenCS2 dataset <ExternalLink size={9} />
-                    </a>{' '}
-                    (200k+ pro matches).
-                  </p>
-                </div>
-              )}
+                <p style={{ fontSize: 10, color: 'var(--faint)', marginTop: 3, lineHeight: 1.5 }}>Cross-reference pro meta from a public dataset.</p>
+              </div>
+            </button>
+          )}
+          {includeProDataset && mode === 'opponent' && (
+            <div style={{ padding: '8px 10px', borderRadius: 8, background: 'color-mix(in srgb, var(--signal) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 15%, transparent)', marginTop: -10 }}>
+              <p style={{ fontSize: 10, color: 'var(--signal)', lineHeight: 1.6, opacity: 0.8 }}>
+                AI will reference pro-level meta from the{' '}
+                <a href="https://huggingface.co/datasets/blanchon/opencs2_dataset" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  OpenCS2 dataset <ExternalLink size={9} />
+                </a>{' '}
+                (200k+ pro matches).
+              </p>
             </div>
           )}
         </div>
 
-        {/* Active context summary */}
-        <div className="p-4 border-t border-border">
-          <p className="text-xs text-muted-foreground mb-1">Active context</p>
-          <div className="flex flex-wrap gap-1">
+        {/* Active context footer */}
+        <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+          <p style={{ fontSize: 10, color: 'var(--faint)', marginBottom: 6 }}>Active context</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
             {mode === 'myteam' ? (
               <Badge variant="neon" className="text-xs">My Team</Badge>
             ) : selectedFolder ? (
               <Badge variant="neon" className="text-xs">{selectedFolder.opponent_display_name}</Badge>
             ) : (
-              <Badge variant="outline" className="text-xs text-muted-foreground">No opponent selected</Badge>
+              <span style={{ fontSize: 10, color: 'var(--faint)', padding: '2px 7px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--elevated)' }}>No opponent selected</span>
             )}
-            <Badge variant="secondary" className="text-xs capitalize">{focusArea}</Badge>
+            <span style={{ fontSize: 10, color: 'var(--muted)', padding: '2px 7px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--elevated)', textTransform: 'capitalize' }}>{focusArea}</span>
             {mode === 'opponent' && includeProDataset && (
-              <Badge className="text-xs bg-blue-500/20 text-blue-300 border-blue-500/30">Pro data</Badge>
+              <span style={{ fontSize: 10, color: 'var(--signal)', padding: '2px 7px', borderRadius: 5, border: '1px solid color-mix(in srgb, var(--signal) 28%, transparent)', background: 'color-mix(in srgb, var(--signal) 8%, transparent)' }}>Pro data</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Right side: Chat + Insights ── */}
+      {/* ── Chat + Insights wrapper ── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minWidth: 0 }}>
 
-      {/* ── Chat panel ── */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-background min-w-0">
-        {/* Chat header */}
-        <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b border-border bg-[hsl(229,23%,9%)] shrink-0">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsContextOpen(true)}
-              className="md:hidden gap-1.5 text-xs text-muted-foreground hover:text-foreground -ml-2 mr-1"
-            >
-              <SlidersHorizontal size={14} />
-              Settings
-            </Button>
-            <MessageSquare size={16} className="text-[#00ffc8] hidden md:block" />
-            <div className="hidden md:flex items-baseline gap-1.5">
-              <span className="text-sm font-semibold text-foreground">
+        {/* ── Chat panel ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)', minWidth: 0 }}>
+
+          {/* Chat header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--panel)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => setIsContextOpen(true)}
+                className="md:hidden"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--muted)', marginRight: 4 }}
+              >
+                <SlidersHorizontal size={13} />
+                Settings
+              </button>
+              <MessageSquare size={14} style={{ color: 'var(--win)' }} className="hidden md:block" />
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }} className="hidden md:block">
                 {mode === 'myteam' ? 'My Team' : selectedFolder ? selectedFolder.opponent_display_name : 'AI Coach'}
               </span>
-              <span className="text-xs text-muted-foreground capitalize">· {focusArea}</span>
+              {(selectedFolder || mode === 'myteam') && (
+                <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'capitalize' }} className="hidden md:block">· {focusArea}</span>
+              )}
             </div>
-            <span className="text-sm font-medium text-foreground md:hidden">
-              {messages.length === 0 ? 'AI Scout' : `${messages.length} messages`}
-            </span>
+            <button
+              onClick={() => { setMessages([]); setInput('') }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--muted)', padding: '5px 9px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', transition: 'all 0.12s' }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)'}
+            >
+              <RotateCcw size={11} />
+              <span className="hidden sm:inline">New Session</span>
+            </button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => { setMessages([]); setInput('') }}
-            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <RotateCcw size={13} />
-            <span className="hidden sm:inline">New Session</span>
-          </Button>
-        </div>
 
-        {/* Messages area */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-1">
-          {isEmpty ? (
-            /* ── Welcome / empty state ── */
-            <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <div className="relative w-16 h-16 rounded-2xl bg-[rgba(0,255,200,0.1)] border border-[rgba(0,255,200,0.2)] flex items-center justify-center mb-5 shadow-[0_0_24px_rgba(0,255,200,0.1)]">
-                <Brain size={28} className="text-[#00ffc8]" />
-                <div className="absolute inset-0 rounded-2xl bg-[rgba(0,255,200,0.05)] animate-ping opacity-20" />
-              </div>
-              <h2 className="text-xl font-bold text-foreground mb-1.5">
-                {mode === 'myteam'
-                  ? 'My Team Coach Ready'
-                  : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Scout Ready'}
-              </h2>
-              <p className="text-muted-foreground text-sm max-w-sm mb-8 leading-relaxed">
-                {mode === 'myteam'
-                  ? "Ask anything about your team's performance — weaknesses, executes, practice plans, and strategy."
-                  : selectedFolder
-                    ? `Ask anything about ${selectedFolder.opponent_display_name} — tendencies, anti-strats, key players, map reads.`
-                    : "Select an opponent you've uploaded demos for, then ask for scouting reports and anti-strats."}
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
-                {suggestedQuestions.map(q => (
-                  <button
-                    key={q.label}
-                    onClick={() => sendMessage(q.prompt)}
-                    disabled={isLoading}
-                    className={cn(
-                      'rv-panel flex items-center gap-2.5 p-3.5 text-left',
-                      'text-[13px] text-muted-foreground hover:text-foreground hover:border-[rgba(0,255,200,0.25)] hover:bg-[rgba(0,255,200,0.04)]',
-                      'transition-all duration-150 group disabled:opacity-50 disabled:cursor-not-allowed',
-                    )}
-                  >
-                    <Sparkles size={13} className="text-[#00ffc8] shrink-0" />
-                    <span className="flex-1 min-w-0 truncate">{q.label}</span>
-                    <ChevronRight size={13} className="text-muted-foreground/40 group-hover:text-[#00ffc8] group-hover:translate-x-0.5 transition-all shrink-0" />
-                  </button>
-                ))}
-              </div>
-
-              {mode === 'opponent' && !selectedFolder && opponents.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-5 flex items-center gap-1">
-                  <ChevronDown size={12} className="rotate-90" />
-                  Pick an opponent in the left panel to get personalised scouting
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {isEmpty ? (
+              /* Empty state */
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', padding: '48px 24px' }}>
+                <div style={{ position: 'relative', width: 64, height: 64, borderRadius: 18, background: 'color-mix(in srgb, var(--win) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20, boxShadow: '0 0 24px color-mix(in srgb, var(--win) 12%, transparent)' }}>
+                  <Brain size={28} style={{ color: 'var(--win)' }} />
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'color-mix(in srgb, var(--win) 5%, transparent)' }} className="animate-ping opacity-20" />
+                </div>
+                <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)', marginBottom: 6 }}>
+                  {mode === 'myteam'
+                    ? 'My Team Coach Ready'
+                    : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Scout Ready'}
+                </h2>
+                <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 340, marginBottom: 28, lineHeight: 1.6 }}>
+                  {mode === 'myteam'
+                    ? "Ask anything about your team's performance — weaknesses, executes, practice plans, and strategy."
+                    : selectedFolder
+                      ? `Ask anything about ${selectedFolder.opponent_display_name} — tendencies, anti-strats, key players, map reads.`
+                      : "Select an opponent you've uploaded demos for, then ask for scouting reports and anti-strats."}
                 </p>
-              )}
-              {mode === 'opponent' && opponents.length === 0 && !loadingOpponents && (
-                <a href="/opponents" className="mt-5 text-xs text-neon-green hover:underline flex items-center gap-1">
-                  <Target size={12} />
-                  Upload your first opponent demo →
-                </a>
-              )}
-            </div>
-          ) : (
-            /* ── Conversation ── */
-            <>
-              {messages.map((msg, i) => {
-                const isLast    = i === messages.length - 1
-                const streaming = isLoading && isLast && msg.role === 'assistant'
 
-                // Extract any showRoundReplay tool invocations from this message
-                const replayInvocations = (msg.toolInvocations ?? []).filter(
-                  inv => inv.toolName === 'showRoundReplay'
-                )
-
-                return (
-                  <div key={msg.id} className="mb-4">
-                    <div className={cn('flex items-end gap-3', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
-                      {msg.role === 'assistant' ? (
-                        <div className="w-8 h-8 rounded-xl bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center shrink-0 mb-0.5">
-                          <Brain size={14} className="text-[#00ffc8]" />
-                        </div>
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 mb-0.5">
-                          <span className="text-xs font-bold text-muted-foreground">You</span>
-                        </div>
-                      )}
-                      <div
-                        className={cn(
-                          'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3',
-                          msg.role === 'user'
-                            ? 'bg-[rgba(0,255,200,0.08)] border border-[rgba(0,255,200,0.18)] rounded-br-sm'
-                            : 'rv-panel rounded-bl-sm'
-                        )}
-                      >
-                        {msg.role === 'assistant' ? (
-                          <>
-                            <MarkdownContent content={msg.content} />
-                            {streaming && (
-                              <span className="inline-block w-2 h-4 bg-neon-green ml-0.5 animate-pulse rounded-sm" />
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-sm text-foreground">{msg.content}</p>
-                        )}
-                        {msg.createdAt && (
-                          <p className="text-xs text-muted-foreground mt-2 select-none">
-                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Inline round replays — shown below the message bubble, aligned with it */}
-                    {replayInvocations.length > 0 && (
-                      <div className="pl-11 mt-2 flex flex-col gap-2">
-                        {replayInvocations.map(inv => {
-                          if (inv.state === 'result') {
-                            const r = inv.result as Record<string, unknown>
-                            if (r.error) return (
-                              <p key={inv.toolCallId} className="text-xs text-muted-foreground italic">
-                                Replay unavailable: {String(r.error)}
-                              </p>
-                            )
-                            return (
-                              <ChatRoundReplay
-                                key={inv.toolCallId}
-                                round={r.round as React.ComponentProps<typeof ChatRoundReplay>['round']}
-                                players={r.players as React.ComponentProps<typeof ChatRoundReplay>['players']}
-                                team1Name={String(r.team1Name)}
-                                team2Name={String(r.team2Name)}
-                                mapName={String(r.mapName)}
-                                roundNumber={Number(r.roundNumber)}
-                                description={String(r.description)}
-                              />
-                            )
-                          }
-                          // Tool is being called — show a small spinner
-                          return (
-                            <div key={inv.toolCallId} className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Loader2 size={11} className="animate-spin text-[#00ffc8]" />
-                              Loading replay…
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {/* Follow-up suggestion chips */}
-              {showFollowUps && (
-                <div className="flex flex-wrap gap-2 pl-11 pb-2">
-                  {followUpChips.map(chip => (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%', maxWidth: 480 }}>
+                  {suggestedQuestions.map(q => (
                     <button
-                      key={chip.label}
-                      onClick={() => sendMessage(chip.prompt)}
-                      className={cn(
-                        'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all',
-                        'border-[rgba(0,255,200,0.2)] text-muted-foreground bg-[rgba(0,255,200,0.04)]',
-                        'hover:border-[rgba(0,255,200,0.45)] hover:text-[#00ffc8] hover:bg-[rgba(0,255,200,0.08)]',
-                      )}
+                      key={q.label}
+                      onClick={() => sendMessage(q.prompt)}
+                      disabled={isLoading}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 9, padding: '12px 14px', textAlign: 'left',
+                        background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, cursor: 'pointer',
+                        fontSize: 12, color: 'var(--muted)', transition: 'all 0.12s',
+                      }}
+                      onMouseEnter={e => {
+                        const b = e.currentTarget as HTMLButtonElement
+                        b.style.borderColor = 'color-mix(in srgb, var(--win) 28%, transparent)'
+                        b.style.color = 'var(--text)'
+                      }}
+                      onMouseLeave={e => {
+                        const b = e.currentTarget as HTMLButtonElement
+                        b.style.borderColor = 'var(--border)'
+                        b.style.color = 'var(--muted)'
+                      }}
                     >
-                      <Sparkles size={10} className="text-[#00ffc8] shrink-0" />
-                      {chip.label}
+                      <Zap size={12} style={{ color: 'var(--win)', flexShrink: 0 }} />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.label}</span>
+                      <ChevronRight size={12} style={{ color: 'var(--faint)', flexShrink: 0 }} />
                     </button>
                   ))}
                 </div>
-              )}
 
-              {/* Typing indicator — shows while waiting for the first streaming token */}
-              {isThinking && <TypingIndicator />}
+                {mode === 'opponent' && !selectedFolder && opponents.length > 0 && (
+                  <p style={{ fontSize: 11, color: 'var(--faint)', marginTop: 18, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <ChevronDown size={11} style={{ transform: 'rotate(90deg)' }} />
+                    Pick an opponent in the left panel to get personalised scouting
+                  </p>
+                )}
+                {mode === 'opponent' && opponents.length === 0 && !loadingOpponents && (
+                  <a href="/opponents" style={{ marginTop: 18, fontSize: 12, color: 'var(--win)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Target size={12} />
+                    Upload your first opponent demo →
+                  </a>
+                )}
+              </div>
+            ) : (
+              <>
+                {messages.map((msg, i) => {
+                  const isLast    = i === messages.length - 1
+                  const streaming = isLoading && isLast && msg.role === 'assistant'
+                  const replayInvocations = (msg.toolInvocations ?? []).filter(
+                    inv => inv.toolName === 'showRoundReplay'
+                  )
 
-              {/* Error state with retry */}
-              {error && !isLoading && (
-                <div className="flex items-end gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-red-400/20 border border-red-400/30 flex items-center justify-center shrink-0">
-                    <AlertCircle size={14} className="text-red-400" />
+                  return (
+                    <div key={msg.id} style={{ marginBottom: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
+                        {msg.role === 'assistant' ? (
+                          <div style={{ width: 32, height: 32, borderRadius: 10, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginBottom: 2 }}>
+                            <Brain size={14} style={{ color: 'var(--win)' }} />
+                          </div>
+                        ) : (
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--elevated)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginBottom: 2 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)' }}>You</span>
+                          </div>
+                        )}
+                        <div style={{
+                          maxWidth: '78%', borderRadius: 16, padding: '12px 16px',
+                          ...(msg.role === 'user'
+                            ? { background: 'color-mix(in srgb, var(--win) 8%, var(--card))', border: '1px solid color-mix(in srgb, var(--win) 18%, transparent)', borderBottomRightRadius: 4 }
+                            : { background: 'var(--card)', border: '1px solid var(--border)', borderBottomLeftRadius: 4 }
+                          ),
+                        }}>
+                          {msg.role === 'assistant' ? (
+                            <>
+                              <MarkdownContent content={msg.content} />
+                              {streaming && (
+                                <span style={{ display: 'inline-block', width: 8, height: 16, background: 'var(--win)', marginLeft: 3, borderRadius: 2, verticalAlign: 'middle' }} className="animate-pulse" />
+                              )}
+                            </>
+                          ) : (
+                            <p style={{ fontSize: 13, color: 'var(--text)' }}>{msg.content}</p>
+                          )}
+                          {msg.createdAt && (
+                            <p style={{ fontSize: 10, color: 'var(--faint)', marginTop: 6 }}>
+                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {replayInvocations.length > 0 && (
+                        <div style={{ paddingLeft: 42, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {replayInvocations.map(inv => {
+                            if (inv.state === 'result') {
+                              const r = inv.result as Record<string, unknown>
+                              if (r.error) return (
+                                <p key={inv.toolCallId} style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>
+                                  Replay unavailable: {String(r.error)}
+                                </p>
+                              )
+                              return (
+                                <ChatRoundReplay
+                                  key={inv.toolCallId}
+                                  round={r.round as React.ComponentProps<typeof ChatRoundReplay>['round']}
+                                  players={r.players as React.ComponentProps<typeof ChatRoundReplay>['players']}
+                                  team1Name={String(r.team1Name)}
+                                  team2Name={String(r.team2Name)}
+                                  mapName={String(r.mapName)}
+                                  roundNumber={Number(r.roundNumber)}
+                                  description={String(r.description)}
+                                />
+                              )
+                            }
+                            return (
+                              <div key={inv.toolCallId} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
+                                <Loader2 size={11} style={{ color: 'var(--win)' }} className="animate-spin" />
+                                Loading replay…
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* Follow-up chips */}
+                {showFollowUps && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingLeft: 42, paddingBottom: 8 }}>
+                    {followUpChips.map(chip => (
+                      <button
+                        key={chip.label}
+                        onClick={() => sendMessage(chip.prompt)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 20,
+                          fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                          border: '1px solid color-mix(in srgb, var(--win) 22%, transparent)',
+                          color: 'var(--muted)', background: 'color-mix(in srgb, var(--win) 4%, transparent)',
+                          transition: 'all 0.12s',
+                        }}
+                        onMouseEnter={e => {
+                          const b = e.currentTarget as HTMLButtonElement
+                          b.style.color = 'var(--win)'
+                          b.style.borderColor = 'color-mix(in srgb, var(--win) 45%, transparent)'
+                        }}
+                        onMouseLeave={e => {
+                          const b = e.currentTarget as HTMLButtonElement
+                          b.style.color = 'var(--muted)'
+                          b.style.borderColor = 'color-mix(in srgb, var(--win) 22%, transparent)'
+                        }}
+                      >
+                        <Sparkles size={9} style={{ color: 'var(--win)', flexShrink: 0 }} />
+                        {chip.label}
+                      </button>
+                    ))}
                   </div>
-                  <div className="bg-card border border-red-400/30 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[75%]">
-                    <p className="text-sm text-red-400">
-                      {error.message?.includes('Unauthorized')
-                        ? 'Not authorised — please refresh the page and try again.'
-                        : error.message?.includes('API key') || error.message?.includes('not configured')
-                          ? 'Groq API key not configured — add GROQ_API_KEY in Railway variables.'
-                          : error.message && error.message.trim().length > 0 && error.message.trim().length < 200
-                            ? error.message.trim()
-                            : 'Something went wrong. Please try again.'}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={retryLastMessage}
-                      className="mt-2 gap-1.5 text-xs border-red-400/30 text-red-400 hover:border-red-400/60"
-                    >
-                      <RefreshCw size={11} />
-                      Retry
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+                )}
 
-        {/* Input area */}
-        <div className="border-t border-border bg-[hsl(229,23%,9%)] p-3 md:p-4 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
-          <div className={cn(
-            'flex items-end gap-3 p-2 rounded-xl border transition-all duration-150',
-            'border-border focus-within:border-[rgba(0,255,200,0.4)] focus-within:shadow-[0_0_0_3px_rgba(0,255,200,0.08)]'
-          )}>
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={e => {
-                setInput(e.target.value)
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                mode === 'myteam'
-                  ? "Ask about your team's performance, weaknesses, or strategy…"
-                  : selectedFolder
-                    ? `Ask about ${selectedFolder.opponent_display_name}…`
-                    : 'Ask anything about CS2 tactics, or select an opponent for personalised scouting…'
-              }
-              disabled={isLoading}
-              rows={1}
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none min-h-[36px] max-h-40 py-2 px-2 disabled:cursor-not-allowed"
-              style={{ height: '36px' }}
-            />
-            <Button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim() || isLoading}
-              size="sm"
-              variant="neon"
-              className="shrink-0 h-10 w-10 p-0 rounded-lg"
+                {isThinking && (
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Brain size={14} style={{ color: 'var(--win)' }} />
+                    </div>
+                    <div className="rv-panel" style={{ padding: '10px 14px' }}>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', height: 16 }}>
+                        {[0, 1, 2].map(i => (
+                          <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)', animationDelay: `${i * 150}ms` }} className="animate-bounce" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {error && !isLoading && (
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,107,122,0.15)', border: '1px solid rgba(255,107,122,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <AlertCircle size={14} style={{ color: 'var(--loss)' }} />
+                    </div>
+                    <div style={{ background: 'var(--card)', border: '1px solid rgba(255,107,122,0.28)', borderRadius: 16, borderBottomLeftRadius: 4, padding: '12px 16px', maxWidth: '75%' }}>
+                      <p style={{ fontSize: 13, color: 'var(--loss)' }}>
+                        {error.message?.includes('Unauthorized')
+                          ? 'Not authorised — please refresh the page and try again.'
+                          : error.message?.includes('API key') || error.message?.includes('not configured')
+                            ? 'Groq API key not configured — add GROQ_API_KEY in Railway variables.'
+                            : error.message && error.message.trim().length > 0 && error.message.trim().length < 200
+                              ? error.message.trim()
+                              : 'Something went wrong. Please try again.'}
+                      </p>
+                      <button
+                        onClick={retryLastMessage}
+                        style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--loss)', padding: '4px 9px', border: '1px solid rgba(255,107,122,0.3)', borderRadius: 7, background: 'transparent', cursor: 'pointer' }}
+                      >
+                        <RefreshCw size={10} />
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input area */}
+          <div style={{ borderTop: '1px solid var(--border)', background: 'var(--panel)', padding: '12px 16px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '8px 10px 8px 14px', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--card)', transition: 'border-color 0.12s' }}
+              onFocusCapture={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'color-mix(in srgb, var(--win) 38%, transparent)'}
+              onBlurCapture={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
             >
-              {isLoading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-            </Button>
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={e => {
+                  setInput(e.target.value)
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  mode === 'myteam'
+                    ? "Ask about your team's performance, weaknesses, or strategy…"
+                    : selectedFolder
+                      ? `Ask about ${selectedFolder.opponent_display_name}…`
+                      : 'Ask anything about CS2 tactics, or select an opponent for personalised scouting…'
+                }
+                disabled={isLoading}
+                rows={1}
+                style={{ flex: 1, background: 'transparent', fontSize: 13, color: 'var(--text)', resize: 'none', outline: 'none', minHeight: 36, maxHeight: 160, paddingTop: 6, paddingBottom: 6 }}
+              />
+              <button
+                onClick={() => sendMessage(input)}
+                disabled={!input.trim() || isLoading}
+                style={{
+                  width: 36, height: 36, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: input.trim() && !isLoading ? 'linear-gradient(180deg, var(--win), color-mix(in srgb, var(--win) 75%, #000))' : 'var(--elevated)',
+                  border: 'none', cursor: input.trim() && !isLoading ? 'pointer' : 'default',
+                  transition: 'all 0.12s',
+                }}
+              >
+                {isLoading ? <Loader2 size={14} style={{ color: 'var(--muted)' }} className="animate-spin" /> : <Send size={14} style={{ color: input.trim() ? '#0a1a12' : 'var(--faint)' }} />}
+              </button>
+            </div>
+            <p style={{ fontSize: 10, color: 'var(--faint)', textAlign: 'center', marginTop: 7 }}>
+              {mode === 'myteam'
+                ? "Analysing your team's own demos for self-improvement coaching"
+                : selectedFolder
+                  ? `Analysing demos from your ${selectedFolder.opponent_display_name} folder`
+                  : 'Select an opponent folder for personalised anti-strats and scouting reports'}
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            {mode === 'myteam'
-              ? "Analysing your team's own demos for self-improvement coaching"
-              : selectedFolder
-                ? `Analysing demos from your ${selectedFolder.opponent_display_name} folder`
-                : 'Select an opponent folder for personalised anti-strats and scouting reports'}
-          </p>
         </div>
-      </div>
 
-      {/* ── Insights side panel ── */}
-      <div style={{ width: 320, minWidth: 320, borderLeft: '1px solid var(--border)', background: 'var(--panel)', overflowY: 'auto', padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
-          <p style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Insights</p>
-        </div>
-        {[
-          { title: 'Mid-control weakness', text: 'The opponent consistently fails to hold mid on Mirage CT-side, often over-rotating. Exploit with quick mid-pushes or splits.' },
-          { title: 'Eco round force pattern', text: 'Expect aggressive force buys with MP9s and Deagles on eco rounds. They stack A-site or push Underpass to disrupt B executes.' },
-          { title: 'AWP positioning', text: 'Primary AWPer favors Connector and Ticket Booth on Mirage CT-side. Flash these angles early to neutralize their impact.' },
-        ].map((insight, i) => (
-          <div key={i} style={{ padding: '15px 16px', borderRadius: 16, position: 'relative', overflow: 'hidden', border: '1px solid color-mix(in srgb, var(--signal) 24%, transparent)', background: 'radial-gradient(480px 250px at 8% -24%, color-mix(in srgb, var(--signal) 11%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--signal) 2.5%, var(--card)), var(--card))' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'rgba(34,211,238,.1)', border: '1px solid rgba(34,211,238,.3)', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.06em', marginBottom: 10 }}>✦ AI INSIGHT</span>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 7 }}>{insight.title}</p>
-            <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>{insight.text}</p>
+        {/* ── Insights panel ── */}
+        <div style={{ width: 300, minWidth: 300, borderLeft: '1px solid var(--border)', background: 'var(--panel)', overflowY: 'auto', padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 10 }} className="hidden lg:flex">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Insights</p>
+            {messages.length > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 6px', fontFamily: 'var(--font-mono)' }}>
+                {Math.max(0, messages.filter(m => m.role === 'assistant').length)}
+              </span>
+            )}
           </div>
-        ))}
-      </div>
+          {[
+            { title: 'Mid-control weakness', text: 'The opponent consistently fails to hold mid on Mirage CT-side, often over-rotating. Exploit with quick mid-pushes or splits.' },
+            { title: 'Eco round force pattern', text: 'Expect aggressive force buys with MP9s and Deagles on eco rounds. They stack A-site or push Underpass to disrupt B executes.' },
+            { title: 'AWP positioning tendency', text: 'Primary AWPer favors Connector and Ticket Booth on Mirage CT-side. Flashing these angles early can neutralize their impact.' },
+          ].map((insight, i) => (
+            <div key={i} style={{ padding: '13px 14px', borderRadius: 13, position: 'relative', overflow: 'hidden', border: '1px solid color-mix(in srgb, var(--signal) 22%, transparent)', background: `radial-gradient(300px 180px at 10% -20%, color-mix(in srgb, var(--signal) 9%, transparent), transparent 60%), var(--card)` }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 28%, transparent)', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.06em', marginBottom: 9 }}>
+                ✦ AI INSIGHT
+              </span>
+              <p style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{insight.title}</p>
+              <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>{insight.text}</p>
+              <button style={{ marginTop: 9, fontSize: 11, color: 'var(--signal)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                View full analysis →
+              </button>
+            </div>
+          ))}
+        </div>
 
-      </div>{/* end right-side wrapper */}
+      </div>
     </div>
   )
 }
