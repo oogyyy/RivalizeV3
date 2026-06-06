@@ -3,20 +3,13 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
-import { PageHeader } from '@/components/layout/PageHeader'
-import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import PersonalStatsAndDemos from '@/app/(app)/improve/PersonalStatsAndDemos'
+import MyMatchesDashboard from '@/app/(app)/improve/MyMatchesDashboard'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 
-/**
- * Auto-provisions a hidden personal team for the user if one doesn't exist yet.
- * Personal teams are excluded from the My Teams page (is_personal=true).
- */
 async function getOrCreatePersonalTeam(
   userId: string,
   admin: ReturnType<typeof createAdminClient>,
 ): Promise<string> {
-  // Look for existing personal team
   const { data: existing } = await admin
     .from('teams')
     .select('id')
@@ -27,7 +20,6 @@ async function getOrCreatePersonalTeam(
 
   if (existing) return existing.id
 
-  // Create one — slug must be unique; use user id prefix to guarantee it
   const slug = `personal-${userId.slice(0, 8)}`
   const { data: team, error } = await admin
     .from('teams')
@@ -37,7 +29,6 @@ async function getOrCreatePersonalTeam(
 
   if (error || !team) throw new Error(`Failed to create personal team: ${error?.message}`)
 
-  // Add the user as owner
   await admin
     .from('team_members')
     .insert({ team_id: team.id, user_id: userId, role: 'owner' })
@@ -70,30 +61,11 @@ export default async function ImprovePage() {
   const demos = (demosData ?? []) as DemoRowData[]
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
-
-      {/* ── Header ── */}
-      <div className="animate-fade-in-up">
-        <PageHeader
-          label="04 Improve"
-          title="My Matches"
-          description="Track your personal performance across pugs, matchmaking, and scrims"
-          actions={
-            <div className="flex items-center gap-2">
-              {demos.length > 0 && (
-                <DemoUploadButton teamId={personalTeamId} demoType="self" />
-              )}
-            </div>
-          }
-        />
-      </div>
-
-      <PersonalStatsAndDemos
-        initialDemos={demos}
-        personalTeamId={personalTeamId}
-        steamId={steamId}
-        faceitPlayerId={faceitPlayerId}
-      />
-    </div>
+    <MyMatchesDashboard
+      initialDemos={demos}
+      personalTeamId={personalTeamId}
+      steamId={steamId}
+      faceitPlayerId={faceitPlayerId}
+    />
   )
 }
