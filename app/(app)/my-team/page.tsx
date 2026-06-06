@@ -3,16 +3,8 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
-import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import FaceitImportButton from '@/components/teams/FaceitImportButton'
-import MyTeamStatsAndDemos from '@/components/teams/MyTeamStatsAndDemos'
+import MyTeamDashboard from '@/components/teams/MyTeamDashboard'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
-import { PageHeader } from '@/components/layout/PageHeader'
-import CreateTeamDialog from '@/app/(app)/teams/CreateTeamDialog'
-import InviteFriendsDialog from '@/app/(app)/teams/[teamId]/InviteFriendsDialog'
-import EditTeamNameDialog from '@/app/(app)/my-team/EditTeamNameDialog'
-import DeleteTeamDialog from '@/app/(app)/my-team/DeleteTeamDialog'
-import TeamSwitcher from '@/app/(app)/my-team/TeamSwitcher'
 import type { TeamOption } from '@/app/(app)/my-team/TeamSwitcher'
 
 export default async function MyTeamPage({
@@ -94,45 +86,15 @@ export default async function MyTeamPage({
   const demos = (demosRes.data ?? []) as DemoRowData[]
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 md:p-7 flex flex-col gap-4">
-
-      {/* ── Header ── */}
-      <div className="animate-fade-in-up">
-        <PageHeader
-          label="My Teams"
-          title={teamName}
-          description="Your team's performance overview"
-          actions={
-            <div className="flex items-center gap-2">
-              {/* Team switcher — only shown when user is in multiple teams */}
-              {allTeams.length > 1 && (
-                <TeamSwitcher teams={allTeams} selectedTeamId={selectedTeamId} />
-              )}
-              {canEdit && (
-                <EditTeamNameDialog teamId={selectedTeamId} currentName={teamName} />
-              )}
-              {canInvite && (
-                <InviteFriendsDialog teamId={selectedTeamId} existingMemberIds={memberIds} />
-              )}
-              {myFaceitId && (
-                <FaceitImportButton teamId={selectedTeamId} faceitNickname={myFaceitId} />
-              )}
-              <DemoUploadButton teamId={selectedTeamId} demoType="self" />
-              <CreateTeamDialog />
-              {canDelete && (
-                <DeleteTeamDialog teamId={selectedTeamId} teamName={teamName} />
-              )}
-            </div>
-          }
-        />
-
-      </div>
-
-      <MyTeamStatsAndDemos
-        initialDemos={demos}
-        primaryTeamId={selectedTeamId}
-        faceitNickname={myFaceitId}
-      />
-    </div>
+    <MyTeamDashboard
+      selectedTeamId={selectedTeamId}
+      allTeams={allTeams}
+      demos={demos}
+      teamName={teamName}
+      canEdit={canEdit}
+      canInvite={canInvite}
+      canDelete={canDelete}
+      myFaceitId={myFaceitId}
+    />
   )
 }
