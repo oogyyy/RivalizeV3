@@ -3,17 +3,14 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
-import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import FaceitImportButton from '@/components/teams/FaceitImportButton'
-import MyTeamStatsAndDemos from '@/components/teams/MyTeamStatsAndDemos'
+import MyTeamDashboard from '@/components/teams/MyTeamDashboard'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
-import { PageHeader } from '@/components/layout/PageHeader'
-import CreateTeamDialog from '@/app/(app)/teams/CreateTeamDialog'
-import InviteFriendsDialog from '@/app/(app)/teams/[teamId]/InviteFriendsDialog'
-import EditTeamNameDialog from '@/app/(app)/my-team/EditTeamNameDialog'
-import DeleteTeamDialog from '@/app/(app)/my-team/DeleteTeamDialog'
-import TeamSwitcher from '@/app/(app)/my-team/TeamSwitcher'
-import type { TeamOption } from '@/app/(app)/my-team/TeamSwitcher'
+
+interface TeamOption {
+  id: string
+  name: string
+  role: 'owner' | 'admin' | 'member'
+}
 
 export default async function MyTeamPage({
   searchParams,
@@ -46,19 +43,15 @@ export default async function MyTeamPage({
 
   const allTeams: TeamOption[] = membershipList
     .filter(m => teamMap.has(m.team_id))
-    .map(m => ({ id: m.team_id, name: teamMap.get(m.team_id)!, role: m.role }))
+    .map(m => ({ id: m.team_id, name: teamMap.get(m.team_id)!, role: m.role as 'owner' | 'admin' | 'member' }))
 
   // No real teams yet (user might only have a personal /improve team)
   if (allTeams.length === 0) {
     return (
-      <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
-        <div className="animate-fade-in-up">
-          <PageHeader
-            label="My Teams"
-            title="No team yet"
-            description="Create a team to start tracking your performance"
-            actions={<CreateTeamDialog />}
-          />
+      <div className="flex-1 overflow-y-auto p-5 md:p-7">
+        <div style={{ marginTop: '60px', textAlign: 'center', opacity: 0.7 }}>
+          <p style={{ fontSize: '18px', fontWeight: 500, marginBottom: '8px' }}>No teams yet</p>
+          <p style={{ fontSize: '14px', marginBottom: '24px' }}>Create a team to start tracking your performance</p>
         </div>
       </div>
     )
@@ -94,61 +87,15 @@ export default async function MyTeamPage({
   const demos = (demosRes.data ?? []) as DemoRowData[]
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 md:p-7 flex flex-col gap-4">
-
-      {/* ── Header ── */}
-      <div className="animate-fade-in-up">
-        <PageHeader
-          label="My Teams"
-          title={teamName}
-          description="Your team's performance overview"
-          actions={
-            <div className="flex items-center gap-2">
-              {/* Team switcher — only shown when user is in multiple teams */}
-              {allTeams.length > 1 && (
-                <TeamSwitcher teams={allTeams} selectedTeamId={selectedTeamId} />
-              )}
-              {canEdit && (
-                <EditTeamNameDialog teamId={selectedTeamId} currentName={teamName} />
-              )}
-              {canInvite && (
-                <InviteFriendsDialog teamId={selectedTeamId} existingMemberIds={memberIds} />
-              )}
-              {myFaceitId && (
-                <FaceitImportButton teamId={selectedTeamId} faceitNickname={myFaceitId} />
-              )}
-              <DemoUploadButton teamId={selectedTeamId} demoType="self" />
-              <CreateTeamDialog />
-              {canDelete && (
-                <DeleteTeamDialog teamId={selectedTeamId} teamName={teamName} />
-              )}
-            </div>
-          }
-        />
-
-        {/* Stats cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 animate-fade-in-up">
-          {[
-            { label: 'MATCHES', value: '—', sub: 'Total played', border: 's-amber' },
-            { label: 'WIN RATE', value: '—', sub: 'Overall', border: 's-signal' },
-            { label: 'TEAM K/D', value: '—', sub: 'Combined', border: 's-purple' },
-            { label: 'AVG ADR', value: '—', sub: 'Per round', border: 's-blue' },
-          ].map((s) => (
-            <div key={s.label} className={`rv-panel lift p-4 ${s.border}`} style={{ cursor: 'default', position: 'relative' }}>
-              <div className={`al-${s.border.replace('s-', '')}`} style={{ position: 'absolute', top: 0, left: 0, right: 0 }} />
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</p>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 4 }}>{s.value}</p>
-              <p style={{ fontSize: 11, color: 'var(--muted)' }}>{s.sub}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <MyTeamStatsAndDemos
-        initialDemos={demos}
-        primaryTeamId={selectedTeamId}
-        faceitNickname={myFaceitId}
-      />
-    </div>
+    <MyTeamDashboard
+      selectedTeamId={selectedTeamId}
+      allTeams={allTeams}
+      demos={demos}
+      teamName={teamName}
+      canEdit={canEdit}
+      canInvite={canInvite}
+      canDelete={canDelete}
+      myFaceitId={myFaceitId}
+    />
   )
 }
