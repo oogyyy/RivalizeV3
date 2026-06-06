@@ -292,19 +292,94 @@ export default function MyTeamStatsAndDemos({
         />
       </div>
 
-      {/* ── Performance Trends ── */}
-      {effectiveDemos.filter(d => d.status === 'completed').length >= 2 && (
-        <div className="animate-fade-in-up animate-fade-in-up-delay-2">
-          <PerformanceTrends demos={effectiveDemos} />
-        </div>
-      )}
-
+      {/* ── Performance + AI Analyst ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fade-in-up animate-fade-in-up-delay-2">
-
-        {/* ── Left: Player stats + Map pool + Demos ── */}
+        {/* Left: Performance Trends + Win rate by map */}
         <div className="lg:col-span-2 space-y-5">
+          {effectiveDemos.filter(d => d.status === 'completed').length >= 2 && (
+            <PerformanceTrends demos={effectiveDemos} />
+          )}
 
-          {/* Roster */}
+          {/* Win rate by map */}
+          {mapGroups.filter(g => g.demos.length > 0).length > 0 && (
+            <div className="rounded-xl border border-border bg-card p-5">
+              <h2 className="text-[13px] font-semibold text-foreground mb-4">Win rate by map</h2>
+              <div className="space-y-3">
+                {mapGroups.filter(g => g.demos.length > 0).map(group => {
+                  const total = group.wins + group.losses + group.draws
+                  const winRate = total > 0 ? (group.wins / total * 100) : 0
+                  return (
+                    <div key={group.map}>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[13px] text-foreground">{group.map.replace('de_', '')}</span>
+                        <span className="text-[13px] font-mono text-[#00ffc8]">{Math.round(winRate)}%</span>
+                      </div>
+                      <div className="h-2 bg-border rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-cyan-400"
+                          style={{ width: `${winRate}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: AI Analyst */}
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="accent-line-green w-full" />
+            <div className="p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-6 h-6 rounded-md bg-[rgba(0,255,200,0.1)] flex items-center justify-center">
+                  <Brain size={13} className="text-[#00ffc8]" />
+                </div>
+                <h2 className="text-[13px] font-semibold text-foreground">AI Analyst</h2>
+                <Badge variant="neon" className="ml-auto text-[10px]">Llama 3.3</Badge>
+              </div>
+              <p className="text-[12px] text-muted-foreground mb-4 leading-relaxed">
+                Analyse your demos to identify weaknesses, improve executes, and build your playbook.
+              </p>
+              <div className="space-y-1.5">
+                {AI_QUICK_ACTIONS.map(action => (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:border-border bg-transparent hover:bg-accent/50 transition-all group"
+                  >
+                    <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border', action.iconBg)}>
+                      {action.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-foreground">{action.title}</p>
+                      <p className="text-[11px] text-muted-foreground/60 leading-tight mt-0.5">{action.description}</p>
+                    </div>
+                    <ArrowRight size={13} className="text-muted-foreground/40 group-hover:text-foreground shrink-0 transition-colors" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {totalMatches === 0 && primaryTeamId && (
+            <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-center">
+              <FileVideo size={22} className="text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-[13px] font-medium text-foreground mb-1">Upload your demos</p>
+              <p className="text-[12px] text-muted-foreground mb-4 leading-relaxed">
+                Upload your team&apos;s own match demos to unlock performance analysis.
+              </p>
+              <DemoUploadButton teamId={primaryTeamId} demoType="self" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Roster + Map Performance ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 animate-fade-in-up animate-fade-in-up-delay-3">
+        {/* Roster */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="accent-line-green w-full" />
             <div className="p-5">
@@ -364,92 +439,91 @@ export default function MyTeamStatsAndDemos({
             </div>
           </div>
 
-          {/* Map Pool */}
+          {/* Map Performance */}
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-6 h-6 rounded-md bg-[rgba(0,255,200,0.1)] flex items-center justify-center">
-                <MapIcon size={13} className="text-[#00ffc8]" />
+                <BarChart3 size={13} className="text-[#00ffc8]" />
               </div>
-              <h2 className="text-[13px] font-semibold text-foreground">Map Pool</h2>
+              <h2 className="text-[13px] font-semibold text-foreground">Map Performance</h2>
             </div>
-            {topMaps.length === 0 ? (
+            {mapGroups.filter(g => g.demos.length > 0).length === 0 ? (
               <EmptyState
-                icon={<MapIcon size={18} className="text-muted-foreground/40" />}
+                icon={<BarChart3 size={18} className="text-muted-foreground/40" />}
                 text="No map data yet."
               />
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {topMaps.map(([map, count]) => (
-                  <div key={map} className="flex items-center gap-2 px-3 py-1.5 bg-accent/50 hover:bg-accent/80 rounded-lg border border-border/60 transition-colors">
-                    <span className="text-[13px] font-medium text-foreground">{map.replace('de_', '')}</span>
-                    <span className="text-[11px] font-mono text-[#00ffc8] bg-[rgba(0,255,200,0.1)] px-1.5 py-0.5 rounded">{count}×</span>
-                  </div>
-                ))}
+              <div className="space-y-3">
+                {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').slice(0, 6).map(group => {
+                  const total = group.wins + group.losses + group.draws
+                  const ctRate = total > 0 ? (group.wins / total * 100) : 0
+                  const tRate = 100 - ctRate
+                  return (
+                    <div key={group.map}>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[13px] text-foreground">{group.map.replace('de_', '')}</span>
+                        <div className="flex gap-2 text-[11px] font-mono">
+                          <span className="text-blue-400">CT {Math.round(ctRate)}%</span>
+                          <span className="text-amber-400">T {Math.round(tRate)}%</span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-border rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-blue-500"
+                          style={{ width: `${ctRate}%` }}
+                        />
+                        <div
+                          className="h-full bg-amber-500"
+                          style={{ width: `${tRate}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
-
-          {/* Demo list */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <FileVideo size={15} className="text-[#00ffc8]" />
-              <h2 className="text-[13px] font-semibold text-foreground">My Team&apos;s Demos</h2>
-              {effectiveDemos.length > 0 && (
-                <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
-                  {effectiveDemos.length} · {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').length} maps
-                </span>
-              )}
-            </div>
-            <MapFolderList mapGroups={mapGroups} onSideChange={handleSideChange} />
-          </div>
         </div>
 
-        {/* ── Right: AI Quick Actions ── */}
-        <div className="space-y-4">
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="accent-line-green w-full" />
-            <div className="p-5">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-6 h-6 rounded-md bg-[rgba(0,255,200,0.1)] flex items-center justify-center">
-                  <Brain size={13} className="text-[#00ffc8]" />
-                </div>
-                <h2 className="text-[13px] font-semibold text-foreground">AI Analyst</h2>
-                <Badge variant="neon" className="ml-auto text-[10px]">Llama 3.3</Badge>
-              </div>
-              <p className="text-[12px] text-muted-foreground mb-4 leading-relaxed">
-                Analyse your demos to identify weaknesses, improve executes, and build your playbook.
-              </p>
-              <div className="space-y-1.5">
-                {AI_QUICK_ACTIONS.map(action => (
-                  <Link
-                    key={action.href}
-                    href={action.href}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:border-border bg-transparent hover:bg-accent/50 transition-all group"
-                  >
-                    <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border', action.iconBg)}>
-                      {action.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-foreground">{action.title}</p>
-                      <p className="text-[11px] text-muted-foreground/60 leading-tight mt-0.5">{action.description}</p>
-                    </div>
-                    <ArrowRight size={13} className="text-muted-foreground/40 group-hover:text-foreground shrink-0 transition-colors" />
-                  </Link>
-                ))}
-              </div>
+      {/* ── Map Pool + Demos ── */}
+      <div className="space-y-5 animate-fade-in-up animate-fade-in-up-delay-3">
+        {/* Map Pool */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-6 h-6 rounded-md bg-[rgba(0,255,200,0.1)] flex items-center justify-center">
+              <MapIcon size={13} className="text-[#00ffc8]" />
             </div>
+            <h2 className="text-[13px] font-semibold text-foreground">Map Pool</h2>
           </div>
-
-          {totalMatches === 0 && primaryTeamId && (
-            <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-center">
-              <FileVideo size={22} className="text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-[13px] font-medium text-foreground mb-1">Upload your demos</p>
-              <p className="text-[12px] text-muted-foreground mb-4 leading-relaxed">
-                Upload your team&apos;s own match demos to unlock performance analysis.
-              </p>
-              <DemoUploadButton teamId={primaryTeamId} demoType="self" />
+          {topMaps.length === 0 ? (
+            <EmptyState
+              icon={<MapIcon size={18} className="text-muted-foreground/40" />}
+              text="No map data yet."
+            />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {topMaps.map(([map, count]) => (
+                <div key={map} className="flex items-center gap-2 px-3 py-1.5 bg-accent/50 hover:bg-accent/80 rounded-lg border border-border/60 transition-colors">
+                  <span className="text-[13px] font-medium text-foreground">{map.replace('de_', '')}</span>
+                  <span className="text-[11px] font-mono text-[#00ffc8] bg-[rgba(0,255,200,0.1)] px-1.5 py-0.5 rounded">{count}×</span>
+                </div>
+              ))}
             </div>
           )}
+        </div>
+
+        {/* Demo list */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <FileVideo size={15} className="text-[#00ffc8]" />
+            <h2 className="text-[13px] font-semibold text-foreground">My Team&apos;s Demos</h2>
+            {effectiveDemos.length > 0 && (
+              <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
+                {effectiveDemos.length} · {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').length} maps
+              </span>
+            )}
+          </div>
+          <MapFolderList mapGroups={mapGroups} onSideChange={handleSideChange} />
         </div>
       </div>
     </>
