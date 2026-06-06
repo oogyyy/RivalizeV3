@@ -45,6 +45,7 @@ export default async function MyTeamPlayerPage({
     .eq('demo_type', 'self')
     .eq('status', 'completed')
     .order('match_date', { ascending: true })
+    .limit(200)
 
   type DemoEntry = {
     demoId: string

@@ -45,6 +45,7 @@ export default async function PlayerPage({
     .eq('demo_type', 'opponent')
     .eq('status', 'completed')
     .order('match_date', { ascending: true })
+    .limit(200)
 
   // Extract per-demo stats for this player
   type DemoEntry = {

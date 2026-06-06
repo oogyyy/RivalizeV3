@@ -55,13 +55,15 @@ export default async function OpponentPage({
 
   // Use admin client to bypass RLS — membership already verified above.
   // STRICT: only fetch opponent demos — self-demos must never appear in scouting folders.
+  // Limit to 500 recent demos to reduce bandwidth; aggregated_stats handles full history
   const { data: demos } = await admin
     .from('demos')
-    .select('*')
+    .select('id, status, map, match_date, created_at, opponent_slug, parsed_data')
     .eq('team_id', teamId)
     .eq('opponent_slug', folder.opponent_slug)
     .eq('demo_type', 'opponent')   // enforce data isolation
     .order('created_at', { ascending: false })
+    .limit(500)
 
   const totalDemos = (demos ?? []).length
   const wins = stats?.wins ?? 0
