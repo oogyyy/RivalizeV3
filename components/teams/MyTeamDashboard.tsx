@@ -116,7 +116,15 @@ export default function MyTeamDashboard({
   myFaceitId,
 }: MyTeamDashboardProps) {
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
+  const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set())
   const stats = useMemo(() => computeStats(demos), [demos])
+
+  const toggleMapExpanded = (map: string) => {
+    const newSet = new Set(expandedMaps)
+    if (newSet.has(map)) newSet.delete(map)
+    else newSet.add(map)
+    setExpandedMaps(newSet)
+  }
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -396,7 +404,7 @@ export default function MyTeamDashboard({
               <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>My Team's Demos</p>
               <span style={{ fontSize: 10, color: 'var(--muted)' }}>{demos.length} • {new Set(demos.map(d => d.map)).size} maps</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <div style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden' }}>
               {(() => {
                 const demosByMap = demos.reduce((acc, demo) => {
                   const map = demo.map || 'Unknown'
@@ -422,28 +430,47 @@ export default function MyTeamDashboard({
                     }
                     const winRate = completedDemos.length > 0 ? (wins / completedDemos.length * 100).toFixed(0) : '0'
                     const lastPlayed = mapDemos.sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0]?.created_at
+                    const isExpanded = expandedMaps.has(map)
 
                     return (
-                      <div key={map} style={{ padding: 16, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'background 0.2s', background: 'transparent' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--card)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 8, background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>{map.substring(0, 2).toUpperCase()}</div>
-                          <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{map}</p>
-                            <p style={{ fontSize: 11, color: 'var(--muted)' }}>Last played {lastPlayed ? new Date(lastPlayed).toLocaleDateString() : 'N/A'}</p>
+                      <div key={map}>
+                        <button onClick={() => toggleMapExpanded(map)} style={{ width: '100%', padding: 16, borderBottom: i < Object.keys(demosByMap).length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'background 0.2s', background: 'transparent', border: 'none', color: 'inherit', font: 'inherit' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, textAlign: 'left' }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>{map.substring(0, 2).toUpperCase()}</div>
+                            <div style={{ flex: 1 }}>
+                              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>{map}</p>
+                              <p style={{ fontSize: 11, color: 'var(--muted)', margin: 0 }}>Last played {lastPlayed ? new Date(lastPlayed).toLocaleDateString() : 'N/A'}</p>
+                            </div>
                           </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-                          <div style={{ textAlign: 'right', minWidth: 80 }}>
-                            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{wins}W - {losses}L ({winRate}%)</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                            <div style={{ textAlign: 'right', minWidth: 80 }}>
+                              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>{wins}W - {losses}L ({winRate}%)</p>
+                            </div>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              {Array.from({ length: Math.min(mapDemos.length, 5) }).map((_, idx) => (
+                                <div key={idx} style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--signal)' }} />
+                              ))}
+                              {mapDemos.length > 5 && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>+{mapDemos.length - 5}</span>}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 80 }}>
+                              <p style={{ fontSize: 12, color: 'var(--signal)', fontWeight: 600, margin: 0 }}>{mapDemos.length} demos</p>
+                              <ChevronRight size={16} style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }} />
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            {Array.from({ length: Math.min(mapDemos.length, 5) }).map((_, idx) => (
-                              <div key={idx} style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--signal)' }} />
+                        </button>
+                        {isExpanded && (
+                          <div style={{ padding: '12px 16px', background: 'rgba(255, 255, 255, 0.02)', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {mapDemos.map((demo, demoIdx) => (
+                              <div key={demoIdx} style={{ padding: 8, borderRadius: 6, background: 'rgba(255, 255, 255, 0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11 }}>
+                                <span style={{ color: 'var(--text)' }}>{demo.opponent_slug || 'Unknown opponent'}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ color: 'var(--muted)' }}>Uploaded {new Date(demo.created_at ?? 0).toLocaleDateString()}</span>
+                                  <span style={{ padding: '2px 6px', borderRadius: 3, background: demo.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' : demo.status === 'processing' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: demo.status === 'completed' ? 'var(--win)' : demo.status === 'processing' ? 'var(--signal)' : 'var(--loss)', textTransform: 'capitalize' }}>{demo.status}</span>
+                                </div>
+                              </div>
                             ))}
-                            {mapDemos.length > 5 && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>+{mapDemos.length - 5}</span>}
                           </div>
-                          <p style={{ fontSize: 12, color: 'var(--signal)', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>{mapDemos.length} demos</p>
-                        </div>
+                        )}
                       </div>
                     )
                   })
