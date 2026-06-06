@@ -127,7 +127,7 @@ export default async function TeamPage({
   // Map stats
   const mapCount: Record<string, number> = {}
   for (const demo of demos ?? []) {
-    if (demo.map) mapCount[ demo.map] = (mapCount[demo.map] ?? 0) + 1
+    if (demo.map) mapCount[demo.map] = (mapCount[demo.map] ?? 0) + 1
   }
   const topMaps = Object.entries(mapCount).sort((a, b) => b[1] - a[1]).slice(0, 6)
 
@@ -202,14 +202,14 @@ export default async function TeamPage({
                     <Users size={12} />
                     {(members ?? []).length} members
                   </span>
-                  <span className="text-border hidden sm-inline">·</span>
+                  <span className="text-border hidden sm:inline">·</span>
                   <span className="flex items-center gap-1">
                     <BarChart3 size={12} />
                     {(demos ?? []).length} demos
                   </span>
                   {totalMatches > 0 && (
                     <>
-                      <span className="text-border hidden sm-inline">·</span>
+                      <span className="text-border hidden sm:inline">·</span>
                       <span className="flex items-center gap-1 text-neon-green font-medium">
                         <Trophy size={12} />
                         {winRate}% win
