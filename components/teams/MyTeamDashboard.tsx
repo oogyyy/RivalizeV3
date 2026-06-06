@@ -2,12 +2,12 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
 import {
   Shield, ChevronUp, ChevronDown, Check, Sliders, Send, Download, Upload, Plus, Trash2,
   TrendingUp, Brain, AlertCircle, Zap, BarChart3, Target, BookOpen, Layers, Film, ChevronRight
 } from 'lucide-react'
 import type { DemoRowData } from './DemoListMultiSelect'
+import MapFolderList, { type MapGroup } from './MapFolderList'
 
 interface TeamOption {
   id: string
@@ -24,6 +24,51 @@ interface MyTeamDashboardProps {
   canInvite: boolean
   canDelete: boolean
   myFaceitId: string | null
+}
+
+const ACTIVE_DUTY_MAPS = [
+  'de_ancient', 'de_anubis', 'de_dust2', 'de_inferno',
+  'de_mirage', 'de_nuke', 'de_overpass',
+]
+
+function buildMapGroups(demos: DemoRowData[]): MapGroup[] {
+  const mapGroupMap = new Map<string, { demos: DemoRowData[]; wins: number; losses: number; draws: number; lastActivity: string }>()
+  for (const map of ACTIVE_DUTY_MAPS) {
+    mapGroupMap.set(map, { demos: [], wins: 0, losses: 0, draws: 0, lastActivity: '' })
+  }
+  for (const demo of demos) {
+    const rawMap = (demo.parsed_data?.header?.map ?? demo.map ?? 'unknown').toLowerCase()
+    const mapKey = (rawMap === 'processing' || rawMap === '') ? 'unknown' : rawMap
+    if (!mapGroupMap.has(mapKey)) {
+      mapGroupMap.set(mapKey, { demos: [], wins: 0, losses: 0, draws: 0, lastActivity: demo.created_at })
+    }
+    const g = mapGroupMap.get(mapKey)!
+    g.demos.push(demo)
+    if (demo.created_at > g.lastActivity) g.lastActivity = demo.created_at
+    if (demo.status === 'completed') {
+      const h = demo.parsed_data?.header
+      const os = demo.parsed_data?.opponentSide ?? 'team2'
+      if (h) {
+        const ours = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
+        const theirs = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
+        if (ours > theirs) g.wins++
+        else if (ours === theirs) g.draws++
+        else g.losses++
+      }
+    }
+  }
+  return [...mapGroupMap.entries()]
+    .map(([map, data]) => ({ map, ...data }))
+    .sort((a, b) => {
+      const aHas = a.demos.length > 0, bHas = b.demos.length > 0
+      if (aHas !== bHas) return aHas ? -1 : 1
+      if (aHas) return b.lastActivity.localeCompare(a.lastActivity)
+      const aIdx = ACTIVE_DUTY_MAPS.indexOf(a.map), bIdx = ACTIVE_DUTY_MAPS.indexOf(b.map)
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+      if (aIdx !== -1) return -1
+      if (bIdx !== -1) return 1
+      return 0
+    })
 }
 
 function computeStats(demos: DemoRowData[]) {
@@ -71,31 +116,21 @@ function computeStats(demos: DemoRowData[]) {
   const avgKD = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : '—'
   const avgAdr = playerCount > 0 ? (totalAdr / playerCount).toFixed(1) : '—'
 
-  const topMaps = Object.entries(mapCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
+  const topMaps = Object.entries(mapCounts).sort((a, b) => b[1] - a[1]).slice(0, 3)
 
-  return { totalMatches, totalWins, totalLosses, totalDraws, winRate, avgKD, avgAdr, topMaps }
+  const topPlayers = Object.entries(myPlayerStats)
+    .map(([name, s]) => ({
+      name,
+      kills: s.kills,
+      deaths: s.deaths,
+      avgAdr: s.games > 0 ? s.adr / s.games : 0,
+      avgRating: s.games > 0 ? s.rating / s.games : 0,
+      games: s.games,
+    }))
+    .sort((a, b) => b.avgRating - a.avgRating)
+
+  return { totalMatches, totalWins, totalLosses, totalDraws, winRate, avgKD, avgAdr, topMaps, topPlayers }
 }
-
-const PERF_TREND = [
-  { match: 1, rate: 62 }, { match: 2, rate: 58 }, { match: 3, rate: 65 }, { match: 4, rate: 61 },
-  { match: 5, rate: 59 }, { match: 6, rate: 64 }, { match: 7, rate: 62 }, { match: 8, rate: 66 },
-  { match: 9, rate: 68 }, { match: 10, rate: 70 }, { match: 11, rate: 72 }, { match: 12, rate: 74 },
-  { match: 13, rate: 75 }, { match: 14, rate: 76 }, { match: 15, rate: 78 }, { match: 16, rate: 80 }
-]
-
-const PERF_RESULTS = ['w', 'l', 'w', 'w', 'l', 'w', 'w', 'l', 'w', 'w', 'w', 'w', 'w', 'l', 'w', 'w']
-
-const WIN_RATE_CHART = [
-  { map: 'Overpass', ct: 100 }, { map: 'Dust2', ct: 92 }, { map: 'Anubis', ct: 88 },
-  { map: 'Inferno', ct: 84 }, { map: 'Mirage', ct: 76 }, { map: 'Nuke', ct: 65 }
-]
-
-const MAP_PERF = [
-  { map: 'Mirage', ct: 58, t: 42 }, { map: 'Inferno', ct: 62, t: 38 }, { map: 'Nuke', ct: 58, t: 42 },
-  { map: 'Overpass', ct: 53, t: 47 }, { map: 'Ancient', ct: 50, t: 50 }, { map: 'Vertigo', ct: 62, t: 38 },
-]
 
 const AI_COACH_ITEMS = [
   { title: 'Weak Spots', desc: 'Identify recurring mistakes and areas to improve', icon: AlertCircle, color: 'var(--loss)' },
@@ -116,15 +151,24 @@ export default function MyTeamDashboard({
   myFaceitId,
 }: MyTeamDashboardProps) {
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
-  const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set())
-  const stats = useMemo(() => computeStats(demos), [demos])
+  const [sideOverrides, setSideOverrides] = useState<Record<string, 'team1' | 'team2'>>({})
 
-  const toggleMapExpanded = (map: string) => {
-    const newSet = new Set(expandedMaps)
-    if (newSet.has(map)) newSet.delete(map)
-    else newSet.add(map)
-    setExpandedMaps(newSet)
+  const effectiveDemos = useMemo(() => {
+    if (Object.keys(sideOverrides).length === 0) return demos
+    return demos.map(d => {
+      const override = sideOverrides[d.id]
+      return override
+        ? { ...d, parsed_data: d.parsed_data ? { ...d.parsed_data, opponentSide: override } : { opponentSide: override } }
+        : d
+    })
+  }, [demos, sideOverrides])
+
+  const handleSideChange = (demoId: string, opponentSide: 'team1' | 'team2') => {
+    setSideOverrides(prev => ({ ...prev, [demoId]: opponentSide }))
   }
+
+  const stats = useMemo(() => computeStats(effectiveDemos), [effectiveDemos])
+  const mapGroups = useMemo(() => buildMapGroups(effectiveDemos), [effectiveDemos])
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -274,38 +318,64 @@ export default function MyTeamDashboard({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {/* Left: Trends */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Performance Trends */}
-          <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TrendingUp size={16} style={{ color: 'var(--accent)' }} /> Performance Trends
-            </p>
-            <div style={{ height: 140, display: 'flex', alignItems: 'flex-end', gap: 3, paddingBottom: 8 }}>
-              {PERF_TREND.map((p, i) => (
-                <div key={i} style={{ flex: 1, height: `${(p.rate / 100) * 120}px`, background: 'linear-gradient(180deg,var(--signal),var(--accent))', borderRadius: '2px 2px 0 0', opacity: 0.8, transition: 'opacity 0.2s', cursor: 'pointer' }} title={`Match ${p.match}: ${p.rate}%`} />
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 4, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-              {PERF_RESULTS.map((r, i) => (
-                <span key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: r === 'w' ? 'var(--win)' : 'var(--loss)', flexShrink: 0 }} />
-              ))}
-            </div>
-          </div>
+          {/* Performance Trends — real data from completed demos sorted oldest→newest */}
+          {(() => {
+            const completed = [...effectiveDemos.filter(d => d.status === 'completed')]
+              .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''))
+            if (completed.length < 2) return null
+            const results = completed.map(d => {
+              const h = d.parsed_data?.header
+              if (!h) return null
+              const os = d.parsed_data?.opponentSide ?? 'team2'
+              const ours = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
+              const theirs = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
+              return ours > theirs ? 'w' : ours < theirs ? 'l' : 'd'
+            }).filter(Boolean) as ('w' | 'l' | 'd')[]
+            const runningRates = results.map((_, idx) => {
+              const slice = results.slice(0, idx + 1)
+              return Math.round(slice.filter(r => r === 'w').length / slice.length * 100)
+            })
+            return (
+              <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
+                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <TrendingUp size={16} style={{ color: 'var(--accent)' }} /> Performance Trends
+                </p>
+                <div style={{ height: 140, display: 'flex', alignItems: 'flex-end', gap: 3, paddingBottom: 8 }}>
+                  {runningRates.map((rate, i) => (
+                    <div key={i} style={{ flex: 1, height: `${(rate / 100) * 120}px`, background: 'linear-gradient(180deg,var(--signal),var(--accent))', borderRadius: '2px 2px 0 0', opacity: 0.8 }} title={`Match ${i + 1}: ${rate}%`} />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 4, paddingTop: 8, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                  {results.map((r, i) => (
+                    <span key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: r === 'w' ? 'var(--win)' : r === 'l' ? 'var(--loss)' : 'var(--muted)', flexShrink: 0 }} />
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Win Rate by Map */}
-          <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Win rate by map</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {WIN_RATE_CHART.map((m, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text)', width: 80, fontWeight: 500 }}>{m.map}</span>
-                  <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ width: `${m.ct}%`, height: '100%', background: 'linear-gradient(90deg,var(--signal),var(--accent))' }} />
-                  </div>
-                  <span style={{ fontSize: 11, color: 'var(--text)', width: 30, textAlign: 'right', fontWeight: 600 }}>{m.ct}%</span>
-                </div>
-              ))}
+          {mapGroups.filter(g => g.demos.length > 0).length > 0 && (
+            <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Win rate by map</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {mapGroups.filter(g => g.demos.length > 0).map((g) => {
+                  const total = g.wins + g.losses + g.draws
+                  const wr = total > 0 ? Math.round(g.wins / total * 100) : 0
+                  const name = g.map.replace(/^(de_|cs_|ar_)/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                  return (
+                    <div key={g.map} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text)', width: 80, fontWeight: 500 }}>{name}</span>
+                      <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ width: `${wr}%`, height: '100%', background: 'linear-gradient(90deg,var(--signal),var(--accent))' }} />
+                      </div>
+                      <span style={{ fontSize: 11, color: 'var(--text)', width: 30, textAlign: 'right', fontWeight: 600 }}>{wr}%</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right: AI Analyst */}
@@ -337,15 +407,37 @@ export default function MyTeamDashboard({
           <div style={{ padding: '15px 18px 8px' }}>
             <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Roster</p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 58px 50px 42px 40px 56px', padding: '2px 18px 8px', gap: 0, fontSize: 9.5, fontWeight: 700, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            {['Player', 'Role', 'Rating', 'K/D', 'Maps', 'Form'].map((h, i) => (
-              <span key={h} style={{ textAlign: i >= 2 && i < 5 ? 'right' : 'left' }}>{h}</span>
-            ))}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-            <p style={{ padding: '9px 18px', textAlign: 'center' }}>No roster data yet. Upload demos to see player stats.</p>
-          </div>
-          <div style={{ height: 8 }} />
+          {stats.topPlayers.length === 0 ? (
+            <div style={{ padding: '12px 18px 20px', textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>
+              No roster data yet. Upload demos to see player stats.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 48px 56px', padding: '2px 18px 8px', gap: 0, fontSize: 9.5, fontWeight: 700, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {['Player', 'Rating', 'ADR', 'K/D'].map((h, i) => (
+                  <span key={h} style={{ textAlign: i > 0 ? 'right' : 'left' }}>{h}</span>
+                ))}
+              </div>
+              <div style={{ paddingBottom: 8 }}>
+                {stats.topPlayers.map((p, i) => (
+                  <Link key={p.name} href={`/my-team/player/${encodeURIComponent(p.name)}`}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 48px 56px', padding: '8px 18px', alignItems: 'center', borderBottom: i < stats.topPlayers.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span style={{ fontSize: 10, width: 20, height: 20, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, background: i === 0 ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.05)', color: i === 0 ? '#fbbf24' : 'var(--faint)' }}>{i + 1}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
+                          <p style={{ fontSize: 10, color: 'var(--muted)', margin: 0 }}>{p.games} {p.games === 1 ? 'game' : 'games'}</p>
+                        </div>
+                      </div>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, textAlign: 'right', margin: 0, color: p.avgRating >= 1.1 ? 'var(--signal)' : p.avgRating >= 0.9 ? 'var(--text)' : 'var(--loss)' }}>{p.avgRating.toFixed(2)}</p>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, textAlign: 'right', margin: 0, color: 'var(--muted)' }}>{p.avgAdr.toFixed(0)}</p>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, textAlign: 'right', margin: 0, color: 'var(--muted)' }}>{p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : '—'}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Map Performance */}
@@ -359,19 +451,25 @@ export default function MyTeamDashboard({
             </div>
           </div>
           <div style={{ padding: '4px 18px 14px' }}>
-            {MAP_PERF.map(m => (
-              <div key={m.map} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 0' }}>
-                <span style={{ fontSize: 13, color: 'var(--text)', width: 72 }}>{m.map}</span>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').slice(0, 6).length === 0 ? (
+              <p style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', padding: '12px 0' }}>No map data yet.</p>
+            ) : mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').slice(0, 6).map(g => {
+              const total = g.wins + g.losses + g.draws
+              const ctRate = total > 0 ? Math.round(g.wins / total * 100) : 50
+              const tRate = 100 - ctRate
+              const name = g.map.replace(/^(de_|cs_|ar_)/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+              return (
+                <div key={g.map} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 0' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text)', width: 72 }}>{name}</span>
                   <div style={{ flex: 1, height: 11, borderRadius: 4, overflow: 'hidden', display: 'flex', border: '1px solid var(--border)' }}>
-                    <div style={{ width: `${m.ct}%`, background: 'linear-gradient(90deg,#4d83e6,var(--ct))' }} />
+                    <div style={{ width: `${ctRate}%`, background: 'linear-gradient(90deg,#4d83e6,var(--ct))' }} />
                     <div style={{ flex: 1, background: 'linear-gradient(90deg,var(--tside),#e09a2e)' }} />
                   </div>
+                  <span style={{ fontSize: 11, color: 'var(--ct)', width: 58, textAlign: 'right' }}>CT {ctRate}%</span>
+                  <span style={{ fontSize: 11, color: 'var(--tside)', width: 50, textAlign: 'right' }}>T {tRate}%</span>
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--ct)', width: 58, textAlign: 'right' }}>CT {m.ct}%</span>
-                <span style={{ fontSize: 11, color: 'var(--tside)', width: 50, textAlign: 'right' }}>T {100 - m.ct}%</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>
@@ -381,116 +479,35 @@ export default function MyTeamDashboard({
         <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Layers size={16} style={{ color: 'var(--signal)' }} /> Map Pool
         </p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[
-            { map: 'Inferno', count: 7 },
-            { map: 'Dust2', count: 3 },
-            { map: 'Mirage', count: 2 }
-          ].map((m, i) => (
-            <span key={i} style={{ padding: '6px 12px', borderRadius: 8, background: 'var(--card-2)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              {m.map}
-              <span style={{ fontSize: 10, color: 'var(--signal)', fontWeight: 700 }}>{m.count}x</span>
-            </span>
-          ))}
-        </div>
+        {stats.topMaps.length === 0 ? (
+          <p style={{ fontSize: 12, color: 'var(--muted)' }}>No map data yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {stats.topMaps.map(([map, count]) => {
+              const name = map.replace(/^(de_|cs_|ar_)/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+              return (
+                <span key={map} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {name}
+                  <span style={{ fontSize: 10, color: 'var(--signal)', fontWeight: 700 }}>{count}×</span>
+                </span>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Demos */}
       <div>
-        {demos.length > 0 ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Film size={16} style={{ color: 'var(--signal)' }} />
-              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>My Team's Demos</p>
-              <span style={{ fontSize: 10, color: 'var(--muted)' }}>{demos.length} • {new Set(demos.map(d => d.map)).size} maps</span>
-            </div>
-            <div style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden' }}>
-              {(() => {
-                const demosByMap = demos.reduce((acc, demo) => {
-                  const map = demo.map || 'Unknown'
-                  if (!acc[map]) acc[map] = []
-                  acc[map].push(demo)
-                  return acc
-                }, {} as Record<string, DemoRowData[]>)
-
-                return Object.entries(demosByMap)
-                  .sort((a, b) => b[1].length - a[1].length)
-                  .map(([map, mapDemos], i) => {
-                    const completedDemos = mapDemos.filter(d => d.status === 'completed')
-                    let wins = 0, losses = 0
-                    for (const demo of completedDemos) {
-                      const h = demo.parsed_data?.header
-                      if (h) {
-                        const opponentSide = demo.parsed_data?.opponentSide ?? 'team2'
-                        const ourScore = opponentSide === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
-                        const theirScore = opponentSide === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
-                        if (ourScore > theirScore) wins++
-                        else if (ourScore < theirScore) losses++
-                      }
-                    }
-                    const winRate = completedDemos.length > 0 ? (wins / completedDemos.length * 100).toFixed(0) : '0'
-                    const lastPlayed = mapDemos.sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0]?.created_at
-                    const isExpanded = expandedMaps.has(map)
-
-                    return (
-                      <div key={map}>
-                        <button onClick={() => toggleMapExpanded(map)} style={{ width: '100%', padding: 16, borderBottom: i < Object.keys(demosByMap).length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'background 0.2s', background: 'transparent', border: 'none', color: 'inherit', font: 'inherit' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, textAlign: 'left' }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>{map.substring(0, 2).toUpperCase()}</div>
-                            <div style={{ flex: 1 }}>
-                              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>{map}</p>
-                              <p style={{ fontSize: 11, color: 'var(--muted)', margin: 0 }}>Last played {lastPlayed ? new Date(lastPlayed).toLocaleDateString() : 'N/A'}</p>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-                            <div style={{ textAlign: 'right', minWidth: 80 }}>
-                              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>{wins}W - {losses}L ({winRate}%)</p>
-                            </div>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              {Array.from({ length: Math.min(mapDemos.length, 5) }).map((_, idx) => (
-                                <div key={idx} style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--signal)' }} />
-                              ))}
-                              {mapDemos.length > 5 && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>+{mapDemos.length - 5}</span>}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 80 }}>
-                              <p style={{ fontSize: 12, color: 'var(--signal)', fontWeight: 600, margin: 0 }}>{mapDemos.length} demos</p>
-                              <ChevronRight size={16} style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }} />
-                            </div>
-                          </div>
-                        </button>
-                        {isExpanded && (
-                          <div style={{ padding: '12px 16px', background: 'rgba(255, 255, 255, 0.02)', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {mapDemos.map((demo, demoIdx) => (
-                              <Link key={demoIdx} href={`/teams/${selectedTeamId}/demos/${demo.id}`}>
-                                <div style={{ padding: 8, borderRadius: 6, background: 'rgba(255, 255, 255, 0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'}>
-                                  <span style={{ color: 'var(--text)' }}>{demo.opponent_slug || 'Unknown opponent'}</span>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ color: 'var(--muted)' }}>Uploaded {new Date(demo.created_at ?? 0).toLocaleDateString()}</span>
-                                    <span style={{ padding: '2px 6px', borderRadius: 3, background: demo.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' : demo.status === 'processing' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: demo.status === 'completed' ? 'var(--win)' : demo.status === 'processing' ? 'var(--signal)' : 'var(--loss)', textTransform: 'capitalize' }}>{demo.status}</span>
-                                  </div>
-                                </div>
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })
-              })()}
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Film size={16} style={{ color: 'var(--signal)' }} />
-              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>My Team's Demos</p>
-            </div>
-            <div style={{ padding: 20, textAlign: 'center', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--muted)' }}>
-              <Film size={32} style={{ margin: '0 auto 12px', color: 'var(--faint)' }} />
-              <p style={{ fontSize: 13 }}>No demos yet. Upload your team's demos to see them here.</p>
-            </div>
-          </>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Film size={16} style={{ color: 'var(--signal)' }} />
+          <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>My Team&apos;s Demos</p>
+          {effectiveDemos.length > 0 && (
+            <span style={{ fontSize: 10, color: 'var(--muted)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4, fontFamily: 'var(--font-mono)' }}>
+              {effectiveDemos.length} · {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').length} maps
+            </span>
+          )}
+        </div>
+        <MapFolderList mapGroups={mapGroups} onSideChange={handleSideChange} />
       </div>
     </div>
   )
