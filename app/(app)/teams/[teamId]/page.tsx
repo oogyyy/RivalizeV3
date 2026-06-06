@@ -78,7 +78,7 @@ export default async function TeamPage({
   // Top 1000 demos provides good coverage while keeping bandwidth reasonable
   const { data: demos } = await admin
     .from('demos')
-    .select('id, status, map, match_date, created_at, opponent_slug, opponent_name, demo_type, parsed_data')
+    .select('id, status, map, match_date, created_at, opponent_slug, opponent_name, demo_type, parsed_data, league')
     .eq('team_id', resolvedTeamId)
     .eq('demo_type', 'opponent')
     .order('created_at', { ascending: false })
@@ -450,7 +450,7 @@ export default async function TeamPage({
                 {isOwnerOrAdmin && myFaceitId && (
                   <FaceitImportButton teamId={resolvedTeamId} faceitNickname={myFaceitId} />
                 )}
-                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
+                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />
               </div>
             </div>
 
@@ -463,7 +463,7 @@ export default async function TeamPage({
                 <p className="text-xs text-muted-foreground mb-4">
                   Upload demos of upcoming opponents to start scouting
                 </p>
-                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />}
+                {isOwnerOrAdmin && <DemoUploadButton teamId={resolvedTeamId} />
               </div>
             ) : (
               <Card className="bg-card border-border overflow-hidden">
