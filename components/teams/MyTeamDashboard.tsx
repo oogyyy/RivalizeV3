@@ -461,13 +461,15 @@ export default function MyTeamDashboard({
                         {isExpanded && (
                           <div style={{ padding: '12px 16px', background: 'rgba(255, 255, 255, 0.02)', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {mapDemos.map((demo, demoIdx) => (
-                              <div key={demoIdx} style={{ padding: 8, borderRadius: 6, background: 'rgba(255, 255, 255, 0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11 }}>
-                                <span style={{ color: 'var(--text)' }}>{demo.opponent_slug || 'Unknown opponent'}</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{ color: 'var(--muted)' }}>Uploaded {new Date(demo.created_at ?? 0).toLocaleDateString()}</span>
-                                  <span style={{ padding: '2px 6px', borderRadius: 3, background: demo.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' : demo.status === 'processing' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: demo.status === 'completed' ? 'var(--win)' : demo.status === 'processing' ? 'var(--signal)' : 'var(--loss)', textTransform: 'capitalize' }}>{demo.status}</span>
+                              <Link key={demoIdx} href={`/teams/${selectedTeamId}/demos/${demo.id}`}>
+                                <div style={{ padding: 8, borderRadius: 6, background: 'rgba(255, 255, 255, 0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'}>
+                                  <span style={{ color: 'var(--text)' }}>{demo.opponent_slug || 'Unknown opponent'}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ color: 'var(--muted)' }}>Uploaded {new Date(demo.created_at ?? 0).toLocaleDateString()}</span>
+                                    <span style={{ padding: '2px 6px', borderRadius: 3, background: demo.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' : demo.status === 'processing' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: demo.status === 'completed' ? 'var(--win)' : demo.status === 'processing' ? 'var(--signal)' : 'var(--loss)', textTransform: 'capitalize' }}>{demo.status}</span>
+                                  </div>
                                 </div>
-                              </div>
+                              </Link>
                             ))}
                           </div>
                         )}
