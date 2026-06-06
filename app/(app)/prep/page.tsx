@@ -6,7 +6,8 @@ import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowRight, Crosshair, Layers, Target, Shield, Activity, Brain, Sparkles, BookOpen, Swords } from 'lucide-react'
-import type { AggregatedStats } from '@/types/database'
+import type { AggregatedStats, TeamFolder } from '@/types/database'
+import PrepHeroSection from '@/components/prep/PrepHeroSection'
 
 const BRIEF_ITEMS = [
   { icon: Layers,    color: 'var(--ct)',     title: 'Map Control:',      text: 'Prioritize mid-control early and deny enemy rotations.' },
@@ -40,51 +41,24 @@ export default async function PrepPage() {
         .select('id, opponent_display_name, opponent_slug, aggregated_stats')
         .in('user_team_id', teamIds)
         .order('updated_at', { ascending: false })
-        .limit(6)
     : { data: [] }
 
-  type FolderRow = { id: string; opponent_display_name: string; opponent_slug: string; aggregated_stats: AggregatedStats | null }
+  type FolderRow = TeamFolder
   const typedFolders = (folders ?? []) as FolderRow[]
   const nextOpponent = typedFolders[0] ?? null
+
+  // Get just the first 6 for the quick list
+  const quickOpponents = typedFolders.slice(0, 6)
 
   return (
     <div className="p-5 md:p-7 flex flex-col gap-4 max-w-7xl">
 
       {/* Hero */}
-      <div className="rv-panel" style={{ position: 'relative', padding: '22px 26px 24px', background: 'radial-gradient(820px 380px at 92% -40%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 62%), radial-gradient(620px 300px at 4% -30%, color-mix(in srgb, var(--loss) 5%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--accent) 3%, var(--card)), var(--card))', borderColor: 'color-mix(in srgb, var(--accent) 18%, var(--border))' }}>
-        <span className="rv-tick rv-tick-tl" /><span className="rv-tick rv-tick-br" />
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 7 }}>Next Match</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.025em', lineHeight: 1, marginBottom: 8 }}>
-              {nextOpponent ? nextOpponent.opponent_display_name : 'No opponent selected'}
-            </h2>
-            <p style={{ fontSize: 13, color: 'var(--muted)' }}>ESEA Advanced — Playoffs · Tomorrow 19:00 CET</p>
-            <div style={{ marginTop: 18 }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 8 }}>Map Pool Win Rates</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {MAP_POOL_WIN.map(({ name, win }) => (
-                  <div key={name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                    <span style={{ padding: '5px 12px', borderRadius: 8, background: 'var(--card-2)', border: '1px solid var(--border-2)', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{name}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: win >= 60 ? 'var(--win)' : win >= 50 ? 'var(--tside)' : 'var(--loss)' }}>{win}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 6 }}>Countdown</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 38, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 16 }}>
-              23h <span style={{ color: 'var(--accent)' }}>14m</span>
-            </div>
-            <Link href="/veto">
-              <button style={{ height: 36, padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--card-2)', color: 'var(--text)', border: '1px solid var(--border-2)' }}>
-                Open Veto <ArrowRight size={13} />
-              </button>
-            </Link>
-          </div>
-        </div>
-      </div>
+      <PrepHeroSection
+        allOpponents={typedFolders}
+        defaultOpponent={nextOpponent}
+        mapPoolWin={MAP_POOL_WIN}
+      />
 
       {/* AI Brief + Key Players */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 14 }}>
@@ -115,9 +89,9 @@ export default async function PrepPage() {
         {/* Opponents quick list */}
         <div className="rv-panel" style={{ padding: '18px', height: 'fit-content' }}>
           <p style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Opponents</p>
-          {typedFolders.length > 0 ? (
+          {quickOpponents.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {typedFolders.map((f, i) => {
+              {quickOpponents.map((f, i) => {
                 const stats = f.aggregated_stats as AggregatedStats | null
                 const wins = stats?.wins ?? 0
                 const losses = stats?.losses ?? 0
