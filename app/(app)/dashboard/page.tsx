@@ -145,7 +145,8 @@ export default async function DashboardPage() {
         .in('team_id', teamIds)
     : { data: [] }
 
-  // Fetch all completed self-demos to compute win rate + avg K/D
+  // Optimization: Only fetch recent 50 completed demos for stats (not ALL)
+  // This reduces bandwidth from 100+ MB to ~5-10 MB for typical usage
   const { data: allSelfDemosData } = teamIds.length
     ? await admin
         .from('demos')
@@ -153,6 +154,8 @@ export default async function DashboardPage() {
         .in('team_id', teamIds)
         .eq('demo_type', 'self')
         .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(50)
     : { data: [] }
 
   type SelfDemoMeta = { parsed_data: unknown }

@@ -52,13 +52,15 @@ export default async function FolderPage({
 
   const stats = folder.aggregated_stats as AggregatedStats | null
 
-  // Fetch demos for this folder's opponent
+  // Fetch demos for this folder's opponent with limit to reduce bandwidth
+  // Limit to 500 recent demos; aggregated_stats handles full history
   const { data: demos } = await supabase
     .from('demos')
-    .select('*')
+    .select('id, status, map, match_date, created_at, opponent_slug, parsed_data')
     .eq('team_id', teamId)
     .eq('opponent_slug', folder.opponent_slug)
     .order('match_date', { ascending: false, nullsFirst: false })
+    .limit(500)
 
   const totalDemos = (demos ?? []).length
   const wins = stats?.wins ?? 0
