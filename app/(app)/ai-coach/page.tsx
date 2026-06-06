@@ -160,7 +160,7 @@ function TypingIndicator() {
       <div className="rv-panel px-4 py-3">
         <div className="flex gap-1 items-center h-4">
           {[0, 1, 2].map(i => (
-            <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)' }} className="animate-bounce" style2={{ animationDelay: `${i * 150}ms` }} />
+            <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)', animationDelay: `${i * 150}ms` }} className="animate-bounce" />
           ))}
         </div>
       </div>
@@ -189,7 +189,7 @@ export default function AIScoutPage() {
   const selectedFolderIdRef = useRef(selectedFolderId)
   const focusAreaRef        = useRef(focusArea)
   const selectedPlayerRef   = useRef(selectedPlayer)
-  const selectedMapRef      = useRef(selectedMap)
+  const selectedMapRef   = useRef(selectedMap)
   const includeProDatasetRef = useRef(includeProDataset)
   const myTeamIdRef         = useRef(myTeamId)
 
@@ -451,8 +451,6 @@ export default function AIScoutPage() {
                       border: active ? '1px solid color-mix(in srgb, var(--win) 22%, transparent)' : '1px solid transparent',
                       transition: 'all 0.12s',
                     }}
-                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'var(--hairline)' }}
-                    onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
                   >
                     <span style={{ color: active ? 'var(--win)' : 'var(--faint)', flexShrink: 0 }}>{area.icon}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -543,7 +541,7 @@ export default function AIScoutPage() {
                 width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10,
                 padding: '10px 11px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
                 background: includeProDataset ? 'color-mix(in srgb, var(--signal) 6%, var(--card))' : 'var(--card)',
-                border: `1px solid ${includeProDataset ? 'color-mix(in srgb, var(--signal) 28%, transparent)' : 'var(--border)'}`,
+                border: `1px solid ${includeProDataset ? 'color-mix(in srgb, var(--signal) 28%, transparent)' : 'var(--border)' }`,
                 transition: 'all 0.12s',
               }}
             >
@@ -889,7 +887,7 @@ export default function AIScoutPage() {
                   transition: 'all 0.12s',
                 }}
               >
-                {isLoading ? <Loader2 size={14} style={{ color: 'var(--muted)' }} className="animate-spin" /> : <Send size={14} style={{ color: input.trim() ? '#0a1a12' : 'var(--faint)' }} />}
+                {isLoading ? <Loader2 size={14} style={{ color: 'var(--muted)' }} className="animate-spin" /> : <Send size={14} style={{ color: input.trim() ? '#0a1a12' : 'var(--faint)' }} />
               </button>
             </div>
             <p style={{ fontSize: 10, color: 'var(--faint)', textAlign: 'center', marginTop: 7 }}>
