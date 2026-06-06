@@ -396,16 +396,58 @@ export default function MyTeamDashboard({
               <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>My Team's Demos</p>
               <span style={{ fontSize: 10, color: 'var(--muted)' }}>{demos.length} • {new Set(demos.map(d => d.map)).size} maps</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-              {demos.map((demo, i) => (
-                <div key={i} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{demo.map}</span>
-                    <span style={{ fontSize: 10, textTransform: 'capitalize', padding: '2px 6px', borderRadius: 4, background: demo.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' : demo.status === 'processing' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: demo.status === 'completed' ? 'var(--win)' : demo.status === 'processing' ? 'var(--signal)' : 'var(--loss)' }}>{demo.status}</span>
-                  </div>
-                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>Uploaded: {demo.created_at ? new Date(demo.created_at).toLocaleDateString() : 'N/A'}</p>
-                </div>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {(() => {
+                const demosByMap = demos.reduce((acc, demo) => {
+                  const map = demo.map || 'Unknown'
+                  if (!acc[map]) acc[map] = []
+                  acc[map].push(demo)
+                  return acc
+                }, {} as Record<string, DemoRowData[]>)
+
+                return Object.entries(demosByMap)
+                  .sort((a, b) => b[1].length - a[1].length)
+                  .map(([map, mapDemos], i) => {
+                    const completedDemos = mapDemos.filter(d => d.status === 'completed')
+                    let wins = 0, losses = 0
+                    for (const demo of completedDemos) {
+                      const h = demo.parsed_data?.header
+                      if (h) {
+                        const opponentSide = demo.parsed_data?.opponentSide ?? 'team2'
+                        const ourScore = opponentSide === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
+                        const theirScore = opponentSide === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
+                        if (ourScore > theirScore) wins++
+                        else if (ourScore < theirScore) losses++
+                      }
+                    }
+                    const winRate = completedDemos.length > 0 ? (wins / completedDemos.length * 100).toFixed(0) : '0'
+                    const lastPlayed = mapDemos.sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0]?.created_at
+
+                    return (
+                      <div key={map} style={{ padding: 16, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'background 0.2s', background: 'transparent' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--card)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 8, background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>{map.substring(0, 2).toUpperCase()}</div>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{map}</p>
+                            <p style={{ fontSize: 11, color: 'var(--muted)' }}>Last played {lastPlayed ? new Date(lastPlayed).toLocaleDateString() : 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                          <div style={{ textAlign: 'right', minWidth: 80 }}>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{wins}W - {losses}L ({winRate}%)</p>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {Array.from({ length: Math.min(mapDemos.length, 5) }).map((_, idx) => (
+                              <div key={idx} style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--signal)' }} />
+                            ))}
+                            {mapDemos.length > 5 && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>+{mapDemos.length - 5}</span>}
+                          </div>
+                          <p style={{ fontSize: 12, color: 'var(--signal)', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>{mapDemos.length} demos</p>
+                        </div>
+                      </div>
+                    )
+                  })
+              })()}
             </div>
           </>
         ) : (
