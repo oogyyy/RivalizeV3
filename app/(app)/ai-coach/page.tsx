@@ -160,7 +160,7 @@ function TypingIndicator() {
       <div className="rv-panel px-4 py-3">
         <div className="flex gap-1 items-center h-4">
           {[0, 1, 2].map(i => (
-            <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)' }} className="animate-bounce" style2={{ animationDelay: `${i * 150}ms` }} />
+            <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)', animationDelay: `${i * 150}ms` }} className="animate-bounce" />
           ))}
         </div>
       </div>
