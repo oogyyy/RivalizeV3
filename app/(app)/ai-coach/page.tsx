@@ -189,7 +189,7 @@ export default function AIScoutPage() {
   const selectedFolderIdRef = useRef(selectedFolderId)
   const focusAreaRef        = useRef(focusArea)
   const selectedPlayerRef   = useRef(selectedPlayer)
-  const selectedMapRef   = useRef(selectedMap)
+  const selectedMapRef      = useRef(selectedMap)
   const includeProDatasetRef = useRef(includeProDataset)
   const myTeamIdRef         = useRef(myTeamId)
 
@@ -451,10 +451,12 @@ export default function AIScoutPage() {
                       border: active ? '1px solid color-mix(in srgb, var(--win) 22%, transparent)' : '1px solid transparent',
                       transition: 'all 0.12s',
                     }}
+                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'var(--hairline)' }}
+                    onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
                   >
                     <span style={{ color: active ? 'var(--win)' : 'var(--faint)', flexShrink: 0 }}>{area.icon}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--win)' : 'var(--text)', truncate: true }}>{area.label}</p>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--win)' : 'var(--text)' }}>{area.label}</p>
                       <p style={{ fontSize: 10, color: 'var(--faint)', marginTop: 1 }}>{area.description}</p>
                     </div>
                     {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)', flexShrink: 0 }} />}
@@ -887,7 +889,7 @@ export default function AIScoutPage() {
                   transition: 'all 0.12s',
                 }}
               >
-                {isLoading ? <Loader2 size={14} style={{ color: 'var(--muted)' }} className="animate-spin" /> : <Send size={14} style={{ color: input.trim() ? '#0a1a12' : 'var(--faint)' }} />
+                {isLoading ? <Loader2 size={14} style={{ color: 'var(--muted)' }} className="animate-spin" /> : <Send size={14} style={{ color: input.trim() ? '#0a1a12' : 'var(--faint)' }} />}
               </button>
             </div>
             <p style={{ fontSize: 10, color: 'var(--faint)', textAlign: 'center', marginTop: 7 }}>
