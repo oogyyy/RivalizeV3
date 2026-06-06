@@ -6,13 +6,12 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   Bell, Shield, Brain, Palette, AlertTriangle,
-  User, Check, Loader2, Eye, EyeOff, Save,
-  ToggleLeft, ToggleRight, Trash2, Lock, Mail
+  User, Check, Loader2, Eye, EyeOff,
+  Trash2, Lock, Mail
 } from 'lucide-react'
 import type { UserSettings } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -37,6 +36,14 @@ const RESPONSE_STYLES: { id: ResponseStyle; label: string; desc: string }[] = [
   { id: 'detailed', label: 'Detailed', desc: 'In-depth analysis with thorough explanations' },
   { id: 'concise', label: 'Concise', desc: 'Short, punchy insights with bullet points' },
   { id: 'coaching', label: 'Coaching Style', desc: 'Motivational and constructive feedback' },
+]
+
+const TABS = [
+  { id: 'account', label: 'Account', icon: User },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'privacy', label: 'Privacy', icon: Shield },
+  { id: 'ai', label: 'AI Coach', icon: Brain },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
 ]
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -116,6 +123,7 @@ function ConfirmDeleteDialog({
 
 export default function SettingsPage() {
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState('account')
   const [settings, setSettings] = useState<Partial<UserSettings>>({
     email_notifications: true,
     ai_coach_ready: true,
@@ -264,7 +272,7 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5 md:space-y-6">
+    <div className="p-4 md:p-6 max-w-3xl space-y-5 md:space-y-6">
       {/* Page header */}
       <PageHeader
         label="Account"
@@ -283,21 +291,39 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Account */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base flex items-center gap-2">
-            <User size={16} className="text-neon-green" />
-            Account
-          </CardTitle>
-          <CardDescription>Manage your email and password</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 3, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 3, marginBottom: 24, flexWrap: 'wrap' }}>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9,
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: activeTab === tab.id ? 600 : 500,
+              background: activeTab === tab.id ? 'var(--accent-soft)' : 'transparent',
+              color: activeTab === tab.id ? 'var(--text)' : 'var(--muted)',
+              transition: 'all 0.14s',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Account tab */}
+      {activeTab === 'account' && (
+        <div className="rv-panel p-5 space-y-5">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <User size={15} style={{ color: 'var(--accent)' }} />
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Account</p>
+          </div>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: -12, marginBottom: 8 }}>Manage your email and password</p>
+
           {/* Change Email */}
-          <div className="p-4 rounded-lg bg-muted/10 border border-border space-y-3">
-            <div className="flex items-center gap-2">
-              <Mail size={14} className="text-muted-foreground" />
-              <p className="text-sm font-medium text-foreground">Change Email</p>
+          <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card-2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Mail size={14} style={{ color: 'var(--muted)' }} />
+              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Change Email</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <Input
@@ -318,15 +344,15 @@ export default function SettingsPage() {
               </Button>
             </div>
             {emailSaved && (
-              <p className="text-xs text-neon-green">Confirmation email sent. Check your inbox.</p>
+              <p className="text-xs text-neon-green mt-2">Confirmation email sent. Check your inbox.</p>
             )}
           </div>
 
           {/* Change Password */}
-          <div className="p-4 rounded-lg bg-muted/10 border border-border space-y-3">
-            <div className="flex items-center gap-2">
-              <Lock size={14} className="text-muted-foreground" />
-              <p className="text-sm font-medium text-foreground">Change Password</p>
+          <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card-2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Lock size={14} style={{ color: 'var(--muted)' }} />
+              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Change Password</p>
             </div>
             <div className="space-y-2">
               <div className="relative">
@@ -353,94 +379,130 @@ export default function SettingsPage() {
             </div>
 
             {passwordError && (
-              <p className="text-xs text-red-400">{passwordError}</p>
+              <p className="text-xs text-red-400 mt-2">{passwordError}</p>
             )}
             {passwordSaved && (
-              <p className="text-xs text-neon-green">Password updated successfully!</p>
+              <p className="text-xs text-neon-green mt-2">Password updated successfully!</p>
             )}
 
             <Button
               variant="outline"
               onClick={handlePasswordChange}
               disabled={!newPassword || !confirmPassword || passwordSaving}
-              className="gap-2"
+              className="gap-2 mt-3"
             >
               {passwordSaving ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
               Update Password
             </Button>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Notifications */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Bell size={16} className="text-neon-green" />
-            Notifications
-          </CardTitle>
-          <CardDescription>Control what notifications you receive</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {NOTIFICATION_TOGGLES.map(toggle => (
-            <div key={toggle.key} className="flex items-center justify-between p-4 rounded-lg border border-[var(--border)] bg-[rgba(255,255,255,0.03)]">
+          {/* Danger Zone */}
+          <div style={{ padding: 16, borderRadius: 10, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.04)', marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <AlertTriangle size={14} style={{ color: '#f87171' }} />
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#f87171' }}>Danger Zone</p>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>Irreversible account actions</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-foreground">{toggle.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{toggle.description}</p>
+                <p className="text-sm font-medium text-foreground">Delete Account</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Permanently delete your account and all data. Cannot be undone.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-2 shrink-0 h-11 sm:h-9 w-full sm:w-auto"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 size={13} />
+                Delete Account
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications tab */}
+      {activeTab === 'notifications' && (
+        <div className="rv-panel p-5">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <Bell size={15} style={{ color: 'var(--accent)' }} />
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Notifications</p>
+          </div>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 16 }}>Control what notifications you receive</p>
+
+          <div>
+            {NOTIFICATION_TOGGLES.map((toggle, i) => (
+              <div
+                key={toggle.key}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 0',
+                  borderTop: i > 0 ? '1px solid var(--border)' : undefined,
+                }}
+              >
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{toggle.label}</p>
+                  <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>{toggle.description}</p>
+                </div>
+                <ToggleSwitch
+                  checked={toggle.value}
+                  onChange={val => handleToggle(toggle.key, val)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Privacy tab */}
+      {activeTab === 'privacy' && (
+        <div className="rv-panel p-5">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <Shield size={15} style={{ color: 'var(--accent)' }} />
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Privacy</p>
+          </div>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 16 }}>Control your profile visibility</p>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Public Profile</p>
+                <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>Allow others to view your profile and stats</p>
               </div>
               <ToggleSwitch
-                checked={toggle.value}
-                onChange={val => handleToggle(toggle.key, val)}
+                checked={!!settings.public_profile}
+                onChange={val => handleToggle('public_profile', val)}
               />
             </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Privacy */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Shield size={16} className="text-neon-green" />
-            Privacy
-          </CardTitle>
-          <CardDescription>Control your profile visibility</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/10">
-            <div>
-              <p className="text-sm font-medium text-foreground">Public Profile</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Allow others to view your profile and stats</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid var(--border)', opacity: 0.5 }}>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Demo Sharing</p>
+                <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>Allow sharing demo analysis links publicly</p>
+              </div>
+              <ToggleSwitch checked={false} onChange={() => {}} />
             </div>
-            <ToggleSwitch
-              checked={!!settings.public_profile}
-              onChange={val => handleToggle('public_profile', val)}
-            />
           </div>
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/10 opacity-60">
-            <div>
-              <p className="text-sm font-medium text-foreground">Demo Sharing</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Allow sharing demo analysis links publicly</p>
-            </div>
-            <ToggleSwitch checked={false} onChange={() => {}} />
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
-      {/* AI Coach Preferences */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Brain size={16} className="text-neon-green" />
-            AI Coach Preferences
-          </CardTitle>
-          <CardDescription>Customize your AI coaching experience</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      {/* AI Coach tab */}
+      {activeTab === 'ai' && (
+        <div className="rv-panel p-5 space-y-6">
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Brain size={15} style={{ color: 'var(--accent)' }} />
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>AI Coach Preferences</p>
+            </div>
+            <p style={{ fontSize: 12.5, color: 'var(--muted)' }}>Customize your AI coaching experience</p>
+          </div>
+
           {/* Model selector */}
           <div>
             <Label className="text-sm font-medium mb-3 block">AI Model</Label>
-            <div className="space-y-2">
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }} className="space-y-2">
               {AI_MODELS.map(model => {
                 const active = settings.ai_model_preference === model.id
                 return (
@@ -480,89 +542,60 @@ export default function SettingsPage() {
           {/* Response style */}
           <div>
             <Label className="text-sm font-medium mb-3 block">Response Style</Label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {RESPONSE_STYLES.map(style => {
-                const active = settings.ai_response_style === style.id
-                return (
-                  <button
-                    key={style.id}
-                    type="button"
-                    onClick={() => saveSettings({ ai_response_style: style.id })}
-                    className={cn(
-                      'flex flex-col items-start gap-1 p-4 rounded-lg border text-left transition-all duration-150',
-                      active
-                        ? 'border-neon-green/40 bg-neon-green/5'
-                        : 'border-border bg-muted/10 hover:border-neon-green/20 hover:bg-muted/20'
-                    )}
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      <div className={cn(
-                        'w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0',
-                        active ? 'border-neon-green' : 'border-border'
-                      )}>
-                        {active && <div className="w-1.5 h-1.5 rounded-full bg-neon-green" />}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {RESPONSE_STYLES.map(style => {
+                  const active = settings.ai_response_style === style.id
+                  return (
+                    <button
+                      key={style.id}
+                      type="button"
+                      onClick={() => saveSettings({ ai_response_style: style.id })}
+                      className={cn(
+                        'flex flex-col items-start gap-1 p-4 rounded-lg border text-left transition-all duration-150',
+                        active
+                          ? 'border-neon-green/40 bg-neon-green/5'
+                          : 'border-border bg-muted/10 hover:border-neon-green/20 hover:bg-muted/20'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <div className={cn(
+                          'w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0',
+                          active ? 'border-neon-green' : 'border-border'
+                        )}>
+                          {active && <div className="w-1.5 h-1.5 rounded-full bg-neon-green" />}
+                        </div>
+                        <p className="text-sm font-semibold text-foreground">{style.label}</p>
                       </div>
-                      <p className="text-sm font-semibold text-foreground">{style.label}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{style.desc}</p>
-                  </button>
-                )
-              })}
+                      <p className="text-xs text-muted-foreground">{style.desc}</p>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
-      {/* Appearance */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Palette size={16} className="text-neon-green" />
-            Appearance
-          </CardTitle>
-          <CardDescription>Visual preferences</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/10">
+      {/* Appearance tab */}
+      {activeTab === 'appearance' && (
+        <div className="rv-panel p-5">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <Palette size={15} style={{ color: 'var(--accent)' }} />
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Appearance</p>
+          </div>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 16 }}>Visual preferences</p>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
             <div>
-              <p className="text-sm font-medium text-foreground">Dark Mode</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Rivalize is optimized for dark mode</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Dark Mode</p>
+              <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>Rivalize is optimized for dark mode</p>
             </div>
             <ToggleSwitch checked={true} onChange={() => {}} />
           </div>
-          <p className="text-xs text-muted-foreground mt-2 px-1">Light mode coming soon.</p>
-        </CardContent>
-      </Card>
-
-      {/* Danger Zone */}
-      <Card className="border-red-400/30">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base flex items-center gap-2 text-red-400">
-            <AlertTriangle size={16} />
-            Danger Zone
-          </CardTitle>
-          <CardDescription>Irreversible account actions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg border border-red-400/20 bg-red-400/5">
-            <div>
-              <p className="text-sm font-medium text-foreground">Delete Account</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Permanently delete your account and all data. Cannot be undone.
-              </p>
-            </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-2 shrink-0 h-11 sm:h-9 w-full sm:w-auto"
-              onClick={() => setShowDeleteDialog(true)}
-            >
-              <Trash2 size={13} />
-              Delete Account
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          <p style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 4 }}>Light mode coming soon.</p>
+        </div>
+      )}
 
       {/* Delete dialog */}
       {showDeleteDialog && (

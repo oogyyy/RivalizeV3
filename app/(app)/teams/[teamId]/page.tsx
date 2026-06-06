@@ -74,12 +74,15 @@ export default async function TeamPage({
     .select('role, user_id, profiles(id, username, display_name, avatar_url)')
     .eq('team_id', resolvedTeamId)
 
-  // Fetch all demos
+  // Fetch opponent demos with limit to reduce bandwidth
+  // Top 1000 demos provides good coverage while keeping bandwidth reasonable
   const { data: demos } = await admin
     .from('demos')
-    .select('*')
+    .select('id, status, map, match_date, created_at, opponent_slug, opponent_name, demo_type, parsed_data, league')
     .eq('team_id', resolvedTeamId)
+    .eq('demo_type', 'opponent')
     .order('created_at', { ascending: false })
+    .limit(1000)
 
   // Fetch folders
   const { data: folders } = await admin

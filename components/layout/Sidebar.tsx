@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Target, Shield, Brain,
   ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Settings, Activity, Puzzle,
+  Crosshair, HelpCircle,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
@@ -17,7 +18,8 @@ const NAV_GROUPS = [
     index: '01',
     label: 'Analyze',
     items: [
-      { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+      { href: '/dashboard', label: 'Dashboard',  Icon: LayoutDashboard },
+      { href: '/prep',      label: 'Match Prep', Icon: Crosshair, live: true },
     ],
   },
   {
@@ -33,7 +35,6 @@ const NAV_GROUPS = [
     label: 'Prepare',
     items: [
       { href: '/ai-coach', label: 'AI Scout', Icon: Brain, live: true },
-      { href: '/my-team',  label: 'My Teams', Icon: Shield },
       { href: '/playbook', label: 'Playbook', Icon: BookOpen },
       { href: '/veto',     label: 'Veto',     Icon: Swords },
       { href: '/lineups',  label: 'Lineups',  Icon: BookMarked },
@@ -41,7 +42,14 @@ const NAV_GROUPS = [
   },
   {
     index: '04',
-    label: 'Improve',
+    label: 'Team',
+    items: [
+      { href: '/my-team', label: 'My Team', Icon: Shield },
+    ],
+  },
+  {
+    index: '05',
+    label: 'Progress',
     items: [
       { href: '/improve', label: 'My Matches', Icon: Activity },
     ],
@@ -357,6 +365,13 @@ export default function Sidebar({ profile: _profile }: SidebarProps) {
 
       {/* Settings footer */}
       <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
+        <NavItem
+          href="/support"
+          label="Support and Feedback"
+          Icon={HelpCircle}
+          isActive={pathname === '/support'}
+          collapsed={collapsed}
+        />
         <NavItem
           href="/settings"
           label="Settings"

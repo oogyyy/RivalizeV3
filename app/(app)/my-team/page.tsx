@@ -94,7 +94,7 @@ export default async function MyTeamPage({
   const demos = (demosRes.data ?? []) as DemoRowData[]
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
+    <div className="flex-1 overflow-y-auto p-5 md:p-7 flex flex-col gap-4">
 
       {/* ── Header ── */}
       <div className="animate-fade-in-up">
@@ -125,6 +125,23 @@ export default async function MyTeamPage({
             </div>
           }
         />
+
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 animate-fade-in-up">
+          {[
+            { label: 'MATCHES', value: '—', sub: 'Total played', border: 's-amber' },
+            { label: 'WIN RATE', value: '—', sub: 'Overall', border: 's-signal' },
+            { label: 'TEAM K/D', value: '—', sub: 'Combined', border: 's-purple' },
+            { label: 'AVG ADR', value: '—', sub: 'Per round', border: 's-blue' },
+          ].map((s) => (
+            <div key={s.label} className={`rv-panel lift p-4 ${s.border}`} style={{ cursor: 'default', position: 'relative' }}>
+              <div className={`al-${s.border.replace('s-', '')}`} style={{ position: 'absolute', top: 0, left: 0, right: 0 }} />
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</p>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 4 }}>{s.value}</p>
+              <p style={{ fontSize: 11, color: 'var(--muted)' }}>{s.sub}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <MyTeamStatsAndDemos
