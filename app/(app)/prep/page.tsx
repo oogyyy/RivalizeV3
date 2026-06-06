@@ -47,9 +47,6 @@ export default async function PrepPage() {
   const typedFolders = (folders ?? []) as FolderRow[]
   const nextOpponent = typedFolders[0] ?? null
 
-  // Get just the first 6 for the quick list
-  const quickOpponents = typedFolders.slice(0, 6)
-
   return (
     <div className="p-5 md:p-7 flex flex-col gap-4 max-w-7xl">
 
@@ -60,70 +57,28 @@ export default async function PrepPage() {
         mapPoolWin={MAP_POOL_WIN}
       />
 
-      {/* AI Brief + Key Players */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 14 }}>
-        {/* AI Brief */}
-        <div style={{ padding: '18px 20px 16px', position: 'relative', borderRadius: 'var(--radius)', border: '1px solid color-mix(in srgb, var(--signal) 24%, transparent)', background: 'radial-gradient(480px 250px at 8% -24%, color-mix(in srgb, var(--signal) 11%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--signal) 2.5%, var(--card)), var(--card))' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>AI Brief</p>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 6, background: 'rgba(34,211,238,.1)', border: '1px solid rgba(34,211,238,.3)', fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.06em' }}>✦ AI INSIGHT</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {BRIEF_ITEMS.map((b, i) => (
-              <div key={i} style={{ display: 'flex', gap: 11, padding: '12px 13px', borderRadius: 10, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
-                <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `color-mix(in srgb, ${b.color} 15%, transparent)`, border: `1px solid color-mix(in srgb, ${b.color} 35%, transparent)` }}>
-                  <b.icon size={13} style={{ color: b.color }} />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>
-                    <span style={{ fontWeight: 700 }}>{b.title}</span>{' '}
-                    <span style={{ color: 'var(--muted)' }}>{b.text}</span>
-                  </p>
-                </div>
+      {/* AI Brief */}
+      <div style={{ padding: '18px 20px 16px', position: 'relative', borderRadius: 'var(--radius)', border: '1px solid color-mix(in srgb, var(--signal) 24%, transparent)', background: 'radial-gradient(480px 250px at 8% -24%, color-mix(in srgb, var(--signal) 11%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--signal) 2.5%, var(--card)), var(--card))' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>AI Brief</p>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 6, background: 'rgba(34,211,238,.1)', border: '1px solid rgba(34,211,238,.3)', fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.06em' }}>✦ AI INSIGHT</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+          {BRIEF_ITEMS.map((b, i) => (
+            <div key={i} style={{ display: 'flex', gap: 11, padding: '12px 13px', borderRadius: 10, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+              <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `color-mix(in srgb, ${b.color} 15%, transparent)`, border: `1px solid color-mix(in srgb, ${b.color} 35%, transparent)` }}>
+                <b.icon size={13} style={{ color: b.color }} />
               </div>
-            ))}
-          </div>
-          <p style={{ fontSize: 11, color: 'var(--faint)', marginTop: 14, fontFamily: 'var(--font-mono)' }}>Last updated 2 hours ago</p>
-        </div>
-
-        {/* Opponents quick list */}
-        <div className="rv-panel" style={{ padding: '18px', height: 'fit-content' }}>
-          <p style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Opponents</p>
-          {quickOpponents.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {quickOpponents.map((f, i) => {
-                const stats = f.aggregated_stats as AggregatedStats | null
-                const wins = stats?.wins ?? 0
-                const losses = stats?.losses ?? 0
-                return (
-                  <Link key={f.id} href={`/opponents/${f.id}`}>
-                    <div className="rv-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 9 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>
-                        {f.opponent_display_name.charAt(0).toUpperCase()}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.opponent_display_name}</p>
-                        {(wins > 0 || losses > 0) && (
-                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: wins > losses ? 'var(--win)' : losses > wins ? 'var(--loss)' : 'var(--muted)' }}>{wins}W – {losses}L</p>
-                        )}
-                      </div>
-                      <ArrowRight size={13} style={{ color: 'var(--faint)', flexShrink: 0 }} />
-                    </div>
-                  </Link>
-                )
-              })}
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>
+                  <span style={{ fontWeight: 700 }}>{b.title}</span>{' '}
+                  <span style={{ color: 'var(--muted)' }}>{b.text}</span>
+                </p>
+              </div>
             </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <p style={{ fontSize: 13, color: 'var(--muted)' }}>No opponents yet</p>
-              <Link href="/opponents">
-                <button style={{ marginTop: 10, height: 32, padding: '0 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }}>
-                  Add Opponent
-                </button>
-              </Link>
-            </div>
-          )}
+          ))}
         </div>
+        <p style={{ fontSize: 11, color: 'var(--faint)', marginTop: 14, fontFamily: 'var(--font-mono)' }}>Last updated 2 hours ago</p>
       </div>
 
       {/* Bottom 3-col: Map Strategy, Veto Plan, Tools */}
