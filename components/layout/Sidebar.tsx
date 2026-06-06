@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Target, Shield, Brain,
   ChevronLeft, ChevronRight, BookOpen, Swords, BookMarked, Film, Settings, Activity, Puzzle,
-  Crosshair, MessageSquare,
+  Crosshair, HelpCircle,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
@@ -367,8 +367,8 @@ export default function Sidebar({ profile: _profile }: SidebarProps) {
       <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
         <NavItem
           href="/support"
-          label="Support"
-          Icon={MessageSquare}
+          label="Support and Feedback"
+          Icon={HelpCircle}
           isActive={pathname === '/support'}
           collapsed={collapsed}
         />
