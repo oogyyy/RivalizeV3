@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, type ElementType, type ChangeEvent, type KeyboardEvent } from 'react'
 import {
   BookMarked, Plus, Trash2, Filter, Loader2, ChevronDown, ChevronUp,
-  Globe, Pencil, Youtube, Video, Image, Upload, X, Link as LinkIcon,
+  Globe, Youtube, Video, Image, Upload, X,
 } from 'lucide-react'
 import Link from 'next/link'
 import LineupBoard, { type DrawAction } from '@/components/lineups/LineupBoard'
@@ -78,7 +78,6 @@ function YoutubeEmbed({ url }: { url: string }) {
 }
 
 const MEDIA_TABS: { value: MediaType; label: string; Icon: ElementType }[] = [
-  { value: 'draw',    label: 'Draw',    Icon: Pencil  },
   { value: 'youtube', label: 'YouTube', Icon: Youtube },
   { value: 'video',   label: 'Video',   Icon: Video   },
   { value: 'images',  label: 'Images',  Icon: Image   },
@@ -107,7 +106,7 @@ export default function LineupsPage() {
   const [deleting, setDeleting]   = useState<string | null>(null)
   const [publishing, setPublishing] = useState<string | null>(null)
 
-  const [newMediaType, setNewMediaType] = useState<MediaType>('draw')
+  const [newMediaType, setNewMediaType] = useState<MediaType>('youtube')
   const [newYoutubeUrl, setNewYoutubeUrl] = useState('')
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [uploadingMedia, setUploadingMedia] = useState(false)
@@ -190,7 +189,6 @@ export default function LineupsPage() {
 
       setLineups((prev: Lineup[]) => [lineup, ...prev])
       resetForm()
-      if (newMediaType === 'draw') setOpenId(lineup.id)
     } finally {
       setCreating(false)
     }
@@ -424,7 +422,7 @@ export default function LineupsPage() {
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, background: 'var(--accent)', color: 'white', fontSize: 13, fontWeight: 600, border: 'none', cursor: isBusy || !newName.trim() ? 'not-allowed' : 'pointer', opacity: isBusy || !newName.trim() ? 0.5 : 1 }}
             >
               {isBusy ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-              {newMediaType === 'draw' ? 'Create & Draw' : 'Create'}
+              Create
             </button>
             <button onClick={resetForm} style={{ padding: '7px 16px', borderRadius: 8, background: 'transparent', color: 'var(--muted)', fontSize: 13, fontWeight: 500, border: '1px solid var(--border)', cursor: 'pointer' }}>
               Cancel
