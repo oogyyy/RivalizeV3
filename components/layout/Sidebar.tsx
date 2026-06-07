@@ -51,7 +51,7 @@ const NAV_GROUPS = [
     index: '05',
     label: 'Progress',
     items: [
-      { href: '/improve', label: 'My Matches', Icon: Activity },
+      { href: '/improve', label: 'PUGS', Icon: Activity },
     ],
   },
 ]

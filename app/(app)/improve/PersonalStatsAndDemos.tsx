@@ -180,7 +180,7 @@ export default function PersonalStatsAndDemos({
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <FileVideo size={15} className="text-[#00ffc8]" />
-            <h2 className="text-[13px] font-semibold text-foreground">My Matches</h2>
+            <h2 className="text-[13px] font-semibold text-foreground">PUGS</h2>
             {demos.length > 0 && (
               <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
                 {demos.length} uploaded

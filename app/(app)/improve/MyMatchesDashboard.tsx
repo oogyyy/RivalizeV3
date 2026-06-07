@@ -271,7 +271,7 @@ export default function MyMatchesDashboard({
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: 32, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 4 }}>
-            My Matches
+            PUGS
           </h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
             Track your personal performance across pugs, matchmaking, and scrims
