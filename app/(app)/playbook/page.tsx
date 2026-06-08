@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { CS2_MAPS } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { Suspense } from 'react'
+import { MAP_THUMBS } from '@/lib/map-config'
 
 type PlaybookMeta = {
   id: string
@@ -342,54 +343,73 @@ function PlaybookListInner() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {playbooks.map(pb => (
-            <div
-              key={pb.id}
-              className={cn(
-                'rv-panel group relative p-4 transition-all duration-150',
-                pb.opponent_name
-                  ? 'hover:border-orange-500/50'
-                  : 'hover:border-[rgba(0,255,200,0.3)]'
-              )}
-            >
-              <Link href={`/playbook/${pb.id}`} className="block mb-3">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <div className={cn(
-                    'w-8 h-8 rounded-lg border flex items-center justify-center shrink-0',
-                    pb.opponent_name
-                      ? 'bg-orange-500/10 border-orange-500/30'
-                      : 'bg-[rgba(0,255,200,0.1)] border-[rgba(0,255,200,0.2)]'
-                  )}>
-                    {pb.opponent_name ? <Swords size={14} className="text-orange-400" /> : <Map size={14} className="text-[#00ffc8]" />}
+          {playbooks.map(pb => {
+            const thumb = MAP_THUMBS[pb.map]
+            return (
+              <div
+                key={pb.id}
+                className={cn(
+                  'rv-panel group relative overflow-hidden transition-all duration-150',
+                  pb.opponent_name
+                    ? 'hover:border-orange-500/50'
+                    : 'hover:border-[rgba(0,255,200,0.3)]'
+                )}
+              >
+                {/* Map thumbnail banner */}
+                <div className="relative h-28 overflow-hidden">
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt={pb.map} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-muted/20" />
+                  )}
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-card/40 to-transparent" />
+
+                  {/* Map name badge pinned to bottom-left */}
+                  <div className="absolute bottom-2 left-3 flex items-center gap-1.5">
+                    <div className={cn(
+                      'w-6 h-6 rounded-md border flex items-center justify-center shrink-0',
+                      pb.opponent_name ? 'bg-orange-500/20 border-orange-500/40' : 'bg-[rgba(0,255,200,0.15)] border-[rgba(0,255,200,0.3)]'
+                    )}>
+                      {pb.opponent_name ? <Swords size={11} className="text-orange-400" /> : <Map size={11} className="text-[#00ffc8]" />}
+                    </div>
+                    <span className={cn(
+                      'text-[10px] font-mono font-semibold px-2 py-0.5 rounded backdrop-blur-sm',
+                      pb.opponent_name ? 'text-orange-400 bg-orange-500/15' : 'text-[#00ffc8] bg-[rgba(0,255,200,0.1)]'
+                    )}>
+                      {pb.map}
+                    </span>
                   </div>
-                  <span className={cn(
-                    'text-[10px] font-mono px-2 py-0.5 rounded',
-                    pb.opponent_name ? 'text-orange-400 bg-orange-500/10' : 'text-[#00ffc8] bg-[rgba(0,255,200,0.08)]'
-                  )}>
-                    {pb.map}
-                  </span>
+
+                  {/* Delete button */}
+                  <button
+                    onClick={() => handleDelete(pb.id)}
+                    disabled={deleting === pb.id}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity text-white/60 hover:text-red-400 hover:bg-red-400/20"
+                  >
+                    {deleting === pb.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  </button>
+                </div>
+
+                {/* Card content */}
+                <Link href={`/playbook/${pb.id}`} className="block px-4 py-3">
                   {pb.opponent_name && (
-                    <span className="text-[10px] font-medium text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20 flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20 mb-1.5">
                       <Target size={9} /> vs {pb.opponent_name}
                     </span>
                   )}
-                </div>
-                <h3 className="text-sm font-semibold text-foreground group-hover:text-[#00ffc8] transition-colors truncate">
-                  {pb.name}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Updated {new Date(pb.updated_at).toLocaleDateString()}
-                </p>
-              </Link>
-              <button
-                onClick={() => handleDelete(pb.id)}
-                disabled={deleting === pb.id}
-                className="absolute top-3 right-3 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
-              >
-                {deleting === pb.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-              </button>
-            </div>
-          ))}
+                  <h3 className="text-sm font-semibold text-foreground group-hover:text-[#00ffc8] transition-colors truncate">
+                    {pb.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Updated {new Date(pb.updated_at).toLocaleDateString()}
+                  </p>
+                </Link>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
