@@ -36,6 +36,7 @@ export interface DemoRowData {
       team2?: string
     }
     opponentSide?: string
+    rounds?: Array<{ number: number; winner?: string }>
     players?: Array<{
       name: string
       kills: number
@@ -44,6 +45,9 @@ export interface DemoRowData {
       rating: number
       adr: number
       team: string
+      entry_kills?: number
+      clutch_wins?: number
+      clutch_attempts?: number
     }>
   } | null
 }

@@ -76,7 +76,10 @@ function computeStats(demos: DemoRowData[]) {
   let totalMatches = 0, totalWins = 0, totalDraws = 0
   let totalKills = 0, totalDeaths = 0, totalAdr = 0, playerCount = 0
   const mapCounts: Record<string, number> = {}
-  const myPlayerStats: Record<string, { kills: number; deaths: number; assists: number; adr: number; rating: number; games: number }> = {}
+  // Per-map T/CT round win tracking for own team
+  const mapSideWins: Record<string, { tWins: number; ctWins: number; tTotal: number; ctTotal: number }> = {}
+  type PlayerAccum = { kills: number; deaths: number; assists: number; adr: number; rating: number; games: number; entryKills: number; clutchWins: number; clutchAttempts: number }
+  const myPlayerStats: Record<string, PlayerAccum> = {}
 
   for (const demo of completedDemos) {
     const pd = demo.parsed_data
@@ -90,6 +93,38 @@ function computeStats(demos: DemoRowData[]) {
       if (ourScore > theirScore) totalWins++
       else if (ourScore === theirScore) totalDraws++
       if (h.map && h.map !== 'unknown') mapCounts[h.map] = (mapCounts[h.map] ?? 0) + 1
+
+      // Compute per-map T/CT win split for our team.
+      // The parsed round.winner is the team label (matches header.team1 or header.team2).
+      // Our team label is the opposite of the opponentSide label.
+      const ourLabel = opponentSide === 'team1' ? (h.team2 ?? 'CT-Side') : (h.team1 ?? 'T-Side')
+      const mapKey = h.map ?? 'unknown'
+      if (!mapSideWins[mapKey]) mapSideWins[mapKey] = { tWins: 0, ctWins: 0, tTotal: 0, ctTotal: 0 }
+      const sw = mapSideWins[mapKey]
+      const totalRounds = (h.score_team1 ?? 0) + (h.score_team2 ?? 0)
+      // CS2 standard: first 12 rounds team keeps their starting side.
+      // Determine our starting side: if opponentSide='team2', opponent is team2,
+      // we are team1. team1 label is usually the T-starting team (not guaranteed,
+      // but we use win_reason to discriminate instead).
+      for (const round of (pd?.rounds ?? [])) {
+        if (!round.winner) continue
+        const ourWon = round.winner === ourLabel
+        // Classify round side from win_reason:
+        //   T wins: TargetBombed, Elimination (when T side wins)
+        //   CT wins: BombDefused, TargetSaved, Elimination (when CT side wins)
+        // Simpler: use round number — rounds 1-12 team1 is T (CS2 default).
+        // round ≤12 → team1=T, team2=CT; round 13-24 → sides flip.
+        const isFirstHalf = round.number <= 12
+        // If opponentSide='team2', our team is team1 → T in first half
+        const ourSideIsT = opponentSide === 'team2' ? isFirstHalf : !isFirstHalf
+        if (ourSideIsT) { sw.tTotal++; if (ourWon) sw.tWins++ }
+        else             { sw.ctTotal++; if (ourWon) sw.ctWins++ }
+      }
+      // Fallback if no round data but we know total rounds
+      if ((pd?.rounds ?? []).length === 0 && totalRounds > 0) {
+        sw.tTotal  += Math.floor(totalRounds / 2)
+        sw.ctTotal += Math.ceil(totalRounds / 2)
+      }
     }
 
     if (pd?.players) {
@@ -100,13 +135,16 @@ function computeStats(demos: DemoRowData[]) {
         totalDeaths += p.deaths
         totalAdr += p.adr
         playerCount++
-        if (!myPlayerStats[p.name]) myPlayerStats[p.name] = { kills: 0, deaths: 0, assists: 0, adr: 0, rating: 0, games: 0 }
+        if (!myPlayerStats[p.name]) myPlayerStats[p.name] = { kills: 0, deaths: 0, assists: 0, adr: 0, rating: 0, games: 0, entryKills: 0, clutchWins: 0, clutchAttempts: 0 }
         myPlayerStats[p.name].kills += p.kills
         myPlayerStats[p.name].deaths += p.deaths
         myPlayerStats[p.name].assists += p.assists
         myPlayerStats[p.name].adr += p.adr
         myPlayerStats[p.name].rating += p.rating
         myPlayerStats[p.name].games += 1
+        myPlayerStats[p.name].entryKills    += p.entry_kills    ?? 0
+        myPlayerStats[p.name].clutchWins    += p.clutch_wins    ?? 0
+        myPlayerStats[p.name].clutchAttempts += p.clutch_attempts ?? 0
       }
     }
   }
@@ -126,18 +164,22 @@ function computeStats(demos: DemoRowData[]) {
       avgAdr: s.games > 0 ? s.adr / s.games : 0,
       avgRating: s.games > 0 ? s.rating / s.games : 0,
       games: s.games,
+      entryKills: s.entryKills,
+      clutchRate: s.clutchAttempts > 0 ? s.clutchWins / s.clutchAttempts : null,
+      clutchWins: s.clutchWins,
+      clutchAttempts: s.clutchAttempts,
     }))
     .sort((a, b) => b.avgRating - a.avgRating)
 
-  return { totalMatches, totalWins, totalLosses, totalDraws, winRate, avgKD, avgAdr, topMaps, topPlayers }
+  return { totalMatches, totalWins, totalLosses, totalDraws, winRate, avgKD, avgAdr, topMaps, topPlayers, mapSideWins }
 }
 
 const AI_COACH_ITEMS = [
-  { title: 'Weak Spots', desc: 'Identify recurring mistakes and areas to improve', icon: AlertCircle, color: 'var(--loss)' },
-  { title: 'Executes', desc: 'Review execute quality, utility usage, and timings', icon: Zap, color: 'var(--accent)' },
-  { title: 'Round Review', desc: 'Analyze clutches, eco plays, and late rounds', icon: BarChart3, color: 'var(--ct)' },
-  { title: 'Practice Drills', desc: 'Personalized drill recommendations', icon: Target, color: 'var(--signal)' },
-  { title: 'Strategy Coach', desc: 'Build a playbook tailored to your roster', icon: BookOpen, color: 'var(--win)' },
+  { title: 'Weak Spots',      desc: 'Identify recurring mistakes and areas to improve', icon: AlertCircle, color: 'var(--loss)',   focus: 'weakness' },
+  { title: 'Executes',        desc: 'Review execute quality, utility usage, and timings', icon: Zap,       color: 'var(--accent)', focus: 'executes' },
+  { title: 'Round Review',    desc: 'Analyze clutches, eco plays, and late rounds',       icon: BarChart3,  color: 'var(--ct)',     focus: 'rounds'   },
+  { title: 'Practice Drills', desc: 'Personalized drill recommendations',                 icon: Target,     color: 'var(--signal)', focus: 'drills'   },
+  { title: 'Strategy Coach',  desc: 'Build a playbook tailored to your roster',           icon: BookOpen,   color: 'var(--win)',    focus: 'strategy' },
 ]
 
 export default function MyTeamDashboard({
@@ -386,14 +428,16 @@ export default function MyTeamDashboard({
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {AI_COACH_ITEMS.map((item, i) => (
-              <div key={i} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card-2)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                <item.icon size={16} style={{ color: 'inherit', marginTop: 2, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{item.title}</p>
-                  <p style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.3 }}>{item.desc}</p>
+              <Link key={i} href={`/ai-coach?mode=myteam&focus=${item.focus}`} style={{ textDecoration: 'none' }}>
+                <div style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card-2)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <item.icon size={16} style={{ color: item.color, marginTop: 2, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{item.title}</p>
+                    <p style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.3 }}>{item.desc}</p>
+                  </div>
+                  <ChevronRight size={14} style={{ color: 'var(--muted)', flexShrink: 0 }} />
                 </div>
-                <ChevronRight size={14} style={{ color: 'var(--muted)', flexShrink: 0 }} />
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -426,7 +470,19 @@ export default function MyTeamDashboard({
                         <span style={{ fontSize: 10, width: 20, height: 20, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, background: i === 0 ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.05)', color: i === 0 ? '#fbbf24' : 'var(--faint)' }}>{i + 1}</span>
                         <div style={{ minWidth: 0 }}>
                           <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
-                          <p style={{ fontSize: 10, color: 'var(--muted)', margin: 0 }}>{p.games} {p.games === 1 ? 'game' : 'games'}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 10, color: 'var(--muted)' }}>{p.games} {p.games === 1 ? 'game' : 'games'}</span>
+                            {p.entryKills > 0 && (
+                              <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: 'color-mix(in srgb, #f97316 12%, transparent)', color: '#f97316' }}>
+                                {p.entryKills}E
+                              </span>
+                            )}
+                            {p.clutchRate !== null && (
+                              <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: 'color-mix(in srgb, #a855f7 12%, transparent)', color: '#a855f7' }}>
+                                {Math.round(p.clutchRate * 100)}%C
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, textAlign: 'right', margin: 0, color: p.avgRating >= 1.1 ? 'var(--signal)' : p.avgRating >= 0.9 ? 'var(--text)' : 'var(--loss)' }}>{p.avgRating.toFixed(2)}</p>
@@ -454,19 +510,21 @@ export default function MyTeamDashboard({
             {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').slice(0, 6).length === 0 ? (
               <p style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', padding: '12px 0' }}>No map data yet.</p>
             ) : mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').slice(0, 6).map(g => {
-              const total = g.wins + g.losses + g.draws
-              const ctRate = total > 0 ? Math.round(g.wins / total * 100) : 50
-              const tRate = 100 - ctRate
+              const sw = stats.mapSideWins[g.map]
+              const tWr  = sw && sw.tTotal  > 0 ? Math.round(sw.tWins  / sw.tTotal  * 100) : null
+              const ctWr = sw && sw.ctTotal > 0 ? Math.round(sw.ctWins / sw.ctTotal * 100) : null
               const name = g.map.replace(/^(de_|cs_|ar_)/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+              // Bar: left = T win rate, right = CT win rate (proportional to rounds played)
+              const tBarPct  = sw ? Math.round(sw.tTotal  / (sw.tTotal + sw.ctTotal) * 100) : 50
               return (
                 <div key={g.map} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 0' }}>
                   <span style={{ fontSize: 13, color: 'var(--text)', width: 72 }}>{name}</span>
                   <div style={{ flex: 1, height: 11, borderRadius: 4, overflow: 'hidden', display: 'flex', border: '1px solid var(--border)' }}>
-                    <div style={{ width: `${ctRate}%`, background: 'linear-gradient(90deg,#4d83e6,var(--ct))' }} />
-                    <div style={{ flex: 1, background: 'linear-gradient(90deg,var(--tside),#e09a2e)' }} />
+                    <div style={{ width: `${tBarPct}%`, background: tWr !== null && tWr >= 55 ? 'linear-gradient(90deg,#e09a2e,var(--tside))' : tWr !== null && tWr < 40 ? 'linear-gradient(90deg,var(--loss),#c0392b)' : 'linear-gradient(90deg,var(--tside),#e09a2e)' }} />
+                    <div style={{ flex: 1, background: ctWr !== null && ctWr >= 55 ? 'linear-gradient(90deg,#4d83e6,var(--ct))' : ctWr !== null && ctWr < 40 ? 'linear-gradient(90deg,var(--loss),#c0392b)' : 'linear-gradient(90deg,#4d83e6,var(--ct))' }} />
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--ct)', width: 58, textAlign: 'right' }}>CT {ctRate}%</span>
-                  <span style={{ fontSize: 11, color: 'var(--tside)', width: 50, textAlign: 'right' }}>T {tRate}%</span>
+                  <span style={{ fontSize: 11, color: 'var(--tside)', width: 48, textAlign: 'right' }}>T {tWr !== null ? `${tWr}%` : '—'}</span>
+                  <span style={{ fontSize: 11, color: 'var(--ct)', width: 50, textAlign: 'right' }}>CT {ctWr !== null ? `${ctWr}%` : '—'}</span>
                 </div>
               )
             })}
