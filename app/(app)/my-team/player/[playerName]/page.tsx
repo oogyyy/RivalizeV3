@@ -3,10 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { notFound, redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Shield } from 'lucide-react'
-import PlayerDeepDive from '@/components/demos/PlayerDeepDive'
-import PlayerWeaknessPanel from '@/components/demos/PlayerWeaknessPanel'
+import PlayerPageClient from '@/components/demos/PlayerPageClient'
 import type { ParsedDemoData, PlayerStats, Kill } from '@/types/database'
 
 export default async function MyTeamPlayerPage({
@@ -94,40 +91,10 @@ export default async function MyTeamPlayerPage({
   if (demoEntries.length === 0) notFound()
 
   return (
-    <div className="min-h-full">
-      <div className="border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-4 md:px-6 py-4">
-          <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-            <Link href="/my-team" className="hover:text-foreground flex items-center gap-1">
-              <Shield size={13} />
-              My Team
-            </Link>
-            <span>/</span>
-            <span className="text-foreground font-medium">{decodedName}</span>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Link href="/my-team" className="text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft size={18} />
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">{decodedName}</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {demoEntries.length} {demoEntries.length === 1 ? 'demo' : 'demos'} · {teamName}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-6">
-        <PlayerWeaknessPanel demoEntries={demoEntries as Parameters<typeof PlayerWeaknessPanel>[0]['demoEntries']} />
-        <PlayerDeepDive
-          playerName={decodedName}
-          folderId=""
-          demoEntries={demoEntries as Parameters<typeof PlayerDeepDive>[0]['demoEntries']}
-          teamName={teamName}
-        />
-      </div>
-    </div>
+    <PlayerPageClient
+      playerName={decodedName}
+      teamName={teamName}
+      demoEntries={demoEntries}
+    />
   )
 }

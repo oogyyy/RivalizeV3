@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import {
   Brain, Send, RotateCcw, Loader2,
   Target, Crosshair, Shield, Users,
-  Sparkles, MessageSquare, ChevronRight, ExternalLink, Database,
+  Sparkles, ChevronRight, ExternalLink, Database,
   SlidersHorizontal, X, ChevronDown, BarChart3, AlertCircle, RefreshCw,
   BookOpen, Zap,
 } from 'lucide-react'
@@ -111,6 +111,31 @@ const FOLLOW_UP_PROMPTS: Record<string, { label: string; prompt: string }[]> = {
   ],
 }
 
+function Scope({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="var(--signal)" strokeWidth={1.6}>
+      <circle cx={12} cy={12} r={9} />
+      <circle cx={12} cy={12} r={4.5} />
+      <circle cx={12} cy={12} r={1.5} fill="var(--signal)" stroke="none" />
+      <line x1={12} y1={2.5} x2={12} y2={5.5} />
+      <line x1={12} y1={18.5} x2={12} y2={21.5} />
+      <line x1={2.5} y1={12} x2={5.5} y2={12} />
+      <line x1={18.5} y1={12} x2={21.5} y2={12} />
+    </svg>
+  )
+}
+
+function ConfidenceBar({ value }: { value: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ flex: 1, height: 4, borderRadius: 3, background: 'var(--hairline)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${value}%`, borderRadius: 3, background: 'linear-gradient(90deg, var(--signal), color-mix(in srgb, var(--signal) 60%, var(--accent)))', transition: 'width 0.6s ease' }} />
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--signal)', fontFamily: 'var(--font-mono)', minWidth: 28 }}>{value}%</span>
+    </div>
+  )
+}
+
 function MarkdownContent({ content }: { content: string }) {
   const rendered = content.split('\n').map((line, i) => {
     if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold text-foreground mt-4 mb-2">{line.slice(4)}</h3>
@@ -153,14 +178,14 @@ function renderInline(text: string): React.ReactNode {
 
 function TypingIndicator() {
   return (
-    <div className="flex items-end gap-3 mb-4">
-      <div style={{ width: 32, height: 32, borderRadius: 10, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Brain size={14} style={{ color: 'var(--win)' }} />
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
+      <div style={{ width: 32, height: 32, borderRadius: 10, background: 'color-mix(in srgb, var(--signal) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Scope size={14} />
       </div>
-      <div className="rv-panel px-4 py-3">
-        <div className="flex gap-1 items-center h-4">
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, borderBottomLeftRadius: 4, padding: '10px 14px' }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', height: 16 }}>
           {[0, 1, 2].map(i => (
-            <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)', animationDelay: `${i * 150}ms` }} className="animate-bounce" />
+            <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--signal)', animationDelay: `${i * 150}ms` }} className="animate-bounce" />
           ))}
         </div>
       </div>
@@ -323,7 +348,7 @@ export default function AIScoutPage() {
     height: '100%',
     overflowY: 'auto',
     flexShrink: 0,
-    width: 260,
+    width: 320,
   }
 
   return (
@@ -351,17 +376,21 @@ export default function AIScoutPage() {
         <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           {/* Title row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Brain size={13} style={{ color: 'var(--win)' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'color-mix(in srgb, var(--signal) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 28%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Scope size={14} />
             </div>
             <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>AI Scout</span>
-            <span style={{ marginLeft: 'auto', padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', fontSize: 10, fontWeight: 700, color: 'var(--win)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Llama 3.3</span>
+            <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="rv-pulse" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--signal)', display: 'block' }} />
+              <span style={{ padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 25%, transparent)', fontSize: 10, fontWeight: 700, color: 'var(--signal)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>LIVE</span>
+            </span>
           </div>
 
           {/* Mode toggle */}
           <div style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 9, background: 'var(--bg)', border: '1px solid var(--border)' }}>
             {(['opponent', 'myteam'] as const).map(m => {
               const active = mode === m
+              const modeColor = m === 'opponent' ? 'var(--signal)' : 'var(--accent)'
               return (
                 <button
                   key={m}
@@ -369,9 +398,9 @@ export default function AIScoutPage() {
                   style={{
                     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                     padding: '6px 8px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    background: active ? 'color-mix(in srgb, var(--win) 10%, var(--card))' : 'transparent',
-                    color: active ? 'var(--win)' : 'var(--muted)',
-                    border: active ? '1px solid color-mix(in srgb, var(--win) 22%, transparent)' : '1px solid transparent',
+                    background: active ? `color-mix(in srgb, ${modeColor} 10%, var(--card))` : 'transparent',
+                    color: active ? modeColor : 'var(--muted)',
+                    border: active ? `1px solid color-mix(in srgb, ${modeColor} 28%, transparent)` : '1px solid transparent',
                     transition: 'all 0.13s',
                   }}
                 >
@@ -411,8 +440,8 @@ export default function AIScoutPage() {
               )}
 
               {selectedFolder && (
-                <div style={{ marginTop: 7, padding: '8px 10px', borderRadius: 8, background: 'color-mix(in srgb, var(--win) 5%, var(--card))', border: '1px solid color-mix(in srgb, var(--win) 18%, transparent)', fontSize: 12 }}>
-                  <p style={{ fontWeight: 600, color: 'var(--win)' }}>{selectedFolder.opponent_display_name}</p>
+                <div style={{ marginTop: 7, padding: '8px 10px', borderRadius: 8, background: 'color-mix(in srgb, var(--signal) 5%, var(--card))', border: '1px solid color-mix(in srgb, var(--signal) 18%, transparent)', fontSize: 12 }}>
+                  <p style={{ fontWeight: 600, color: 'var(--signal)' }}>{selectedFolder.opponent_display_name}</p>
                   <p style={{ color: 'var(--muted)', marginTop: 2 }}>
                     {(selectedFolder.aggregated_stats as { total_matches?: number } | null)?.total_matches ?? 0} matches ·{' '}
                     {Math.round(((selectedFolder.aggregated_stats as { win_rate?: number } | null)?.win_rate ?? 0) * 100)}% win rate
@@ -424,8 +453,8 @@ export default function AIScoutPage() {
 
           {/* My team banner */}
           {mode === 'myteam' && (
-            <div style={{ padding: '9px 11px', borderRadius: 9, background: 'color-mix(in srgb, var(--win) 5%, var(--card))', border: '1px solid color-mix(in srgb, var(--win) 18%, transparent)', fontSize: 12 }}>
-              <p style={{ fontWeight: 600, color: 'var(--win)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ padding: '9px 11px', borderRadius: 9, background: 'color-mix(in srgb, var(--accent) 5%, var(--card))', border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)', fontSize: 12 }}>
+              <p style={{ fontWeight: 600, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <Shield size={11} /> My Team Analysis
               </p>
               <p style={{ color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>
@@ -440,6 +469,7 @@ export default function AIScoutPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {activeFocusAreas.map(area => {
                 const active = focusArea === area.id
+                const aColor = mode === 'opponent' ? 'var(--signal)' : 'var(--accent)'
                 return (
                   <button
                     key={area.id}
@@ -447,19 +477,19 @@ export default function AIScoutPage() {
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 9,
                       padding: '8px 10px', borderRadius: 9, cursor: 'pointer', textAlign: 'left',
-                      background: active ? 'color-mix(in srgb, var(--win) 8%, var(--card))' : 'transparent',
-                      border: active ? '1px solid color-mix(in srgb, var(--win) 22%, transparent)' : '1px solid transparent',
+                      background: active ? `color-mix(in srgb, ${aColor} 8%, var(--card))` : 'transparent',
+                      border: active ? `1px solid color-mix(in srgb, ${aColor} 28%, transparent)` : '1px solid transparent',
                       transition: 'all 0.12s',
                     }}
                     onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'var(--hairline)' }}
                     onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
                   >
-                    <span style={{ color: active ? 'var(--win)' : 'var(--faint)', flexShrink: 0 }}>{area.icon}</span>
+                    <span style={{ color: active ? aColor : 'var(--faint)', flexShrink: 0 }}>{area.icon}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--win)' : 'var(--text)' }}>{area.label}</p>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: active ? aColor : 'var(--text)' }}>{area.label}</p>
                       <p style={{ fontSize: 10, color: 'var(--faint)', marginTop: 1 }}>{area.description}</p>
                     </div>
-                    {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)', flexShrink: 0 }} />}
+                    {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: aColor, flexShrink: 0 }} />}
                   </button>
                 )
               })}
@@ -518,16 +548,16 @@ export default function AIScoutPage() {
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 11px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                background: 'color-mix(in srgb, var(--win) 5%, var(--card))',
-                border: '1px solid color-mix(in srgb, var(--win) 22%, transparent)',
+                background: 'color-mix(in srgb, var(--accent) 5%, var(--card))',
+                border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)',
                 transition: 'all 0.12s',
               }}
             >
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'color-mix(in srgb, var(--win) 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <BookOpen size={13} style={{ color: 'var(--win)' }} />
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <BookOpen size={13} style={{ color: 'var(--accent)' }} />
               </div>
               <div>
-                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--win)' }}>Build a Playbook</p>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Build a Playbook</p>
                 <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
                   {selectedMap ? `Create a ${selectedMap} playbook` : 'Create a structured playbook with AI'}
                 </p>
@@ -611,7 +641,7 @@ export default function AIScoutPage() {
                 <SlidersHorizontal size={13} />
                 Settings
               </button>
-              <MessageSquare size={14} style={{ color: 'var(--win)' }} className="hidden md:block" />
+              <span className="hidden md:block"><Scope size={14} /></span>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }} className="hidden md:block">
                 {mode === 'myteam' ? 'My Team' : selectedFolder ? selectedFolder.opponent_display_name : 'AI Coach'}
               </span>
@@ -635,9 +665,9 @@ export default function AIScoutPage() {
             {isEmpty ? (
               /* Empty state */
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', padding: '48px 24px' }}>
-                <div style={{ position: 'relative', width: 64, height: 64, borderRadius: 18, background: 'color-mix(in srgb, var(--win) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20, boxShadow: '0 0 24px color-mix(in srgb, var(--win) 12%, transparent)' }}>
-                  <Brain size={28} style={{ color: 'var(--win)' }} />
-                  <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'color-mix(in srgb, var(--win) 5%, transparent)' }} className="animate-ping opacity-20" />
+                <div style={{ position: 'relative', width: 64, height: 64, borderRadius: 18, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 22%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20, boxShadow: '0 0 32px color-mix(in srgb, var(--signal) 18%, transparent)' }}>
+                  <Scope size={28} />
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'color-mix(in srgb, var(--signal) 5%, transparent)' }} className="animate-ping opacity-20" />
                 </div>
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)', marginBottom: 6 }}>
                   {mode === 'myteam'
@@ -665,7 +695,7 @@ export default function AIScoutPage() {
                       }}
                       onMouseEnter={e => {
                         const b = e.currentTarget as HTMLButtonElement
-                        b.style.borderColor = 'color-mix(in srgb, var(--win) 28%, transparent)'
+                        b.style.borderColor = 'color-mix(in srgb, var(--signal) 35%, transparent)'
                         b.style.color = 'var(--text)'
                       }}
                       onMouseLeave={e => {
@@ -674,7 +704,7 @@ export default function AIScoutPage() {
                         b.style.color = 'var(--muted)'
                       }}
                     >
-                      <Zap size={12} style={{ color: 'var(--win)', flexShrink: 0 }} />
+                      <Zap size={12} style={{ color: 'var(--signal)', flexShrink: 0 }} />
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.label}</span>
                       <ChevronRight size={12} style={{ color: 'var(--faint)', flexShrink: 0 }} />
                     </button>
@@ -688,7 +718,7 @@ export default function AIScoutPage() {
                   </p>
                 )}
                 {mode === 'opponent' && opponents.length === 0 && !loadingOpponents && (
-                  <a href="/opponents" style={{ marginTop: 18, fontSize: 12, color: 'var(--win)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <a href="/opponents" style={{ marginTop: 18, fontSize: 12, color: 'var(--signal)', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <Target size={12} />
                     Upload your first opponent demo →
                   </a>
@@ -707,8 +737,8 @@ export default function AIScoutPage() {
                     <div key={msg.id} style={{ marginBottom: 16 }}>
                       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
                         {msg.role === 'assistant' ? (
-                          <div style={{ width: 32, height: 32, borderRadius: 10, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginBottom: 2 }}>
-                            <Brain size={14} style={{ color: 'var(--win)' }} />
+                          <div style={{ width: 32, height: 32, borderRadius: 10, background: 'color-mix(in srgb, var(--signal) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginBottom: 2 }}>
+                            <Scope size={14} />
                           </div>
                         ) : (
                           <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--elevated)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginBottom: 2 }}>
@@ -718,15 +748,15 @@ export default function AIScoutPage() {
                         <div style={{
                           maxWidth: '78%', borderRadius: 16, padding: '12px 16px',
                           ...(msg.role === 'user'
-                            ? { background: 'color-mix(in srgb, var(--win) 8%, var(--card))', border: '1px solid color-mix(in srgb, var(--win) 18%, transparent)', borderBottomRightRadius: 4 }
-                            : { background: 'var(--card)', border: '1px solid var(--border)', borderBottomLeftRadius: 4 }
+                            ? { background: 'color-mix(in srgb, var(--accent) 10%, var(--card))', border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)', borderBottomRightRadius: 4 }
+                            : { background: 'color-mix(in srgb, var(--signal) 4%, var(--card))', border: '1px solid color-mix(in srgb, var(--signal) 12%, transparent)', borderBottomLeftRadius: 4 }
                           ),
                         }}>
                           {msg.role === 'assistant' ? (
                             <>
                               <MarkdownContent content={msg.content} />
                               {streaming && (
-                                <span style={{ display: 'inline-block', width: 8, height: 16, background: 'var(--win)', marginLeft: 3, borderRadius: 2, verticalAlign: 'middle' }} className="animate-pulse" />
+                                <span style={{ display: 'inline-block', width: 8, height: 16, background: 'var(--signal)', marginLeft: 3, borderRadius: 2, verticalAlign: 'middle' }} className="animate-pulse" />
                               )}
                             </>
                           ) : (
@@ -786,42 +816,29 @@ export default function AIScoutPage() {
                         style={{
                           display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 20,
                           fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                          border: '1px solid color-mix(in srgb, var(--win) 22%, transparent)',
-                          color: 'var(--muted)', background: 'color-mix(in srgb, var(--win) 4%, transparent)',
+                          border: '1px solid color-mix(in srgb, var(--signal) 22%, transparent)',
+                          color: 'var(--muted)', background: 'color-mix(in srgb, var(--signal) 4%, transparent)',
                           transition: 'all 0.12s',
                         }}
                         onMouseEnter={e => {
                           const b = e.currentTarget as HTMLButtonElement
-                          b.style.color = 'var(--win)'
-                          b.style.borderColor = 'color-mix(in srgb, var(--win) 45%, transparent)'
+                          b.style.color = 'var(--signal)'
+                          b.style.borderColor = 'color-mix(in srgb, var(--signal) 45%, transparent)'
                         }}
                         onMouseLeave={e => {
                           const b = e.currentTarget as HTMLButtonElement
                           b.style.color = 'var(--muted)'
-                          b.style.borderColor = 'color-mix(in srgb, var(--win) 22%, transparent)'
+                          b.style.borderColor = 'color-mix(in srgb, var(--signal) 22%, transparent)'
                         }}
                       >
-                        <Sparkles size={9} style={{ color: 'var(--win)', flexShrink: 0 }} />
+                        <Sparkles size={9} style={{ color: 'var(--signal)', flexShrink: 0 }} />
                         {chip.label}
                       </button>
                     ))}
                   </div>
                 )}
 
-                {isThinking && (
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 10, background: 'color-mix(in srgb, var(--win) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Brain size={14} style={{ color: 'var(--win)' }} />
-                    </div>
-                    <div className="rv-panel" style={{ padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', height: 16 }}>
-                        {[0, 1, 2].map(i => (
-                          <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--win)', animationDelay: `${i * 150}ms` }} className="animate-bounce" />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {isThinking && <TypingIndicator />}
 
                 {error && !isLoading && (
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
@@ -856,7 +873,7 @@ export default function AIScoutPage() {
           {/* Input area */}
           <div style={{ borderTop: '1px solid var(--border)', background: 'var(--panel)', padding: '12px 16px', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '8px 10px 8px 14px', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--card)', transition: 'border-color 0.12s' }}
-              onFocusCapture={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'color-mix(in srgb, var(--win) 38%, transparent)'}
+              onFocusCapture={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'color-mix(in srgb, var(--signal) 42%, transparent)'}
               onBlurCapture={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
             >
               <textarea
@@ -884,12 +901,12 @@ export default function AIScoutPage() {
                 disabled={!input.trim() || isLoading}
                 style={{
                   width: 36, height: 36, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: input.trim() && !isLoading ? 'linear-gradient(180deg, var(--win), color-mix(in srgb, var(--win) 75%, #000))' : 'var(--elevated)',
+                  background: input.trim() && !isLoading ? 'linear-gradient(135deg, var(--signal), color-mix(in srgb, var(--signal) 65%, var(--accent)))' : 'var(--elevated)',
                   border: 'none', cursor: input.trim() && !isLoading ? 'pointer' : 'default',
                   transition: 'all 0.12s',
                 }}
               >
-                {isLoading ? <Loader2 size={14} style={{ color: 'var(--muted)' }} className="animate-spin" /> : <Send size={14} style={{ color: input.trim() ? '#0a1a12' : 'var(--faint)' }} />}
+                {isLoading ? <Loader2 size={14} style={{ color: 'var(--muted)' }} className="animate-spin" /> : <Send size={14} style={{ color: input.trim() ? '#050e1a' : 'var(--faint)' }} />}
               </button>
             </div>
             <p style={{ fontSize: 10, color: 'var(--faint)', textAlign: 'center', marginTop: 7 }}>
@@ -903,31 +920,75 @@ export default function AIScoutPage() {
         </div>
 
         {/* ── Insights panel ── */}
-        <div style={{ width: 300, minWidth: 300, borderLeft: '1px solid var(--border)', background: 'var(--panel)', overflowY: 'auto', padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 10 }} className="hidden lg:flex">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Insights</p>
-            {messages.length > 0 && (
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 6px', fontFamily: 'var(--font-mono)' }}>
-                {Math.max(0, messages.filter(m => m.role === 'assistant').length)}
-              </span>
-            )}
-          </div>
-          {[
-            { title: 'Mid-control weakness', text: 'The opponent consistently fails to hold mid on Mirage CT-side, often over-rotating. Exploit with quick mid-pushes or splits.' },
-            { title: 'Eco round force pattern', text: 'Expect aggressive force buys with MP9s and Deagles on eco rounds. They stack A-site or push Underpass to disrupt B executes.' },
-            { title: 'AWP positioning tendency', text: 'Primary AWPer favors Connector and Ticket Booth on Mirage CT-side. Flashing these angles early can neutralize their impact.' },
-          ].map((insight, i) => (
-            <div key={i} style={{ padding: '13px 14px', borderRadius: 13, position: 'relative', overflow: 'hidden', border: '1px solid color-mix(in srgb, var(--signal) 22%, transparent)', background: `radial-gradient(300px 180px at 10% -20%, color-mix(in srgb, var(--signal) 9%, transparent), transparent 60%), var(--card)` }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 28%, transparent)', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.06em', marginBottom: 9 }}>
-                ✦ AI INSIGHT
-              </span>
-              <p style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{insight.title}</p>
-              <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>{insight.text}</p>
-              <button style={{ marginTop: 9, fontSize: 11, color: 'var(--signal)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
-                View full analysis →
-              </button>
+        <div style={{ width: 360, minWidth: 360, borderLeft: '1px solid var(--border)', background: 'var(--panel)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }} className="hidden lg:flex">
+          {/* Panel header */}
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 22%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Sparkles size={12} style={{ color: 'var(--signal)' }} />
             </div>
-          ))}
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Insights</p>
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--signal)', background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 22%, transparent)', borderRadius: 5, padding: '2px 6px', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
+              {messages.filter(m => m.role === 'assistant').length || 3} LIVE
+            </span>
+          </div>
+
+          {/* Insight cards */}
+          <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+            {[
+              { title: 'Mid-control weakness', text: 'The opponent consistently fails to hold mid on Mirage CT-side, often over-rotating. Exploit with quick mid-pushes or splits.', confidence: 94 },
+              { title: 'Eco round force pattern', text: 'Expect aggressive force buys with MP9s and Deagles on eco rounds. They stack A-site or push Underpass to disrupt B executes.', confidence: 87 },
+              { title: 'AWP positioning tendency', text: 'Primary AWPer favors Connector and Ticket Booth on Mirage CT-side. Flashing these angles early can neutralize their impact.', confidence: 81 },
+            ].map((insight, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: '14px', borderRadius: 12, position: 'relative', overflow: 'hidden',
+                  border: '1px solid color-mix(in srgb, var(--signal) 20%, transparent)',
+                  background: `radial-gradient(260px 140px at 0% 0%, color-mix(in srgb, var(--signal) 7%, transparent), transparent 65%), var(--card)`,
+                  transition: 'border-color 0.14s, box-shadow 0.14s',
+                  cursor: 'default',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = 'color-mix(in srgb, var(--signal) 40%, transparent)'
+                  ;(e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px color-mix(in srgb, var(--signal) 10%, transparent)'
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = 'color-mix(in srgb, var(--signal) 20%, transparent)'
+                  ;(e.currentTarget as HTMLDivElement).style.boxShadow = 'none'
+                }}
+              >
+                {/* Badge row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 28%, transparent)', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.07em' }}>
+                    ✦ AI INSIGHT
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--win) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 20%, transparent)', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: 'var(--win)', letterSpacing: '0.07em' }}>
+                    HIGH
+                  </span>
+                </div>
+
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 7, lineHeight: 1.3 }}>{insight.title}</p>
+                <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 12 }}>{insight.text}</p>
+
+                {/* Confidence bar */}
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Confidence</span>
+                  </div>
+                  <ConfidenceBar value={insight.confidence} />
+                </div>
+
+                <button
+                  onClick={() => sendMessage(`Tell me more about: ${insight.title}`)}
+                  style={{ fontSize: 11, color: 'var(--signal)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 4, transition: 'opacity 0.12s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.opacity = '0.7'}
+                  onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}
+                >
+                  View full analysis <ChevronRight size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
       </div>
