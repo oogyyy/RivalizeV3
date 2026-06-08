@@ -8,6 +8,7 @@ import {
   getPublicUrl,
 } from '@/lib/r2'
 import { notifyTeamDemoReady } from '@/lib/notifications'
+import { notifyDiscordDemoCompleted } from '@/lib/discord/notify'
 
 type ParsedDataRow = {
   header?: { map?: string; score_team1?: number; score_team2?: number }
@@ -275,6 +276,15 @@ export async function applyParsedDemo(
     parsedData.header?.map ?? 'unknown',
     demo.opponent_slug ?? 'Unknown',
     demo.demo_type ?? 'opponent',
+  )
+
+  // Post match summary to the team's Discord channel (non-fatal).
+  await notifyDiscordDemoCompleted(
+    demo.team_id,
+    demoId,
+    parsedDataNoFrames as Record<string, unknown>,
+    demo.demo_type ?? 'opponent',
+    demo.opponent_slug ?? undefined,
   )
 
   // Recalculate folder aggregates for opponent demos only (non-fatal).
