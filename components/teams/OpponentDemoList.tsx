@@ -42,11 +42,13 @@ interface Props {
 const statusVariant = (status: string) => {
   if (status === 'completed')  return 'neon'        as const
   if (status === 'processing') return 'processing'  as const
+  if (status === 'queued')     return 'processing'  as const
   return 'destructive' as const
 }
 const statusLabel = (status: string) => {
   if (status === 'completed')  return 'Analyzed'
   if (status === 'processing') return 'Processing'
+  if (status === 'queued')     return 'Queued'
   return 'Failed'
 }
 const normaliseTeamName = (n: string | undefined, fallback: string) => {
@@ -91,17 +93,17 @@ function BulkDeleteModal({
 export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdmin, opponentDisplayName }: Props) {
   const router = useRouter()
 
-  const processingIds = demos.filter(d => d.status === 'processing').map(d => d.id)
-  const hasProcessing = processingIds.length > 0
+  const pendingIds = demos.filter(d => d.status === 'processing' || d.status === 'queued').map(d => d.id)
+  const hasPending = pendingIds.length > 0
 
   useEffect(() => {
-    if (!hasProcessing) return
+    if (!hasPending) return
     const supabase = createClient()
     const channel = supabase
       .channel('opponent-demo-status')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'demos' }, (payload) => {
         const updated = payload.new as { id: string; status: string }
-        if (processingIds.includes(updated.id) && updated.status !== 'processing') {
+        if (pendingIds.includes(updated.id) && updated.status !== 'processing' && updated.status !== 'queued') {
           router.refresh()
         }
       })
@@ -112,7 +114,7 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
       clearInterval(poll)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasProcessing])
+  }, [hasPending])
 
   // null on server/hydration to avoid Date.now() mismatch (React error #418)
   const [now, setNow] = useState<number | null>(null)

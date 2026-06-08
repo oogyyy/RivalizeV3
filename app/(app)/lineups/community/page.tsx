@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Globe, Loader2, ArrowLeft, BookMarked, Filter } from 'lucide-react'
+import { Globe, Loader2, ArrowLeft, BookMarked, Filter, Copy, Check } from 'lucide-react'
 import Link from 'next/link'
 import LineupBoard, { type DrawAction } from '@/components/lineups/LineupBoard'
+
+interface Team { id: string; name: string }
 
 const CS2_MAPS = [
   { value: '', label: 'All' },
@@ -53,6 +55,48 @@ export default function CommunityLineupsPage() {
   const [mapFilter, setMap]     = useState('')
   const [typeFilter, setType]   = useState('')
   const [selected, setSelected] = useState<CommunityLineup | null>(null)
+  const [teams, setTeams]       = useState<Team[]>([])
+  const [copyTeamId, setCopyTeamId] = useState('')
+  const [copying, setCopying]   = useState(false)
+  const [copied, setCopied]     = useState(false)
+  const [copyError, setCopyError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/teams').then(r => r.ok ? r.json() : []).then((ts: Team[]) => {
+      setTeams(ts)
+      if (ts.length > 0) setCopyTeamId(ts[0].id)
+    })
+  }, [])
+
+  async function handleCopy(lineup: CommunityLineup) {
+    if (!copyTeamId) return
+    setCopying(true); setCopyError(null)
+    try {
+      const res = await fetch('/api/lineups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamId: copyTeamId,
+          map: lineup.map,
+          name: `${lineup.name} (from Community)`,
+          type: lineup.type,
+          notes: lineup.notes,
+          canvasData: lineup.canvas_data,
+          mediaType: 'draw',
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error ?? 'Copy failed')
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch (err) {
+      setCopyError(err instanceof Error ? err.message : 'Copy failed')
+    } finally {
+      setCopying(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -190,7 +234,7 @@ export default function CommunityLineupsPage() {
       {selected && (
         <div
           style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-          onClick={() => setSelected(null)}
+          onClick={() => { setSelected(null); setCopied(false); setCopyError(null) }}
         >
           <div
             style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, width: '100%', maxWidth: 640, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}
@@ -205,7 +249,7 @@ export default function CommunityLineupsPage() {
                 </p>
               </div>
               <button
-                onClick={() => setSelected(null)}
+                onClick={() => { setSelected(null); setCopied(false); setCopyError(null) }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 20, lineHeight: 1, padding: 4 }}
               >
                 ×
@@ -223,6 +267,36 @@ export default function CommunityLineupsPage() {
                   onSave={async () => {}}
                 />
               </div>
+
+              {/* Copy to My Team */}
+              {teams.length > 0 && (
+                <div style={{ marginTop: 14, padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'rgba(129,140,248,0.04)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <Copy size={13} style={{ color: '#818cf8', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0 }}>Save to:</span>
+                  <select
+                    value={copyTeamId}
+                    onChange={e => setCopyTeamId(e.target.value)}
+                    style={{ flex: '1 1 120px', minWidth: 0, padding: '5px 10px', fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', outline: 'none' }}
+                  >
+                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                  <button
+                    onClick={() => handleCopy(selected)}
+                    disabled={copying || copied}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+                      borderRadius: 8, fontSize: 12, fontWeight: 600, border: 'none', cursor: copying || copied ? 'default' : 'pointer',
+                      background: copied ? 'rgba(34,197,94,0.15)' : 'var(--accent)',
+                      color: copied ? '#4ade80' : 'white',
+                      opacity: copying ? 0.7 : 1, transition: 'all 0.15s',
+                    }}
+                  >
+                    {copying ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : copied ? <Check size={12} /> : <Copy size={12} />}
+                    {copied ? 'Saved!' : copying ? 'Saving…' : 'Copy to My Lineups'}
+                  </button>
+                  {copyError && <p style={{ width: '100%', fontSize: 11, color: 'var(--loss)', margin: 0 }}>{copyError}</p>}
+                </div>
+              )}
             </div>
           </div>
         </div>
