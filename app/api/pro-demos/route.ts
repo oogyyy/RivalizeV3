@@ -16,13 +16,17 @@ export async function GET(request: Request) {
   const offset = parseInt(searchParams.get('offset') ?? '0', 10)
   const limit = Math.min(50, parseInt(searchParams.get('limit') ?? '20', 10))
 
+  // HuggingFace has no server-side map filter; when a filter is active we
+  // over-fetch (5×) to have enough rows to return a full page after filtering.
+  const fetchLength = mapFilter ? Math.min(limit * 5, 100) : limit
+
   try {
     const params = new URLSearchParams({
       dataset: HF_DATASET,
       config: 'default',
       split: 'train',
       offset: offset.toString(),
-      length: limit.toString(),
+      length: fetchLength.toString(),
     })
 
     const res = await fetch(`${HF_API}?${params}`, {
@@ -51,14 +55,14 @@ export async function GET(request: Request) {
       demo_url?: string
     }
 
-    // Filter and shape the rows
-    let rows = (data.rows ?? []).map(r => r.row as HFRow)
+    let rows = (data.rows ?? []).map((r, i) => ({ idx: offset + i, row: r.row as HFRow }))
     if (mapFilter) {
-      rows = rows.filter(r => r.map?.toLowerCase().includes(mapFilter.toLowerCase()))
+      rows = rows.filter(r => r.row.map?.toLowerCase().includes(mapFilter.toLowerCase()))
+      rows = rows.slice(0, limit)
     }
 
-    const matches = rows.map(r => ({
-      id: r.match_id ?? String(Math.random()),
+    const matches = rows.map(({ idx, row: r }) => ({
+      id: r.match_id ?? `hf-${idx}`,
       team1: r.team1 ?? 'Team A',
       team2: r.team2 ?? 'Team B',
       map: r.map ?? 'unknown',
