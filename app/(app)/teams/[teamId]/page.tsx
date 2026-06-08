@@ -17,7 +17,7 @@ import InviteCodeSection from './InviteCodeSection'
 import InviteFriendsDialog from './InviteFriendsDialog'
 import {
   Users, Upload, Brain, Trophy, Crosshair, ArrowLeft,
-  Crown, Shield, User, BarChart3, Target, MapPin,
+  Crown, Shield, User, BarChart3, Target, MapPin, Zap, Swords,
 } from 'lucide-react'
 import type { PlayerStats, AggregatedStats } from '@/types/database'
 
@@ -257,6 +257,57 @@ export default async function TeamPage({
                 </Card>
               ))}
             </div>
+
+            {/* Threat intel row — opponent averages from team_stats_cache */}
+            {totalMatches > 0 && (statsCache?.avg_rating ?? 0) > 0 && (
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2 pt-4 px-5">
+                  <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Swords size={12} className="text-red-400" />
+                    Opponent Threat Index
+                    <span className="ml-1 text-[10px] font-normal normal-case tracking-normal text-muted-foreground/60">avg across all scouted matches</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-5 pb-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {[
+                      {
+                        label: 'Avg Rating',
+                        value: (statsCache?.avg_rating ?? 0).toFixed(2),
+                        color: (statsCache?.avg_rating ?? 0) >= 1.15 ? 'text-red-400' : (statsCache?.avg_rating ?? 0) >= 1.0 ? 'text-yellow-400' : 'text-green-400',
+                        icon: Target,
+                      },
+                      {
+                        label: 'Avg ADR',
+                        value: (statsCache?.avg_adr ?? 0).toFixed(0),
+                        color: (statsCache?.avg_adr ?? 0) >= 85 ? 'text-red-400' : (statsCache?.avg_adr ?? 0) >= 70 ? 'text-yellow-400' : 'text-green-400',
+                        icon: BarChart3,
+                      },
+                      {
+                        label: 'Entry Rate',
+                        value: (statsCache?.entry_rate ?? 0) > 0 ? `${((statsCache?.entry_rate ?? 0) * 100).toFixed(1)}%` : '—',
+                        color: (statsCache?.entry_rate ?? 0) >= 0.15 ? 'text-red-400' : (statsCache?.entry_rate ?? 0) >= 0.1 ? 'text-yellow-400' : 'text-green-400',
+                        icon: Zap,
+                      },
+                      {
+                        label: 'Clutch Rate',
+                        value: (statsCache?.clutch_rate ?? 0) > 0 ? `${((statsCache?.clutch_rate ?? 0) * 100).toFixed(1)}%` : '—',
+                        color: (statsCache?.clutch_rate ?? 0) >= 0.35 ? 'text-red-400' : (statsCache?.clutch_rate ?? 0) >= 0.25 ? 'text-yellow-400' : 'text-green-400',
+                        icon: Trophy,
+                      },
+                    ].map(({ label, value, color, icon: Icon }) => (
+                      <div key={label} className="flex items-center gap-3 p-3 rounded-lg bg-accent/20">
+                        <Icon size={14} className="text-muted-foreground shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-muted-foreground">{label}</p>
+                          <p className={`text-lg font-bold font-mono leading-tight ${color}`}>{value}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {/* Top Players leaderboard */}

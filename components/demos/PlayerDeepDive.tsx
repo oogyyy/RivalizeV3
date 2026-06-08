@@ -6,7 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from 'recharts'
-import { Crosshair, TrendingUp, Target, Skull } from 'lucide-react'
+import { Crosshair, TrendingUp, Target, Skull, Zap, Trophy, ArrowLeftRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PlayerStats, Kill } from '@/types/database'
 
@@ -48,6 +48,12 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
     const n = demoEntries.length
     const sum = (fn: (s: PlayerStats) => number) => demoEntries.reduce((acc, e) => acc + fn(e.stats), 0)
     const avg = (fn: (s: PlayerStats) => number) => n > 0 ? sum(fn) / n : 0
+    const entryKills     = sum(s => s.entry_kills     ?? 0)
+    const clutchWins     = sum(s => s.clutch_wins     ?? 0)
+    const clutchAttempts = sum(s => s.clutch_attempts ?? 0)
+    const tradeKills     = sum(s => s.trade_kills     ?? 0)
+    const flashEff       = sum(s => s.flashes_effective ?? 0)
+    const flashThrown    = sum(s => s.flashes_thrown    ?? 0)
     return {
       games: n,
       kills: sum(s => s.kills),
@@ -60,6 +66,15 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
       avgKast: avg(s => s.kast),
       avgHs: avg(s => s.headshot_percentage),
       kd: sum(s => s.deaths) > 0 ? sum(s => s.kills) / sum(s => s.deaths) : 0,
+      entryKills,
+      clutchWins,
+      clutchAttempts,
+      clutchRate: clutchAttempts > 0 ? clutchWins / clutchAttempts : null,
+      tradeKills,
+      flashEff,
+      flashThrown,
+      flashRate: flashThrown > 0 ? flashEff / flashThrown : null,
+      hasPhase2Stats: entryKills > 0 || clutchAttempts > 0 || tradeKills > 0 || flashThrown > 0,
     }
   }, [demoEntries])
 
@@ -124,6 +139,60 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
         <StatPill label="Avg HS%" value={`${totals.avgHs.toFixed(0)}%`} />
         <StatPill label="Avg KAST" value={`${totals.avgKast.toFixed(0)}%`} />
       </div>
+
+      {/* Phase 2 advanced stats — only shown when data exists */}
+      {totals.hasPhase2Stats && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Zap size={12} />
+            Advanced Stats
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {totals.entryKills > 0 && (
+              <div className="text-center p-3 rounded-lg" style={{ background: 'color-mix(in srgb, #f97316 8%, transparent)' }}>
+                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#f97316' }}>
+                  <Zap size={9} className="inline mr-0.5" />Entry Kills
+                </p>
+                <p className="text-xl font-bold font-mono" style={{ color: '#f97316' }}>{totals.entryKills}</p>
+              </div>
+            )}
+            {totals.clutchAttempts > 0 && (
+              <div className="text-center p-3 rounded-lg" style={{ background: 'color-mix(in srgb, #a855f7 8%, transparent)' }}>
+                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#a855f7' }}>
+                  <Trophy size={9} className="inline mr-0.5" />Clutch Rate
+                </p>
+                <p className="text-xl font-bold font-mono" style={{ color: '#a855f7' }}>
+                  {totals.clutchRate !== null ? `${(totals.clutchRate * 100).toFixed(0)}%` : '—'}
+                </p>
+                <p className="text-[9px] mt-0.5" style={{ color: 'color-mix(in srgb, #a855f7 60%, transparent)' }}>
+                  {totals.clutchWins}/{totals.clutchAttempts}
+                </p>
+              </div>
+            )}
+            {totals.tradeKills > 0 && (
+              <div className="text-center p-3 rounded-lg" style={{ background: 'color-mix(in srgb, #3b82f6 8%, transparent)' }}>
+                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#3b82f6' }}>
+                  <ArrowLeftRight size={9} className="inline mr-0.5" />Trade Kills
+                </p>
+                <p className="text-xl font-bold font-mono" style={{ color: '#3b82f6' }}>{totals.tradeKills}</p>
+              </div>
+            )}
+            {totals.flashRate !== null && (
+              <div className="text-center p-3 rounded-lg" style={{ background: 'color-mix(in srgb, #22d3ee 8%, transparent)' }}>
+                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#22d3ee' }}>
+                  Flash Eff.
+                </p>
+                <p className="text-xl font-bold font-mono" style={{ color: '#22d3ee' }}>
+                  {`${(totals.flashRate * 100).toFixed(0)}%`}
+                </p>
+                <p className="text-[9px] mt-0.5" style={{ color: 'color-mix(in srgb, #22d3ee 60%, transparent)' }}>
+                  {totals.flashEff}/{totals.flashThrown ?? 0}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Rating trend */}
       {trendData.length > 1 && (

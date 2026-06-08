@@ -140,6 +140,14 @@ export default async function OpponentPage({
           ex.assists += p.assists
           ex.adr    = (ex.adr    * ex.count + p.adr)    / (ex.count + 1)
           ex.rating = (ex.rating * ex.count + p.rating) / (ex.count + 1)
+          ex.entry_kills       = (ex.entry_kills       ?? 0) + (p.entry_kills       ?? 0)
+          ex.entry_deaths      = (ex.entry_deaths      ?? 0) + (p.entry_deaths      ?? 0)
+          ex.trade_kills       = (ex.trade_kills       ?? 0) + (p.trade_kills       ?? 0)
+          ex.traded_deaths     = (ex.traded_deaths     ?? 0) + (p.traded_deaths     ?? 0)
+          ex.clutch_attempts   = (ex.clutch_attempts   ?? 0) + (p.clutch_attempts   ?? 0)
+          ex.clutch_wins       = (ex.clutch_wins       ?? 0) + (p.clutch_wins       ?? 0)
+          ex.flashes_thrown    = (ex.flashes_thrown    ?? 0) + (p.flashes_thrown    ?? 0)
+          ex.flashes_effective = (ex.flashes_effective ?? 0) + (p.flashes_effective ?? 0)
           ex.count++
         }
       }
@@ -393,6 +401,25 @@ export default async function OpponentPage({
                             <span className={`text-[9px] font-bold px-1 py-0.5 rounded shrink-0 ${ri.color} ${ri.bg}`}>{ri.label}</span>
                           </div>
                           <p className="text-[10px] text-muted-foreground">{player.kills}K {player.deaths}D · {player.adr.toFixed(0)} ADR</p>
+                          {((player.entry_kills ?? 0) > 0 || (player.clutch_wins ?? 0) > 0 || (player.trade_kills ?? 0) > 0) && (
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              {(player.entry_kills ?? 0) > 0 && (
+                                <span className="text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: 'color-mix(in srgb, #f97316 12%, transparent)', color: '#f97316' }}>
+                                  {player.entry_kills}E
+                                </span>
+                              )}
+                              {(player.clutch_wins ?? 0) > 0 && (
+                                <span className="text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: 'color-mix(in srgb, #a855f7 12%, transparent)', color: '#a855f7' }}>
+                                  {player.clutch_wins}/{player.clutch_attempts}C
+                                </span>
+                              )}
+                              {(player.trade_kills ?? 0) > 0 && (
+                                <span className="text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: 'color-mix(in srgb, #3b82f6 12%, transparent)', color: '#3b82f6' }}>
+                                  {player.trade_kills}T
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="text-right shrink-0">
                           <span className={`text-xs font-bold font-mono ${player.rating >= 1.2 ? 'text-red-400' : player.rating >= 1.0 ? 'text-yellow-400' : 'text-foreground'}`}>
