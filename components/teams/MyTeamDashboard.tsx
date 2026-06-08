@@ -1,13 +1,17 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Shield, ChevronUp, ChevronDown, Check, Sliders, Send, Download, Upload, Plus, Trash2,
-  TrendingUp, Brain, AlertCircle, Zap, BarChart3, Target, BookOpen, Layers, Film, ChevronRight
+  TrendingUp, Brain, AlertCircle, Zap, BarChart3, Target, BookOpen, Layers, Film, ChevronRight,
+  Loader2, X, UserPlus,
 } from 'lucide-react'
 import type { DemoRowData } from './DemoListMultiSelect'
 import MapFolderList, { type MapGroup } from './MapFolderList'
+import DemoUploadButton from './DemoUploadButton'
+import FaceitImportButton from './FaceitImportButton'
 
 interface TeamOption {
   id: string
@@ -192,8 +196,97 @@ export default function MyTeamDashboard({
   canDelete,
   myFaceitId,
 }: MyTeamDashboardProps) {
+  const router = useRouter()
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
   const [sideOverrides, setSideOverrides] = useState<Record<string, 'team1' | 'team2'>>({})
+
+  // Modal state
+  const [modal, setModal] = useState<'edit' | 'invite' | 'delete' | null>(null)
+  // Edit name
+  const [editName, setEditName] = useState(teamName)
+  const [editNameSaving, setEditNameSaving] = useState(false)
+  const [editNameError, setEditNameError] = useState<string | null>(null)
+  // Delete
+  const [deleteSaving, setDeleteSaving] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Invite friends
+  type FriendEntry = { id: string; profile: { id: string; username: string; display_name: string | null } }
+  const [friends, setFriends] = useState<FriendEntry[]>([])
+  const [friendsLoading, setFriendsLoading] = useState(false)
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set())
+  const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({})
+
+  function openInviteModal() {
+    setModal('invite')
+    setFriendsLoading(true)
+    fetch('/api/friends')
+      .then(r => r.ok ? r.json() : Promise.resolve({ friends: [] }))
+      .then(data => setFriends(data.friends ?? []))
+      .catch(() => {})
+      .finally(() => setFriendsLoading(false))
+  }
+
+  async function handleSaveName() {
+    if (!editName.trim()) return
+    setEditNameSaving(true); setEditNameError(null)
+    try {
+      const res = await fetch(`/api/teams/${selectedTeamId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName.trim() }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error ?? `Error ${res.status}`)
+      }
+      setModal(null)
+      router.refresh()
+    } catch (err) {
+      setEditNameError(err instanceof Error ? err.message : 'Failed to save')
+    } finally {
+      setEditNameSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    setDeleteSaving(true); setDeleteError(null)
+    try {
+      const res = await fetch(`/api/teams/${selectedTeamId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error ?? `Error ${res.status}`)
+      }
+      setModal(null)
+      router.push('/my-team')
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete')
+    } finally {
+      setDeleteSaving(false)
+    }
+  }
+
+  async function handleInvite(friendUserId: string) {
+    setInviteErrors(prev => { const n = { ...prev }; delete n[friendUserId]; return n })
+    try {
+      const res = await fetch(`/api/teams/${selectedTeamId}/invitations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inviteeId: friendUserId }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error ?? `Error ${res.status}`)
+      }
+      setInvitedIds(prev => new Set([...prev, friendUserId]))
+    } catch (err) {
+      setInviteErrors(prev => ({ ...prev, [friendUserId]: err instanceof Error ? err.message : 'Failed' }))
+    }
+  }
+
+  // Reset edit name when modal opens
+  useEffect(() => {
+    if (modal === 'edit') setEditName(teamName)
+  }, [modal, teamName])
 
   const effectiveDemos = useMemo(() => {
     if (Object.keys(sideOverrides).length === 0) return demos
@@ -301,42 +394,28 @@ export default function MyTeamDashboard({
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {canEdit && (
-            <Link href={`/my-team?edit=name&team=${selectedTeamId}`}>
-              <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                <Sliders size={14} /> Edit Name
-              </button>
-            </Link>
+            <button onClick={() => setModal('edit')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              <Sliders size={14} /> Edit Name
+            </button>
           )}
           {canInvite && (
-            <Link href={`/my-team?invite=true&team=${selectedTeamId}`}>
-              <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                <Send size={14} /> Invite Friends
-              </button>
-            </Link>
+            <button onClick={openInviteModal} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              <Send size={14} /> Invite Friends
+            </button>
           )}
           {myFaceitId && (
-            <Link href={`/my-team?faceit=true&team=${selectedTeamId}`}>
-              <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                <Download size={14} /> Import from FACEIT
-              </button>
-            </Link>
+            <FaceitImportButton teamId={selectedTeamId} faceitNickname={myFaceitId} />
           )}
-          <Link href={`/my-team?upload=demo&team=${selectedTeamId}`}>
-            <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-              <Upload size={14} /> Upload Demo
-            </button>
-          </Link>
+          <DemoUploadButton teamId={selectedTeamId} demoType="self" label="Upload Demo" />
           <Link href="/teams">
             <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--accent)', color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, border: 'none' }}>
               <Plus size={14} /> Create Team
             </button>
           </Link>
           {canDelete && (
-            <Link href={`/my-team?delete=true&team=${selectedTeamId}`}>
-              <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--loss)', color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, border: 'none' }}>
-                <Trash2 size={14} /> Delete Team
-              </button>
-            </Link>
+            <button onClick={() => setModal('delete')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--loss)', color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, border: 'none' }}>
+              <Trash2 size={14} /> Delete Team
+            </button>
           )}
         </div>
       </div>
@@ -352,24 +431,14 @@ export default function MyTeamDashboard({
             Once you upload a self demo, Rivalize will analyse every round — win rates, ratings, map splits, T/CT performance, and player deep-dives.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <Link href={`/my-team?upload=demo&team=${selectedTeamId}`}>
-              <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 9, background: 'var(--accent)', color: 'white', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-                <Upload size={14} /> Upload Demo
-              </button>
-            </Link>
+            <DemoUploadButton teamId={selectedTeamId} demoType="self" label="Upload Demo" />
             {myFaceitId && (
-              <Link href={`/my-team?faceit=true&team=${selectedTeamId}`}>
-                <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 9, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                  <Download size={14} /> Import from FACEIT
-                </button>
-              </Link>
+              <FaceitImportButton teamId={selectedTeamId} faceitNickname={myFaceitId} />
             )}
             {canInvite && (
-              <Link href={`/my-team?invite=true&team=${selectedTeamId}`}>
-                <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 9, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                  <Send size={14} /> Invite Teammates
-                </button>
-              </Link>
+              <button onClick={openInviteModal} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 9, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                <Send size={14} /> Invite Teammates
+              </button>
             )}
           </div>
           <div style={{ display: 'flex', gap: 24, justifyContent: 'center', marginTop: 28, flexWrap: 'wrap' }}>
@@ -618,6 +687,144 @@ export default function MyTeamDashboard({
         </div>
         <MapFolderList mapGroups={mapGroups} onSideChange={handleSideChange} />
       </div>}
+
+      {/* ── Edit Name modal ─────────────────────────────────────────────────── */}
+      {modal === 'edit' && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={() => setModal(null)}
+        >
+          <div
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, width: 400, maxWidth: 'calc(100vw - 32px)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Edit Team Name</p>
+              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <input
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !editNameSaving && handleSaveName()}
+              placeholder="Team name"
+              autoFocus
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--input, var(--card-2))', color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            />
+            {editNameError && <p style={{ color: 'var(--loss)', fontSize: 12, marginTop: 6 }}>{editNameError}</p>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button onClick={() => setModal(null)} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveName}
+                disabled={editNameSaving || !editName.trim()}
+                style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: 'white', fontSize: 13, fontWeight: 600, cursor: editNameSaving ? 'not-allowed' : 'pointer', border: 'none', display: 'flex', alignItems: 'center', gap: 6, opacity: editNameSaving || !editName.trim() ? 0.65 : 1 }}
+              >
+                {editNameSaving && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Invite Friends modal ─────────────────────────────────────────────── */}
+      {modal === 'invite' && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={() => setModal(null)}
+        >
+          <div
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, width: 440, maxWidth: 'calc(100vw - 32px)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Invite Friends</p>
+              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {friendsLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 0', gap: 8, color: 'var(--muted)', fontSize: 13 }}>
+                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading friends…
+                </div>
+              ) : friends.length === 0 ? (
+                <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--muted)', padding: '32px 0' }}>
+                  No friends yet. Add friends on the{' '}
+                  <Link href="/social" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Social</Link>
+                  {' '}page first.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {friends.map(f => {
+                    const isInvited = invitedIds.has(f.profile.id)
+                    const errMsg = inviteErrors[f.profile.id]
+                    return (
+                      <div key={f.profile.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card-2, rgba(255,255,255,0.03))' }}>
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>
+                            {f.profile.display_name || f.profile.username}
+                          </p>
+                          {errMsg && <p style={{ fontSize: 11, color: 'var(--loss)', margin: '2px 0 0' }}>{errMsg}</p>}
+                        </div>
+                        <button
+                          onClick={() => !isInvited && handleInvite(f.profile.id)}
+                          disabled={isInvited}
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 7, background: isInvited ? 'rgba(99,102,241,0.12)' : 'var(--accent)', color: isInvited ? 'var(--accent)' : 'white', fontSize: 12, fontWeight: 600, border: 'none', cursor: isInvited ? 'default' : 'pointer', opacity: isInvited ? 0.8 : 1 }}
+                        >
+                          {isInvited ? <Check size={12} /> : <UserPlus size={12} />}
+                          {isInvited ? 'Invited' : 'Invite'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Team modal ────────────────────────────────────────────────── */}
+      {modal === 'delete' && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={() => !deleteSaving && setModal(null)}
+        >
+          <div
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, width: 400, maxWidth: 'calc(100vw - 32px)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Delete Team</p>
+              <button onClick={() => setModal(null)} disabled={deleteSaving} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 20 }}>
+              Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>{teamName}</strong>?
+              All demos, stats, and lineups for this team will be permanently removed. This cannot be undone.
+            </p>
+            {deleteError && <p style={{ color: 'var(--loss)', fontSize: 12, marginBottom: 12 }}>{deleteError}</p>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setModal(null)} disabled={deleteSaving} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteSaving}
+                style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--loss)', color: 'white', fontSize: 13, fontWeight: 600, cursor: deleteSaving ? 'not-allowed' : 'pointer', border: 'none', display: 'flex', alignItems: 'center', gap: 6, opacity: deleteSaving ? 0.7 : 1 }}
+              >
+                {deleteSaving && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
+                Delete Team
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
