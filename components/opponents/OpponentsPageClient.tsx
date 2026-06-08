@@ -108,6 +108,7 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
           <DemoUploadButton
             teamId={primaryTeamId}
             demoType="opponent"
+            label="Add Opponent"
           />
         )}
       </div>
@@ -161,7 +162,7 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
           <p style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 280, marginBottom: 20 }}>
             {search ? 'Try a different search term' : 'Upload an opponent demo to start building your scouting library'}
           </p>
-          {!search && primaryTeamId && <DemoUploadButton teamId={primaryTeamId} demoType="opponent" />}
+          {!search && primaryTeamId && <DemoUploadButton teamId={primaryTeamId} demoType="opponent" label="Add Opponent" />}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>

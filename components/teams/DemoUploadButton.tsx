@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import {
-  Upload, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info, RefreshCw,
+  Upload, Plus, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info, RefreshCw,
 } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
@@ -17,6 +17,8 @@ interface DemoUploadButtonProps {
   teamId: string
   /** 'opponent' (default) → Opponents / scouting. 'self' → My Team analysis. */
   demoType?: 'opponent' | 'self'
+  /** Override the trigger button label. Defaults to 'Upload Demo'. */
+  label?: string
   onSuccess?: () => void
 }
 
@@ -149,7 +151,7 @@ async function uploadViaServer(
   return completeRes.json()
 }
 
-export default function DemoUploadButton({ teamId, demoType = 'opponent', onSuccess }: DemoUploadButtonProps) {
+export default function DemoUploadButton({ teamId, demoType = 'opponent', label, onSuccess }: DemoUploadButtonProps) {
   const router = useRouter()
   const [open, setOpen]               = useState(false)
   const [uploads, setUploads]         = useState<FileUpload[]>([])
@@ -291,10 +293,12 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', onSucc
   // ── Render ────────────────────────────────────────────────────────────────────
 
   if (!open) {
+    const triggerLabel = label ?? 'Upload Demo'
+    const TriggerIcon = label ? Plus : Upload
     return (
       <Button variant="neon" onClick={() => setOpen(true)} className="gap-2">
-        <Upload size={16} />
-        Upload Demo
+        <TriggerIcon size={15} />
+        {triggerLabel}
       </Button>
     )
   }
