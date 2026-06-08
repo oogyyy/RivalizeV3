@@ -1,13 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BookOpen, Plus, Trash2, Loader2, Map, Target, Swords } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CS2_MAPS } from '@/types/database'
 import { cn } from '@/lib/utils'
-import { Suspense } from 'react'
 import { MAP_THUMBS } from '@/lib/map-config'
 
 type PlaybookMeta = {
@@ -204,7 +203,7 @@ function PlaybookListInner() {
             </label>
             {opponents.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">
-                No opponents yet — <a href="/opponents" className="text-[#00ffc8] hover:underline">upload demos first</a> to enable anti-strat playbooks.
+                No opponents yet — <Link href="/opponents" className="text-[#00ffc8] hover:underline">upload demos first</Link> to enable anti-strat playbooks.
               </p>
             ) : (
               <select

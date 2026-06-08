@@ -148,7 +148,7 @@ function TeamEmblem({ name, icon: Icon, color, size = 52 }: {
 }
 
 function MapTile({
-  map, mapState, score, isSuggested, isLocked, onSelect, currentAction, thumbUrl,
+  map, mapState, score, isSuggested, isLocked, onSelect, thumbUrl,
 }: {
   map: string
   mapState: MapState
@@ -156,7 +156,7 @@ function MapTile({
   isSuggested: boolean
   isLocked: boolean
   onSelect: () => void
-  currentAction: 'ban' | 'pick' | 'decider' | null
+  currentAction?: 'ban' | 'pick' | 'decider' | null
   thumbUrl?: string
 }) {
   const label = MAP_LABELS[map] ?? map
@@ -180,6 +180,7 @@ function MapTile({
     >
       {/* Map thumbnail background */}
       {thumbUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={thumbUrl}
           alt=""
@@ -253,8 +254,8 @@ function MapTile({
   )
 }
 
-function SequenceDot({ step, action, done, active, mapLabel }: {
-  step: VetoStep; action: MapState | 'decider'; done: boolean; active: boolean; mapLabel: string | null
+function SequenceDot({ step, done, active, mapLabel }: {
+  step: VetoStep; action?: MapState | 'decider'; done: boolean; active: boolean; mapLabel: string | null
 }) {
   const ring = done && step.action === 'ban'
     ? '#FF6B7A'
@@ -321,7 +322,9 @@ export default function VetoClient({ teams, selfMapStatsByTeam, opponents, activ
   const hasData = teams.length > 0
 
   const opponent = opponents.find(o => o.id === selectedOpponentId) ?? null
-  const oppPicks = opponent?.mapPicks ?? {}
+
+  // Memoised so oppPicks reference doesn't change on every render
+  const oppPicks = useMemo(() => opponent?.mapPicks ?? {}, [opponent])
   const maxOppPicks = Math.max(1, ...Object.values(oppPicks).concat([1]))
 
   const sequence = VETO_SEQUENCES[format]

@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     return cors(NextResponse.json({ error: parsed.error.flatten() }, { status: 400 }))
   }
 
-  const { match_id, destination, player_faction, team_id, opponent_name } = parsed.data
+  const { match_id, destination, player_faction: _player_faction, team_id, opponent_name } = parsed.data
   const admin = createAdminClient()
 
   // Resolve the target team ID

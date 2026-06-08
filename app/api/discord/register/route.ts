@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 
 // Called once (manually or via admin) to register slash commands with Discord.
 // Requires DISCORD_APPLICATION_ID and DISCORD_BOT_TOKEN env vars.

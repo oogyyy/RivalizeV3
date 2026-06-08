@@ -338,7 +338,7 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
               )}
               {winRate < 0.4 && winRate > 0 && (
                 <div className="flex gap-2"><span className="text-neon-green shrink-0">›</span>
-                  <span>Beatable opponent ({fmtPct(winRate)} win rate on file) — stay disciplined and don't give away easy rounds through over-aggression.</span>
+                  <span>Beatable opponent ({fmtPct(winRate)} win rate on file) — stay disciplined and don&apos;t give away easy rounds through over-aggression.</span>
                 </div>
               )}
               {sortedMaps[0] && (

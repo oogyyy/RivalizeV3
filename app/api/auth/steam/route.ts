@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 
 // Derives the public base URL from the request.
 // APP_URL (server-side only, read at runtime) takes priority over

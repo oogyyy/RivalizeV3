@@ -53,12 +53,6 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const admin = createAdminClient()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
   const { data: memberships } = await admin
     .from('team_members')
     .select('role, team_id')

@@ -5,7 +5,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import OpponentsPageClient from '@/components/opponents/OpponentsPageClient'
-import type { AggregatedStats } from '@/types/database'
 
 export default async function OpponentsPage() {
   const user = await getCurrentUser()

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, type ChangeEvent, type KeyboardEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   ArrowLeft, Search, Download, CheckCircle2, AlertCircle,
@@ -45,8 +44,6 @@ export default function FaceitImportClient({
   teams: Team[]
   defaultTeamId: string | null
 }) {
-  const router = useRouter()
-
   const [selectedTeamId, setSelectedTeamId] = useState(defaultTeamId ?? '')
   const [nickname, setNickname] = useState('')
   const [lookupLoading, setLookupLoading] = useState(false)
@@ -217,6 +214,7 @@ export default function FaceitImportClient({
         {player && (
           <div className="flex items-center gap-3 p-4 rounded-lg bg-card border border-border">
             {player.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={player.avatar} alt={player.nickname} className="w-12 h-12 rounded-full object-cover" />
             ) : (
               <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center">

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { testWebhook } from '@/lib/discord/notify'
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
   const webhookIdToken = webhookUrl.replace('https://discord.com/api/webhooks/', '')
   const [webhookId, webhookToken] = webhookIdToken.split('/')
   let guildId: string | null = null
-  let guildName: string | null = null
+  const guildName: string | null = null
   let channelId: string | null = null
 
   try {

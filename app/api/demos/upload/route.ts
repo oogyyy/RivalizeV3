@@ -1,6 +1,6 @@
 export const maxDuration = 300
 
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
@@ -202,7 +202,7 @@ async function handleComplete(
   const uploadId   = q.get('uploadId')
   const key        = q.get('key')
   const teamId     = q.get('teamId')
-  const filename   = q.get('filename') ?? ''
+  const _filename  = q.get('filename') ?? ''
   const opponentName = q.get('opponentName') ?? 'Unknown'
   const demoType   = (q.get('demoType') ?? 'opponent') as 'opponent' | 'self'
   const fileSize   = parseInt(q.get('fileSize') ?? '0', 10)

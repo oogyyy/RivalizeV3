@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserPlus, UserCheck, Clock, UserMinus, Loader2, Check, X } from 'lucide-react'
+import { UserPlus, Clock, UserMinus, Loader2, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface Props {
