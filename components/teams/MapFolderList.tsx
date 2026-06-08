@@ -34,15 +34,15 @@ function RecordBadge({ wins, losses, draws }: { wins: number; losses: number; dr
   if (total === 0) return null
   const wr = Math.round((wins / total) * 100)
   return (
-    <span className="flex items-center gap-1.5 text-xs font-mono">
-      <span className="text-neon-green">{wins}W</span>
-      <span className="text-muted-foreground">–</span>
-      <span className="text-red-400">{losses}L</span>
+    <span className="flex items-center gap-1 text-xs font-mono text-muted-foreground">
+      <span className="text-foreground font-semibold">{wins}W</span>
+      <span>-</span>
+      <span className="text-foreground font-semibold">{losses}L</span>
       {draws > 0 && <>
-        <span className="text-muted-foreground">–</span>
-        <span className="text-yellow-400">{draws}D</span>
+        <span>-</span>
+        <span className="text-foreground font-semibold">{draws}D</span>
       </>}
-      <span className="text-muted-foreground text-[10px]">({wr}%)</span>
+      <span className="ml-1">({wr}%)</span>
     </span>
   )
 }
@@ -79,24 +79,20 @@ export default function MapFolderList({ mapGroups, onSideChange, demoHrefPrefix 
             key={group.map}
             className={cn(
               'border border-border rounded-xl overflow-hidden transition-all',
-              isOpen ? 'bg-card' : 'bg-card/60',
+              isOpen ? 'bg-card' : 'bg-card/70',
               isEmpty && 'opacity-60',
             )}
           >
             {/* ── Folder header ── */}
             <button
               onClick={() => toggle(group.map)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors text-left"
+              className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-white/[0.03] transition-colors text-left"
             >
               {/* Map thumbnail */}
-              <div className="w-14 h-10 rounded-md overflow-hidden shrink-0 bg-accent border border-border relative">
+              <div className="w-16 h-11 rounded-lg overflow-hidden shrink-0 border border-border/60 relative bg-muted/40">
                 {thumb ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={thumb}
-                    alt={group.map}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={thumb} alt={group.map} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <MapPin size={14} className="text-muted-foreground" />
@@ -106,26 +102,23 @@ export default function MapFolderList({ mapGroups, onSideChange, demoHrefPrefix 
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
                   <span className="font-semibold text-sm text-foreground">{name}</span>
-                  <span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded font-mono">
-                    {group.demos.length} demo{group.demos.length !== 1 ? 's' : ''}
-                  </span>
                   {pending > 0 && (
                     <span className="text-[10px] text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 px-1.5 py-0.5 rounded font-mono">
                       {pending} parsing
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <div className="mt-0.5">
                   {isEmpty ? (
                     <span className="text-[11px] text-muted-foreground">No demos yet</span>
                   ) : total > 0 ? (
                     <>
                       <RecordBadge wins={group.wins} losses={group.losses} draws={group.draws} />
-                      <span className="text-[10px] text-muted-foreground">
-                        · Last played {formatDate(group.lastActivity)}
-                      </span>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Last played {formatDate(group.lastActivity)}
+                      </p>
                     </>
                   ) : (
                     <span className="text-[11px] text-muted-foreground">No results yet</span>
@@ -133,10 +126,15 @@ export default function MapFolderList({ mapGroups, onSideChange, demoHrefPrefix 
                 </div>
               </div>
 
-              {/* Chevron */}
-              {isOpen
-                ? <ChevronDown size={14} className="text-muted-foreground shrink-0" />
-                : <ChevronRight size={14} className="text-muted-foreground shrink-0" />}
+              {/* Demo count + chevron */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-semibold" style={{ color: 'var(--signal)' }}>
+                  {group.demos.length}&nbsp;demo{group.demos.length !== 1 ? 's' : ''}
+                </span>
+                {isOpen
+                  ? <ChevronDown size={14} className="text-muted-foreground" />
+                  : <ChevronRight size={14} className="text-muted-foreground" />}
+              </div>
             </button>
 
             {/* ── Expanded content ── */}
