@@ -4,28 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import OpponentCardWithDelete from '@/components/teams/OpponentCardWithDelete'
-import { Target, Brain, Upload, Zap, Trophy } from 'lucide-react'
+import OpponentsPageClient from '@/components/opponents/OpponentsPageClient'
 import type { AggregatedStats } from '@/types/database'
-
-function TeamAvatar({ name, color = 'var(--accent)', size = 42 }: { name: string; color?: string; size?: number }) {
-  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: `linear-gradient(135deg, color-mix(in srgb, ${color} 80%, #000), color-mix(in srgb, ${color} 40%, #0c0f1a))`,
-      border: `1.5px solid color-mix(in srgb, ${color} 55%, transparent)`,
-      fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: size * 0.34, color: '#fff'
-    }}>
-      {initials}
-    </div>
-  )
-}
 
 export default async function OpponentsPage() {
   const user = await getCurrentUser()
@@ -99,117 +79,11 @@ export default async function OpponentsPage() {
     demosBySlug[d.opponent_slug].push(d)
   }
 
-  const totalOpponents = (folders ?? []).length
-  const totalDemos     = (allDemos ?? []).length
-  const analyzedDemos  = ((allDemos ?? []) as DemoRow[]).filter(d => d.status === 'completed').length
-
   return (
-    <div className="p-5 md:p-7 space-y-6 max-w-7xl mx-auto">
-
-      {/* ── Header ── */}
-      <div className="animate-fade-in-up flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 8 }}>Scouting</p>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Opponents</h1>
-          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>Your scouting library — teams you&apos;re preparing to face</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Link href="/ai-coach">
-            <Button variant="secondary" className="gap-2">
-              <Brain size={15} />
-              AI Scout
-            </Button>
-          </Link>
-          <Link href="/opponents/import">
-            <Button variant="secondary" className="gap-2">
-              <Zap size={15} className="text-orange-400" />
-              Import FaceIt
-            </Button>
-          </Link>
-          <Link href="/opponents/pro-demos">
-            <Button variant="secondary" className="gap-2">
-              <Trophy size={15} className="text-yellow-400" />
-              Pro Library
-            </Button>
-          </Link>
-          <DemoUploadButton teamId={primaryTeamId ?? ''} />
-        </div>
-      </div>
-
-      {/* ── Stats row ── */}
-      <div className="grid grid-cols-3 gap-4 animate-fade-in-up">
-        {[
-          { label: 'Opponents', value: totalOpponents, accent: 'var(--pink)', border: 's-pink', sub: 'In scouting library' },
-          { label: 'Demos', value: totalDemos, accent: 'var(--signal)', border: 's-signal', sub: 'Total uploaded' },
-          { label: 'Analyzed', value: analyzedDemos, accent: 'var(--win)', border: 's-green', sub: 'Fully processed' },
-        ].map(({ label, value, accent, border, sub }) => (
-          <div key={label} className={`rv-panel lift p-5 ${border}`} style={{ cursor: 'default' }}>
-            <p style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: 8 }}>{label}</p>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 38, fontWeight: 600, color: accent, lineHeight: 1, letterSpacing: '-0.03em', marginBottom: 8, textShadow: `0 0 22px color-mix(in srgb, ${accent} 35%, transparent)` }}>{value}</p>
-            <p style={{ fontSize: 11.5, color: 'var(--faint)' }}>{sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Opponent grid ── */}
-      {(folders ?? []).length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in-up animate-fade-in-up-delay-2">
-          <div className="w-16 h-16 rounded-2xl bg-red-500/[0.08] border border-red-500/15 flex items-center justify-center mb-5">
-            <Target size={28} className="text-red-400/70" />
-          </div>
-          <h2 className="text-[17px] font-bold text-foreground mb-2">No opponents scouted yet</h2>
-          <p className="text-[13px] text-muted-foreground max-w-xs mb-6 leading-relaxed">
-            Upload your first opponent demo to start building your scouting library.
-          </p>
-          {primaryTeamId && (
-            <DemoUploadButton teamId={primaryTeamId} />
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in-up animate-fade-in-up-delay-2">
-          {(folders ?? []).map((folder) => {
-            const demos = demosBySlug[folder.opponent_slug] ?? []
-            const lastActivity = demos
-              .map(d => d.match_date ?? d.created_at)
-              .sort()
-              .at(-1)
-
-            return (
-              <OpponentCardWithDelete
-                key={folder.id}
-                folder={{
-                  id: folder.id,
-                  opponent_display_name: folder.opponent_display_name,
-                  opponent_slug: folder.opponent_slug,
-                  aggregated_stats: folder.aggregated_stats as AggregatedStats | null,
-                }}
-                demoCount={demos.length}
-                lastActivity={lastActivity}
-              />
-            )
-          })}
-
-          {/* Add opponent CTA card */}
-          {primaryTeamId && (
-            <div className="h-full">
-              <Card className="bg-card/50 border-dashed border-border hover:border-[rgba(0,255,200,0.35)] hover:bg-card transition-all duration-200 group h-full card-hover">
-                <CardContent className="p-5 flex flex-col items-center justify-center h-full min-h-[160px] text-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[rgba(0,255,200,0.08)] flex items-center justify-center group-hover:bg-[rgba(0,255,200,0.15)] transition-colors border border-[rgba(0,255,200,0.15)]">
-                    <Upload size={17} className="text-[#00ffc8]" />
-                  </div>
-                  <div>
-                    <p className="text-[13px] font-semibold text-foreground group-hover:text-[#00ffc8] transition-colors">
-                      Scout another opponent
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Upload a demo to add them</p>
-                  </div>
-                  <DemoUploadButton teamId={primaryTeamId} />
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <OpponentsPageClient
+      folders={folders ?? []}
+      demosBySlug={demosBySlug}
+      primaryTeamId={primaryTeamId}
+    />
   )
 }
