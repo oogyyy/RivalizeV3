@@ -55,7 +55,13 @@ interface Props {
   showReparse?: boolean
   canDelete?: boolean
   demoHrefSuffix?: string
+  layout?: 'list' | 'cards'
   onSideChange?: (demoId: string, opponentSide: 'team1' | 'team2') => void
+}
+
+function cleanTeamName(name: string | undefined): string | null {
+  if (!name || name === 'T-Side' || name === 'CT-Side') return null
+  return name
 }
 
 // ── Bulk delete modal ──────────────────────────────────────────────────────────
@@ -224,7 +230,160 @@ export default function DemoListMultiSelect({
         </div>
       </div>
 
-      {/* Demo rows */}
+      {/* Demo rows / cards */}
+      {layout === 'cards' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto pr-1 -mr-1">
+          {demos.map(demo => {
+            const pd         = demo.parsed_data
+            const h          = pd?.header
+            const opSide     = (pd?.opponentSide ?? 'team2') as 'team1' | 'team2'
+            const ourScore   = h ? (opSide === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)) : null
+            const theirScore = h ? (opSide === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)) : null
+            const isWin  = ourScore !== null && theirScore !== null && ourScore > theirScore
+            const isDraw = ourScore !== null && theirScore !== null && ourScore === theirScore
+            const isLoss = ourScore !== null && theirScore !== null && ourScore < theirScore
+            const href       = demo.status === 'completed' ? `${demoHrefPrefix}/${demo.id}${demoHrefSuffix}` : null
+            const isSelected = selected.has(demo.id)
+            const isStuck    = demo.status === 'processing' || demo.status === 'failed'
+            const ourTeamName   = cleanTeamName(opSide === 'team1' ? h?.team2 : h?.team1) ?? 'My Team'
+            const theirTeamName = cleanTeamName(opSide === 'team1' ? h?.team1 : h?.team2) ?? demo.opponent_slug ?? 'Opponent'
+
+            const resultColor = isWin ? 'var(--win)' : isLoss ? 'var(--loss)' : '#facc15'
+            const resultLabel = isWin ? 'W' : isLoss ? 'L' : 'D'
+
+            const cardContent = (
+              <div
+                key={demo.id}
+                className={cn(
+                  'rv-panel relative rounded-xl border border-border overflow-hidden transition-all duration-150',
+                  selecting && isSelected ? 'ring-1 ring-neon-green bg-neon-green/5' : 'hover:border-accent/40 hover:shadow-md',
+                  selecting && 'cursor-pointer',
+                )}
+                onClick={selecting ? () => toggleSelect(demo.id) : undefined}
+              >
+                {/* Accent top bar colored by result */}
+                {demo.status === 'completed' && ourScore !== null && (
+                  <div className="h-0.5 w-full" style={{ background: resultColor }} />
+                )}
+
+                <div className="p-3">
+                  {/* Top row: checkbox (if selecting) + status + actions */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {selecting && (
+                        <button onClick={e => { e.stopPropagation(); toggleSelect(demo.id) }} className="shrink-0 text-muted-foreground hover:text-neon-green transition-colors">
+                          {isSelected ? <CheckSquare size={14} className="text-neon-green" /> : <Square size={14} />}
+                        </button>
+                      )}
+                      {/* Status icon */}
+                      {demo.status === 'completed' ? (
+                        <CheckCircle2 size={12} className="text-neon-green" />
+                      ) : demo.status === 'failed' ? (
+                        <AlertCircle size={12} className="text-red-400" />
+                      ) : (
+                        <div className="w-3 h-3 rounded-full border border-yellow-400 border-t-transparent animate-spin" />
+                      )}
+                      {/* Result badge */}
+                      {demo.status === 'completed' && ourScore !== null && (
+                        <span
+                          className="text-[10px] font-black px-1.5 py-0.5 rounded font-mono"
+                          style={{ color: resultColor, background: `color-mix(in srgb, ${resultColor} 12%, transparent)` }}
+                        >
+                          {resultLabel}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    {!selecting && (
+                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        {showReparse && demo.status === 'completed' && (
+                          <ReparseButton demoId={demo.id} variant="icon" />
+                        )}
+                        {canDelete && <DeleteDemoButton demoId={demo.id} />}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Team names + score */}
+                  <div className="mb-1.5">
+                    {demo.status === 'completed' && ourScore !== null && theirScore !== null ? (
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-sm font-bold text-foreground truncate">{ourTeamName}</span>
+                        <span
+                          className="text-base font-black font-mono shrink-0 tabular-nums"
+                          style={{ color: resultColor }}
+                        >
+                          {ourScore}–{theirScore}
+                        </span>
+                        <span className="text-sm font-bold text-muted-foreground truncate">{theirTeamName}</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {ourTeamName} vs {theirTeamName}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Map + date */}
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    {h?.map ?? demo.map ?? 'Unknown map'}
+                    {' · '}
+                    {demo.match_date
+                      ? new Date(demo.match_date).toLocaleDateString()
+                      : new Date(demo.created_at).toLocaleDateString()}
+                  </p>
+
+                  {/* Stuck / failed recovery */}
+                  {!selecting && isStuck && showReparse && (
+                    <div className={cn(
+                      'mt-2 flex items-start gap-2 rounded-lg px-2.5 py-1.5 border',
+                      demo.status === 'failed' ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20',
+                    )}>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn('text-[10px] font-medium', demo.status === 'failed' ? 'text-red-400' : 'text-amber-400')}>
+                          {demo.status === 'failed' ? 'Parsing failed'
+                            : !demo.processing_started_at
+                              ? !now || now - new Date(demo.created_at).getTime() < 10 * 60 * 1000 ? 'Queued…' : 'Stuck in processing'
+                              : !now || now - new Date(demo.processing_started_at).getTime() < 30 * 60 * 1000 ? 'Parsing…' : 'Stuck in processing'}
+                        </p>
+                        {demo.error_message && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5 break-words line-clamp-1">{demo.error_message}</p>
+                        )}
+                      </div>
+                      {now && (demo.status === 'failed' ||
+                        (!demo.processing_started_at && now - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) ||
+                        (demo.processing_started_at && now - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
+                        <ReparseButton demoId={demo.id} variant="prominent" />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Team selector */}
+                  {!selecting && showSideSelector && demo.status === 'completed' && (
+                    <div className="mt-2">
+                      <SetOpponentSideButton
+                        demoId={demo.id}
+                        currentSide={opSide}
+                        variant="self"
+                        teamNames={h ? {
+                          team1: (!h.team1 || h.team1 === 'T-Side' || h.team1 === 'CT-Side') ? 'Team 1 (T-Side)' : h.team1,
+                          team2: (!h.team2 || h.team2 === 'T-Side' || h.team2 === 'CT-Side') ? 'Team 2 (CT-Side)' : h.team2,
+                        } : undefined}
+                        onSideChange={onSideChange}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+
+            return href && !selecting
+              ? <Link key={demo.id} href={href} className="block no-underline">{cardContent}</Link>
+              : <div key={demo.id}>{cardContent}</div>
+          })}
+        </div>
+      ) : (
       <div className="space-y-0 max-h-[480px] overflow-y-auto pr-1 -mr-1">
         {demos.map(demo => {
           const pd      = demo.parsed_data
@@ -362,6 +521,7 @@ export default function DemoListMultiSelect({
           )
         })}
       </div>
+      )}
 
       {showConfirm && (
         <BulkDeleteModal
