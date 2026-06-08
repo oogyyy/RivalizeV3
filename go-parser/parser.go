@@ -819,9 +819,16 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 		if nonKnifeRounds > 0 {
 			kast = math.Round(float64(a.kastRounds)/float64(nonKnifeRounds)*1000) / 10
 		}
-		kd := float64(a.kills) / math.Max(float64(a.deaths), 1)
+		// HLTV Rating 2.0 approximation: uses KPR/DPR (not K/D ratio), KAST%, ADR, and Impact.
+		// Impact estimates multi-kill round contribution (per community reverse-engineering).
+		rounds := math.Max(float64(nonKnifeRounds), 1)
+		kpr    := float64(a.kills) / rounds
+		dpr    := float64(a.deaths) / rounds
+		apr    := float64(a.assists) / rounds
+		impact := 2.13*kpr + 0.42*apr - 0.41
+		// kast is already a 0–100 percentage; adr is raw damage/round.
 		rating := math.Round(math.Max(0.3, math.Min(2.5,
-			kd*0.38+adr/100.0*0.42+0.317+float64(a.mvps)/math.Max(float64(nonKnifeRounds), 1)*0.1,
+			0.0073*kast+0.3591*kpr-0.5329*dpr+0.073*impact+0.003*adr+0.20,
 		))*100) / 100
 
 		players = append(players, PlayerStat{
