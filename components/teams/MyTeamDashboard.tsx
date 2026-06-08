@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Shield, ChevronUp, ChevronDown, Check, Sliders, Send, Download, Upload, Plus, Trash2,
   TrendingUp, Brain, AlertCircle, Zap, BarChart3, Target, BookOpen, Layers, Film, ChevronRight,
-  Loader2, X, UserPlus,
+  Loader2, X, UserPlus, MessageSquare, Copy, CheckCheck, ExternalLink,
 } from 'lucide-react'
 import type { DemoRowData } from './DemoListMultiSelect'
 import MapFolderList, { type MapGroup } from './MapFolderList'
@@ -201,7 +201,7 @@ export default function MyTeamDashboard({
   const [sideOverrides, setSideOverrides] = useState<Record<string, 'team1' | 'team2'>>({})
 
   // Modal state
-  const [modal, setModal] = useState<'edit' | 'invite' | 'delete' | null>(null)
+  const [modal, setModal] = useState<'edit' | 'invite' | 'delete' | 'discord' | null>(null)
   // Edit name
   const [editName, setEditName] = useState(teamName)
   const [editNameSaving, setEditNameSaving] = useState(false)
@@ -215,6 +215,71 @@ export default function MyTeamDashboard({
   const [friendsLoading, setFriendsLoading] = useState(false)
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set())
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({})
+
+  // Discord integration
+  type DiscordIntegration = { id: string; guild_id: string; guild_name: string | null; channel_id: string | null; created_at: string }
+  const [discordLinkCode, setDiscordLinkCode] = useState<string | null>(null)
+  const [discordIntegration, setDiscordIntegration] = useState<DiscordIntegration | null>(null)
+  const [discordLoading, setDiscordLoading] = useState(false)
+  const [discordWebhookInput, setDiscordWebhookInput] = useState('')
+  const [discordConnecting, setDiscordConnecting] = useState(false)
+  const [discordError, setDiscordError] = useState<string | null>(null)
+  const [discordCodeCopied, setDiscordCodeCopied] = useState(false)
+  const [discordDisconnecting, setDiscordDisconnecting] = useState(false)
+
+  function openDiscordModal() {
+    setModal('discord' as typeof modal)
+    setDiscordError(null)
+    setDiscordWebhookInput('')
+    setDiscordLoading(true)
+    fetch(`/api/discord/setup?teamId=${selectedTeamId}`)
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
+      .then(data => {
+        setDiscordLinkCode(data.linkCode ?? null)
+        setDiscordIntegration(data.integration ?? null)
+      })
+      .catch(() => {})
+      .finally(() => setDiscordLoading(false))
+  }
+
+  async function handleDiscordConnect() {
+    if (!discordWebhookInput.trim()) return
+    setDiscordConnecting(true); setDiscordError(null)
+    try {
+      const res = await fetch('/api/discord/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId: selectedTeamId, webhookUrl: discordWebhookInput.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? `Error ${res.status}`)
+      // Reload integration status
+      const fresh = await fetch(`/api/discord/setup?teamId=${selectedTeamId}`)
+      const freshData = fresh.ok ? await fresh.json() : {}
+      setDiscordIntegration(freshData.integration ?? null)
+      setDiscordWebhookInput('')
+    } catch (err) {
+      setDiscordError(err instanceof Error ? err.message : 'Connection failed')
+    } finally {
+      setDiscordConnecting(false)
+    }
+  }
+
+  async function handleDiscordDisconnect() {
+    setDiscordDisconnecting(true); setDiscordError(null)
+    try {
+      await fetch('/api/discord/setup', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId: selectedTeamId }),
+      })
+      setDiscordIntegration(null)
+    } catch {
+      setDiscordError('Failed to disconnect')
+    } finally {
+      setDiscordDisconnecting(false)
+    }
+  }
 
   function openInviteModal() {
     setModal('invite')
@@ -401,6 +466,12 @@ export default function MyTeamDashboard({
           {canInvite && (
             <button onClick={openInviteModal} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
               <Send size={14} /> Invite Friends
+            </button>
+          )}
+          {(canEdit || canInvite) && (
+            <button onClick={openDiscordModal} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: discordIntegration ? 'rgba(88,101,242,0.12)' : 'transparent', color: discordIntegration ? '#5865F2' : 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              <MessageSquare size={14} /> Discord
+              {discordIntegration && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#57F287', flexShrink: 0 }} />}
             </button>
           )}
           {myFaceitId && (
@@ -784,6 +855,123 @@ export default function MyTeamDashboard({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Discord Integration modal ───────────────────────────────────────── */}
+      {modal === 'discord' && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={() => setModal(null)}
+        >
+          <div
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, width: 460, maxWidth: 'calc(100vw - 32px)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(88,101,242,0.15)', border: '1px solid rgba(88,101,242,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <MessageSquare size={15} style={{ color: '#5865F2' }} />
+                </div>
+                <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Discord Integration</p>
+              </div>
+              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 4, display: 'flex' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {discordLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 0', gap: 8, color: 'var(--muted)', fontSize: 13 }}>
+                <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
+              </div>
+            ) : discordIntegration ? (
+              /* Connected state */
+              <div>
+                <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(87,242,135,0.06)', border: '1px solid rgba(87,242,135,0.2)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#57F287', flexShrink: 0 }} />
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Connected</p>
+                    <p style={{ fontSize: 11, color: 'var(--muted)', margin: '2px 0 0' }}>
+                      Guild {discordIntegration.guild_id}{discordIntegration.channel_id ? ` · #channel ${discordIntegration.channel_id}` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Link code for slash commands */}
+                {discordLinkCode && (
+                  <div style={{ marginBottom: 16 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Slash Command Link Code</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+                      <code style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, letterSpacing: '0.1em', color: '#5865F2' }}>{discordLinkCode}</code>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(discordLinkCode); setDiscordCodeCopied(true); setTimeout(() => setDiscordCodeCopied(false), 2000) }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: discordCodeCopied ? '#57F287' : 'var(--muted)', cursor: 'pointer', fontSize: 12 }}
+                      >
+                        {discordCodeCopied ? <CheckCheck size={13} /> : <Copy size={13} />}
+                        {discordCodeCopied ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+                      Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)', background: 'var(--elevated)', padding: '1px 5px', borderRadius: 4 }}>/rivalize link {discordLinkCode}</code> in any Discord server to enable slash commands there.
+                    </p>
+                  </div>
+                )}
+
+                <p style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.6 }}>
+                  Match summaries will be posted automatically whenever a demo finishes processing. Use <strong style={{ color: 'var(--text)' }}>/rivalize report</strong> and <strong style={{ color: 'var(--text)' }}>/rivalize standings</strong> for on-demand stats.
+                </p>
+
+                {discordError && <p style={{ color: 'var(--loss)', fontSize: 12, marginBottom: 12 }}>{discordError}</p>}
+
+                <button
+                  onClick={handleDiscordDisconnect}
+                  disabled={discordDisconnecting}
+                  style={{ padding: '8px 16px', borderRadius: 8, background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {discordDisconnecting && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />}
+                  Disconnect Discord
+                </button>
+              </div>
+            ) : (
+              /* Not connected state */
+              <div>
+                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 18 }}>
+                  Connect a Discord webhook to auto-post match summaries when demos finish processing.
+                </p>
+
+                <div style={{ marginBottom: 18, padding: '12px 14px', borderRadius: 10, background: 'var(--card-2)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
+                  <p style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>How to connect:</p>
+                  <ol style={{ paddingLeft: 16, margin: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <li>Open Discord → your server → channel settings</li>
+                    <li>Go to <strong style={{ color: 'var(--text)' }}>Integrations → Webhooks → New Webhook</strong></li>
+                    <li>Copy the webhook URL and paste it below</li>
+                  </ol>
+                  <a href="https://support.discord.com/hc/en-us/articles/228383668" target="_blank" rel="noopener noreferrer" style={{ color: '#5865F2', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11 }}>
+                    Discord webhook guide <ExternalLink size={10} />
+                  </a>
+                </div>
+
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'block', marginBottom: 6 }}>Webhook URL</label>
+                <input
+                  value={discordWebhookInput}
+                  onChange={e => { setDiscordWebhookInput(e.target.value); setDiscordError(null) }}
+                  onKeyDown={e => e.key === 'Enter' && !discordConnecting && handleDiscordConnect()}
+                  placeholder="https://discord.com/api/webhooks/..."
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1px solid ${discordError ? 'var(--loss)' : 'var(--border)'}`, background: 'var(--input, var(--card-2))', color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: discordError ? 6 : 14 }}
+                />
+                {discordError && <p style={{ color: 'var(--loss)', fontSize: 12, marginBottom: 12 }}>{discordError}</p>}
+
+                <button
+                  onClick={handleDiscordConnect}
+                  disabled={discordConnecting || !discordWebhookInput.trim()}
+                  style={{ width: '100%', padding: '10px 16px', borderRadius: 9, background: '#5865F2', color: 'white', fontSize: 13, fontWeight: 700, border: 'none', cursor: discordConnecting || !discordWebhookInput.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, opacity: discordConnecting || !discordWebhookInput.trim() ? 0.65 : 1 }}
+                >
+                  {discordConnecting && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
+                  Connect Discord
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
