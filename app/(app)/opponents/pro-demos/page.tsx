@@ -1,17 +1,35 @@
-import { Trophy } from 'lucide-react'
+export const dynamic = 'force-dynamic'
 
-export default function ProDemosPage() {
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { redirect } from 'next/navigation'
+import ProDemosClient from './ProDemosClient'
+
+export default async function ProDemosPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const admin = createAdminClient()
+
+  // Fetch all teams the user belongs to (for the import team selector)
+  const { data: memberships } = await admin
+    .from('team_members')
+    .select('team_id, teams(id, name)')
+    .eq('user_id', user.id)
+
+  const teams: { id: string; name: string }[] = []
+  for (const m of memberships ?? []) {
+    const t = m.teams as unknown as { id: string; name: string } | null
+    if (t?.id && t?.name) teams.push({ id: t.id, name: t.name })
+  }
+
+  const defaultTeamId = teams[0]?.id ?? null
+
   return (
-    <div className="flex-1 flex items-center justify-center p-8">
-      <div className="text-center max-w-sm">
-        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-4">
-          <Trophy size={24} className="text-amber-400" />
-        </div>
-        <h1 className="text-xl font-bold text-foreground mb-2">Pro Library</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Professional demo analysis is coming soon. You'll be able to browse and study demos from top-tier teams and tournaments.
-        </p>
-      </div>
-    </div>
+    <ProDemosClient
+      teams={teams}
+      defaultTeamId={defaultTeamId}
+    />
   )
 }
