@@ -71,6 +71,15 @@ func handleParse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Reject requests missing the shared secret (set PARSER_SECRET on both services).
+	// An empty PARSER_SECRET disables auth (dev/test only).
+	if secret := os.Getenv("PARSER_SECRET"); secret != "" {
+		if r.Header.Get("X-Parser-Secret") != secret {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
+
 	defer func() {
 		if rec := recover(); rec != nil {
 			log.Printf("[parse] recovered from panic: %v", rec)

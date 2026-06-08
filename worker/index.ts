@@ -52,11 +52,14 @@ async function reclaimStale(): Promise<void> {
   const cutoff = new Date(Date.now() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
 
   // Find stale processing demos so we can handle retry exhaustion per-row.
+  // Use last_heartbeat_at when present (updated every 30s during active parsing);
+  // fall back to processing_started_at for demos claimed before the heartbeat fix.
   const { data: stale } = await supabase
     .from('demos')
     .select('id, retry_count')
     .eq('status', 'processing')
     .not('processing_started_at', 'is', null)
+    .or(`last_heartbeat_at.is.null,last_heartbeat_at.lt.${cutoff}`)
     .lt('processing_started_at', cutoff)
 
   if (stale && stale.length > 0) {
@@ -219,6 +222,16 @@ async function processQueuedJob(claim: DemoClaim): Promise<void> {
   const start = Date.now()
   console.log(`[worker][demoId=${demoId}][size=${sizeMb}MB] Claimed for parsing`)
 
+  // Heartbeat: update last_heartbeat_at every 30s so reclaimStale() won't
+  // reclaim a demo that's actively being parsed by the Go service.
+  const heartbeatInterval = setInterval(async () => {
+    await supabase
+      .from('demos')
+      .update({ last_heartbeat_at: new Date().toISOString() })
+      .eq('id', demoId)
+      .eq('status', 'processing')
+  }, 30_000)
+
   try {
     const result = await parseAndSaveDemo(demoId)
 
@@ -272,6 +285,8 @@ async function processQueuedJob(claim: DemoClaim): Promise<void> {
     if (isPermanent) {
       console.error(`[worker][demoId=${demoId}] Permanently failed`)
     }
+  } finally {
+    clearInterval(heartbeatInterval)
   }
 }
 
