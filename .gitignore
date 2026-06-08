@@ -1,29 +1,75 @@
-# Dependencies
+# ── Dependencies ────────────────────────────────────────────────
 node_modules/
 .pnp
 .pnp.js
 
-# Next.js
+# ── Next.js ─────────────────────────────────────────────────────
 .next/
 out/
 build/
+next-env.d.ts
 
-# Env files
+# ── TypeScript build artifacts ───────────────────────────────────
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# ── Go build artifacts ───────────────────────────────────────────
+go-parser/go-parser
+go-parser/*.exe
+go-parser/tmp/
+
+# ── Environment variables ────────────────────────────────────────
 .env
 .env.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
+.env.production
 .env.production.local
+.env*.local
 
-# Debug
+# ── CS2 demo files (large binaries — upload to R2 instead) ───────
+*.dem
+*.dem.zst
+*.dem.gz
+*.dem.bz2
+
+# ── Other large / binary artifacts ──────────────────────────────
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# ── Debug logs ──────────────────────────────────────────────────
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+*.log
 
-# Misc
+# ── OS / Editor ─────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+
+# ── Claude Code / AI tooling (local agent state) ─────────────────
 .claude/
+skills-lock.json
+
+# ── Certificates ────────────────────────────────────────────────
 *.pem
+*.key
+*.crt
+*.p12
+
+# ── Vercel ──────────────────────────────────────────────────────
 .vercel
-tsconfig.tsbuildinfo
-go-parser/go-parser
