@@ -296,7 +296,12 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', label,
     const triggerLabel = label ?? 'Upload Demo'
     const TriggerIcon = label ? Plus : Upload
     return (
-      <Button variant="neon" onClick={() => setOpen(true)} className="gap-2">
+      <Button
+        variant="neon"
+        onClick={() => setOpen(true)}
+        className="gap-2"
+        style={label ? { background: 'var(--accent)', color: '#fff', boxShadow: 'none' } : undefined}
+      >
         <TriggerIcon size={15} />
         {triggerLabel}
       </Button>
