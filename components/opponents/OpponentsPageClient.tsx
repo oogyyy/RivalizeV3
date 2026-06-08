@@ -241,7 +241,7 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
 
                 {/* Action buttons */}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <Link href={`/opponents/${opponent.opponent_slug}`} style={{ flex: 1, textDecoration: 'none' }}>
+                  <Link href={`/opponents/${opponent.id}`} style={{ flex: 1, textDecoration: 'none' }}>
                     <button
                       style={{
                         width: '100%', padding: '9px 12px', borderRadius: 8,
