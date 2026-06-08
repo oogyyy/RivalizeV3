@@ -17,6 +17,7 @@ const eslintConfig = [
       '@next/next/no-html-link-for-pages': 'warn',
       'react/no-unescaped-entities': 'warn',
       '@typescript-eslint/no-unused-expressions': 'warn',
+      '@typescript-eslint/no-empty-object-type': 'warn',
 
       // ── TypeScript ─────────────────────────────────────────────────────────────
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
