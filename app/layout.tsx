@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Sora, Space_Grotesk, JetBrains_Mono } from 'next/font/google'
+import { ThemeProvider } from '@/components/ThemeProvider'
 import './globals.css'
 
 const inter = Inter({
@@ -48,10 +49,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        {/* Prevent flash of wrong theme — runs synchronously before paint */}
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('rivalize-theme');if(t==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}` }} />
+      </head>
       <body
         className={`${inter.variable} ${sora.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} min-h-screen bg-background text-foreground antialiased font-sans`}
       >
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   )
