@@ -131,6 +131,7 @@ export default async function MyTeamMapPage({ params }: Props) {
             showSideSelector
             showReparse
             canDelete
+            layout="cards"
           />
         )}
       </div>
