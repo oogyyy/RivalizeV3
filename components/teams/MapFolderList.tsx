@@ -1,10 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, ChevronRight, MapPin } from 'lucide-react'
-import { cn, formatDate } from '@/lib/utils'
+import Link from 'next/link'
+import { MapPin } from 'lucide-react'
 import { MAP_THUMBS } from '@/lib/map-config'
-import DemoListMultiSelect, { type DemoRowData } from '@/components/teams/DemoListMultiSelect'
+import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 
 export interface MapGroup {
   map: string
@@ -29,136 +28,113 @@ function mapDisplayName(map: string): string {
     .join(' ')
 }
 
-function RecordBadge({ wins, losses, draws }: { wins: number; losses: number; draws: number }) {
-  const total = wins + losses + draws
-  if (total === 0) return null
-  const wr = Math.round((wins / total) * 100)
-  return (
-    <span className="flex items-center gap-1.5 text-xs font-mono">
-      <span className="text-neon-green">{wins}W</span>
-      <span className="text-muted-foreground">–</span>
-      <span className="text-red-400">{losses}L</span>
-      {draws > 0 && <>
-        <span className="text-muted-foreground">–</span>
-        <span className="text-yellow-400">{draws}D</span>
-      </>}
-      <span className="text-muted-foreground text-[10px]">({wr}%)</span>
-    </span>
-  )
-}
-
-export default function MapFolderList({ mapGroups, onSideChange, demoHrefPrefix = '/my-team/demos' }: Props) {
-  // Auto-expand the first folder that actually has demos
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
-    const first = mapGroups.find(g => g.demos.length > 0)
-    return new Set(first ? [first.map] : [])
-  })
-
-  const toggle = (map: string) =>
-    setExpanded(prev => {
-      const next = new Set(prev)
-      next.has(map) ? next.delete(map) : next.add(map)
-      return next
-    })
-
+export default function MapFolderList({ mapGroups }: Props) {
   if (mapGroups.length === 0) return null
 
   return (
-    <div className="space-y-2">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {mapGroups.map(group => {
-        const isOpen  = expanded.has(group.map)
         const thumb   = MAP_THUMBS[group.map]
         const name    = mapDisplayName(group.map)
         const total   = group.wins + group.losses + group.draws
+        const wr      = total > 0 ? Math.round((group.wins / total) * 100) : null
+        const isEmpty = group.demos.length === 0
         const pending = group.demos.filter(d => d.status !== 'completed').length
 
-        const isEmpty = group.demos.length === 0
+        const wrColor = wr === null ? 'var(--muted-foreground)'
+          : wr >= 55 ? 'var(--win)'
+          : wr >= 45 ? '#facc15'
+          : 'var(--loss)'
 
         return (
-          <div
+          <Link
             key={group.map}
-            className={cn(
-              'border border-border rounded-xl overflow-hidden transition-all',
-              isOpen ? 'bg-card' : 'bg-card/60',
-              isEmpty && 'opacity-60',
-            )}
+            href={`/my-team/map/${group.map}`}
+            className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
+            style={{ borderRadius: 14 }}
           >
-            {/* ── Folder header ── */}
-            <button
-              onClick={() => toggle(group.map)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors text-left"
+            <div
+              className="rv-panel overflow-hidden transition-all duration-200 group-hover:border-[color:var(--accent)]/40"
+              style={{
+                opacity: isEmpty ? 0.55 : 1,
+                borderRadius: 14,
+              }}
             >
-              {/* Map thumbnail */}
-              <div className="w-14 h-10 rounded-md overflow-hidden shrink-0 bg-accent border border-border relative">
+              {/* Map thumbnail banner */}
+              <div className="relative w-full h-28 bg-muted/40 overflow-hidden">
                 {thumb ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={thumb}
-                    alt={group.map}
-                    className="w-full h-full object-cover"
+                    alt={name}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <MapPin size={14} className="text-muted-foreground" />
+                    <MapPin size={24} className="text-muted-foreground/40" />
+                  </div>
+                )}
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+                {/* Map name over thumbnail */}
+                <div className="absolute bottom-0 left-0 right-0 px-3 pb-2.5">
+                  <p className="text-sm font-bold text-white leading-tight drop-shadow">{name}</p>
+                </div>
+
+                {/* Pending badge */}
+                {pending > 0 && (
+                  <div className="absolute top-2 right-2">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-400/20 text-yellow-300 border border-yellow-400/30">
+                      {pending} parsing
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-sm text-foreground">{name}</span>
-                  <span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded font-mono">
-                    {group.demos.length} demo{group.demos.length !== 1 ? 's' : ''}
-                  </span>
-                  {pending > 0 && (
-                    <span className="text-[10px] text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 px-1.5 py-0.5 rounded font-mono">
-                      {pending} parsing
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  {isEmpty ? (
-                    <span className="text-[11px] text-muted-foreground">No demos yet</span>
-                  ) : total > 0 ? (
-                    <>
-                      <RecordBadge wins={group.wins} losses={group.losses} draws={group.draws} />
-                      <span className="text-[10px] text-muted-foreground">
-                        · Last played {formatDate(group.lastActivity)}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[11px] text-muted-foreground">No results yet</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Chevron */}
-              {isOpen
-                ? <ChevronDown size={14} className="text-muted-foreground shrink-0" />
-                : <ChevronRight size={14} className="text-muted-foreground shrink-0" />}
-            </button>
-
-            {/* ── Expanded content ── */}
-            {isOpen && (
-              <div className="border-t border-border px-4 py-3">
+              {/* Card body */}
+              <div className="px-3 py-2.5 space-y-2">
                 {isEmpty ? (
-                  <p className="text-[12px] text-muted-foreground py-2 text-center">
-                    No demos uploaded for this map yet.
-                  </p>
+                  <p className="text-[11px] text-muted-foreground">No demos yet</p>
                 ) : (
-                  <DemoListMultiSelect
-                    demos={group.demos}
-                    demoHrefPrefix={demoHrefPrefix}
-                    showSideSelector
-                    showReparse
-                    canDelete
-                    onSideChange={onSideChange}
-                  />
+                  <>
+                    {/* Win rate bar */}
+                    {wr !== null && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-muted-foreground">Win rate</span>
+                          <span className="text-xs font-bold font-mono" style={{ color: wrColor }}>{wr}%</span>
+                        </div>
+                        <div className="h-1 rounded-full bg-white/[0.07] overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${wr}%`, background: wrColor }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Record + demos row */}
+                    <div className="flex items-center justify-between">
+                      {total > 0 ? (
+                        <span className="text-[11px] font-mono text-muted-foreground">
+                          <span className="text-foreground font-semibold">{group.wins}W</span>
+                          {' – '}
+                          <span className="text-foreground font-semibold">{group.losses}L</span>
+                          {group.draws > 0 && <>{' – '}<span className="text-foreground font-semibold">{group.draws}D</span></>}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">No results yet</span>
+                      )}
+                      <span className="text-[11px] font-semibold" style={{ color: 'var(--signal)' }}>
+                        {group.demos.length} demo{group.demos.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          </Link>
         )
       })}
     </div>
