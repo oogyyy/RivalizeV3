@@ -109,6 +109,7 @@ export default function DemoListMultiSelect({
   showReparse = true,
   canDelete = true,
   demoHrefSuffix = '',
+  layout = 'list',
   onSideChange,
 }: Props) {
   const router = useRouter()
