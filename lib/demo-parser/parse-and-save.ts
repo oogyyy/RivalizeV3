@@ -335,4 +335,14 @@ export async function applyParsedDemo(
       console.error(`[apply] Non-fatal error updating team_folders for ${demoId}:`, aggErr)
     }
   }
+
+  // Refresh the team-level stats cache (non-fatal — dashboard falls back gracefully).
+  try {
+    const { error: cacheErr } = await admin.rpc('refresh_team_stats', { p_team_id: demo.team_id })
+    if (cacheErr) {
+      console.error(`[apply] Non-fatal: refresh_team_stats failed for team ${demo.team_id}: ${cacheErr.message}`)
+    }
+  } catch (cacheErr) {
+    console.error(`[apply] Non-fatal: refresh_team_stats threw for team ${demo.team_id}:`, cacheErr)
+  }
 }

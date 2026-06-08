@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	dem "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
@@ -109,6 +110,7 @@ type Kill struct {
 	VictimName string  `json:"victim_name"`
 	Weapon     string  `json:"weapon"`
 	Headshot   bool    `json:"headshot"`
+	IsEntry    bool    `json:"is_entry,omitempty"` // first cross-team kill of the round
 	KillerX    float64 `json:"killer_x"`
 	KillerY    float64 `json:"killer_y"`
 	VictimX    float64 `json:"victim_x"`
@@ -131,6 +133,15 @@ type PlayerStat struct {
 	FlashAssists       int     `json:"flash_assists"`
 	MVPs               int     `json:"mvps"`
 	RoundsPlayed       int     `json:"rounds_played"`
+	// Phase 2 extended stats
+	EntryKills       int `json:"entry_kills"`
+	EntryDeaths      int `json:"entry_deaths"`
+	TradeKills       int `json:"trade_kills"`
+	TradedDeaths     int `json:"traded_deaths"`
+	ClutchAttempts   int `json:"clutch_attempts"`
+	ClutchWins       int `json:"clutch_wins"`
+	FlashesThrown    int `json:"flashes_thrown"`
+	FlashesEffective int `json:"flashes_effective"` // enemies blinded > 2s
 }
 
 type GameEvent struct {
@@ -153,6 +164,15 @@ type playerAccum struct {
 	headshots    int
 	mvps         int
 	kastRounds   int
+	// Phase 2 extended stats
+	entryKills       int
+	entryDeaths      int
+	tradeKills       int
+	tradedDeaths     int
+	clutchAttempts   int
+	clutchWins       int
+	flashesThrown    int
+	flashesEffective int
 }
 
 // roundContrib tracks a single player's contribution within one round so we
@@ -188,6 +208,12 @@ type roundState struct {
 	victims   map[uint64]bool
 	assisters map[uint64]bool
 	killedBy  map[uint64]killedByEntry
+	// Phase 2: entry and clutch tracking
+	entryKillerID    uint64
+	entryVictimID    uint64
+	clutchPlayerID   uint64
+	clutchPlayerTeam common.Team
+	clutchAgainst    int
 }
 
 type grenadeInFlight struct {
@@ -341,6 +367,17 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 			cur.isKnifeRound = allKnife
 		}
 
+		// ── Clutch resolution ─────────────────────────────────────────────────
+		// Resolved here after winnerTeam is set and isKnifeRound is known.
+		if !cur.isKnifeRound && cur.clutchPlayerID != 0 {
+			if a, ok := accums[cur.clutchPlayerID]; ok {
+				a.clutchAttempts++
+				if e.Winner == cur.clutchPlayerTeam {
+					a.clutchWins++
+				}
+			}
+		}
+
 		// ── Team name collection — first half real rounds only ─────────────────
 		// Score counting is done in post-processing where we know the knife offset.
 		// Team names: collect while we haven't yet seen regulationHalf non-knife rounds.
@@ -473,6 +510,14 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 			}
 		}
 
+		// Entry kill: first cross-team kill of the round.
+		// Set before the cur==nil guard so isEntry is in scope when building the Kill struct.
+		isEntry := cur != nil && crossTeam && cur.entryKillerID == 0
+		if isEntry {
+			cur.entryKillerID = killer.SteamID64
+			cur.entryVictimID = victim.SteamID64
+		}
+
 		// Round kill-list and time calculation require an active round.
 		if cur == nil {
 			return
@@ -483,7 +528,7 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 			timeInRound = float64(tick-cur.startTick) / 64.0
 		}
 
-		k := Kill{Tick: tick, Time: timeInRound, Headshot: e.IsHeadshot}
+		k := Kill{Tick: tick, Time: timeInRound, Headshot: e.IsHeadshot, IsEntry: isEntry}
 		if e.Weapon != nil {
 			k.Weapon = e.Weapon.String()
 		}
@@ -494,6 +539,44 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 		pos = victim.Position()
 		k.VictimX, k.VictimY = float64(pos.X), float64(pos.Y)
 		cur.kills = append(cur.kills, k)
+
+		// Clutch detection: after this kill, check if a 1vN situation has emerged.
+		// Game state reflects the victim as dead by the time the Kill event fires.
+		if crossTeam && cur.clutchPlayerID == 0 {
+			gs := p.GameState()
+			tAlive := 0
+			ctAlive := 0
+			for _, pl := range gs.Participants().Playing() {
+				if pl == nil || !pl.IsAlive() {
+					continue
+				}
+				switch pl.Team {
+				case common.TeamTerrorists:
+					tAlive++
+				case common.TeamCounterTerrorists:
+					ctAlive++
+				}
+			}
+			if tAlive == 1 && ctAlive >= 2 {
+				for _, pl := range gs.Participants().Playing() {
+					if pl != nil && pl.IsAlive() && pl.Team == common.TeamTerrorists {
+						cur.clutchPlayerID = pl.SteamID64
+						cur.clutchPlayerTeam = common.TeamTerrorists
+						cur.clutchAgainst = ctAlive
+						break
+					}
+				}
+			} else if ctAlive == 1 && tAlive >= 2 {
+				for _, pl := range gs.Participants().Playing() {
+					if pl != nil && pl.IsAlive() && pl.Team == common.TeamCounterTerrorists {
+						cur.clutchPlayerID = pl.SteamID64
+						cur.clutchPlayerTeam = common.TeamCounterTerrorists
+						cur.clutchAgainst = tAlive
+						break
+					}
+				}
+			}
+		}
 	})
 
 	p.RegisterEventHandler(func(e events.PlayerHurt) {
@@ -541,6 +624,12 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 		if gt == "" {
 			return
 		}
+		// Count flash grenades thrown per player
+		if gt == "flash" && proj.Thrower != nil && proj.Thrower.SteamID64 != 0 {
+			if a := getOrCreate(proj.Thrower); a != nil {
+				a.flashesThrown++
+			}
+		}
 		pos := proj.Position()
 		thrower := ""
 		if proj.Thrower != nil {
@@ -553,6 +642,28 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 			gtype:   gt,
 			throwX:  float64(pos.X),
 			throwY:  float64(pos.Y),
+		}
+	})
+
+	// Flash effectiveness: count enemy blinds lasting > 2 seconds
+	p.RegisterEventHandler(func(e events.PlayerFlashed) {
+		if cur == nil || p.GameState().IsWarmupPeriod() {
+			return
+		}
+		if e.Attacker == nil || e.Player == nil {
+			return
+		}
+		if e.Attacker.SteamID64 == 0 || e.Player.SteamID64 == 0 {
+			return
+		}
+		// Skip team flashes
+		if e.Attacker.Team == e.Player.Team {
+			return
+		}
+		if e.FlashDuration() >= 2*time.Second {
+			if a := getOrCreate(e.Attacker); a != nil {
+				a.flashesEffective++
+			}
 		}
 	})
 
@@ -780,6 +891,14 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 					// was on the original victim's team (rules out TK chains etc.).
 					if atkKb.attackerTeam == kb.victimTeam {
 						traded[victimID] = true
+						// Credit the trade kill to the player who avenged victimID
+						if a, ok := accums[atkKb.attackerID]; ok {
+							a.tradeKills++
+						}
+						// Credit a traded death to the player whose death was avenged
+						if a, ok := accums[victimID]; ok {
+							a.tradedDeaths++
+						}
 					}
 				}
 			}
@@ -791,6 +910,24 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 			T := traded[sid]
 			if K || A || S || T {
 				a.kastRounds++
+			}
+		}
+	}
+
+	// ── Entry kill/death counting ─────────────────────────────────────────────
+
+	for _, rnd := range completedRounds {
+		if rnd.isKnifeRound {
+			continue
+		}
+		if rnd.entryKillerID != 0 {
+			if a, ok := accums[rnd.entryKillerID]; ok {
+				a.entryKills++
+			}
+		}
+		if rnd.entryVictimID != 0 {
+			if a, ok := accums[rnd.entryVictimID]; ok {
+				a.entryDeaths++
 			}
 		}
 	}
@@ -847,6 +984,14 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 			FlashAssists:       a.flashAssists,
 			MVPs:               a.mvps,
 			RoundsPlayed:       nonKnifeRounds,
+			EntryKills:         a.entryKills,
+			EntryDeaths:        a.entryDeaths,
+			TradeKills:         a.tradeKills,
+			TradedDeaths:       a.tradedDeaths,
+			ClutchAttempts:     a.clutchAttempts,
+			ClutchWins:         a.clutchWins,
+			FlashesThrown:      a.flashesThrown,
+			FlashesEffective:   a.flashesEffective,
 		})
 	}
 

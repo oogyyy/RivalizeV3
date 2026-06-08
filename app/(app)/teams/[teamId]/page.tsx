@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import FolderCard from '@/components/teams/FolderCard'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import FaceitImportButton from '@/components/teams/FaceitImportButton'
+import RefreshStatsButton from '@/components/teams/RefreshStatsButton'
 import TeamTabNav from './TeamTabNav'
 import InviteCodeSection from './InviteCodeSection'
 import InviteFriendsDialog from './InviteFriendsDialog'
@@ -74,23 +75,30 @@ export default async function TeamPage({
     .select('role, user_id, profiles(id, username, display_name, avatar_url)')
     .eq('team_id', resolvedTeamId)
 
-  // Fetch opponent demos with limit to reduce bandwidth
-  // Top 1000 demos provides good coverage while keeping bandwidth reasonable
+  // Fetch demo metadata only — no parsed_data needed (stats come from the cache).
+  // The demos list is still needed for folder→demo mapping and the "All Demos" tab.
   const { data: demos } = await admin
     .from('demos')
-    .select('id, status, map, match_date, created_at, opponent_slug, opponent_name, demo_type, parsed_data, league')
+    .select('id, status, map, match_date, created_at, opponent_slug, opponent_name, league')
     .eq('team_id', resolvedTeamId)
     .eq('demo_type', 'opponent')
     .order('created_at', { ascending: false })
     .limit(1000)
 
-  // Fetch folders
+  // Fetch folders (aggregated_stats has per-opponent top_players already pre-computed)
   const { data: folders } = await admin
     .from('team_folders')
     .select('*')
     .eq('user_team_id', resolvedTeamId)
 
-  // Build folder -> demos count map
+  // Fetch pre-computed team stats cache (single row, instant)
+  const { data: statsCache } = await admin
+    .from('team_stats_cache')
+    .select('*')
+    .eq('team_id', resolvedTeamId)
+    .maybeSingle()
+
+  // Build folder -> demos map for lastPlayed / demo counts
   const demosByOpponent: Record<string, typeof demos> = {}
   for (const demo of demos ?? []) {
     const key = demo.opponent_slug ?? demo.opponent_name
@@ -98,25 +106,22 @@ export default async function TeamPage({
     demosByOpponent[key].push(demo)
   }
 
-  // Compute top opponent players across all completed demos (exclude own team)
+  // Top opponent players: aggregate from per-folder top_players (already pre-computed).
+  // O(folders × 5) vs the old O(demos × players) scan over parsed_data.
   const playerMap: Record<string, PlayerStats & { count: number }> = {}
-  for (const demo of demos ?? []) {
-    if (demo.status === 'completed' && demo.parsed_data) {
-      const pd = demo.parsed_data as { header?: { team1?: string }; players?: PlayerStats[] }
-      const ownTeamName = pd.header?.team1 ?? 'My Team'
-      for (const p of pd.players ?? []) {
-        if (p.team === ownTeamName) continue
-        if (!playerMap[p.steam_id]) {
-          playerMap[p.steam_id] = { ...p, count: 1 }
-        } else {
-          const existing = playerMap[p.steam_id]
-          existing.kills += p.kills
-          existing.deaths += p.deaths
-          existing.assists += p.assists
-          existing.adr = (existing.adr * existing.count + p.adr) / (existing.count + 1)
-          existing.rating = (existing.rating * existing.count + p.rating) / (existing.count + 1)
-          existing.count++
-        }
+  for (const folder of folders ?? []) {
+    const stats = folder.aggregated_stats as AggregatedStats | null
+    for (const p of stats?.top_players ?? []) {
+      if (!playerMap[p.steam_id]) {
+        playerMap[p.steam_id] = { ...p, count: 1 }
+      } else {
+        const e = playerMap[p.steam_id]
+        e.kills   += p.kills
+        e.deaths  += p.deaths
+        e.assists += p.assists
+        e.adr     = (e.adr    * e.count + p.adr)    / (e.count + 1)
+        e.rating  = (e.rating * e.count + p.rating) / (e.count + 1)
+        e.count++
       }
     }
   }
@@ -124,30 +129,16 @@ export default async function TeamPage({
     .sort((a, b) => b.rating - a.rating)
     .slice(0, 5)
 
-  // Map stats
-  const mapCount: Record<string, number> = {}
-  for (const demo of demos ?? []) {
-    if (demo.map) mapCount[demo.map] = (mapCount[demo.map] ?? 0) + 1
-  }
-  const topMaps = Object.entries(mapCount).sort((a, b) => b[1] - a[1]).slice(0, 6)
+  // Stats from cache — fall back to 0 if cache hasn't been built yet
+  const wins         = statsCache?.wins          ?? 0
+  const losses       = statsCache?.losses        ?? 0
+  const draws        = statsCache?.draws         ?? 0
+  const totalMatches = statsCache?.total_matches ?? 0
+  const winRate      = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0
 
-  // Win/loss from parsed demos
-  const completedDemos = (demos ?? []).filter((d) => d.status === 'completed' && d.parsed_data)
-  let wins = 0
-  let losses = 0
-  let draws = 0
-  for (const demo of completedDemos) {
-    const pd = demo.parsed_data as { header?: { score_team1?: number; score_team2?: number } }
-    if (pd?.header) {
-      const s1 = pd.header.score_team1 ?? 0
-      const s2 = pd.header.score_team2 ?? 0
-      if (s1 > s2) wins++
-      else if (s2 > s1) losses++
-      else draws++
-    }
-  }
-  const totalMatches = wins + losses + draws
-  const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0
+  const mapsPlayed  = (statsCache?.maps_played ?? {}) as Record<string, number>
+  const topMaps     = Object.entries(mapsPlayed).sort((a, b) => b[1] - a[1]).slice(0, 6)
+  const completedDemos = (demos ?? []).filter(d => d.status === 'completed')
 
   const statusVariant = (status: string) => {
     if (status === 'completed') return 'neon' as const
@@ -244,12 +235,19 @@ export default async function TeamPage({
         {tab === 'overview' && (
           <div className="space-y-6">
             {/* Stats row */}
+            <div className="flex items-center justify-between mb-1 -mt-1">
+              <div />
+              <RefreshStatsButton
+                teamId={resolvedTeamId}
+                lastUpdated={statsCache?.updated_at ?? null}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {[
                 { label: 'Opponent Demos', value: (demos ?? []).length, color: 'text-foreground' },
                 { label: 'Opponents Scouted', value: (folders ?? []).length, color: 'text-neon-green' },
                 { label: 'Analysed', value: completedDemos.length, color: 'text-green-400' },
-                { label: 'Pending', value: (demos ?? []).filter(d => d.status !== 'completed').length, color: 'text-yellow-400' },
+                { label: 'Win Rate', value: totalMatches > 0 ? `${winRate}%` : '—', color: 'text-neon-green' },
               ].map(({ label, value, color }) => (
                 <Card key={label} className="bg-card border-border">
                   <CardContent className="p-5 text-center">
@@ -358,7 +356,7 @@ export default async function TeamPage({
                   ) : (
                     <div className="space-y-3">
                       {topMaps.map(([map, count]) => {
-                        const pct = Math.round((count / (demos ?? []).length) * 100)
+                        const pct = totalMatches > 0 ? Math.round((count / totalMatches) * 100) : 0
                         return (
                           <div key={map}>
                             <div className="flex items-center justify-between mb-1">

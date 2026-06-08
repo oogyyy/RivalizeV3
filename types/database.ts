@@ -151,6 +151,7 @@ export interface Kill {
   victim_name: string
   weapon: string
   headshot: boolean
+  is_entry?: boolean  // first cross-team kill of the round
   killer_x: number
   killer_y: number
   victim_x: number
@@ -173,6 +174,15 @@ export interface PlayerStats {
   flash_assists: number
   mvps: number
   rounds_played: number
+  // Phase 2 extended stats
+  entry_kills?: number
+  entry_deaths?: number
+  trade_kills?: number
+  traded_deaths?: number
+  clutch_attempts?: number
+  clutch_wins?: number
+  flashes_thrown?: number
+  flashes_effective?: number
 }
 
 export interface GameEvent {

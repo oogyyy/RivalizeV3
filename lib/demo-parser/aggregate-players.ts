@@ -37,14 +37,23 @@ export function computeTopPlayers(demos: DemoRecord[]): PlayerStats[] {
         playerMap[p.steam_id] = { ...p, count: 1 }
       } else {
         const e = playerMap[p.steam_id]
-        e.kills    += p.kills
-        e.deaths   += p.deaths
-        e.assists  += p.assists
+        e.kills     += p.kills
+        e.deaths    += p.deaths
+        e.assists   += p.assists
         e.headshots += p.headshots
         e.adr    = (e.adr    * e.count + p.adr)    / (e.count + 1)
         e.rating = (e.rating * e.count + p.rating) / (e.count + 1)
         e.kast   = (e.kast   * e.count + p.kast)   / (e.count + 1)
         e.rounds_played += p.rounds_played
+        // Phase 2 extended stats: summed across demos
+        e.entry_kills       = (e.entry_kills       ?? 0) + (p.entry_kills       ?? 0)
+        e.entry_deaths      = (e.entry_deaths      ?? 0) + (p.entry_deaths      ?? 0)
+        e.trade_kills       = (e.trade_kills       ?? 0) + (p.trade_kills       ?? 0)
+        e.traded_deaths     = (e.traded_deaths     ?? 0) + (p.traded_deaths     ?? 0)
+        e.clutch_attempts   = (e.clutch_attempts   ?? 0) + (p.clutch_attempts   ?? 0)
+        e.clutch_wins       = (e.clutch_wins       ?? 0) + (p.clutch_wins       ?? 0)
+        e.flashes_thrown    = (e.flashes_thrown    ?? 0) + (p.flashes_thrown    ?? 0)
+        e.flashes_effective = (e.flashes_effective ?? 0) + (p.flashes_effective ?? 0)
         e.count++
       }
     }

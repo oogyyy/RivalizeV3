@@ -68,9 +68,13 @@ export async function triggerParseJob(
 
   let res: Response
   try {
+    const parseHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (process.env.PARSER_SECRET) {
+      parseHeaders['X-Parser-Secret'] = process.env.PARSER_SECRET
+    }
     res = await fetch(`${base}/parse`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: parseHeaders,
       body: JSON.stringify({
         demo_id:               demoId,
         r2_key:                r2Key,
