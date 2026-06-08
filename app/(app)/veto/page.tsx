@@ -18,21 +18,40 @@ export default async function VetoPage() {
 
   const admin = createAdminClient()
 
+  // 1. Fetch all team memberships
   const { data: memberships } = await admin
     .from('team_members')
-    .select('role, team_id')
+    .select('team_id')
     .eq('user_id', user.id)
 
-  const teamId = (memberships ?? [])[0]?.team_id ?? null
+  const allTeamIds = (memberships ?? []).map(m => m.team_id).filter(Boolean)
 
-  // Self demo map stats
-  const selfMapStats: Record<string, { wins: number; losses: number; winRate: number }> = {}
+  // 2. Fetch teams, filtering out personal teams
+  const teams: Array<{ id: string; name: string }> = []
 
-  if (teamId) {
+  if (allTeamIds.length > 0) {
+    const { data: teamsData } = await admin
+      .from('teams')
+      .select('id, name')
+      .in('id', allTeamIds)
+      .eq('is_personal', false)
+
+    for (const t of teamsData ?? []) {
+      teams.push({ id: t.id, name: t.name })
+    }
+  }
+
+  // 3. Compute selfMapStats for each team
+  type MapStat = { wins: number; losses: number; winRate: number }
+  const selfMapStatsByTeam: Record<string, Record<string, MapStat>> = {}
+
+  for (const team of teams) {
+    const teamStats: Record<string, MapStat> = {}
+
     const { data: selfDemos } = await admin
       .from('demos')
       .select('parsed_data, map')
-      .eq('team_id', teamId)
+      .eq('team_id', team.id)
       .eq('status', 'completed')
       .eq('demo_type', 'self')
       .order('created_at', { ascending: false })
@@ -51,18 +70,20 @@ export default async function VetoPage() {
       const ourScore = ourSide === 'team1' ? score_team1 : score_team2
       const theirScore = ourSide === 'team1' ? score_team2 : score_team1
 
-      if (!selfMapStats[demo.map]) selfMapStats[demo.map] = { wins: 0, losses: 0, winRate: 0 }
-      if (ourScore > theirScore) selfMapStats[demo.map].wins++
-      else selfMapStats[demo.map].losses++
+      if (!teamStats[demo.map]) teamStats[demo.map] = { wins: 0, losses: 0, winRate: 0 }
+      if (ourScore > theirScore) teamStats[demo.map].wins++
+      else teamStats[demo.map].losses++
     }
 
-    for (const [map, s] of Object.entries(selfMapStats)) {
+    for (const [map, s] of Object.entries(teamStats)) {
       const total = s.wins + s.losses
-      selfMapStats[map].winRate = total > 0 ? s.wins / total : 0
+      teamStats[map].winRate = total > 0 ? s.wins / total : 0
     }
+
+    selfMapStatsByTeam[team.id] = teamStats
   }
 
-  // Opponent folders with map picks
+  // 4. Opponent folders — use first non-personal team's folders
   type OpponentEntry = {
     id: string
     name: string
@@ -70,12 +91,13 @@ export default async function VetoPage() {
   }
 
   const opponents: OpponentEntry[] = []
+  const firstTeamId = teams[0]?.id ?? null
 
-  if (teamId) {
+  if (firstTeamId) {
     const { data: folders } = await admin
       .from('team_folders')
       .select('id, opponent_display_name, aggregated_stats')
-      .eq('user_team_id', teamId)
+      .eq('user_team_id', firstTeamId)
       .order('created_at', { ascending: false })
 
     for (const f of folders ?? []) {
@@ -90,10 +112,10 @@ export default async function VetoPage() {
 
   return (
     <VetoClient
-      selfMapStats={selfMapStats}
+      teams={teams}
+      selfMapStatsByTeam={selfMapStatsByTeam}
       opponents={opponents}
       activeDutyMaps={ACTIVE_DUTY}
-      hasData={teamId !== null}
     />
   )
 }
