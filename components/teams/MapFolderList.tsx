@@ -18,6 +18,7 @@ export interface MapGroup {
 interface Props {
   mapGroups: MapGroup[]
   onSideChange?: (demoId: string, opponentSide: 'team1' | 'team2') => void
+  demoHrefPrefix?: string
 }
 
 function mapDisplayName(map: string): string {
@@ -46,7 +47,7 @@ function RecordBadge({ wins, losses, draws }: { wins: number; losses: number; dr
   )
 }
 
-export default function MapFolderList({ mapGroups, onSideChange }: Props) {
+export default function MapFolderList({ mapGroups, onSideChange, demoHrefPrefix = '/my-team/demos' }: Props) {
   // Auto-expand the first folder that actually has demos
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     const first = mapGroups.find(g => g.demos.length > 0)
@@ -148,7 +149,7 @@ export default function MapFolderList({ mapGroups, onSideChange }: Props) {
                 ) : (
                   <DemoListMultiSelect
                     demos={group.demos}
-                    demoHrefPrefix="/my-team/demos"
+                    demoHrefPrefix={demoHrefPrefix}
                     showSideSelector
                     showReparse
                     canDelete

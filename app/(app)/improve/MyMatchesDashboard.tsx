@@ -397,7 +397,7 @@ export default function MyMatchesDashboard({
             <DemoUploadButton teamId={personalTeamId} demoType="self" />
           </div>
         ) : (
-          <MapFolderList mapGroups={mapGroups} />
+          <MapFolderList mapGroups={mapGroups} demoHrefPrefix="/my-team/demos?from=pugs" />
         )}
       </div>
 

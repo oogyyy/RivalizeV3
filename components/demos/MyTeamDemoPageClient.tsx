@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, formatDuration, getRatingColor } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -437,6 +438,9 @@ interface Props {
 }
 
 export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
+  const searchParams = useSearchParams()
+  const fromPugs = searchParams?.get('from') === 'pugs'
+
   const [demo, setDemo]     = useState<Demo>(initialDemo)
   const [parsing, setParsing] = useState(false)
   const [reparsing, setReparsing] = useState(false)
@@ -513,10 +517,10 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Top nav */}
       <div className="flex items-center justify-between">
-        <Link href="/my-team">
+        <Link href={fromPugs ? '/improve' : '/my-team'}>
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
             <ArrowLeft size={14} />
-            Back to My Team
+            {fromPugs ? 'Back to PUGS' : 'Back to My Team'}
           </Button>
         </Link>
         <div className="flex items-center gap-2">
