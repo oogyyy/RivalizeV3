@@ -520,7 +520,7 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
         <Link href={fromPugs ? '/improve' : '/my-team'}>
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
             <ArrowLeft size={14} />
-            {fromPugs ? 'Back to PUGS' : 'Back to My Team'}
+            {fromPugs ? 'Back to My Demos' : 'Back to My Team'}
           </Button>
         </Link>
         <div className="flex items-center gap-2">
