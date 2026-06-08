@@ -31,7 +31,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('playbooks')
-    .select('id, team_id, map, name, created_at, updated_at')
+    .select('id, team_id, map, name, opponent_name, created_at, updated_at')
     .in('team_id', teamIds)
     .order('updated_at', { ascending: false })
 

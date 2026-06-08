@@ -166,6 +166,85 @@ input:focus, textarea:focus, select:focus { outline: none; }
   --radius: 15px;
 }
 
+/* ── Light mode overrides ────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  /* shadcn token overrides */
+  --background:         226 25% 96%;
+  --card:               226 30% 99%;
+  --card-foreground:    226 30% 5%;
+  --popover:            226 25% 98%;
+  --popover-foreground: 226 30% 5%;
+  --foreground:         226 30% 5%;
+  --primary:            349 89% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary:          226 22% 93%;
+  --secondary-foreground: 226 30% 5%;
+  --muted:              226 22% 93%;
+  --muted-foreground:   226 10% 42%;
+  --accent:             256 70% 58%;
+  --accent-foreground:  0 0% 100%;
+  --destructive:        0 84% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border:             226 18% 87%;
+  --input:              226 22% 97%;
+  --ring:               349 89% 60%;
+
+  /* Surface scale */
+  --bg:       hsl(226 25% 96%);
+  --panel:    hsl(226 22% 93%);
+  --card:     hsl(226 30% 99%);
+  --card-2:   hsl(226 22% 95%);
+  --elevated: hsl(226 20% 91%);
+
+  /* Borders */
+  --border:        rgba(0,0,0,0.09);
+  --border-2:      rgba(0,0,0,0.15);
+  --border-strong: rgba(107,92,231,0.22);
+  --track:         rgba(0,0,0,0.06);
+  --hairline:      rgba(0,0,0,0.04);
+
+  /* Text */
+  --text:  #0D0E1A;
+  --muted: rgba(13,14,26,0.52);
+  --faint: rgba(13,14,26,0.28);
+
+  /* Accent — slightly deeper violet for contrast on light bg */
+  --accent:      #6B5CE7;
+  --accent-deep: color-mix(in srgb, #6B5CE7 74%, white);
+  --accent-fg:   #ffffff;
+  --accent-soft: color-mix(in srgb, #6B5CE7 10%, transparent);
+  --accent-line: color-mix(in srgb, #6B5CE7 28%, transparent);
+
+  /* Semantic — darker for readable contrast on light surfaces */
+  --signal: #0891B2;
+  --win:    #16A34A;
+  --loss:   #DC2626;
+  --ct:     #2563EB;
+  --tside:  #D97706;
+
+  /* Brand */
+  --pink:   #DB2777;
+  --purple: #7C3AED;
+  --teal:   #0891B2;
+
+  --brand-bg:           hsl(226 25% 96%);
+  --brand-card:         hsl(226 30% 99%);
+  --brand-purple:       #6B5CE7;
+  --brand-purple-hover: #5b4cd8;
+  --brand-cyan:         #0891B2;
+  --brand-pink:         #DB2777;
+  --brand-border:       rgba(0,0,0,0.09);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track { background: var(--bg); }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #c4c7d8; border-radius: 9999px; }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder { color: rgba(13,14,26,0.30); }
+
+[data-theme="light"] ::selection { background-color: var(--accent-soft); color: #0D0E1A; }
+
 /* Strong neon glows */
 .neon-pink      { text-shadow: 0 0 8px currentColor; }
 .neon-cyan      { text-shadow: 0 0 8px currentColor; }

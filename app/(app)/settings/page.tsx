@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useTheme } from '@/components/ThemeProvider'
 import {
   Bell, Shield, Brain, Palette, AlertTriangle,
   User, Check, Loader2, Eye, EyeOff,
@@ -123,6 +124,7 @@ function ConfirmDeleteDialog({
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { theme, setTheme } = useTheme()
   const [activeTab, setActiveTab] = useState('account')
   const [settings, setSettings] = useState<Partial<UserSettings>>({
     email_notifications: true,
@@ -589,11 +591,10 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
             <div>
               <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Dark Mode</p>
-              <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>Rivalize is optimized for dark mode</p>
+              <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>Toggle between dark and light interface</p>
             </div>
-            <ToggleSwitch checked={true} onChange={() => {}} />
+            <ToggleSwitch checked={theme === 'dark'} onChange={val => setTheme(val ? 'dark' : 'light')} />
           </div>
-          <p style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 4 }}>Light mode coming soon.</p>
         </div>
       )}
 
