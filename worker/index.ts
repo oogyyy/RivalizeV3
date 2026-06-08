@@ -43,19 +43,48 @@ interface DemoClaim {
 
 /**
  * Reclaim stale in-progress jobs.
- * Covers both the processing state (Phase A in-progress) and any 'parsed'
- * demo that sat unclaimed for a very long time (worker crash mid-apply).
+ *
+ * Increments retry_count on every reclaim so demos that get stuck repeatedly
+ * (e.g. worker OOM-crashing mid-parse before the catch block runs) eventually
+ * reach MAX_RETRIES and are marked 'failed' rather than looping forever.
  */
 async function reclaimStale(): Promise<void> {
   const cutoff = new Date(Date.now() - BASE_RECLAIM_MINUTES * 60 * 1000).toISOString()
 
-  // Reset any 'processing' jobs whose heartbeat is stale.
-  await supabase
+  // Find stale processing demos so we can handle retry exhaustion per-row.
+  const { data: stale } = await supabase
     .from('demos')
-    .update({ status: 'queued', processing_started_at: null })
+    .select('id, retry_count')
     .eq('status', 'processing')
     .not('processing_started_at', 'is', null)
     .lt('processing_started_at', cutoff)
+
+  if (stale && stale.length > 0) {
+    for (const demo of stale) {
+      const newRetryCount = (demo.retry_count ?? 0) + 1
+      const isPermanent   = newRetryCount >= MAX_RETRIES
+
+      await supabase
+        .from('demos')
+        .update({
+          status:                isPermanent ? 'failed' : 'queued',
+          processing_started_at: null,
+          queued_at:             new Date().toISOString(),
+          retry_count:           newRetryCount,
+          error_message: isPermanent
+            ? `Timed out ${MAX_RETRIES} times — check the Go parser logs or delete and re-upload.`
+            : `Timed out in processing (attempt ${newRetryCount}/${MAX_RETRIES}) — re-queued automatically.`,
+        })
+        .eq('id', demo.id)
+        .eq('status', 'processing') // guard against concurrent reclaim
+
+      if (isPermanent) {
+        console.error(`[worker][demoId=${demo.id}] Permanently failed after ${MAX_RETRIES} stale reclaims`)
+      } else {
+        console.warn(`[worker][demoId=${demo.id}] Stale reclaim — re-queued (attempt ${newRetryCount}/${MAX_RETRIES})`)
+      }
+    }
+  }
 
   // Defensive reset for 'queued' rows that somehow have a stale claim marker.
   await supabase

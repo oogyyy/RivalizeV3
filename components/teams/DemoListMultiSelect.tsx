@@ -336,29 +336,30 @@ export default function DemoListMultiSelect({
                   </p>
 
                   {/* Stuck / failed recovery */}
-                  {!selecting && isStuck && showReparse && (
-                    <div className={cn(
-                      'mt-2 flex items-start gap-2 rounded-lg px-2.5 py-1.5 border',
-                      demo.status === 'failed' ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20',
-                    )}>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn('text-[10px] font-medium', demo.status === 'failed' ? 'text-red-400' : 'text-amber-400')}>
-                          {demo.status === 'failed' ? 'Parsing failed'
-                            : !demo.processing_started_at
-                              ? !now || now - new Date(demo.created_at).getTime() < 10 * 60 * 1000 ? 'Queued…' : 'Stuck in processing'
-                              : !now || now - new Date(demo.processing_started_at).getTime() < 30 * 60 * 1000 ? 'Parsing…' : 'Stuck in processing'}
-                        </p>
-                        {demo.error_message && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5 break-words line-clamp-1">{demo.error_message}</p>
-                        )}
+                  {!selecting && isStuck && showReparse && (() => {
+                    const startedMs = demo.processing_started_at ? new Date(demo.processing_started_at).getTime() : null
+                    const isActive  = demo.status === 'processing' && (!now || (startedMs ? now - startedMs < 30 * 60 * 1000 : now - new Date(demo.created_at).getTime() < 10 * 60 * 1000))
+                    const showRetry = demo.status === 'failed' || !isActive
+                    const label     = demo.status === 'failed' ? 'Parsing failed' : isActive ? (startedMs ? 'Parsing…' : 'Queued for parsing…') : 'Stuck in processing'
+                    return (
+                      <div className={cn(
+                        'mt-2 flex items-start gap-2 rounded-lg px-2.5 py-1.5 border',
+                        demo.status === 'failed' ? 'bg-red-500/5 border-red-500/20'
+                          : isActive             ? 'bg-blue-500/5 border-blue-500/20'
+                                                 : 'bg-amber-500/5 border-amber-500/20',
+                      )}>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn('text-[10px] font-medium', demo.status === 'failed' ? 'text-red-400' : isActive ? 'text-blue-400' : 'text-amber-400')}>
+                            {label}
+                          </p>
+                          {demo.error_message && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5 break-words line-clamp-1">{demo.error_message}</p>
+                          )}
+                        </div>
+                        {showRetry && <ReparseButton demoId={demo.id} variant="prominent" />}
                       </div>
-                      {now && (demo.status === 'failed' ||
-                        (!demo.processing_started_at && now - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) ||
-                        (demo.processing_started_at && now - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
-                        <ReparseButton demoId={demo.id} variant="prominent" />
-                      )}
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {/* Team selector */}
                   {!selecting && showSideSelector && demo.status === 'completed' && (
@@ -470,38 +471,32 @@ export default function DemoListMultiSelect({
               </div>
 
               {/* Stuck / failed recovery row */}
-              {!selecting && isStuck && showReparse && (
-                <div className={cn(
-                  'ml-[22px] flex items-start gap-3 rounded-lg px-3 py-2 border',
-                  demo.status === 'failed'
-                    ? 'bg-red-500/5 border-red-500/20'
-                    : 'bg-amber-500/5 border-amber-500/20',
-                )}>
-                  <div className="flex-1 min-w-0">
-                    <p className={cn('text-[11px] font-medium', demo.status === 'failed' ? 'text-red-400' : 'text-amber-400')}>
-                      {demo.status === 'failed'
-                        ? 'Parsing failed'
-                        : !demo.processing_started_at
-                          ? !now || now - new Date(demo.created_at).getTime() < 10 * 60 * 1000
-                            ? 'Queued…'
-                            : 'Stuck in processing'
-                          : !now || now - new Date(demo.processing_started_at).getTime() < 30 * 60 * 1000
-                            ? 'Parsing…'
-                            : 'Stuck in processing'}
-                    </p>
-                    {demo.error_message && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5 break-words line-clamp-2" title={demo.error_message}>
-                        {demo.error_message}
+              {!selecting && isStuck && showReparse && (() => {
+                const startedMs = demo.processing_started_at ? new Date(demo.processing_started_at).getTime() : null
+                const isActive  = demo.status === 'processing' && (!now || (startedMs ? now - startedMs < 30 * 60 * 1000 : now - new Date(demo.created_at).getTime() < 10 * 60 * 1000))
+                const showRetry = demo.status === 'failed' || !isActive
+                const label     = demo.status === 'failed' ? 'Parsing failed' : isActive ? (startedMs ? 'Parsing…' : 'Queued for parsing…') : 'Stuck in processing'
+                return (
+                  <div className={cn(
+                    'ml-[22px] flex items-start gap-3 rounded-lg px-3 py-2 border',
+                    demo.status === 'failed' ? 'bg-red-500/5 border-red-500/20'
+                      : isActive             ? 'bg-blue-500/5 border-blue-500/20'
+                                             : 'bg-amber-500/5 border-amber-500/20',
+                  )}>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn('text-[11px] font-medium', demo.status === 'failed' ? 'text-red-400' : isActive ? 'text-blue-400' : 'text-amber-400')}>
+                        {label}
                       </p>
-                    )}
+                      {demo.error_message && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5 break-words line-clamp-2" title={demo.error_message}>
+                          {demo.error_message}
+                        </p>
+                      )}
+                    </div>
+                    {showRetry && <ReparseButton demoId={demo.id} variant="prominent" />}
                   </div>
-                  {now && (demo.status === 'failed' ||
-                    (!demo.processing_started_at && now - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) ||
-                    (demo.processing_started_at && now - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
-                    <ReparseButton demoId={demo.id} variant="prominent" />
-                  )}
-                </div>
-              )}
+                )
+              })()}
 
               {/* Team selector */}
               {!selecting && showSideSelector && demo.status === 'completed' && (

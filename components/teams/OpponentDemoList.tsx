@@ -334,36 +334,47 @@ export default function OpponentDemoList({ demos, folderId, teamId, isOwnerOrAdm
                 </div>
 
                 {/* Stuck / failed recovery */}
-                {!selecting && isOwnerOrAdmin && (demo.status === 'processing' || demo.status === 'failed') && (
-                  <div className={cn(
-                    'mt-3 flex items-start gap-3 rounded-lg px-3 py-2 border',
-                    demo.status === 'failed' ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20',
-                  )}>
-                    <div className="flex-1 min-w-0">
-                      <p className={cn('text-[11px] font-medium', demo.status === 'failed' ? 'text-red-400' : 'text-amber-400')}>
-                        {demo.status === 'failed'
-                          ? 'Parsing failed'
-                          : !demo.processing_started_at
-                            ? !now || now - new Date(demo.created_at).getTime() < 10 * 60 * 1000
-                              ? 'Queued…'
-                              : 'Stuck in processing'
-                            : !now || now - new Date(demo.processing_started_at).getTime() < 30 * 60 * 1000
-                              ? 'Parsing…'
-                              : 'Stuck in processing'}
-                      </p>
-                      {demo.error_message && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 break-words" title={demo.error_message}>
-                          {demo.error_message}
+                {!selecting && isOwnerOrAdmin && (demo.status === 'processing' || demo.status === 'failed') && (() => {
+                  const startedMs  = demo.processing_started_at ? new Date(demo.processing_started_at).getTime() : null
+                  const createdMs  = new Date(demo.created_at).getTime()
+                  const isStuck    = now && (
+                    startedMs  ? now - startedMs  >= 30 * 60 * 1000
+                               : now - createdMs  >= 10 * 60 * 1000
+                  )
+                  const label =
+                    demo.status === 'failed'   ? 'Parsing failed' :
+                    isStuck                    ? 'Stuck in processing' :
+                    startedMs                  ? 'Parsing…' :
+                                                 'Queued for parsing…'
+                  const showRetry = demo.status === 'failed' || isStuck
+                  const isActive  = demo.status === 'processing' && !isStuck
+
+                  return (
+                    <div className={cn(
+                      'mt-3 flex items-start gap-3 rounded-lg px-3 py-2 border',
+                      demo.status === 'failed'  ? 'bg-red-500/5 border-red-500/20'
+                        : isActive             ? 'bg-blue-500/5 border-blue-500/20'
+                                               : 'bg-amber-500/5 border-amber-500/20',
+                    )}>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          'text-[11px] font-medium',
+                          demo.status === 'failed' ? 'text-red-400'
+                            : isActive            ? 'text-blue-400'
+                                                  : 'text-amber-400',
+                        )}>
+                          {label}
                         </p>
-                      )}
+                        {demo.error_message && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 break-words" title={demo.error_message}>
+                            {demo.error_message}
+                          </p>
+                        )}
+                      </div>
+                      {showRetry && <ReparseButton demoId={demo.id} variant="prominent" />}
                     </div>
-                    {now && (demo.status === 'failed' ||
-                      (!demo.processing_started_at && now - new Date(demo.created_at).getTime() >= 10 * 60 * 1000) ||
-                      (demo.processing_started_at && now - new Date(demo.processing_started_at).getTime() >= 30 * 60 * 1000)) && (
-                      <ReparseButton demoId={demo.id} variant="prominent" />
-                    )}
-                  </div>
-                )}
+                  )
+                })()}
               </CardContent>
             </Card>
           )
