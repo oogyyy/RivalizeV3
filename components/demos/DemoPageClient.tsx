@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -541,6 +541,13 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
     setReparsing(false)
   }, [fetchDemo])
 
+  // Auto-refresh while the demo is waiting in queue or being processed.
+  useEffect(() => {
+    if (demo.status !== 'queued' && demo.status !== 'processing') return
+    const interval = setInterval(fetchDemo, 5_000)
+    return () => clearInterval(interval)
+  }, [demo.status, fetchDemo])
+
   const parsed = demo.parsed_data as ParsedDemoData | null
   const replayData = useFullParsedDemo(demo.id, parsed, activeTab === 'replay' || activeTab === '3d')
   const replayParsed = replayData.parsed ?? parsed
@@ -557,6 +564,9 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
           </Button>
         </Link>
         <div className="flex items-center gap-2">
+          {demo.status === 'queued' && (
+            <Badge variant="processing">Queued</Badge>
+          )}
           {demo.status === 'processing' && (
             <Badge variant="processing">Processing...</Badge>
           )}
@@ -566,16 +576,18 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
           {demo.status === 'completed' && (
             <Badge variant="neon">Analyzed</Badge>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={handleParse}
-            disabled={parsing || reparsing}
-          >
-            {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            {parsing ? 'Parsing...' : demo.status === 'completed' ? 'Re-parse' : 'Parse Now'}
-          </Button>
+          {demo.status !== 'queued' && demo.status !== 'processing' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleParse}
+              disabled={parsing || reparsing}
+            >
+              {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {parsing ? 'Parsing...' : demo.status === 'completed' ? 'Re-parse' : 'Parse Now'}
+            </Button>
+          )}
           {demo.status === 'completed' && (
             <Button
               variant="outline"
@@ -645,22 +657,33 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-              <BarChart3 size={28} className="text-muted-foreground" />
+              {(demo.status === 'queued' || demo.status === 'processing')
+                ? <Loader2 size={28} className="text-neon-green animate-spin" />
+                : <BarChart3 size={28} className="text-muted-foreground" />
+              }
             </div>
             <div>
               <p className="font-semibold text-foreground">
-                {demo.status === 'processing' ? 'Demo is being processed...' : 'No analysis data yet'}
+                {demo.status === 'queued'
+                  ? 'Waiting in queue…'
+                  : demo.status === 'processing'
+                  ? 'Demo is being processed…'
+                  : 'No analysis data yet'}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                {demo.status === 'processing'
-                  ? 'This usually takes a few seconds. Refresh to check.'
+                {demo.status === 'queued'
+                  ? 'Your demo will start processing shortly. This page refreshes automatically.'
+                  : demo.status === 'processing'
+                  ? 'Analysis in progress. This page refreshes automatically.'
                   : 'Click Parse Now to analyze this demo.'}
               </p>
             </div>
-            <Button variant="neon" onClick={handleParse} disabled={parsing} className="gap-2">
-              {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {parsing ? 'Parsing...' : 'Parse Demo'}
-            </Button>
+            {demo.status !== 'queued' && demo.status !== 'processing' && (
+              <Button variant="neon" onClick={handleParse} disabled={parsing} className="gap-2">
+                {parsing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                {parsing ? 'Parsing...' : 'Parse Demo'}
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
