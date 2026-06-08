@@ -308,37 +308,53 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', label,
     )
   }
 
+  const accentStep = (n: number) => (
+    <span
+      className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
+      style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' }}
+    >
+      {n}
+    </span>
+  )
+
   const modal = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+      <div className="rv-panel relative w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ borderRadius: 16 }}>
+        <span className="rv-tick rv-tick-tl" />
+        <span className="rv-tick rv-tick-br" />
+
+        {/* Gradient top bar */}
+        <div className="absolute top-0 left-0 right-0 h-0.5 rounded-t-2xl" style={{ background: 'linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 0%, transparent) 80%)' }} />
 
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card z-10">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">
-              {demoType === 'self' ? 'Upload My Team Demos' : 'Upload Opponent Demo'}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              .dem / .zst files · up to 500 MB per file
-            </p>
+        <div className="flex items-center justify-between px-5 pt-5 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'color-mix(in srgb, var(--accent) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)' }}>
+              <Upload size={16} style={{ color: 'var(--accent)' }} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-foreground leading-tight">
+                {demoType === 'self' ? 'Upload Team Demos' : 'Add Opponent'}
+              </h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5">.dem / .zst · up to 500 MB per file</p>
+            </div>
           </div>
           <button
             onClick={handleClose}
             disabled={isProcessing}
-            className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors disabled:opacity-40"
           >
-            <X size={18} />
+            <X size={15} />
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
-          {/* Step 1 — Opponent name (opponent flow only) */}
+        <div className="px-5 pb-5 space-y-4">
+
+          {/* Step 1 — Opponent name */}
           {demoType === 'opponent' && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
-                  STEP 1
-                </span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                {accentStep(1)}
                 <span className="text-xs font-semibold text-foreground">Who are you scouting?</span>
               </div>
               <input
@@ -347,31 +363,33 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', label,
                 onChange={e => setOpponentName(e.target.value)}
                 placeholder="e.g. NAVI, Astralis, Team Liquid…"
                 disabled={isProcessing}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#00ff87] disabled:opacity-50"
+                className="w-full rounded-lg border bg-white/[0.03] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 transition-colors"
+                style={{
+                  borderColor: opponentName ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'var(--border)',
+                  boxShadow: opponentName ? '0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent)' : 'none',
+                }}
               />
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
                 <Info size={10} className="shrink-0" />
-                After upload, you can set which team is the opponent from the demo row.
+                You can update the opponent name from the demo row after upload.
               </p>
             </div>
           )}
 
-          {/* File drop zone */}
+          {/* Step 2 — Drop zone */}
           <div className="space-y-2">
             {demoType === 'opponent' && (
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-bold text-neon-green bg-neon-green/10 border border-neon-green/20 rounded px-1.5 py-0.5">
-                  STEP 2
-                </span>
+              <div className="flex items-center gap-2">
+                {accentStep(2)}
                 <span className="text-xs font-semibold text-foreground">Add demo files</span>
               </div>
             )}
 
             {hasLargeFile && (
-              <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
+              <div className="flex items-start gap-2.5 rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-3 py-2.5">
                 <Info size={13} className="text-yellow-400 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-yellow-300">
-                  Large files upload directly to cloud storage — keep this tab open until all uploads complete.
+                <p className="text-[11px] text-yellow-300 leading-relaxed">
+                  Large files upload directly to cloud storage — keep this tab open until complete.
                 </p>
               </div>
             )}
@@ -379,89 +397,78 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', label,
             <div
               {...getRootProps()}
               className={cn(
-                'border-2 border-dashed rounded-lg p-7 text-center cursor-pointer transition-all duration-200',
+                'rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-200',
                 isDragActive
-                  ? 'border-[#00ff87] bg-[#00ff87]/5'
-                  : 'border-border hover:border-[#00ff87]/50 hover:bg-accent/30'
+                  ? 'border-[color:var(--accent)] bg-[color:var(--accent)]/5'
+                  : 'border-border/60 hover:border-[color:var(--accent)]/40 hover:bg-white/[0.02]'
               )}
             >
               <input {...getInputProps()} />
-              <Upload
-                size={26}
-                className={cn('mx-auto mb-2.5 transition-colors', isDragActive ? 'text-[#00ff87]' : 'text-muted-foreground')}
-              />
+              <div
+                className="w-10 h-10 rounded-xl mx-auto mb-3 flex items-center justify-center transition-colors"
+                style={{
+                  background: isDragActive ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'color-mix(in srgb, var(--border) 60%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--border) 80%, transparent)',
+                }}
+              >
+                <Upload size={18} style={{ color: isDragActive ? 'var(--accent)' : 'var(--muted-foreground)' }} />
+              </div>
               {isDragActive ? (
-                <p className="text-sm font-medium text-[#00ff87]">Drop .dem files here…</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>Drop files here…</p>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-foreground">Drag & drop demo files here</p>
-                  <p className="text-xs text-muted-foreground mt-1">.dem or .zst · up to 500 MB · click to browse</p>
+                  <p className="text-sm font-semibold text-foreground">Drag &amp; drop demo files</p>
+                  <p className="text-xs text-muted-foreground mt-1">.dem or .zst · up to 500 MB · <span className="underline underline-offset-2">click to browse</span></p>
                 </>
               )}
             </div>
 
-            {/* Per-file status rows */}
+            {/* Per-file rows */}
             {uploads.length > 0 && (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <div className="space-y-1.5 max-h-44 overflow-y-auto pr-0.5">
                 {uploads.map((upload, i) => {
                   const inFlight = upload.status === 'presigning' || upload.status === 'uploading' || upload.status === 'registering'
+                  const isDone   = upload.status === 'queued' || upload.status === 'adopted'
+                  const isErr    = upload.status === 'error'
                   return (
                     <div
                       key={i}
-                      className={cn(
-                        'flex items-center gap-3 rounded-md border bg-background/50 px-3 py-2',
-                        upload.status === 'error' ? 'border-red-500/40' : 'border-border'
-                      )}
+                      className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
+                      style={{
+                        borderColor: isErr ? 'color-mix(in srgb, var(--loss) 30%, transparent)'
+                          : isDone ? 'color-mix(in srgb, var(--win) 25%, transparent)'
+                          : 'var(--border)',
+                        background: isErr ? 'color-mix(in srgb, var(--loss) 5%, transparent)'
+                          : isDone ? 'color-mix(in srgb, var(--win) 4%, transparent)'
+                          : 'color-mix(in srgb, var(--card) 60%, transparent)',
+                      }}
                     >
-                      <FileVideo
-                        size={16}
-                        className={cn(
-                          'shrink-0',
-                          upload.status === 'queued' || upload.status === 'adopted' ? 'text-[#00ff87]'
-                          : upload.status === 'error' ? 'text-red-400'
-                          : 'text-muted-foreground'
-                        )}
-                      />
+                      <FileVideo size={15} className="shrink-0" style={{ color: isDone ? 'var(--win)' : isErr ? 'var(--loss)' : 'var(--muted-foreground)' }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-foreground truncate">{upload.file.name}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] text-muted-foreground shrink-0">
-                            {formatFileSize(upload.file.size)}
-                          </span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">{formatFileSize(upload.file.size)}</span>
                           {inFlight ? (
-                            <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-[#00ff87] rounded-full transition-all duration-300"
-                                style={{ width: `${upload.progress}%` }}
-                              />
+                            <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'color-mix(in srgb, var(--border) 80%, transparent)' }}>
+                              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${upload.progress}%`, background: 'var(--accent)' }} />
                             </div>
                           ) : (
-                            <span className={cn(
-                              'text-[10px] font-medium truncate',
-                              upload.status === 'queued' || upload.status === 'adopted' ? 'text-[#00ff87]'
-                              : upload.status === 'error' ? 'text-red-400'
-                              : 'text-muted-foreground'
-                            )}>
+                            <span className="text-[10px] font-medium truncate" style={{ color: isDone ? 'var(--win)' : isErr ? 'var(--loss)' : 'var(--muted-foreground)' }}>
                               {statusLabel(upload)}
                             </span>
                           )}
                         </div>
-                        {inFlight && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{statusLabel(upload)}</p>
-                        )}
+                        {inFlight && <p className="text-[10px] text-muted-foreground mt-0.5">{statusLabel(upload)}</p>}
                       </div>
                       <div className="shrink-0">
-                        {upload.status === 'queued' || upload.status === 'adopted'
-                          ? <CheckCircle2 size={14} className="text-[#00ff87]" />
-                          : upload.status === 'error'
-                          ? <AlertCircle size={14} className="text-red-400" />
+                        {isDone
+                          ? <CheckCircle2 size={14} style={{ color: 'var(--win)' }} />
+                          : isErr
+                          ? <AlertCircle size={14} style={{ color: 'var(--loss)' }} />
                           : inFlight
-                          ? <Loader2 size={14} className="text-[#00ff87] animate-spin" />
+                          ? <Loader2 size={14} className="animate-spin" style={{ color: 'var(--accent)' }} />
                           : (
-                            <button
-                              onClick={() => removeFile(i)}
-                              className="text-muted-foreground hover:text-red-400 transition-colors"
-                            >
+                            <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-foreground transition-colors">
                               <X size={14} />
                             </button>
                           )
@@ -474,88 +481,68 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', label,
             )}
           </div>
 
-          {/* Summary banner — shown after all uploads complete */}
+          {/* Summary banner */}
           {allSettled && (() => {
             const uploadedCount = uploads.filter(u => u.status === 'queued').length
             const adoptedCount  = uploads.filter(u => u.status === 'adopted').length
             const summaryParts: string[] = []
             if (uploadedCount > 0) summaryParts.push(`${uploadedCount} queued for parsing`)
             if (adoptedCount  > 0) summaryParts.push(`${adoptedCount} instantly added`)
+            const isSuccess = errorCount === 0
+            const isPartial = !isSuccess && queuedCount > 0
             return (
-              <div className={cn(
-                'flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm font-medium',
-                errorCount === 0
-                  ? 'border-[#00ff87]/30 bg-[#00ff87]/5 text-[#00ff87]'
-                  : queuedCount > 0
-                  ? 'border-yellow-500/30 bg-yellow-500/5 text-yellow-300'
-                  : 'border-red-500/30 bg-red-500/5 text-red-400'
-              )}>
-                {errorCount === 0 ? (
-                  <>
-                    <CheckCircle2 size={14} className="shrink-0" />
-                    {summaryParts.join(' · ')}
-                  </>
-                ) : queuedCount > 0 ? (
-                  <>
-                    <AlertCircle size={14} className="shrink-0" />
-                    {summaryParts.join(' · ')} · {errorCount} failed
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle size={14} className="shrink-0" />
-                    All uploads failed — check your connection and try again
-                  </>
-                )}
+              <div
+                className="flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm font-medium"
+                style={{
+                  borderColor: isSuccess ? 'color-mix(in srgb, var(--win) 30%, transparent)' : isPartial ? 'color-mix(in srgb, #facc15 30%, transparent)' : 'color-mix(in srgb, var(--loss) 30%, transparent)',
+                  background:  isSuccess ? 'color-mix(in srgb, var(--win) 6%, transparent)' : isPartial ? 'color-mix(in srgb, #facc15 6%, transparent)' : 'color-mix(in srgb, var(--loss) 6%, transparent)',
+                  color:       isSuccess ? 'var(--win)' : isPartial ? '#facc15' : 'var(--loss)',
+                }}
+              >
+                {isSuccess ? <CheckCircle2 size={14} className="shrink-0" /> : <AlertCircle size={14} className="shrink-0" />}
+                {isSuccess ? summaryParts.join(' · ')
+                  : isPartial ? `${summaryParts.join(' · ')} · ${errorCount} failed`
+                  : 'All uploads failed — check your connection and try again'}
               </div>
             )
           })()}
 
           {/* Footer */}
-          <div className="flex items-center justify-between pt-1 border-t border-border">
-            <span className="text-xs text-muted-foreground">
-              {uploads.length === 0
-                ? 'No files selected'
-                : isProcessing
-                ? `Uploading ${activeCount} of ${uploads.length} file${uploads.length !== 1 ? 's' : ''}…`
-                : allSettled
-                ? `${queuedCount} queued · ${errorCount} failed`
+          <div className="flex items-center justify-between pt-3 border-t border-border/60">
+            <span className="text-[11px] text-muted-foreground">
+              {uploads.length === 0 ? 'No files selected'
+                : isProcessing ? `Uploading ${activeCount} of ${uploads.length}…`
+                : allSettled ? `${queuedCount} queued · ${errorCount} failed`
                 : `${uploads.length} file${uploads.length !== 1 ? 's' : ''} selected`}
             </span>
             <div className="flex gap-2">
               {errorCount > 0 && !isProcessing && (
-                <Button variant="outline" size="sm" onClick={retryFailed} className="gap-1.5">
-                  <RefreshCw size={12} />
-                  Retry {errorCount} failed
+                <Button variant="ghost" size="sm" onClick={retryFailed} className="gap-1.5 text-xs h-8">
+                  <RefreshCw size={11} />
+                  Retry {errorCount}
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClose}
-                disabled={isProcessing}
-              >
+              <Button variant="secondary" size="sm" onClick={handleClose} disabled={isProcessing} className="h-8 text-xs">
                 {allSettled ? 'Done' : 'Cancel'}
               </Button>
               {pendingCount > 0 && (
                 <Button
-                  variant="neon"
                   size="sm"
                   onClick={uploadAll}
                   disabled={isProcessing || !canUpload}
-                  className="gap-2"
+                  className="gap-1.5 h-8 text-xs"
+                  style={{ background: 'var(--accent)', color: '#fff', boxShadow: 'none' }}
                   title={demoType !== 'self' && !opponentName.trim() ? 'Enter opponent name first' : undefined}
                 >
-                  {isProcessing ? (
-                    <><Loader2 size={14} className="animate-spin" /> Uploading…</>
-                  ) : (
-                    <><Upload size={14} /> Upload {pendingCount > 1 ? `${pendingCount} files` : 'demo'}</>
-                  )}
+                  {isProcessing
+                    ? <><Loader2 size={13} className="animate-spin" /> Uploading…</>
+                    : <><Upload size={13} /> Upload {pendingCount > 1 ? `${pendingCount} files` : 'demo'}</>
+                  }
                 </Button>
               )}
             </div>
           </div>
         </div>
-
       </div>
     </div>
   )
