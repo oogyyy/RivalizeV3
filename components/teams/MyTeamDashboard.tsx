@@ -212,6 +212,8 @@ export default function MyTeamDashboard({
   const stats = useMemo(() => computeStats(effectiveDemos), [effectiveDemos])
   const mapGroups = useMemo(() => buildMapGroups(effectiveDemos), [effectiveDemos])
 
+  const hasNoDemos = effectiveDemos.length === 0
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header */}
@@ -339,25 +341,74 @@ export default function MyTeamDashboard({
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        {[
-          { label: 'MATCHES', stat: stats.totalMatches || '—', sub: `${stats.totalWins}W ${stats.totalLosses}L ${stats.totalDraws}D` },
-          { label: 'WIN RATE', stat: stats.totalMatches > 0 ? `${Math.round(stats.winRate * 100)}%` : '—', sub: `${stats.totalWins} wins from ${stats.totalMatches}` },
-          { label: 'TEAM K/D', stat: stats.avgKD, sub: 'Combined team ratio' },
-          { label: 'AVG ADR', stat: stats.avgAdr, sub: 'Avg damage per round' },
-        ].map((s, i) => (
-          <div key={i} style={{ padding: 16, position: 'relative', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden', cursor: 'default' }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: ['var(--tside)', 'var(--signal)', 'var(--accent)', 'var(--ct)'][i] }} />
-            <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</p>
-            <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 4 }}>{s.stat}</p>
-            <p style={{ fontSize: 11, color: 'var(--muted)' }}>{s.sub}</p>
+      {/* Zero-demos onboarding */}
+      {hasNoDemos && (
+        <div style={{ borderRadius: 14, border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.05)', padding: '32px 28px', textAlign: 'center' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
+            <Film size={24} style={{ color: '#818cf8' }} />
           </div>
-        ))}
-      </div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Upload your first demo</h2>
+          <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 420, margin: '0 auto 24px', lineHeight: 1.6 }}>
+            Once you upload a self demo, Rivalize will analyse every round — win rates, ratings, map splits, T/CT performance, and player deep-dives.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Link href={`/my-team?upload=demo&team=${selectedTeamId}`}>
+              <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 9, background: 'var(--accent)', color: 'white', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                <Upload size={14} /> Upload Demo
+              </button>
+            </Link>
+            {myFaceitId && (
+              <Link href={`/my-team?faceit=true&team=${selectedTeamId}`}>
+                <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 9, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  <Download size={14} /> Import from FACEIT
+                </button>
+              </Link>
+            )}
+            {canInvite && (
+              <Link href={`/my-team?invite=true&team=${selectedTeamId}`}>
+                <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 9, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  <Send size={14} /> Invite Teammates
+                </button>
+              </Link>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 24, justifyContent: 'center', marginTop: 28, flexWrap: 'wrap' }}>
+            {[
+              { icon: BarChart3, label: 'Win rates & K/D', desc: 'Per map and per player' },
+              { icon: Target, label: 'T/CT splits', desc: 'Which side you struggle on' },
+              { icon: Brain, label: 'AI coaching', desc: 'Personalised drills and tips' },
+            ].map(({ icon: Icon, label, desc }) => (
+              <div key={label} style={{ textAlign: 'center' }}>
+                <Icon size={18} style={{ color: 'var(--muted)', margin: '0 auto 4px' }} />
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{label}</p>
+                <p style={{ fontSize: 11, color: 'var(--muted)' }}>{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Main Content: Trends + AI */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      {/* Stats Cards */}
+      {!hasNoDemos && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {[
+            { label: 'MATCHES', stat: stats.totalMatches || '—', sub: `${stats.totalWins}W ${stats.totalLosses}L ${stats.totalDraws}D` },
+            { label: 'WIN RATE', stat: stats.totalMatches > 0 ? `${Math.round(stats.winRate * 100)}%` : '—', sub: `${stats.totalWins} wins from ${stats.totalMatches}` },
+            { label: 'TEAM K/D', stat: stats.avgKD, sub: 'Combined team ratio' },
+            { label: 'AVG ADR', stat: stats.avgAdr, sub: 'Avg damage per round' },
+          ].map((s, i) => (
+            <div key={i} style={{ padding: 16, position: 'relative', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden', cursor: 'default' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: ['var(--tside)', 'var(--signal)', 'var(--accent)', 'var(--ct)'][i] }} />
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</p>
+              <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 4 }}>{s.stat}</p>
+              <p style={{ fontSize: 11, color: 'var(--muted)' }}>{s.sub}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Main Content: Trends + AI — only when demos exist */}
+      {!hasNoDemos && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {/* Left: Trends */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Performance Trends — real data from completed demos sorted oldest→newest */}
@@ -441,10 +492,10 @@ export default function MyTeamDashboard({
             ))}
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Roster + Map Performance */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 14 }}>
+      {!hasNoDemos && <div style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 14 }}>
         {/* Roster */}
         <div style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden', position: 'relative' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'var(--accent)' }} />
@@ -530,10 +581,10 @@ export default function MyTeamDashboard({
             })}
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Map Pool */}
-      <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
+      {!hasNoDemos && <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
         <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Layers size={16} style={{ color: 'var(--signal)' }} /> Map Pool
         </p>
@@ -552,10 +603,10 @@ export default function MyTeamDashboard({
             })}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Demos */}
-      <div>
+      {!hasNoDemos && <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <Film size={16} style={{ color: 'var(--signal)' }} />
           <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>My Team&apos;s Demos</p>
@@ -566,7 +617,7 @@ export default function MyTeamDashboard({
           )}
         </div>
         <MapFolderList mapGroups={mapGroups} onSideChange={handleSideChange} />
-      </div>
+      </div>}
     </div>
   )
 }
