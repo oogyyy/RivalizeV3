@@ -4,12 +4,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useChat } from 'ai/react'
 import {
-  BookOpen, Save, ArrowLeft, Sparkles, Loader2, CheckCircle2,
-  Swords, Shield, Crosshair, Users, BarChart3, Coins,
+  Save, ArrowLeft, Sparkles, Loader2, CheckCircle2,
+  Swords, Shield, Crosshair, Users, Coins,
   Brain, Send, RotateCcw, AlertCircle, RefreshCw, Map, MessageSquare, Target,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 type SectionId = 't_side' | 'ct_side' | 'a_execute' | 'b_execute' | 'roles' | 'economy'

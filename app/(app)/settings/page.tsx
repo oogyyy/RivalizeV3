@@ -136,7 +136,6 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
 
   // Password change
-  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -208,7 +207,6 @@ export default function SettingsPage() {
       setPasswordError(error.message)
     } else {
       setPasswordSaved(true)
-      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => setPasswordSaved(false), 3000)

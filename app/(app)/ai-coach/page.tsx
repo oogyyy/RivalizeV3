@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useChat } from 'ai/react'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
@@ -235,7 +235,6 @@ export default function AIScoutPage() {
     isLoading,
     error,
     append,
-    reload,
     setMessages,
   } = useChat({
     api: '/api/ai/coach',
@@ -424,7 +423,7 @@ export default function AIScoutPage() {
               ) : opponents.length === 0 ? (
                 <div style={{ borderRadius: 9, border: '1px solid var(--border)', background: 'var(--card)', padding: '10px 12px', fontSize: 12, color: 'var(--muted)' }}>
                   No opponents yet —{' '}
-                  <a href="/opponents" style={{ color: 'var(--win)' }}>upload a demo first</a>
+                  <Link href="/opponents" style={{ color: 'var(--win)' }}>upload a demo first</Link>
                 </div>
               ) : (
                 <select
@@ -718,10 +717,10 @@ export default function AIScoutPage() {
                   </p>
                 )}
                 {mode === 'opponent' && opponents.length === 0 && !loadingOpponents && (
-                  <a href="/opponents" style={{ marginTop: 18, fontSize: 12, color: 'var(--signal)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Link href="/opponents" style={{ marginTop: 18, fontSize: 12, color: 'var(--signal)', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <Target size={12} />
                     Upload your first opponent demo →
-                  </a>
+                  </Link>
                 )}
               </div>
             ) : (

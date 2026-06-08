@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, type ChangeEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import {
@@ -42,7 +41,6 @@ export default function ProDemosClient({
   teams: Team[]
   defaultTeamId: string | null
 }) {
-  const router = useRouter()
   const [selectedTeamId, setSelectedTeamId] = useState(defaultTeamId ?? '')
   const [matches, setMatches] = useState<ProMatch[]>([])
   const [total, setTotal] = useState(0)

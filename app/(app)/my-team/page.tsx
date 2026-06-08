@@ -82,7 +82,7 @@ export default async function MyTeamPage({
       .limit(50),
   ])
 
-  const memberIds = (membersRes.data ?? []).map((m: { user_id: string }) => m.user_id).filter(Boolean)
+  const _memberIds = (membersRes.data ?? []).map((m: { user_id: string }) => m.user_id).filter(Boolean)
   const myFaceitId = profileRes.data?.faceit_id ?? null
   const demos = (demosRes.data ?? []) as DemoRowData[]
 

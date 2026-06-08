@@ -147,7 +147,7 @@ function TeamEmblem({ name, icon: Icon, color, size = 52 }: {
 }
 
 function MapTile({
-  map, mapState, score, isSuggested, isLocked, onSelect, currentAction,
+  map, mapState, score, isSuggested, isLocked, onSelect, thumbUrl,
 }: {
   map: string
   mapState: MapState
@@ -155,7 +155,8 @@ function MapTile({
   isSuggested: boolean
   isLocked: boolean
   onSelect: () => void
-  currentAction: 'ban' | 'pick' | 'decider' | null
+  currentAction?: 'ban' | 'pick' | 'decider' | null
+  thumbUrl?: string
 }) {
   const label = MAP_LABELS[map] ?? map
   const color = MAP_COLORS[map] ?? 'var(--accent)'
@@ -176,6 +177,26 @@ function MapTile({
         mapState === 'picked' && 'border-[#34E2A0]/25 bg-[#34E2A0]/5 opacity-80 cursor-not-allowed',
       )}
     >
+      {/* Map thumbnail background */}
+      {thumbUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={thumbUrl}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+          style={{ opacity: mapState === null ? 0.18 : 0.10 }}
+        />
+      )}
+
+      {/* Tint overlay for banned/picked state */}
+      {mapState === 'banned' && (
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(255,107,122,0.12)' }} />
+      )}
+      {mapState === 'picked' && (
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(52,226,160,0.10)' }} />
+      )}
+
       {/* Color accent top strip */}
       <div
         className="absolute top-0 left-0 right-0 h-0.5 rounded-t-xl"
@@ -232,8 +253,8 @@ function MapTile({
   )
 }
 
-function SequenceDot({ step, action, done, active, mapLabel }: {
-  step: VetoStep; action: MapState | 'decider'; done: boolean; active: boolean; mapLabel: string | null
+function SequenceDot({ step, done, active, mapLabel }: {
+  step: VetoStep; action?: MapState | 'decider'; done: boolean; active: boolean; mapLabel: string | null
 }) {
   const ring = done && step.action === 'ban'
     ? '#FF6B7A'
@@ -294,7 +315,9 @@ export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, ha
   const [aiError, setAiError] = useState('')
 
   const opponent = opponents.find(o => o.id === selectedOpponentId) ?? null
-  const oppPicks = opponent?.mapPicks ?? {}
+
+  // Memoised so oppPicks reference doesn't change on every render
+  const oppPicks = useMemo(() => opponent?.mapPicks ?? {}, [opponent])
   const maxOppPicks = Math.max(1, ...Object.values(oppPicks).concat([1]))
 
   const sequence = VETO_SEQUENCES[format]

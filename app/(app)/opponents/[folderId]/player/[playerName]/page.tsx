@@ -5,7 +5,6 @@ import { getCurrentUser } from '@/lib/auth/get-user'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import PlayerDeepDive from '@/components/demos/PlayerDeepDive'
 import type { ParsedDemoData, PlayerStats, Kill } from '@/types/database'
 

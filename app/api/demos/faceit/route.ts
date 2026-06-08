@@ -221,7 +221,7 @@ export async function POST(request: Request) {
     const filename = `faceit-${matchId}.dem.gz`
     const r2Key = `${teamId}/faceit-${Date.now()}-${filename}`
 
-    const opponentFaction = playerFaction === 'faction1' ? 'faction2' : 'faction1'
+    const _opponentFaction = playerFaction === 'faction1' ? 'faction2' : 'faction1'
     const opponentSlug = slugify(opponentName)
     const matchDate = new Date(match.started_at * 1000).toISOString()
 

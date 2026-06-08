@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ExternalLink, Loader2, Zap } from 'lucide-react'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'

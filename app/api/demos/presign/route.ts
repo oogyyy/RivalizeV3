@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { teamId, filename, fileSize } = parsed.data
+  const { teamId, filename, fileSize: _fileSize } = parsed.data
 
   const lowerName = filename.toLowerCase()
   if (!lowerName.endsWith('.dem') && !lowerName.endsWith('.zst')) {
