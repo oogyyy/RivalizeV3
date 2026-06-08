@@ -461,7 +461,6 @@ export default function VetoClient({ teams, selfMapStatsByTeam, opponents, activ
                     {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 )}
-                <p className="text-xs text-muted-foreground">ESEA Advanced</p>
               </div>
             </div>
 
