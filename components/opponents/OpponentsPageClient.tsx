@@ -193,12 +193,6 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
                       <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 5, lineHeight: 1 }}>
                         {opponent.opponent_display_name}
                       </p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 500 }}>EU · FACEIT</span>
-                        <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: '#92400e', color: '#fcd34d', letterSpacing: '0.03em' }}>
-                          LVL 10
-                        </span>
-                      </div>
                     </div>
                   </div>
                   <Trophy size={15} style={{ color: 'var(--faint)', flexShrink: 0, marginTop: 2 }} />
