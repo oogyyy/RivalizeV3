@@ -1,5 +1,6 @@
 "use client";
 import { useState } from 'react';
+import { FlaskConical } from 'lucide-react';
 import Navigation, { type TabId } from './Navigation';
 import DashboardView   from './DashboardView';
 import MyTeamView      from './MyTeamView';
@@ -59,8 +60,18 @@ export default function ScoutShell({ currentUser = 'Mikael' }: Props) {
         currentUser={currentUser}
         onLogout={() => handleTabChange('dashboard')}
       />
-      <main className="flex-1 overflow-hidden relative">
-        {renderView()}
+      <main className="flex-1 overflow-hidden relative flex flex-col">
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-[11px] shrink-0">
+          <FlaskConical size={12} className="shrink-0" />
+          <span>
+            <strong>Preview — sample data only.</strong>
+            {' '}Stats, opponents, and match history shown here are not from your account.
+            {' '}The Scout Hub will be connected to your real demos in a future update.
+          </span>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          {renderView()}
+        </div>
       </main>
     </div>
   );

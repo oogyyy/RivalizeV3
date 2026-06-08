@@ -66,13 +66,15 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
       const lastActivity = demos.map(d => d.match_date ?? d.created_at).sort().at(-1) ?? ''
       const completedDemos = demos.length
 
-      // Best map from maps_played
+      // Best map from maps_played (most frequently played map)
       const mapsPlayed = stats?.maps_played ?? {}
-      const bestMap = Object.entries(mapsPlayed).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
-      const bestMapLabel = bestMap ? bestMap.replace(/^de_/, '').replace(/^(.)/, c => c.toUpperCase()) : 'Mirage'
-      const bestMapWr = winRate > 0 ? Math.min(95, winRate + Math.floor(Math.random() * 15)) : 65
+      const bestMapEntry = Object.entries(mapsPlayed).sort((a, b) => b[1] - a[1])[0] ?? null
+      const bestMapLabel = bestMapEntry
+        ? bestMapEntry[0].replace(/^de_/, '').replace(/^(.)/, c => c.toUpperCase())
+        : null
+      const bestMapCount = bestMapEntry?.[1] ?? 0
 
-      return { ...folder, index: i, demoCount: completedDemos, winRate, totalMatches, lastActivity, bestMap: bestMapLabel, bestMapWr }
+      return { ...folder, index: i, demoCount: completedDemos, winRate, totalMatches, lastActivity, bestMap: bestMapLabel, bestMapCount }
     })
   }, [folders, demosBySlug])
 
@@ -214,24 +216,30 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
                   ))}
                 </div>
 
-                {/* Best map win rate bar */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      Best Map Win Rate{' '}
-                      <span style={{ color: 'var(--win)', fontWeight: 600 }}>({opponent.bestMap})</span>
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--win)', fontFamily: 'var(--font-mono)' }}>
-                      {opponent.bestMapWr}%
-                    </span>
+                {/* Most played map */}
+                {opponent.bestMap ? (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                        Most Played Map
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
+                        {opponent.bestMap}
+                        <span style={{ color: 'var(--muted)', fontWeight: 400 }}>{' '}({opponent.bestMapCount}g)</span>
+                      </span>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 3, background: 'var(--hairline)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: opponent.totalMatches > 0 ? `${Math.min(100, (opponent.bestMapCount / opponent.totalMatches) * 100)}%` : '0%',
+                        borderRadius: 3,
+                        background: 'linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 70%, var(--signal)))',
+                      }} />
+                    </div>
                   </div>
-                  <div style={{ height: 5, borderRadius: 3, background: 'var(--hairline)', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: `${opponent.bestMapWr}%`, borderRadius: 3,
-                      background: 'linear-gradient(90deg, var(--win), color-mix(in srgb, var(--win) 70%, var(--signal)))',
-                    }} />
-                  </div>
-                </div>
+                ) : (
+                  <div style={{ marginBottom: 14, height: 33 }} />
+                )}
 
                 {/* Action buttons */}
                 <div style={{ display: 'flex', gap: 8 }}>
