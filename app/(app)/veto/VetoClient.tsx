@@ -7,6 +7,7 @@ import {
   RotateCcw, Trophy, Swords, Shuffle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { MAP_THUMBS } from '@/lib/map-config'
 
 /* ─── types ────────────────────────────────────────────────────── */
 
@@ -19,10 +20,10 @@ interface OpponentEntry {
 }
 
 interface Props {
-  selfMapStats: Record<string, MapStat>
+  teams: Array<{ id: string; name: string }>
+  selfMapStatsByTeam: Record<string, Record<string, MapStat>>
   opponents: OpponentEntry[]
   activeDutyMaps: string[]
-  hasData: boolean
 }
 
 type MapState = null | 'banned' | 'picked'
@@ -147,7 +148,7 @@ function TeamEmblem({ name, icon: Icon, color, size = 52 }: {
 }
 
 function MapTile({
-  map, mapState, score, isSuggested, isLocked, onSelect, currentAction,
+  map, mapState, score, isSuggested, isLocked, onSelect, currentAction, thumbUrl,
 }: {
   map: string
   mapState: MapState
@@ -156,6 +157,7 @@ function MapTile({
   isLocked: boolean
   onSelect: () => void
   currentAction: 'ban' | 'pick' | 'decider' | null
+  thumbUrl?: string
 }) {
   const label = MAP_LABELS[map] ?? map
   const color = MAP_COLORS[map] ?? 'var(--accent)'
@@ -176,6 +178,25 @@ function MapTile({
         mapState === 'picked' && 'border-[#34E2A0]/25 bg-[#34E2A0]/5 opacity-80 cursor-not-allowed',
       )}
     >
+      {/* Map thumbnail background */}
+      {thumbUrl && (
+        <img
+          src={thumbUrl}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+          style={{ opacity: mapState === null ? 0.18 : 0.10 }}
+        />
+      )}
+
+      {/* Tint overlay for banned/picked state */}
+      {mapState === 'banned' && (
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(255,107,122,0.12)' }} />
+      )}
+      {mapState === 'picked' && (
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(52,226,160,0.10)' }} />
+      )}
+
       {/* Color accent top strip */}
       <div
         className="absolute top-0 left-0 right-0 h-0.5 rounded-t-xl"
@@ -203,7 +224,7 @@ function MapTile({
 
       {/* Map name */}
       <span className={cn(
-        'text-xs font-bold mt-3 leading-tight',
+        'text-xs font-bold mt-3 leading-tight relative',
         mapState === 'banned' ? 'text-[#FF6B7A]' : mapState === 'picked' ? 'text-[#34E2A0]' : 'text-foreground',
       )}>
         {label}
@@ -212,7 +233,7 @@ function MapTile({
       {/* State label */}
       {mapState !== null && (
         <span className={cn(
-          'text-[9px] font-semibold uppercase tracking-wider',
+          'text-[9px] font-semibold uppercase tracking-wider relative',
           mapState === 'banned' ? 'text-[#FF6B7A]/70' : 'text-[#34E2A0]/70'
         )}>
           {mapState === 'banned' ? 'Banned' : 'Picked'}
@@ -221,7 +242,7 @@ function MapTile({
 
       {/* Win rate bar */}
       {isAvailable && pct !== null && (
-        <div className="w-full mt-auto space-y-0.5">
+        <div className="w-full mt-auto space-y-0.5 relative">
           <div className="h-1 bg-white/10 rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
           </div>
@@ -284,14 +305,20 @@ function SequenceDot({ step, action, done, active, mapLabel }: {
 
 /* ─── main component ────────────────────────────────────────────── */
 
-export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, hasData }: Props) {
+export default function VetoClient({ teams, selfMapStatsByTeam, opponents, activeDutyMaps }: Props) {
   const [format, setFormat] = useState<Format>('bo3')
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id ?? '')
   const [selectedOpponentId, setSelectedOpponentId] = useState('')
   const [completedActions, setCompletedActions] = useState<Array<{ map: string; step: VetoStep }>>([])
   const [showAIPanel, setShowAIPanel] = useState(true)
   const [aiRecommendation, setAiRecommendation] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
+
+  // Derive selfMapStats from the selected team
+  const selfMapStats = selfMapStatsByTeam[selectedTeamId] ?? {}
+
+  const hasData = teams.length > 0
 
   const opponent = opponents.find(o => o.id === selectedOpponentId) ?? null
   const oppPicks = opponent?.mapPicks ?? {}
@@ -382,7 +409,7 @@ export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, ha
     return scores.reduce((a, b) => a + b, 0) / scores.length
   }, [pickedMaps, selfMapStats])
 
-  const yourTeam = 'Your Team'
+  const yourTeam = teams.find(t => t.id === selectedTeamId)?.name ?? 'My Team'
   const opponentName = opponent?.name ?? 'Opponent'
 
   return (
@@ -423,7 +450,17 @@ export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, ha
             <div className="flex items-center gap-3 flex-1">
               <TeamEmblem name={yourTeam} icon={Shield} color="var(--accent)" />
               <div>
-                <p className="text-base font-bold text-foreground">{yourTeam}</p>
+                {teams.length <= 1 ? (
+                  <p className="text-base font-bold text-foreground">{yourTeam}</p>
+                ) : (
+                  <select
+                    value={selectedTeamId}
+                    onChange={e => { setSelectedTeamId(e.target.value); reset() }}
+                    className="text-sm font-bold bg-transparent border-none text-foreground focus:outline-none cursor-pointer"
+                  >
+                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                )}
                 <p className="text-xs text-muted-foreground">ESEA Advanced</p>
               </div>
             </div>
@@ -530,6 +567,7 @@ export default function VetoClient({ selfMapStats, opponents, activeDutyMaps, ha
                   isLocked={!isAvailable || isComplete}
                   onSelect={() => isAvailable && !isComplete && selectMap(map)}
                   currentAction={currentStep?.action ?? null}
+                  thumbUrl={MAP_THUMBS[map]}
                 />
               )
             })}
