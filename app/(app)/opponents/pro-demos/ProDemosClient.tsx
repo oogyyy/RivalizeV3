@@ -140,7 +140,7 @@ export default function ProDemosClient({
               <select
                 value={selectedTeamId}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedTeamId(e.target.value)}
-                className="text-sm bg-card border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-neon-green/50"
+                className="text-sm bg-card border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-[color:var(--accent)]/50"
               >
                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
@@ -174,7 +174,7 @@ export default function ProDemosClient({
                   className={cn(
                     'px-3 py-1.5 font-medium transition-colors whitespace-nowrap',
                     mapFilter === m.value
-                      ? 'bg-neon-green/20 text-neon-green'
+                      ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent)]'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent/30'
                   )}
                 >
@@ -191,7 +191,7 @@ export default function ProDemosClient({
               value={teamSearch}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setTeamSearch(e.target.value)}
               placeholder="Search teams…"
-              className="pl-8 pr-3 py-1.5 text-xs bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-neon-green/50 w-40"
+              className="pl-8 pr-3 py-1.5 text-xs bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[color:var(--accent)]/50 w-40"
             />
           </div>
         </div>
@@ -199,7 +199,7 @@ export default function ProDemosClient({
         {/* Match list */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 size={24} className="text-neon-green animate-spin" />
+            <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} />
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground text-sm">
@@ -231,7 +231,7 @@ export default function ProDemosClient({
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">
-                      <span className="text-neon-green">{match.team1}</span>
+                      <span style={{ color: 'var(--accent)' }}>{match.team1}</span>
                       <span className="text-muted-foreground mx-1.5">vs</span>
                       <span className="text-red-400">{match.team2}</span>
                     </p>
@@ -333,7 +333,7 @@ export default function ProDemosClient({
             <p className="font-semibold text-foreground">About this library</p>
             <p>
               Recent professional CS2 results provided by{' '}
-              <a href="https://www.pandascore.co" target="_blank" rel="noopener noreferrer" className="text-neon-green hover:underline">
+              <a href="https://www.pandascore.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }} className="hover:underline">
                 PandaScore
               </a>.
               Demo files aren&apos;t distributed by any public API — click <span className="text-foreground font-medium">Import</span> on a match

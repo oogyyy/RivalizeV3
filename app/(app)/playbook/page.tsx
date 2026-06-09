@@ -165,21 +165,7 @@ function PlaybookListInner() {
         </div>
         <button
           onClick={() => setShowNew(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px',
-            borderRadius: 9, border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)',
-            background: 'color-mix(in srgb, var(--accent) 14%, transparent)',
-            color: 'var(--accent)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            transition: 'all 0.14s', flexShrink: 0,
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--accent) 22%, transparent)'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--accent) 60%, transparent)'
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--accent) 14%, transparent)'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--accent) 40%, transparent)'
-          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
         >
           <Plus size={15} />
           New Playbook

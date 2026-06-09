@@ -301,7 +301,7 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', label,
         variant="neon"
         onClick={() => setOpen(true)}
         className="gap-2"
-        style={label ? { background: 'var(--accent)', color: '#fff', boxShadow: 'none' } : undefined}
+        style={{ background: 'var(--accent)', color: '#fff', boxShadow: 'none' }}
       >
         <TriggerIcon size={15} />
         {triggerLabel}

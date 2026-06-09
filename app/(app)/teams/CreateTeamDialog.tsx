@@ -61,10 +61,11 @@ export default function CreateTeamDialog({ asCard }: CreateTeamDialogProps) {
   const trigger = asCard ? (
     <button
       onClick={() => setOpen(true)}
-      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-dashed border-border hover:border-neon-green/40 hover:bg-card/60 transition-all duration-150 group cursor-pointer"
+      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-dashed border-border hover:border-[color:var(--accent)]/40 hover:bg-card/60 transition-all duration-150 group cursor-pointer"
     >
-      <div className="w-9 h-9 rounded-md bg-neon-green/5 border border-dashed border-neon-green/20 flex items-center justify-center shrink-0 group-hover:border-neon-green/50 transition-colors">
-        <Plus size={16} className="text-neon-green/50 group-hover:text-neon-green transition-colors" />
+      <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0 transition-colors"
+        style={{ background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px dashed color-mix(in srgb, var(--accent) 25%, transparent)' }}>
+        <Plus size={16} style={{ color: 'color-mix(in srgb, var(--accent) 60%, transparent)' }} className="group-hover:text-[color:var(--accent)] transition-colors" />
       </div>
       <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
         Create new team
@@ -87,8 +88,8 @@ export default function CreateTeamDialog({ asCard }: CreateTeamDialogProps) {
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-border">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded bg-neon-green/10 flex items-center justify-center">
-                  <Users size={16} className="text-neon-green" />
+                <div className="w-8 h-8 rounded flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)' }}>
+                  <Users size={16} style={{ color: 'var(--accent)' }} />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-foreground">Create Team</h2>

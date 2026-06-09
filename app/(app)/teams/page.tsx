@@ -81,17 +81,17 @@ export default async function TeamsPage() {
           {teams.length > 0 && (
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <Users size={12} className="text-neon-green" />
+                <Users size={12} style={{ color: 'var(--accent)' }} />
                 <span className="font-semibold text-foreground">{teams.length}</span> team{teams.length !== 1 ? 's' : ''}
               </span>
               <span className="text-border">|</span>
               <span className="flex items-center gap-1">
-                <Shield size={12} className="text-neon-green" />
+                <Shield size={12} style={{ color: 'var(--accent)' }} />
                 <span className="font-semibold text-foreground">{ownedCount}</span> owned
               </span>
               <span className="text-border">|</span>
               <span className="flex items-center gap-1">
-                <FileVideo size={12} className="text-neon-green" />
+                <FileVideo size={12} style={{ color: 'var(--accent)' }} />
                 <span className="font-semibold text-foreground">{totalDemos}</span> demos
               </span>
             </div>
@@ -103,8 +103,8 @@ export default async function TeamsPage() {
       {/* Teams list */}
       {teams.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-full bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mb-4">
-            <Users size={28} className="text-neon-green" />
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)' }}>
+            <Users size={28} style={{ color: 'var(--accent)' }} />
           </div>
           <h2 className="text-lg font-bold text-foreground mb-1">No teams yet</h2>
           <p className="text-sm text-muted-foreground max-w-xs mb-5">

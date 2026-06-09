@@ -10,11 +10,11 @@ const buttonVariants = cva(
       variant: {
         /* Primary CTA */
         default:
-          'bg-primary text-white shadow-[0_0_18px_rgba(255,45,120,0.28)] hover:opacity-90 active:scale-[0.98]',
+          'bg-[color:var(--accent)] text-white shadow-[0_2px_12px_color-mix(in_srgb,var(--accent)_30%,transparent)] hover:opacity-90 active:scale-[0.98]',
 
-        /* Pink accent — alias of default */
+        /* Accent-filled — primary action button */
         neon:
-          'bg-primary text-white shadow-[0_0_18px_rgba(255,45,120,0.28)] hover:opacity-90 active:scale-[0.98]',
+          'bg-[color:var(--accent)] text-white shadow-[0_2px_12px_color-mix(in_srgb,var(--accent)_30%,transparent)] hover:opacity-90 active:scale-[0.98]',
 
         /* Filled secondary */
         secondary:
