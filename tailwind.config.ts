@@ -89,6 +89,7 @@ const config: Config = {
         'fade-in':       'fade-in 0.2s ease-out',
         'reparse-fill':  'reparse-fill 30s ease-out forwards',
         'shimmer':       'shimmer 1.5s linear infinite',
+        'rv-shimmer':    'rv-shimmer 2s ease-in-out infinite',
         'fade-in-up':    'fade-in-up 0.35s ease-out both',
         'marquee':       'marquee 28s linear infinite',
         'glow':          'glow 2s ease-in-out infinite',
@@ -129,6 +130,10 @@ const config: Config = {
         'glow': {
           '0%, 100%': { filter: 'drop-shadow(0 0 4px rgba(112, 71, 235, 0.4))' },
           '50%':       { filter: 'drop-shadow(0 0 12px rgba(112, 71, 235, 0.8))' },
+        },
+        'rv-shimmer': {
+          '0%':   { backgroundPosition: '-400% 0' },
+          '100%': { backgroundPosition: '400% 0' },
         },
       },
     },

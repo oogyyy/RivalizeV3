@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Rivalize">
+  <rect width="512" height="512" rx="112" fill="#0d0f1e"/>
+  <rect width="512" height="512" rx="112" fill="url(#bg-grad)" opacity="0.6"/>
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1040"/>
+      <stop offset="100%" stop-color="#0d0f1e"/>
+    </linearGradient>
+    <linearGradient id="bolt-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a394ff"/>
+      <stop offset="100%" stop-color="#8B7CFF"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Glow layer -->
+  <path d="M176 88h176L280 228h152L200 424l48-148H108L176 88z"
+    fill="#8B7CFF" opacity="0.25" filter="url(#glow)"/>
+  <!-- Main bolt -->
+  <path d="M176 88h176L280 228h152L200 424l48-148H108L176 88z"
+    fill="url(#bolt-grad)"/>
+  <!-- Cyan accent edge -->
+  <path d="M176 88h176L280 228h152L200 424l48-148H108L176 88z"
+    fill="none" stroke="#22D3EE" stroke-width="3" opacity="0.35"/>
+</svg>
