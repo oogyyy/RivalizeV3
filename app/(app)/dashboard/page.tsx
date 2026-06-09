@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic'
 
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
@@ -50,16 +49,16 @@ export default async function DashboardPage() {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
 
-  const supabase = await createClient()
   const admin = createAdminClient()
 
   // ── Fetch memberships first (needed to scope all other queries) ──────────────
-  const { data: memberships } = await admin
+  const { data: membershipsRaw } = await admin
     .from('team_members')
     .select('role, team_id')
     .eq('user_id', user.id)
 
-  const teamIds       = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
+  const memberships = (membershipsRaw ?? []) as Array<{ role: string; team_id: string }>
+  const teamIds       = memberships.map((m) => m.team_id).filter(Boolean)
   const primaryTeamId = teamIds[0] ?? null
 
   // ── Parallel fetch: all queries that depend only on teamIds ──────────────────

@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import {
-  ArrowLeft, ThumbsUp, ThumbsDown, Globe, Map, Trophy,
-  TrendingUp, Brain, Clock, BarChart3,
+  ArrowLeft, ThumbsUp, ThumbsDown, Map, Trophy,
+  TrendingUp, Brain, Clock,
 } from 'lucide-react'
 
 function mapLabel(raw: string): string {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Users, TrendingUp, Globe, ArrowRight, ThumbsUp } from 'lucide-react'
+import { Search, Users, TrendingUp, Globe, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 interface AggStats {
   wins?: number

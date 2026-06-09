@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Sparkles, Brain, Globe, ThumbsUp } from 'lucide-react'
+import { ArrowRight, Brain, Globe, ThumbsUp } from 'lucide-react'
 
 export interface RecentDemoItem {
   id: string
