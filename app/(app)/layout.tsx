@@ -5,6 +5,8 @@ import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import MobileMenu from '@/components/layout/MobileMenu'
+import MobileTopBar from '@/components/layout/MobileTopBar'
+import BottomNav from '@/components/layout/BottomNav'
 import TopBar from '@/components/layout/TopBar'
 import SocialPanel from '@/components/layout/SocialPanel'
 import FeedbackBubble from '@/components/feedback/FeedbackBubble'
@@ -40,8 +42,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Content column */}
       <div className="flex-1 min-w-0 flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
+        {/* Mobile sticky header — hidden on md+ */}
+        <MobileTopBar />
+
+        {/* Desktop top bar — hidden on mobile */}
         <TopBar profile={profile} />
-        <main className="flex-1 overflow-auto pt-16 md:pt-0">
+
+        <main className="flex-1 overflow-auto rv-main-scroll md:pt-0">
           {children}
         </main>
       </div>
@@ -49,7 +56,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Right social panel */}
       <SocialPanel />
 
-      {/* Mobile menu */}
+      {/* Mobile bottom navigation */}
+      <BottomNav />
+
+      {/* Mobile full-screen menu drawer */}
       <MobileMenu profile={profile} />
 
       {/* Global Feedback Bubble */}

@@ -1,0 +1,61 @@
+{
+  "name": "Rivalize — CS2 Intel Platform",
+  "short_name": "Rivalize",
+  "description": "AI-powered CS2 demo analysis and coaching platform for competitive teams.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d0f1e",
+  "theme_color": "#8B7CFF",
+  "orientation": "portrait-primary",
+  "lang": "en-US",
+  "categories": ["sports", "games", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "description": "Your CS2 analytics overview"
+    },
+    {
+      "name": "Scout Opponents",
+      "short_name": "Scout",
+      "url": "/opponents",
+      "description": "Upload and analyze opponent demos"
+    },
+    {
+      "name": "AI Scout",
+      "short_name": "AI",
+      "url": "/ai-coach",
+      "description": "Get AI-powered tactical insights"
+    },
+    {
+      "name": "My Team",
+      "short_name": "Team",
+      "url": "/my-team",
+      "description": "Team stats and demo library"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}
