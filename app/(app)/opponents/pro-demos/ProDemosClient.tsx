@@ -2,12 +2,10 @@
 
 import { useState, useEffect, useCallback, type ChangeEvent } from 'react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
 import {
-  ArrowLeft, Trophy, Search, Download, ChevronLeft, ChevronRight,
+  Trophy, Search, Download, ChevronLeft, ChevronRight,
   ExternalLink, Loader2, Star, Filter, Database,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import ImportProMatchModal from './ImportProMatchModal'
 
 interface Team { id: string; name: string }
@@ -27,7 +25,7 @@ export interface ProMatch {
 }
 
 const CS2_MAPS = [
-  { value: '',           label: 'All Maps' },
+  { value: '',           label: 'All' },
   { value: 'de_dust2',   label: 'Dust2' },
   { value: 'de_mirage',  label: 'Mirage' },
   { value: 'de_inferno', label: 'Inferno' },
@@ -43,6 +41,8 @@ function hltvSearchUrl(match: ProMatch) {
     `site:hltv.org ${match.team1} vs ${match.team2} ${match.event}`
   )}`
 }
+
+const GRID_COLUMNS = 'minmax(0,1fr) 120px 70px 170px 130px'
 
 export default function ProDemosClient({
   teams,
@@ -63,6 +63,7 @@ export default function ProDemosClient({
   const [fallback, setFallback] = useState(false)
   const [fallbackReason, setFallbackReason] = useState<string | null>(null)
   const [activeMatch, setActiveMatch] = useState<ProMatch | null>(null)
+  const [hoveredRow, setHoveredRow] = useState<string | null>(null)
   const [imported, setImported] = useState<Record<string, string>>({})
   const PAGE_SIZE = 20
 
@@ -108,238 +109,296 @@ export default function ProDemosClient({
       )
     : matches
 
+  const pageButtonStyle = (disabled: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+    borderRadius: 8, border: '1px solid var(--border)', background: 'transparent',
+    color: disabled ? 'var(--faint)' : 'var(--text)', fontSize: 12, fontWeight: 600,
+    cursor: disabled ? 'not-allowed' : 'pointer', transition: 'border-color 0.14s',
+  })
+
   return (
-    <div className="min-h-full">
-      {/* Header */}
-      <div className="border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-4 md:px-6 py-4 md:py-5">
-          <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-            <Link href="/opponents" className="hover:text-foreground transition-colors">Opponents</Link>
-            <span>/</span>
-            <span className="text-foreground font-medium">Pro Match Library</span>
-          </nav>
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3">
-              <Link href="/opponents" className="text-muted-foreground hover:text-foreground transition-colors">
-                <ArrowLeft size={18} />
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-                  <Trophy size={18} className="text-yellow-400" />
-                  Pro Match Library
-                </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {fallback
-                    ? 'Curated pro matches — import to your scouting library'
-                    : `Recent pro matches${total ? ` · ${total.toLocaleString()} tracked` : ''} — import to your scouting library`
-                  }
-                </p>
-              </div>
-            </div>
-            {teams.length > 0 && (
-              <select
-                value={selectedTeamId}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedTeamId(e.target.value)}
-                className="text-sm bg-card border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-[color:var(--accent)]/50"
-              >
-                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            )}
+    <div style={{ flex: 1, overflowY: 'auto', padding: '28px 28px' }}>
+
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Trophy size={18} style={{ color: '#facc15' }} />
           </div>
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 3 }}>
+              Pro Match Library
+            </h1>
+            <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+              {fallback
+                ? 'Curated pro matches — import to your scouting library'
+                : `Recent pro matches${total ? ` · ${total.toLocaleString()} tracked` : ''} — import to your scouting library`
+              }
+            </p>
+          </div>
+        </div>
+        {teams.length > 0 && (
+          <select
+            value={selectedTeamId}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedTeamId(e.target.value)}
+            style={{
+              fontSize: 13, background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 8, padding: '8px 12px', color: 'var(--text)', outline: 'none', cursor: 'pointer',
+            }}
+          >
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
+      </div>
+
+      {/* ── Fallback banner ── */}
+      {fallback && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px',
+          borderRadius: 10, marginBottom: 18,
+          background: 'color-mix(in srgb, var(--signal) 8%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--signal) 20%, transparent)',
+        }}>
+          <Database size={14} style={{ color: 'var(--signal)', flexShrink: 0, marginTop: 1 }} />
+          <p style={{ fontSize: 12, color: 'var(--signal)', margin: 0, lineHeight: 1.5 }}>
+            {fallbackReason === 'missing-key'
+              ? <>Showing curated matches. Live recent results need a PandaScore API key — add <code style={{ fontFamily: 'var(--font-mono)' }}>PANDASCORE_API_KEY</code> to the server environment (free tier at <a href="https://www.pandascore.co" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>pandascore.co</a>).</>
+              : 'Showing curated matches — live match data is temporarily unavailable.'}
+          </p>
+        </div>
+      )}
+
+      {/* ── Search bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 14px', borderRadius: 10,
+        border: '1px solid var(--border)', background: 'var(--card)',
+        marginBottom: 16, transition: 'border-color 0.14s',
+      }}>
+        <Search size={14} style={{ color: 'var(--faint)', flexShrink: 0 }} />
+        <input
+          type="text"
+          placeholder="Search teams…"
+          value={teamSearch}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setTeamSearch(e.target.value)}
+          onFocus={e => ((e.currentTarget.parentElement as HTMLDivElement).style.borderColor = 'var(--accent)')}
+          onBlur={e => ((e.currentTarget.parentElement as HTMLDivElement).style.borderColor = 'var(--border)')}
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'var(--text)' }}
+        />
+      </div>
+
+      {/* ── Map filter ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22, flexWrap: 'wrap' }}>
+        <Filter size={13} style={{ color: 'var(--faint)', flexShrink: 0 }} />
+        <div style={{ display: 'flex', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0 }}>
+          {CS2_MAPS.map((m, i) => (
+            <button
+              key={m.value}
+              onClick={() => setMapFilter(m.value)}
+              style={{
+                padding: '6px 12px', fontSize: 11, fontWeight: 600,
+                background: mapFilter === m.value ? 'var(--accent-soft)' : 'transparent',
+                color: mapFilter === m.value ? 'var(--text)' : 'var(--muted)',
+                border: 'none', borderLeft: i > 0 ? '1px solid var(--border)' : 'none',
+                cursor: 'pointer', transition: 'background 0.12s, color 0.12s', whiteSpace: 'nowrap',
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-5">
-        {fallback && (
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-400/10 border border-blue-400/20 text-xs text-blue-300">
-            <Database size={14} className="shrink-0 mt-0.5" />
-            <p>
-              {fallbackReason === 'missing-key'
-                ? <>Showing curated matches. Live recent results need a PandaScore API key — add <code className="font-mono">PANDASCORE_API_KEY</code> to the server environment (free tier at <a href="https://www.pandascore.co" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-200">pandascore.co</a>).</>
-                : 'Showing curated matches — live match data is temporarily unavailable.'}
-            </p>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Map filter */}
-          <div className="flex items-center gap-2">
-            <Filter size={13} className="text-muted-foreground" />
-            <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
-              {CS2_MAPS.map(m => (
-                <button
-                  key={m.value}
-                  onClick={() => setMapFilter(m.value)}
-                  className={cn(
-                    'px-3 py-1.5 font-medium transition-colors whitespace-nowrap',
-                    mapFilter === m.value
-                      ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent)]'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/30'
-                  )}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Team search */}
-          <div className="relative ml-auto">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={teamSearch}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setTeamSearch(e.target.value)}
-              placeholder="Search teams…"
-              className="pl-8 pr-3 py-1.5 text-xs bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[color:var(--accent)]/50 w-40"
-            />
-          </div>
+      {/* ── Match list ── */}
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 24px' }}>
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} />
         </div>
-
-        {/* Match list */}
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} />
+      ) : filtered.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 24px', textAlign: 'center', borderRadius: 14, border: '1px dashed var(--border)' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Search size={22} style={{ color: 'var(--accent)' }} />
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground text-sm">
-            No matches found.
+          <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>No matches found</p>
+          <p style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 280 }}>
+            Try a different search term or map filter
+          </p>
+        </div>
+      ) : (
+        <div style={{ borderRadius: 12, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden' }}>
+          {/* Table header */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: GRID_COLUMNS, gap: 12,
+            padding: '10px 16px', background: 'var(--elevated)',
+            fontSize: 10, fontWeight: 600, color: 'var(--muted)',
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+            borderBottom: '1px solid var(--border)',
+          }}>
+            <div>Match</div>
+            <div>Maps</div>
+            <div>Score</div>
+            <div>Event</div>
+            <div style={{ textAlign: 'right' }}>Action</div>
           </div>
-        ) : (
-          <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
-            {/* Table header */}
-            <div className="grid px-4 py-2.5 bg-muted/30 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
-              style={{ gridTemplateColumns: '1fr 110px 70px 160px auto' }}>
-              <div>Match</div>
-              <div>Maps</div>
-              <div>Score</div>
-              <div>Event</div>
-              <div className="text-right">Action</div>
-            </div>
 
-            {filtered.map(match => {
-              const demoId = imported[match.id]
-              const mapsLabel = match.maps.length > 0
-                ? match.maps.map(m => m.replace(/^(de|cs)_/, '')).join(', ')
-                : match.best_of ? `BO${match.best_of}` : '—'
+          {filtered.map((match, idx) => {
+            const demoId = imported[match.id]
+            const mapsLabel = match.maps.length > 0
+              ? match.maps.map(m => m.replace(/^(de|cs)_/, '')).join(', ')
+              : match.best_of ? `BO${match.best_of}` : '—'
 
-              return (
-                <div
-                  key={match.id}
-                  className="grid items-center gap-3 px-4 py-3 hover:bg-accent/20 transition-colors"
-                  style={{ gridTemplateColumns: '1fr 110px 70px 160px auto' }}
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      <span style={{ color: 'var(--accent)' }}>{match.team1}</span>
-                      <span className="text-muted-foreground mx-1.5">vs</span>
-                      <span className="text-red-400">{match.team2}</span>
+            return (
+              <div
+                key={match.id}
+                onMouseEnter={() => setHoveredRow(match.id)}
+                onMouseLeave={() => setHoveredRow(null)}
+                style={{
+                  display: 'grid', gridTemplateColumns: GRID_COLUMNS, gap: 12,
+                  alignItems: 'center', padding: '12px 16px',
+                  borderBottom: idx < filtered.length - 1 ? '1px solid var(--hairline)' : 'none',
+                  background: hoveredRow === match.id ? 'color-mix(in srgb, var(--accent) 4%, transparent)' : 'transparent',
+                  transition: 'background 0.12s',
+                }}
+              >
+                {/* Match */}
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: 'var(--accent)' }}>{match.team1}</span>
+                    <span style={{ color: 'var(--faint)', margin: '0 6px', fontWeight: 500 }}>vs</span>
+                    <span style={{ color: 'var(--loss)' }}>{match.team2}</span>
+                  </p>
+                  {match.date && (
+                    <p style={{ fontSize: 10, color: 'var(--faint)', margin: '2px 0 0' }}>
+                      {new Date(match.date).toLocaleDateString()}
                     </p>
-                    {match.date && (
-                      <p className="text-[10px] text-muted-foreground/60">
-                        {new Date(match.date).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="min-w-0">
-                    <span className="text-xs font-mono text-foreground capitalize truncate block" title={mapsLabel}>
-                      {mapsLabel}
-                    </span>
-                  </div>
-
-                  <div>
-                    {match.score ? (
-                      <span className="text-xs font-mono text-foreground">{match.score}</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground/40">—</span>
-                    )}
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="text-[10px] text-muted-foreground truncate">{match.event}</p>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 justify-end">
-                    {demoId ? (
-                      <Link href={`/demos/${demoId}`}>
-                        <Button size="sm" variant="neon" className="h-7 text-xs gap-1">
-                          <Star size={10} />
-                          View
-                        </Button>
-                      </Link>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-7 text-xs gap-1"
-                        onClick={() => setActiveMatch(match)}
-                        disabled={!selectedTeamId}
-                        title={!selectedTeamId ? 'Select a team first' : undefined}
-                      >
-                        <Download size={10} />
-                        Import
-                      </Button>
-                    )}
-                    <a
-                      href={hltvSearchUrl(match)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Find on HLTV"
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors"
-                    >
-                      <ExternalLink size={11} />
-                    </a>
-                  </div>
+                  )}
                 </div>
-              )
-            })}
-          </div>
-        )}
 
-        {/* Pagination */}
-        {!fallback && (page > 1 || hasMore) && (
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={page <= 1 || loading}
-              onClick={() => goToPage(page - 1)}
-              className="gap-1.5"
-            >
-              <ChevronLeft size={14} />
-              Previous
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              Page {page}{total ? ` · ${total.toLocaleString()} matches` : ''}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!hasMore || loading}
-              onClick={() => goToPage(page + 1)}
-              className="gap-1.5"
-            >
-              Next
-              <ChevronRight size={14} />
-            </Button>
-          </div>
-        )}
+                {/* Maps */}
+                <div style={{ minWidth: 0 }}>
+                  <span title={mapsLabel} style={{
+                    fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text)',
+                    textTransform: 'capitalize', display: 'block',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {mapsLabel}
+                  </span>
+                </div>
 
-        {/* Info card */}
-        <div className="rounded-xl border border-border bg-card/50 p-4 flex items-start gap-3">
-          <Database size={16} className="text-muted-foreground shrink-0 mt-0.5" />
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p className="font-semibold text-foreground">About this library</p>
-            <p>
-              Recent professional CS2 results provided by{' '}
-              <a href="https://www.pandascore.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }} className="hover:underline">
-                PandaScore
-              </a>.
-              Demo files aren&apos;t distributed by any public API — click <span className="text-foreground font-medium">Import</span> on a match
-              to grab the .dem from HLTV and drop it straight into your scouting library, or paste a direct demo URL.
-            </p>
-          </div>
+                {/* Score */}
+                <div>
+                  <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: match.score ? 'var(--text)' : 'var(--faint)' }}>
+                    {match.score ?? '—'}
+                  </span>
+                </div>
+
+                {/* Event */}
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 11, color: 'var(--muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {match.event}
+                  </p>
+                </div>
+
+                {/* Action */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                  {demoId ? (
+                    <Link
+                      href={`/demos/${demoId}`}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px',
+                        borderRadius: 7, background: 'color-mix(in srgb, var(--win) 14%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--win) 30%, transparent)',
+                        color: 'var(--win)', fontSize: 11, fontWeight: 600, textDecoration: 'none',
+                      }}
+                    >
+                      <Star size={10} /> View
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => setActiveMatch(match)}
+                      disabled={!selectedTeamId}
+                      title={!selectedTeamId ? 'Select a team first' : undefined}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px',
+                        borderRadius: 7, border: 'none',
+                        background: 'var(--accent)', color: '#fff',
+                        fontSize: 11, fontWeight: 600,
+                        cursor: selectedTeamId ? 'pointer' : 'not-allowed',
+                        opacity: selectedTeamId ? 1 : 0.5,
+                      }}
+                    >
+                      <Download size={10} /> Import
+                    </button>
+                  )}
+                  <a
+                    href={hltvSearchUrl(match)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Find on HLTV"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 26, height: 26, borderRadius: 7,
+                      border: '1px solid var(--border)', color: 'var(--muted)',
+                      transition: 'color 0.12s, border-color 0.12s',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text)'
+                      ;(e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border-2)'
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLAnchorElement).style.color = 'var(--muted)'
+                      ;(e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border)'
+                    }}
+                  >
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Pagination ── */}
+      {!fallback && (page > 1 || hasMore) && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+          <button
+            disabled={page <= 1 || loading}
+            onClick={() => goToPage(page - 1)}
+            style={pageButtonStyle(page <= 1 || loading)}
+          >
+            <ChevronLeft size={13} /> Previous
+          </button>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+            Page {page}{total ? ` · ${total.toLocaleString()} matches` : ''}
+          </span>
+          <button
+            disabled={!hasMore || loading}
+            onClick={() => goToPage(page + 1)}
+            style={pageButtonStyle(!hasMore || loading)}
+          >
+            Next <ChevronRight size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Info card ── */}
+      <div style={{
+        marginTop: 20, borderRadius: 12, border: '1px solid var(--border)',
+        background: 'var(--card)', padding: 16,
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+      }}>
+        <Database size={15} style={{ color: 'var(--muted)', flexShrink: 0, marginTop: 2 }} />
+        <div>
+          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>About this library</p>
+          <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>
+            Recent professional CS2 results provided by{' '}
+            <a href="https://www.pandascore.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+              PandaScore
+            </a>.
+            Demo files aren&apos;t distributed by any public API — click <span style={{ color: 'var(--text)', fontWeight: 600 }}>Import</span> on a match
+            to grab the .dem from HLTV and drop it straight into your scouting library, or paste a direct demo URL.
+          </p>
         </div>
       </div>
 
