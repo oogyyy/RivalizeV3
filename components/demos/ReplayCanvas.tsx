@@ -685,53 +685,83 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     <button
       onClick={() => setActiveTool(tool)}
       title={tip}
-      className={cn(
-        'flex items-center justify-center h-8 rounded-md border transition-all',
-        activeTool === tool
-          ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
-          : 'border-border/25 text-muted-foreground/55 hover:border-border/50 hover:text-foreground',
-      )}
+      className="flex items-center justify-center h-8 rounded-md transition-all"
+      style={{
+        border: '1px solid',
+        borderColor: activeTool === tool ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border)',
+        background: activeTool === tool ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'transparent',
+        color: activeTool === tool ? 'var(--accent)' : 'var(--faint)',
+      }}
     >
       {icon}
     </button>
   )
 
   return (
-    <div className="flex flex-col rounded-xl border border-white/[0.08] overflow-hidden bg-[#07080e] select-none">
+    <div
+      className="flex flex-col rounded-xl overflow-hidden select-none"
+      style={{
+        border: '1px solid var(--border)',
+        background: 'var(--bg)',
+        boxShadow: '0 4px 32px rgba(0,0,0,0.4)',
+      }}
+    >
 
       {/* ── HEADER ──────────────────────────────────────────────────────────── */}
-      <header className="flex items-center gap-3 px-4 py-2 border-b border-white/[0.06] bg-white/[0.015] flex-shrink-0">
-        {/* Map + round */}
+      <header
+        className="flex items-center gap-3 px-4 py-2.5 flex-shrink-0"
+        style={{
+          borderBottom: '1px solid var(--border)',
+          background: 'color-mix(in srgb, var(--card) 80%, transparent)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
+        {/* Map badge + round counter */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[11px] font-black font-mono tracking-[0.14em] uppercase bg-white/[0.07] text-muted-foreground px-2 py-0.5 rounded">
+          <span
+            className="text-[11px] font-black tracking-[0.14em] uppercase px-2.5 py-1 rounded-lg"
+            style={{
+              fontFamily: 'var(--font-display)',
+              background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)',
+              color: 'var(--accent)',
+            }}
+          >
             {mapName.replace('de_', '')}
           </span>
-          <span className="font-mono text-[13px] font-semibold">
-            R<span className="text-foreground">{currentRound?.number ?? roundIdx + 1}</span>
-            <span className="text-muted-foreground/35 text-[11px]">/{rounds.length}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+            R<span>{currentRound?.number ?? roundIdx + 1}</span>
+            <span style={{ color: 'var(--faint)', fontSize: 11 }}>/{rounds.length}</span>
           </span>
           {currentRound?.bomb_planted && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 font-mono animate-pulse">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md font-mono animate-pulse"
+              style={{ background: 'color-mix(in srgb, var(--tside) 15%, transparent)', color: 'var(--tside)', border: '1px solid color-mix(in srgb, var(--tside) 30%, transparent)' }}>
               BOMB
             </span>
           )}
           {!hasFrames && (
-            <span className="text-[10px] text-amber-400/50 border border-amber-400/20 px-1.5 py-0.5 rounded font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md"
+              style={{ color: 'var(--muted)', border: '1px solid var(--border)', fontFamily: 'var(--font-mono)' }}>
               kill-only
             </span>
           )}
         </div>
 
         {/* Round type filter */}
-        <div className="flex items-center gap-0.5 bg-white/[0.04] rounded-lg p-0.5">
+        <div className="flex items-center gap-0.5 rounded-lg p-0.5" style={{ background: 'var(--card-2)' }}>
           {(['all', 'pistol', 'eco', 'force', 'full'] as RoundFilter[]).map(f => (
             <button
               key={f}
               onClick={() => setRoundFilter(f)}
-              className={cn(
-                'px-2 py-0.5 text-[10px] font-mono rounded-md transition-all',
-                roundFilter === f ? 'bg-white/12 text-foreground font-bold' : 'text-muted-foreground/40 hover:text-muted-foreground',
-              )}
+              className="px-2 py-0.5 rounded-md transition-all"
+              style={{
+                fontSize: 10, fontFamily: 'var(--font-mono)',
+                background: roundFilter === f ? 'var(--elevated)' : 'transparent',
+                color: roundFilter === f ? 'var(--text)' : 'var(--faint)',
+                fontWeight: roundFilter === f ? 700 : 400,
+                border: roundFilter === f ? '1px solid var(--border)' : '1px solid transparent',
+              }}
             >
               {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
@@ -741,58 +771,84 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         <div className="flex-1" />
 
         {/* Score */}
-        <div className="flex items-center gap-2 font-mono tabular-nums">
-          <span className="text-[11px] truncate max-w-[80px] font-medium" style={{ color: T1_COLOR + 'bb' }}>{team1Name}</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[22px] font-black leading-none" style={{ color: T1_COLOR }}>{roundScore.t1}</span>
-            <span className="text-muted-foreground/30">:</span>
-            <span className="text-[22px] font-black leading-none" style={{ color: T2_COLOR }}>{roundScore.t2}</span>
+        <div className="flex items-center gap-2 tabular-nums">
+          <span className="text-[11px] truncate max-w-[90px] font-semibold" style={{ color: T1_COLOR + 'cc', fontFamily: 'var(--font-ui)' }}>{team1Name}</span>
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl" style={{ background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+            <span className="text-[24px] font-black leading-none" style={{ color: T1_COLOR, fontFamily: 'var(--font-display)' }}>{roundScore.t1}</span>
+            <span style={{ color: 'var(--faint)', fontSize: 14 }}>:</span>
+            <span className="text-[24px] font-black leading-none" style={{ color: T2_COLOR, fontFamily: 'var(--font-display)' }}>{roundScore.t2}</span>
           </div>
-          <span className="text-[11px] truncate max-w-[80px] font-medium" style={{ color: T2_COLOR + 'bb' }}>{team2Name}</span>
+          <span className="text-[11px] truncate max-w-[90px] font-semibold" style={{ color: T2_COLOR + 'cc', fontFamily: 'var(--font-ui)' }}>{team2Name}</span>
         </div>
       </header>
 
       {/* ── ROUND NAVIGATION ────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/[0.04] bg-white/[0.008] flex-shrink-0">
+      <div
+        className="flex items-center gap-1 px-3 py-1.5 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}
+      >
         <button
           onClick={() => setRoundIdx(i => Math.max(0, i - 1))}
           disabled={roundIdx === 0}
-          className="p-1 rounded border border-border/35 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex-shrink-0"
+          className="flex-shrink-0 disabled:opacity-20 transition-colors"
+          style={{ padding: 4, borderRadius: 6, border: '1px solid var(--border)', color: 'var(--muted)', background: 'transparent' }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)' }}
         >
           <ChevronLeft size={12} />
         </button>
+
         <div ref={roundBarRef} className="flex gap-0.5 overflow-x-auto flex-1 min-w-0 py-0.5" style={{ scrollbarWidth: 'none' }}>
           {rounds.map((r, i) => {
-            const type   = getRoundType(r, i)
-            const hidden = roundFilter !== 'all' && type !== roundFilter
+            const type    = getRoundType(r, i)
+            const hidden  = roundFilter !== 'all' && type !== roundFilter
+            const active  = roundIdx === i
+            const isPistol = type === 'pistol'
             return (
               <button
                 key={i}
-                data-active={roundIdx === i ? 'true' : 'false'}
+                data-active={active ? 'true' : 'false'}
                 onClick={() => setRoundIdx(i)}
                 title={`R${r.number} (${type}) — ${r.winner}`}
-                className={cn(
-                  'relative flex-shrink-0 w-7 h-7 text-[10px] font-mono rounded transition-all duration-100 border',
-                  hidden && 'opacity-18',
-                  roundIdx === i
-                    ? 'border-white/30 bg-white/10 text-foreground font-bold'
-                    : 'border-border/22 text-muted-foreground/50 hover:border-border/50 hover:text-foreground',
-                  type === 'pistol' && roundIdx !== i && 'border-yellow-500/22',
-                )}
+                className="relative flex-shrink-0 w-7 h-7 transition-all duration-100"
+                style={{
+                  fontSize: 10, fontFamily: 'var(--font-mono)',
+                  borderRadius: 6, border: '1px solid',
+                  opacity: hidden ? 0.18 : 1,
+                  fontWeight: active ? 700 : 400,
+                  background: active
+                    ? 'color-mix(in srgb, var(--accent) 18%, transparent)'
+                    : 'transparent',
+                  borderColor: active
+                    ? 'color-mix(in srgb, var(--accent) 45%, transparent)'
+                    : isPistol && !active
+                      ? 'rgba(251,191,36,0.22)'
+                      : 'var(--border)',
+                  color: active ? 'var(--accent)' : 'var(--faint)',
+                  boxShadow: active ? '0 0 8px color-mix(in srgb, var(--accent) 25%, transparent)' : 'none',
+                }}
               >
                 {r.number}
                 <span
                   className="absolute bottom-[2px] left-1/2 -translate-x-1/2 w-[3px] h-[3px] rounded-full"
-                  style={{ background: type === 'pistol' ? '#fbbf24' : r.winner === team1Name ? T1_COLOR + 'aa' : T2_COLOR + 'aa' }}
+                  style={{
+                    background: isPistol ? '#fbbf24'
+                      : r.winner === team1Name ? T1_COLOR + 'aa'
+                      : T2_COLOR + 'aa'
+                  }}
                 />
               </button>
             )
           })}
         </div>
+
         <button
           onClick={() => setRoundIdx(i => Math.min(rounds.length - 1, i + 1))}
           disabled={roundIdx === rounds.length - 1}
-          className="p-1 rounded border border-border/35 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex-shrink-0"
+          className="flex-shrink-0 disabled:opacity-20 transition-colors"
+          style={{ padding: 4, borderRadius: 6, border: '1px solid var(--border)', color: 'var(--muted)', background: 'transparent' }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)' }}
         >
           <ChevronRight size={12} />
         </button>
@@ -805,7 +861,10 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         <button
           onClick={() => setLeftOpen(v => !v)}
           title={leftOpen ? 'Hide controls' : 'Show controls'}
-          className="w-5 flex-shrink-0 border-r border-white/[0.06] flex items-center justify-center text-muted-foreground/25 hover:text-muted-foreground hover:bg-white/[0.03] transition-all"
+          className="w-5 flex-shrink-0 flex items-center justify-center transition-all"
+          style={{ borderRight: '1px solid var(--border)', color: 'var(--faint)', background: 'var(--card)' }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--elevated)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--faint)'; e.currentTarget.style.background = 'var(--card)' }}
         >
           <ChevronLeft
             size={11}
@@ -816,12 +875,12 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
         {leftOpen && (
           <aside
-            className="w-[192px] flex-shrink-0 border-r border-white/[0.06] flex flex-col overflow-y-auto bg-white/[0.01]"
-            style={{ scrollbarWidth: 'none' }}
+            className="w-[192px] flex-shrink-0 flex flex-col overflow-y-auto"
+            style={{ borderRight: '1px solid var(--border)', background: 'var(--card)', scrollbarWidth: 'none' }}
           >
             {/* Layers */}
             <div className="px-3 pt-3 pb-2">
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/35 mb-2">Layers</p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--faint)' }}>Layers</p>
 
               {/* Grenades: compact 2×2 grid */}
               <div className="grid grid-cols-2 gap-1 mb-1">
@@ -864,38 +923,40 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
                 <button
                   key={label}
                   onClick={toggle}
-                  className={cn(
-                    'w-full flex items-center gap-2 px-2 py-1 rounded text-[10px] font-medium transition-all',
-                    active ? 'text-foreground/80' : 'text-muted-foreground/35 hover:text-muted-foreground/65',
-                  )}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded text-[10px] font-medium transition-all"
+                  style={{ color: active ? 'var(--text)' : 'var(--faint)' }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--muted)' }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--faint)' }}
                 >
                   <span>{icon}</span>
                   <span className="flex-1 text-left">{label}</span>
                   {active
-                    ? <Eye size={8} className="opacity-30 flex-shrink-0" />
-                    : <EyeOff size={8} className="opacity-18 flex-shrink-0" />}
+                    ? <Eye size={8} style={{ opacity: 0.35, flexShrink: 0 }} />
+                    : <EyeOff size={8} style={{ opacity: 0.18, flexShrink: 0 }} />}
                 </button>
               ))}
 
               {/* Heatmap toggle */}
               <button
                 onClick={() => setShowHeatmap(v => !v)}
-                className={cn(
-                  'w-full flex items-center gap-2 px-2 py-1 rounded text-[10px] font-medium transition-all mt-0.5',
-                  showHeatmap ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20' : 'text-muted-foreground/35 hover:text-muted-foreground/65',
-                )}
+                className="w-full flex items-center gap-2 px-2 py-1 rounded text-[10px] font-medium transition-all mt-0.5"
+                style={{
+                  background: showHeatmap ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent',
+                  border: showHeatmap ? '1px solid color-mix(in srgb, var(--accent) 22%, transparent)' : '1px solid transparent',
+                  color: showHeatmap ? 'var(--accent)' : 'var(--faint)',
+                }}
               >
                 <Activity size={9} />
                 <span className="flex-1 text-left">Heatmap</span>
-                {!hasFrames && <span className="text-[8px] text-amber-400/30">no data</span>}
+                {!hasFrames && <span className="text-[8px]" style={{ color: 'var(--muted)' }}>no data</span>}
               </button>
             </div>
 
-            <div className="mx-3 border-t border-white/[0.05]" />
+            <div className="mx-3" style={{ borderTop: '1px solid var(--border)' }} />
 
             {/* Draw tools */}
             <div className="px-3 pt-2.5 pb-3">
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/35 mb-2">Draw</p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--faint)' }}>Draw</p>
               <div className="grid grid-cols-3 gap-1 mb-2.5">
                 <ToolBtn tool="select" icon={<MousePointer size={12}/>} tip="Select / Focus player" />
                 <ToolBtn tool="pen"    icon={<Pencil size={12}/>}       tip="Freehand pen" />
@@ -929,13 +990,16 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
             {/* Focus player badge */}
             {focusPlayer && (
               <>
-                <div className="mx-3 border-t border-white/[0.05]" />
+                <div className="mx-3" style={{ borderTop: '1px solid var(--border)' }} />
                 <div className="px-3 py-2.5">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/35 mb-1.5">Focus</p>
-                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-cyan-500/10 border border-cyan-500/20">
-                    <Crosshair size={10} className="text-cyan-400 flex-shrink-0" />
-                    <span className="text-[10px] font-mono text-cyan-300 truncate flex-1">{focusPlayer}</span>
-                    <button onClick={() => setFocusPlayer(null)} className="text-muted-foreground/35 hover:text-foreground text-xs leading-none">✕</button>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] mb-1.5" style={{ color: 'var(--faint)' }}>Focus</p>
+                  <div
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded"
+                    style={{ background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 22%, transparent)' }}
+                  >
+                    <Crosshair size={10} style={{ color: 'var(--signal)', flexShrink: 0 }} />
+                    <span className="text-[10px] truncate flex-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--signal)' }}>{focusPlayer}</span>
+                    <button onClick={() => setFocusPlayer(null)} className="text-xs leading-none" style={{ color: 'var(--faint)' }}>✕</button>
                   </div>
                 </div>
               </>
@@ -944,16 +1008,18 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         )}
 
         {/* ── CANVAS AREA ─────────────────────────────────────────────────── */}
-        <div className="flex-1 flex items-center justify-center bg-[#07080e] relative overflow-hidden p-2 min-w-0">
+        <div className="flex-1 flex items-center justify-center relative overflow-hidden p-3 min-w-0" style={{ background: 'var(--bg)' }}>
           <canvas
             ref={canvasRef}
             width={CANVAS_SIZE}
             height={CANVAS_SIZE}
-            className={cn(
-              'rounded-lg border border-white/[0.07]',
-              activeTool !== 'select' ? 'cursor-crosshair' : 'cursor-default',
-            )}
-            style={{ width: '100%', maxWidth: CANVAS_SIZE, aspectRatio: '1 / 1' }}
+            className={cn(activeTool !== 'select' ? 'cursor-crosshair' : 'cursor-default')}
+            style={{
+              width: '100%', maxWidth: CANVAS_SIZE, aspectRatio: '1 / 1',
+              borderRadius: 12,
+              border: '1px solid color-mix(in srgb, var(--accent) 15%, var(--border))',
+              boxShadow: '0 0 40px color-mix(in srgb, var(--accent) 6%, transparent), 0 4px 24px rgba(0,0,0,0.4)',
+            }}
             onMouseDown={handleCanvasMouseDown}
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
@@ -984,33 +1050,37 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
 
         {/* ── RIGHT PANEL ─────────────────────────────────────────────────── */}
         {rightOpen && (
-          <aside className="w-[240px] flex-shrink-0 border-l border-white/[0.06] flex flex-col overflow-hidden bg-white/[0.01]">
+          <aside className="w-[240px] flex-shrink-0 flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--border)', background: 'var(--card)' }}>
 
             {/* Tabs */}
-            <div className="flex border-b border-white/[0.06] flex-shrink-0">
+            <div className="flex flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
               <button
                 onClick={() => setRightTab('players')}
-                className={cn(
-                  'flex-1 py-2 text-[10px] font-bold uppercase tracking-[0.1em] transition-all border-b-2 -mb-px',
-                  rightTab === 'players'
-                    ? 'text-foreground/90 border-cyan-500/60'
-                    : 'text-muted-foreground/35 border-transparent hover:text-muted-foreground/60',
-                )}
+                className="flex-1 py-2 transition-all"
+                style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  fontFamily: 'var(--font-ui)',
+                  color: rightTab === 'players' ? 'var(--text)' : 'var(--faint)',
+                  borderBottom: rightTab === 'players' ? '2px solid var(--signal)' : '2px solid transparent',
+                  marginBottom: -1,
+                }}
               >
                 Players
               </button>
               <button
                 onClick={() => setRightTab('kills')}
-                className={cn(
-                  'flex-1 py-2 text-[10px] font-bold uppercase tracking-[0.1em] transition-all border-b-2 -mb-px flex items-center justify-center gap-1.5',
-                  rightTab === 'kills'
-                    ? 'text-foreground/90 border-red-500/50'
-                    : 'text-muted-foreground/35 border-transparent hover:text-muted-foreground/60',
-                )}
+                className="flex-1 py-2 transition-all flex items-center justify-center gap-1.5"
+                style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  fontFamily: 'var(--font-ui)',
+                  color: rightTab === 'kills' ? 'var(--text)' : 'var(--faint)',
+                  borderBottom: rightTab === 'kills' ? '2px solid var(--loss)' : '2px solid transparent',
+                  marginBottom: -1,
+                }}
               >
                 Kill Feed
                 {kills.length > 0 && (
-                  <span className="font-mono text-[9px] tabular-nums opacity-60">
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, opacity: 0.55 }}>
                     {pastKills.length}/{kills.length}
                   </span>
                 )}
@@ -1117,7 +1187,10 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         <button
           onClick={() => setRightOpen(v => !v)}
           title={rightOpen ? 'Hide stats' : 'Show stats'}
-          className="w-5 flex-shrink-0 border-l border-white/[0.06] flex items-center justify-center text-muted-foreground/25 hover:text-muted-foreground hover:bg-white/[0.03] transition-all"
+          className="w-5 flex-shrink-0 flex items-center justify-center transition-all"
+          style={{ borderLeft: '1px solid var(--border)', color: 'var(--faint)', background: 'var(--card)' }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--elevated)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--faint)'; e.currentTarget.style.background = 'var(--card)' }}
         >
           <ChevronRight
             size={11}
@@ -1127,7 +1200,10 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       </div>
 
       {/* ── CONTROLS ────────────────────────────────────────────────────────── */}
-      <div className="border-t border-white/[0.06] bg-white/[0.015] px-4 pt-2.5 pb-3 space-y-2 flex-shrink-0">
+      <div
+        className="px-4 pt-2.5 pb-3 space-y-2 flex-shrink-0"
+        style={{ borderTop: '1px solid var(--border)', background: 'var(--card)' }}
+      >
 
         {/* Event marker track */}
         <div className="relative h-3.5 mx-0.5">
@@ -1174,35 +1250,48 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
           <button
             onClick={restart}
             title="Restart"
-            className="p-1.5 rounded-lg border border-border/35 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+            className="flex-shrink-0 transition-all"
+            style={{ padding: '6px', borderRadius: 8, border: '1px solid var(--border)', color: 'var(--muted)', background: 'transparent' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--border-2)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'var(--border)' }}
           >
             <RotateCcw size={13} />
           </button>
 
           <button
             onClick={toggle}
-            className="flex items-center gap-2 px-5 py-1.5 rounded-full text-[13px] font-semibold border transition-all flex-shrink-0"
-            style={{ background: 'rgba(34,211,238,0.12)', borderColor: 'rgba(34,211,238,0.28)', color: T1_COLOR }}
+            className="flex items-center gap-2 rounded-full font-semibold border-none flex-shrink-0 transition-all"
+            style={{
+              padding: '7px 20px', fontSize: 13,
+              background: 'linear-gradient(180deg, var(--accent), var(--accent-deep))',
+              color: '#fff',
+              boxShadow: '0 2px 12px color-mix(in srgb, var(--accent) 35%, transparent)',
+            }}
           >
             {isPlaying ? <Pause size={14} /> : <Play size={14} />}
             {isPlaying ? 'Pause' : 'Play'}
           </button>
 
-          <div className="flex border border-border/35 rounded-full overflow-hidden text-[11px] font-mono flex-shrink-0">
+          <div className="flex rounded-full overflow-hidden flex-shrink-0" style={{ border: '1px solid var(--border)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
             {([0.5, 1, 2, 4] as SpeedValue[]).map(s => (
               <button
                 key={s}
                 onClick={() => setSpeed(s)}
-                className={cn('px-2.5 py-1 transition-colors', speed === s ? 'text-cyan-300' : 'text-muted-foreground hover:text-foreground')}
-                style={speed === s ? { background: 'rgba(34,211,238,0.15)' } : undefined}
+                className="transition-colors"
+                style={{
+                  padding: '4px 10px',
+                  background: speed === s ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'transparent',
+                  color: speed === s ? 'var(--accent)' : 'var(--faint)',
+                  fontWeight: speed === s ? 700 : 400,
+                }}
               >
                 {s}×
               </button>
             ))}
           </div>
 
-          <span className="text-[11px] font-mono text-muted-foreground/45 tabular-nums">
-            {time.toFixed(1)}<span className="opacity-40">s / </span>{maxTime.toFixed(1)}<span className="opacity-40">s</span>
+          <span className="tabular-nums" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>
+            {time.toFixed(1)}<span style={{ opacity: 0.4 }}>s / </span>{maxTime.toFixed(1)}<span style={{ opacity: 0.4 }}>s</span>
           </span>
 
           <div className="flex-1" />
@@ -1210,30 +1299,31 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
           <button
             onClick={toggleRecord}
             disabled={recordState === 'processing'}
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] transition-all flex-shrink-0',
-              recordState === 'recording'
-                ? 'border-red-400/35 bg-red-400/10 text-red-400'
-                : 'border-border/35 text-muted-foreground hover:text-foreground',
-            )}
+            className="flex items-center gap-1.5 rounded-full transition-all flex-shrink-0"
+            style={{
+              padding: '6px 12px', fontSize: 11,
+              background: recordState === 'recording' ? 'color-mix(in srgb, var(--loss) 12%, transparent)' : 'var(--elevated)',
+              border: `1px solid ${recordState === 'recording' ? 'color-mix(in srgb, var(--loss) 30%, transparent)' : 'var(--border)'}`,
+              color: recordState === 'recording' ? 'var(--loss)' : 'var(--muted)',
+            }}
           >
             {recordState === 'recording' ? <><StopCircle size={12}/>Stop</> : <><Video size={12}/>Clip</>}
           </button>
         </div>
 
         {/* Keyboard hints + legend */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground/28">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5" style={{ fontSize: 9, color: 'var(--faint)' }}>
           {[['Space','play/pause'],['← →','±2s'],['↑ ↓','rounds'],['Esc','reset']].map(([k,v]) => (
             <span key={k}>
-              <kbd className="bg-white/[0.05] px-1 py-0.5 rounded text-[8px] text-muted-foreground/40">{k}</kbd> {v}
+              <kbd style={{ background: 'var(--card-2)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: 4, fontSize: 8, color: 'var(--muted)' }}>{k}</kbd> {v}
             </span>
           ))}
           <div className="flex items-center gap-3 ml-auto">
-            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T1_COLOR }}/><span style={{ color: T1_COLOR + '77' }}>{team1Name}</span></div>
-            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T2_COLOR }}/><span style={{ color: T2_COLOR + '77' }}>{team2Name}</span></div>
+            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T1_COLOR }}/><span style={{ color: T1_COLOR + '66' }}>{team1Name}</span></div>
+            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T2_COLOR }}/><span style={{ color: T2_COLOR + '66' }}>{team2Name}</span></div>
             {hasFrames
-              ? <span className="text-cyan-400/20">{frames.length} frames</span>
-              : <span className="text-amber-400/22">kill-only replay</span>
+              ? <span style={{ color: 'var(--faint)' }}>{frames.length} frames</span>
+              : <span style={{ color: 'var(--faint)' }}>kill-only replay</span>
             }
           </div>
         </div>
