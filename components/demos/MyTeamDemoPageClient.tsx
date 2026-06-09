@@ -15,6 +15,7 @@ import ReplayCanvas from '@/components/demos/ReplayCanvas'
 import dynamic from 'next/dynamic'
 import DemoInlineChat from '@/components/demos/DemoInlineChat'
 import AiMatchReport from '@/components/demos/AiMatchReport'
+import StrategyBoard from '@/components/demos/StrategyBoard'
 import { useFullParsedDemo } from '@/components/demos/useFullParsedDemo'
 
 const Replay3DCanvas = dynamic(
@@ -35,7 +36,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts'
 
-type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy' | 'replay' | '3d' | 'ai'
+type Tab = 'overview' | 'players' | 'rounds' | 'heatmap' | 'economy' | 'replay' | '3d' | 'strategy' | 'ai'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'overview',  label: 'Overview',       icon: <BarChart3 size={14} /> },
@@ -45,6 +46,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'economy',   label: 'Economy',        icon: <TrendingUp size={14} /> },
   { id: 'replay',    label: '2D Replay',      icon: <Play size={14} /> },
   { id: '3d',        label: '3D Replay',      icon: <Box size={14} /> },
+  { id: 'strategy',  label: 'Strategy Board', icon: <Target size={14} /> },
   { id: 'ai',        label: 'AI Report',      icon: <Brain size={14} /> },
 ]
 
@@ -791,6 +793,10 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                       />
                     </div>
                   </div>
+                )}
+
+                {activeTab === 'strategy' && parsed && (
+                  <StrategyBoard mapName={parsed.header.map} />
                 )}
 
                 {activeTab === 'ai' && (
