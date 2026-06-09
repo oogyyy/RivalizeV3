@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const revalidate = 3600 // cache for 1 hour
+// Served at request time (Supabase isn't available during build);
+// the Cache-Control header below handles the 1-hour CDN cache.
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const admin = createAdminClient()
