@@ -109,6 +109,7 @@ async function handleReport(guildId: string) {
     .select('id, map, parsed_data, created_at')
     .eq('team_id', integration.team_id)
     .eq('status', 'completed')
+    .eq('demo_type', 'self')
     .order('created_at', { ascending: false })
     .limit(1)
 
