@@ -13,11 +13,12 @@ export default async function OpponentsPage() {
   const supabase = await createClient()
   const admin = createAdminClient()
 
-  const { data: profile } = await supabase
+  const { data: profileData } = await supabase
     .from('profiles')
     .select('display_name, username')
     .eq('id', user.id)
     .single()
+  const profile = profileData as { display_name: string | null; username: string } | null
 
   const { data: memberships } = await admin
     .from('team_members')
@@ -80,7 +81,8 @@ export default async function OpponentsPage() {
 
   return (
     <OpponentsPageClient
-      folders={folders ?? []}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      folders={(folders ?? []) as any}
       demosBySlug={demosBySlug}
       primaryTeamId={primaryTeamId}
     />

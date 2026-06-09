@@ -1,8 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-// Module-level singleton — safe for long-running Node.js servers.
-// Avoids re-instantiating the client (and re-parsing config) on every request.
-let _admin: ReturnType<typeof createClient> | null = null
+// Explicit SupabaseClient<any> prevents ReturnType<> from resolving to SupabaseClient<never>
+// which would cause all .from() queries to return never[].
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _admin: SupabaseClient<any> | null = null
 
 export function createAdminClient() {
   if (_admin) return _admin

@@ -43,6 +43,7 @@ export default async function MyTeamDemoPage({ params }: Props) {
     )
   }
 
+  if (!demo.team_id) redirect('/my-team')
   const { data: member } = await admin
     .from('team_members')
     .select('role')
