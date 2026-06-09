@@ -60,7 +60,7 @@ export default async function OpponentPage({
     .select('*')
     .eq('id', folderId)
     .single()
-  if (!folder) notFound()
+  if (!folder || !folder.user_team_id) notFound()
 
   const teamId: string = folder.user_team_id
 

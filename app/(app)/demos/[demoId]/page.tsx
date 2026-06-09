@@ -45,6 +45,7 @@ export default async function DemoPage({ params, searchParams }: Props) {
   }
 
   // Verify the caller is a member of the demo's team
+  if (!demo.team_id) redirect('/opponents')
   const { data: member } = await admin
     .from('team_members')
     .select('role')

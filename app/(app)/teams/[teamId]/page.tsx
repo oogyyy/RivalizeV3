@@ -92,7 +92,8 @@ export default async function TeamPage({
     .eq('user_team_id', resolvedTeamId)
 
   // Fetch pre-computed team stats cache (single row, instant)
-  const { data: statsCache } = await admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: statsCache } = await (admin as any)
     .from('team_stats_cache')
     .select('*')
     .eq('team_id', resolvedTeamId)
@@ -102,6 +103,7 @@ export default async function TeamPage({
   const demosByOpponent: Record<string, typeof demos> = {}
   for (const demo of demos ?? []) {
     const key = demo.opponent_slug ?? demo.opponent_name
+    if (!key) continue
     if (!demosByOpponent[key]) demosByOpponent[key] = []
     demosByOpponent[key].push(demo)
   }
@@ -184,7 +186,7 @@ export default async function TeamPage({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl md:text-2xl font-bold text-foreground">{team.name}</h1>
-                  <Badge variant={roleVariant[myMembership.role]}>
+                  <Badge variant={roleVariant[myMembership.role ?? 'member']}>
                     {myMembership.role}
                   </Badge>
                 </div>
@@ -552,7 +554,7 @@ export default async function TeamPage({
                             {demo.league ?? '—'}
                           </td>
                           <td className="px-4 py-3">
-                            <Badge variant={statusVariant(demo.status)} className="text-xs">
+                            <Badge variant={statusVariant(demo.status ?? '')} className="text-xs">
                               {demo.status}
                             </Badge>
                           </td>

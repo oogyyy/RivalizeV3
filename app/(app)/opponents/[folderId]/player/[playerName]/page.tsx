@@ -26,7 +26,7 @@ export default async function PlayerPage({
     .select('id, user_team_id, opponent_slug, opponent_display_name')
     .eq('id', folderId)
     .single()
-  if (!folder) notFound()
+  if (!folder || !folder.user_team_id) notFound()
 
   const { data: member } = await admin
     .from('team_members')
