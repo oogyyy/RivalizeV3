@@ -17,7 +17,7 @@ type CategoryId = typeof CATEGORIES[number]['id']
 
 const FAQ = [
   { q: 'How do I upload a demo?',                   a: 'Go to Opponents, open or create a folder, then click the Upload Demo button to add a .dem or .zst file.' },
-  { q: 'How long does demo analysis take?',          a: 'Analysis typically takes 1–3 minutes depending on file size and server load. You'll get a notification when it\'s ready.' },
+  { q: 'How long does demo analysis take?',          a: "Analysis typically takes 1–3 minutes depending on file size and server load. You'll get a notification when it's ready." },
   { q: 'How do I create a team?',                   a: 'Navigate to My Team and use the Create Team button. You can then invite teammates via their username.' },
   { q: 'Can I share scouting data with teammates?', a: 'Yes — teammates added to your team can view all shared demos, maps, and scouting reports.' },
   { q: 'What demo formats are supported?',          a: 'Rivalize supports CS2 .dem files from Matchmaking, FACEIT, and ESL. Compressed .zst files are also accepted.' },
