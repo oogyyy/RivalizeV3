@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,10 +11,12 @@ import { cn } from '@/lib/utils'
 import {
   Bell, Shield, Brain, Palette, AlertTriangle,
   User, Check, Loader2, Eye, EyeOff,
-  Trash2, Lock, Mail
+  Trash2, Lock, Mail, CreditCard, Zap, Building2, ExternalLink, CheckCircle2,
 } from 'lucide-react'
 import type { UserSettings } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { PLANS, type PlanId } from '@/lib/stripe'
+import type { TeamSubscription } from '@/lib/billing'
 
 type AIModel = 'gpt-4o' | 'grok-2' | 'claude-3-5-sonnet'
 type ResponseStyle = 'detailed' | 'concise' | 'coaching'
@@ -44,6 +46,7 @@ const TABS = [
   { id: 'privacy', label: 'Privacy', icon: Shield },
   { id: 'ai', label: 'AI Coach', icon: Brain },
   { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'billing', label: 'Billing', icon: CreditCard },
 ]
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -123,7 +126,9 @@ function ConfirmDeleteDialog({
 
 export default function SettingsPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState('account')
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') ?? 'account')
+  const upgraded = searchParams.get('upgraded') === '1'
   const [settings, setSettings] = useState<Partial<UserSettings>>({
     email_notifications: true,
     ai_coach_ready: true,
@@ -152,14 +157,25 @@ export default function SettingsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Billing
+  const [teamId, setTeamId] = useState<string | null>(null)
+  const [subscription, setSubscription] = useState<TeamSubscription | null>(null)
+  const [billingLoading, setBillingLoading] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState<PlanId | null>(null)
+  const [portalLoading, setPortalLoading] = useState(false)
+
   useEffect(() => {
     const fetchSettings = async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data } = await supabase.from('user_settings').select('*').eq('user_id', user.id).single()
-      if (data) setSettings(data as UserSettings)
+      const [{ data: settingsData }, { data: memberData }] = await Promise.all([
+        supabase.from('user_settings').select('*').eq('user_id', user.id).single(),
+        supabase.from('team_members').select('team_id').eq('user_id', user.id).eq('role', 'owner').limit(1).maybeSingle(),
+      ])
+      if (settingsData) setSettings(settingsData as UserSettings)
+      if (memberData?.team_id) setTeamId(memberData.team_id)
       setLoading(false)
     }
     fetchSettings()
@@ -187,6 +203,53 @@ export default function SettingsPage() {
 
   const handleToggle = (key: keyof UserSettings, val: boolean) => {
     saveSettings({ [key]: val })
+  }
+
+  // Load billing when billing tab opens and teamId is known
+  useEffect(() => {
+    if (activeTab !== 'billing' || !teamId || subscription) return
+    const load = async () => {
+      setBillingLoading(true)
+      try {
+        const res = await fetch(`/api/billing/subscription?teamId=${teamId}`)
+        if (res.ok) setSubscription(await res.json())
+      } finally {
+        setBillingLoading(false)
+      }
+    }
+    load()
+  }, [activeTab, teamId, subscription])
+
+  const handleUpgrade = async (plan: PlanId) => {
+    if (!teamId || checkoutLoading) return
+    setCheckoutLoading(plan)
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, plan }),
+      })
+      const { url } = await res.json() as { url: string }
+      if (url) window.location.href = url
+    } finally {
+      setCheckoutLoading(null)
+    }
+  }
+
+  const handleManageBilling = async () => {
+    if (!teamId || portalLoading) return
+    setPortalLoading(true)
+    try {
+      const res = await fetch('/api/billing/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId }),
+      })
+      const { url } = await res.json() as { url: string }
+      if (url) window.location.href = url
+    } finally {
+      setPortalLoading(false)
+    }
   }
 
   const handlePasswordChange = async () => {
@@ -592,6 +655,150 @@ export default function SettingsPage() {
             <ToggleSwitch checked={true} onChange={() => {}} />
           </div>
           <p style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 4 }}>Light mode coming soon.</p>
+        </div>
+      )}
+
+      {/* Billing tab */}
+      {activeTab === 'billing' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Upgraded success banner */}
+          {upgraded && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'color-mix(in srgb, var(--win) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 30%, transparent)' }}>
+              <CheckCircle2 size={16} style={{ color: 'var(--win)', flexShrink: 0 }} />
+              <p style={{ fontSize: 13, color: 'var(--win)', fontWeight: 600 }}>Upgrade successful! Your plan is now active.</p>
+            </div>
+          )}
+
+          {/* Current plan & usage */}
+          <div className="rv-panel p-5">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <CreditCard size={15} style={{ color: 'var(--accent)' }} />
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Billing</p>
+            </div>
+
+            {billingLoading || !subscription ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted)', fontSize: 13 }}>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                Loading billing info…
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Plan + status */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>
+                        {PLANS[subscription.plan].name}
+                      </p>
+                      {subscription.plan !== 'free' && (
+                        <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 700, color: subscription.status === 'active' || subscription.status === 'trialing' ? 'var(--win)' : 'var(--tside)', background: subscription.status === 'active' || subscription.status === 'trialing' ? 'color-mix(in srgb, var(--win) 12%, transparent)' : 'color-mix(in srgb, var(--tside) 12%, transparent)', border: '1px solid currentColor', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          {subscription.status}
+                        </span>
+                      )}
+                    </div>
+                    {subscription.plan !== 'free' && subscription.currentPeriodEnd && (
+                      <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                        {subscription.cancelAtPeriodEnd ? 'Cancels' : 'Renews'} {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                      </p>
+                    )}
+                    {subscription.plan === 'free' && (
+                      <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>No credit card required</p>
+                    )}
+                  </div>
+                  {subscription.plan !== 'free' && (
+                    <button
+                      onClick={handleManageBilling}
+                      disabled={portalLoading}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: portalLoading ? 0.6 : 1 }}
+                    >
+                      {portalLoading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <ExternalLink size={13} />}
+                      Manage subscription
+                    </button>
+                  )}
+                </div>
+
+                {/* Usage meter */}
+                {(() => {
+                  const limit = PLANS[subscription.plan].demosPerMonth
+                  const used  = subscription.demosUsedThisMonth
+                  const pct   = limit === -1 ? 0 : Math.min(100, (used / limit) * 100)
+                  const resetDate = new Date(subscription.quotaResetAt).toLocaleDateString()
+                  return (
+                    <div style={{ padding: 14, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card-2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text)' }}>Demos this month</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', color: limit === -1 ? 'var(--win)' : pct >= 100 ? 'var(--loss)' : 'var(--text)' }}>
+                          {limit === -1 ? `${used} / ∞` : `${used} / ${limit}`}
+                        </span>
+                      </div>
+                      {limit !== -1 && (
+                        <div style={{ height: 6, borderRadius: 9999, background: 'var(--track)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', borderRadius: 9999, width: `${pct}%`, background: pct >= 100 ? 'var(--loss)' : pct >= 75 ? 'var(--tside)' : 'var(--win)', transition: 'width 0.5s' }} />
+                        </div>
+                      )}
+                      <p style={{ fontSize: 11, color: 'var(--faint)', marginTop: 6 }}>Resets {resetDate}</p>
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+          </div>
+
+          {/* Plan cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
+            {(Object.entries(PLANS) as [PlanId, typeof PLANS[PlanId]][]).map(([planId, plan]) => {
+              const isCurrent = subscription?.plan === planId
+              const isUpgrade = !isCurrent && planId !== 'free'
+              return (
+                <div
+                  key={planId}
+                  style={{
+                    padding: 20, borderRadius: 12, border: isCurrent ? '1px solid color-mix(in srgb, var(--accent) 40%, transparent)' : '1px solid var(--border)',
+                    background: isCurrent ? 'color-mix(in srgb, var(--accent) 5%, var(--card))' : 'var(--card)',
+                    display: 'flex', flexDirection: 'column', gap: 14,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>{plan.name}</p>
+                      <p style={{ fontSize: 20, fontWeight: 800, color: plan.price === 0 ? 'var(--muted)' : 'var(--accent)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
+                        {plan.price === 0 ? 'Free' : `$${plan.price}/mo`}
+                      </p>
+                    </div>
+                    {isCurrent && (
+                      <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700, color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent-line)' }}>Current</span>
+                    )}
+                  </div>
+
+                  <ul style={{ display: 'flex', flexDirection: 'column', gap: 7, listStyle: 'none', padding: 0, margin: 0 }}>
+                    {plan.features.map(f => (
+                      <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: 'var(--muted)' }}>
+                        <CheckCircle2 size={13} style={{ color: 'var(--win)', flexShrink: 0, marginTop: 1 }} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {isUpgrade && (
+                    <button
+                      onClick={() => handleUpgrade(planId)}
+                      disabled={!!checkoutLoading}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                        padding: '9px 0', borderRadius: 9, border: 'none', cursor: checkoutLoading ? 'not-allowed' : 'pointer',
+                        background: 'linear-gradient(180deg, var(--accent), var(--accent-deep))',
+                        color: '#fff', fontSize: 13, fontWeight: 600, opacity: checkoutLoading ? 0.7 : 1,
+                        boxShadow: '0 1px 0 rgba(255,255,255,0.18) inset, 0 4px 14px -6px rgba(124,107,255,0.6)',
+                      }}
+                    >
+                      {checkoutLoading === planId ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={13} />}
+                      {checkoutLoading === planId ? 'Redirecting…' : `Upgrade to ${plan.name}`}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
