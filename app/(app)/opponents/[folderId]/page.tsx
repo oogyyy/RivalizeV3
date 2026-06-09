@@ -75,7 +75,7 @@ export default async function OpponentPage({
   const stats = folder.aggregated_stats as AggregatedStats | null
 
   type DemoListRow  = { id: string; status: string; map: string; match_date: string | null; created_at: string; opponent_slug: string }
-  type DemoStatRow  = { map: string; parsed_data: unknown }
+  type DemoStatRow  = { id: string; map: string; parsed_data: unknown }
 
   // Two parallel queries: display list (no heavy parsed_data) + stat computation (completed only)
   const [listResult, statResult] = await Promise.all([
@@ -89,7 +89,7 @@ export default async function OpponentPage({
       .limit(200),
     admin
       .from('demos')
-      .select('map, parsed_data')
+      .select('id, map, parsed_data')
       .eq('team_id', teamId)
       .eq('opponent_slug', folder.opponent_slug)
       .eq('demo_type', 'opponent')
@@ -99,6 +99,14 @@ export default async function OpponentPage({
   ])
   const demos     = listResult.data as DemoListRow[] | null
   const statDemos = statResult.data as DemoStatRow[] | null
+
+  // Build a header lookup so OpponentDemoList can show real team names
+  const parsedByDemoId = new Map(
+    (statDemos ?? []).map(d => [
+      d.id,
+      d.parsed_data as { header?: import('@/types/database').DemoHeader; opponentSide?: 'team1' | 'team2' } | null,
+    ])
+  )
 
   const totalDemos = (demos ?? []).length
   const wins    = stats?.wins    ?? 0
@@ -327,7 +335,7 @@ export default async function OpponentPage({
               </div>
               <div className="p-2">
                 <OpponentDemoList
-                  demos={(demos ?? []).map(d => ({ ...d, parsed_data: null }))}
+                  demos={(demos ?? []).map(d => ({ ...d, parsed_data: parsedByDemoId.get(d.id) ?? null }))}
                   folderId={folderId}
                   teamId={teamId}
                   isOwnerOrAdmin={isOwnerOrAdmin}
