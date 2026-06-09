@@ -4,6 +4,9 @@ import { useState, useMemo, useEffect } from 'react'
 import {
   Film, TrendingUp, Zap, ExternalLink, Loader2, Info,
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
+} from 'recharts'
 import { MAP_THUMBS } from '@/lib/map-config'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
 import MapFolderList, { type MapGroup } from '@/components/teams/MapFolderList'
@@ -127,6 +130,33 @@ function fmtDate(ts: number | string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+type PerfPoint = {
+  idx: number
+  result: 'w' | 'l' | 'd' | null
+  runningRate: number | null
+  ourScore: number
+  theirScore: number
+  map: string
+  date: string | null
+}
+
+function PerfTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: PerfPoint }> }) {
+  if (!active || !payload?.length) return null
+  const p = payload[0].payload
+  const resultColor = p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : '#facc15'
+  const resultLabel = p.result === 'w' ? 'Win' : p.result === 'l' ? 'Loss' : p.result === 'd' ? 'Draw' : '?'
+  return (
+    <div style={{ background: 'var(--card-2)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '8px 10px', fontSize: 11, lineHeight: 1.6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+      <p style={{ fontWeight: 700, color: 'var(--text)', margin: '0 0 2px' }}>Match #{p.idx} · {p.map}</p>
+      {p.date && <p style={{ color: 'var(--muted)', margin: '0 0 2px' }}>{p.date}</p>}
+      <p style={{ color: resultColor, fontWeight: 600, margin: '0 0 2px' }}>
+        {resultLabel}{(p.ourScore > 0 || p.theirScore > 0) ? ` · ${p.ourScore}–${p.theirScore}` : ''}
+      </p>
+      <p style={{ color: 'var(--muted)', margin: 0 }}>Win rate: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{p.runningRate ?? '—'}%</span></p>
+    </div>
+  )
+}
+
 function FaceitMatchRow({ match }: { match: FaceitRecentMatch }) {
   const myScore = match.score?.[match.my_faction] ?? null
   const oppFac = match.my_faction === 'faction1' ? 'faction2' : 'faction1'
@@ -220,19 +250,44 @@ export default function MyMatchesDashboard({
     const completed = [...demos.filter(d => d.status === 'completed')]
       .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''))
     if (completed.length < 2) return null
-    const results = completed.map(d => {
+
+    let wins = 0, total = 0
+    const points: PerfPoint[] = completed.map((d, idx) => {
       const h = d.parsed_data?.header
-      if (!h) return null
       const os = d.parsed_data?.opponentSide ?? 'team2'
-      const ours = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
-      const theirs = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
-      return ours > theirs ? 'w' : ours < theirs ? 'l' : 'd'
-    }).filter(Boolean) as ('w' | 'l' | 'd')[]
-    const runningRates = results.map((_, idx) => {
-      const slice = results.slice(0, idx + 1)
-      return Math.round(slice.filter(r => r === 'w').length / slice.length * 100)
+      let result: 'w' | 'l' | 'd' | null = null
+      let ourScore = 0, theirScore = 0
+
+      if (h) {
+        ourScore = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
+        theirScore = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
+        total++
+        if (ourScore > theirScore) { wins++; result = 'w' }
+        else if (ourScore < theirScore) result = 'l'
+        else result = 'd'
+      }
+
+      const mapRaw = d.parsed_data?.header?.map
+      const mapName = mapRaw ? (MAP_LABELS[mapRaw] ?? mapRaw.replace(/^de_/, '').replace(/\b\w/g, (c: string) => c.toUpperCase())) : '—'
+      const runningRate = total > 0 ? Math.round((wins / total) * 100) : null
+      const dateStr = d.match_date || d.created_at
+
+      return {
+        idx: idx + 1,
+        result,
+        runningRate,
+        ourScore,
+        theirScore,
+        map: mapName,
+        date: dateStr ? fmtDate(dateStr) : null,
+      }
     })
-    return { results, runningRates }
+
+    const totalW = points.filter(p => p.result === 'w').length
+    const totalL = points.filter(p => p.result === 'l').length
+    const totalD = points.filter(p => p.result === 'd').length
+
+    return { points, totalW, totalL, totalD }
   }, [demos])
 
   const STAT_CARDS = [
@@ -352,26 +407,82 @@ export default function MyMatchesDashboard({
       {/* Performance Trends */}
       {perfTrends && (
         <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
-          <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <TrendingUp size={16} style={{ color: 'var(--accent)' }} /> Performance Trends
-          </p>
-          <div style={{ height: 120, display: 'flex', alignItems: 'flex-end', gap: 3, paddingBottom: 8 }}>
-            {perfTrends.runningRates.map((rate, i) => (
-              <div
-                key={i}
-                style={{ flex: 1, height: `${(rate / 100) * 100}px`, background: 'linear-gradient(180deg,var(--signal),var(--accent))', borderRadius: '2px 2px 0 0', opacity: 0.8, minWidth: 4 }}
-                title={`Match ${i + 1}: ${rate}% win rate`}
-              />
-            ))}
+          {/* Header row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <TrendingUp size={16} style={{ color: 'var(--accent)' }} /> Performance Trends
+            </p>
+            <div style={{ display: 'flex', gap: 10, fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+              <span style={{ color: '#00ffc8' }}>{perfTrends.totalW}W</span>
+              <span style={{ color: '#ff4466' }}>{perfTrends.totalL}L</span>
+              {perfTrends.totalD > 0 && <span style={{ color: '#facc15' }}>{perfTrends.totalD}D</span>}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 4, paddingTop: 8, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
-            {perfTrends.results.map((r, i) => (
-              <span
-                key={i}
-                style={{ width: 10, height: 10, borderRadius: '50%', background: r === 'w' ? 'var(--win)' : r === 'l' ? 'var(--loss)' : 'var(--muted)', flexShrink: 0 }}
-                title={r === 'w' ? 'Win' : r === 'l' ? 'Loss' : 'Draw'}
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 0, marginBottom: 12 }}>
+            Running win rate · hover bars for match details
+          </p>
+
+          {/* Recharts bar chart */}
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={perfTrends.points} margin={{ top: 6, right: 4, bottom: 0, left: -16 }} barCategoryGap="18%">
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis
+                dataKey="idx"
+                tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.35)' }}
+                tickLine={false}
+                axisLine={false}
+                label={{ value: 'Match #', position: 'insideBottomRight', offset: 0, fontSize: 9, fill: 'rgba(255,255,255,0.3)' }}
               />
-            ))}
+              <YAxis
+                domain={[0, 100]}
+                tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.35)' }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v: number) => `${v}%`}
+                ticks={[0, 25, 50, 75, 100]}
+              />
+              <ReferenceLine
+                y={50}
+                stroke="rgba(255,255,255,0.12)"
+                strokeDasharray="4 3"
+                label={{ value: '50%', position: 'right', fontSize: 8, fill: 'rgba(255,255,255,0.3)' }}
+              />
+              <Tooltip content={<PerfTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+              <Bar dataKey="runningRate" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                {perfTrends.points.map((p, i) => (
+                  <Cell
+                    key={i}
+                    fill={p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.15)'}
+                    fillOpacity={0.75}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+
+          {/* Result dots row + legend */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', gap: 3, flex: 1, flexWrap: 'wrap' }}>
+              {perfTrends.points.map((p, i) => (
+                <span
+                  key={i}
+                  title={`Match ${p.idx}: ${p.result === 'w' ? 'Win' : p.result === 'l' ? 'Loss' : p.result === 'd' ? 'Draw' : '?'} on ${p.map}${(p.ourScore > 0 || p.theirScore > 0) ? ` · ${p.ourScore}–${p.theirScore}` : ''}`}
+                  style={{
+                    width: 10, height: 10, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
+                    background: p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.2)',
+                    boxShadow: p.result === 'w' ? '0 0 5px rgba(0,255,200,0.5)' : p.result === 'l' ? '0 0 5px rgba(255,68,102,0.4)' : 'none',
+                  }}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0, fontSize: 9, color: 'var(--muted)', alignItems: 'center' }}>
+              {[['#00ffc8', 'W'], ['#ff4466', 'L'], ['#facc15', 'D']].map(([color, label]) => (
+                <span key={label as string} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: color as string, display: 'inline-block' }} />
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       )}
