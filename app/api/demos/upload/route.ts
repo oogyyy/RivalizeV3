@@ -12,6 +12,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { getPublicUrl } from '@/lib/r2'
 import { slugify } from '@/lib/utils'
+import { checkDemoQuota, incrementDemoCount } from '@/lib/billing'
 
 const MAX_FILE_SIZE  = 500 * 1024 * 1024
 const MAX_CHUNK_SIZE =  10 * 1024 * 1024  // stay under Railway's 10 MB proxy limit
@@ -73,6 +74,12 @@ async function handleInit(
     .from('team_members').select('role')
     .eq('team_id', teamId).eq('user_id', userId).single()
   if (!member) return NextResponse.json({ error: 'Not a member of this team' }, { status: 403 })
+
+  // Quota check
+  const quota = await checkDemoQuota(teamId)
+  if (!quota.allowed) {
+    return NextResponse.json({ error: 'quota_exceeded', message: quota.reason }, { status: 402 })
+  }
 
   const fileHash     = q.get('fileHash')
   const opponentName = q.get('opponentName') ?? 'Unknown'
@@ -273,6 +280,9 @@ async function handleComplete(
       { onConflict: 'user_team_id,opponent_slug' },
     )
   }
+
+  // Increment monthly demo count for quota tracking
+  await incrementDemoCount(teamId)
 
   return NextResponse.json(demo, { status: 201 })
 }
