@@ -4,11 +4,28 @@ import { useState, useEffect, useCallback, type ChangeEvent } from 'react'
 import Link from 'next/link'
 import {
   Trophy, Search, Download, ChevronLeft, ChevronRight,
-  ExternalLink, Loader2, Star, Filter, Database,
+  ExternalLink, Loader2, Star, Filter, Database, Radio, CalendarClock,
 } from 'lucide-react'
 import ImportProMatchModal from './ImportProMatchModal'
 
 interface Team { id: string; name: string }
+
+interface LiveMatch {
+  id: string
+  team1: string
+  team2: string
+  team1_logo: string | null
+  team2_logo: string | null
+  team1_score: number
+  team2_score: number
+  current_map: string | null
+  maps_finished: number
+  best_of: number | null
+  begin_at: string | null
+  event: string
+  status: string
+  stream_url: string | null
+}
 
 export interface ProMatch {
   id: string
@@ -42,6 +59,18 @@ function hltvSearchUrl(match: ProMatch) {
   )}`
 }
 
+function startsIn(beginAt: string | null): string {
+  if (!beginAt) return 'TBD'
+  const diff = new Date(beginAt).getTime() - Date.now()
+  if (diff <= 0) return 'starting'
+  const mins = Math.round(diff / 60000)
+  if (mins < 60) return `in ${mins}m`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `in ${hours}h ${mins % 60}m`
+  return new Date(beginAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+    ' ' + new Date(beginAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
 const GRID_COLUMNS = 'minmax(0,1fr) 120px 70px 170px 130px'
 
 export default function ProDemosClient({
@@ -65,7 +94,27 @@ export default function ProDemosClient({
   const [activeMatch, setActiveMatch] = useState<ProMatch | null>(null)
   const [hoveredRow, setHoveredRow] = useState<string | null>(null)
   const [imported, setImported] = useState<Record<string, string>>({})
+  const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([])
+  const [upcomingMatches, setUpcomingMatches] = useState<LiveMatch[]>([])
   const PAGE_SIZE = 20
+
+  // Poll live/upcoming matches every 60s
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/pro-demos/live')
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
+        setLiveMatches(data.live ?? [])
+        setUpcomingMatches(data.upcoming ?? [])
+      } catch { /* keep last known state */ }
+    }
+    load()
+    const t = setInterval(load, 60_000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [])
 
   const fetchMatches = useCallback(async (pg: number, map: string, q: string) => {
     setLoading(true)
@@ -168,6 +217,117 @@ export default function ProDemosClient({
         </div>
       )}
 
+      {/* ── Live now ── */}
+      {liveMatches.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <style>{`@keyframes rvLivePulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }`}</style>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Radio size={13} style={{ color: 'var(--loss)' }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Live Now
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--faint)' }}>· updates every 60s</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }}>
+            {liveMatches.map(lm => (
+              <div key={lm.id} style={{
+                borderRadius: 12, border: '1px solid color-mix(in srgb, var(--loss) 25%, var(--border))',
+                background: 'var(--card)', padding: '12px 14px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    fontSize: 9, fontWeight: 700, color: 'var(--loss)',
+                    textTransform: 'uppercase', letterSpacing: '0.1em',
+                  }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%', background: 'var(--loss)',
+                      animation: 'rvLivePulse 1.6s ease-in-out infinite',
+                    }} />
+                    Live
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>
+                    {lm.event}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+                    {lm.team1_logo && <img src={lm.team1_logo} alt="" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }} />}
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lm.team1}</span>
+                  </div>
+                  <span style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text)', flexShrink: 0 }}>
+                    {lm.team1_score}<span style={{ color: 'var(--faint)', margin: '0 5px' }}>:</span>{lm.team2_score}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1, justifyContent: 'flex-end' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lm.team2}</span>
+                    {lm.team2_logo && <img src={lm.team2_logo} alt="" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }} />}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--muted)', textTransform: 'capitalize' }}>
+                    {lm.current_map ? lm.current_map.replace(/^(de|cs)_/, '') : '—'}
+                    {lm.best_of ? ` · map ${Math.min(lm.maps_finished + 1, lm.best_of)} of BO${lm.best_of}` : ''}
+                  </span>
+                  {lm.stream_url && (
+                    <a
+                      href={lm.stream_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        fontSize: 10, fontWeight: 600, color: 'var(--loss)',
+                        textDecoration: 'none', padding: '2px 8px', borderRadius: 6,
+                        background: 'color-mix(in srgb, var(--loss) 10%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--loss) 22%, transparent)',
+                      }}
+                    >
+                      <ExternalLink size={9} /> Watch
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Upcoming ── */}
+      {upcomingMatches.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <CalendarClock size={13} style={{ color: 'var(--muted)' }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Upcoming
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+            {upcomingMatches.map(um => (
+              <div key={um.id} style={{
+                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
+                borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)',
+                padding: '8px 12px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {um.team1_logo && <img src={um.team1_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} />}
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{um.team1}</span>
+                  <span style={{ fontSize: 10, color: 'var(--faint)' }}>vs</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{um.team2}</span>
+                  {um.team2_logo && <img src={um.team2_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} />}
+                </div>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
+                  color: 'var(--accent)', whiteSpace: 'nowrap',
+                  padding: '2px 7px', borderRadius: 6,
+                  background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+                }}>
+                  {startsIn(um.begin_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Search bar ── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
@@ -262,10 +422,12 @@ export default function ProDemosClient({
               >
                 {/* Match */}
                 <div style={{ minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span style={{ color: 'var(--accent)' }}>{match.team1}</span>
+                  <p style={{ display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 600, margin: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {match.team1_logo && <img src={match.team1_logo} alt="" style={{ width: 15, height: 15, objectFit: 'contain', marginRight: 6, flexShrink: 0 }} />}
+                    <span style={{ color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{match.team1}</span>
                     <span style={{ color: 'var(--faint)', margin: '0 6px', fontWeight: 500 }}>vs</span>
-                    <span style={{ color: 'var(--loss)' }}>{match.team2}</span>
+                    {match.team2_logo && <img src={match.team2_logo} alt="" style={{ width: 15, height: 15, objectFit: 'contain', marginRight: 6, flexShrink: 0 }} />}
+                    <span style={{ color: 'var(--loss)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{match.team2}</span>
                   </p>
                   {match.date && (
                     <p style={{ fontSize: 10, color: 'var(--faint)', margin: '2px 0 0' }}>
