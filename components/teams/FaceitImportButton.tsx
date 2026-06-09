@@ -166,7 +166,11 @@ export default function FaceitImportButton({ teamId, faceitNickname }: Props) {
 
   if (!open) {
     return (
-      <Button variant="outline" onClick={handleOpen} className="gap-2 relative">
+      <Button
+        variant="outline"
+        onClick={handleOpen}
+        className="gap-2 relative border-[#FF5500]/60 text-[#FF5500] hover:bg-[#FF5500]/10 hover:border-[#FF5500] hover:text-[#FF5500]"
+      >
         <Download size={16} />
         Import from FACEIT
         {pendingCount !== null && pendingCount > 0 && (
