@@ -16,7 +16,7 @@ import type { Round, PlayerStats, PositionFrame } from '@/types/database'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CANVAS_SIZE  = 580
+const CANVAS_SIZE  = 720
 const T1_COLOR     = '#22d3ee'   // cyan
 const T2_COLOR     = '#fb923c'   // orange
 const KILL_FLASH   = 1.4
@@ -197,6 +197,11 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   // ── Hover tooltip ─────────────────────────────────────────────────────────
   const [hoveredPlayer, setHoveredPlayer] = useState<string | null>(null)
   const [mousePos,      setMousePos]      = useState({ x: 0, y: 0 })
+
+  // ── Panel visibility ──────────────────────────────────────────────────────
+  const [leftOpen,  setLeftOpen]  = useState(true)
+  const [rightOpen, setRightOpen] = useState(true)
+  const [rightTab,  setRightTab]  = useState<'players' | 'kills'>('players')
 
   // ── Data loading ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -671,32 +676,9 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   // ── Guards ────────────────────────────────────────────────────────────────
   if (!rounds.length) return <p className="text-muted-foreground text-sm">No replay data available.</p>
 
-  const annotCount = annotations[roundIdx]?.length ?? 0
-  const hoverStats = hoveredPlayer ? players.find(p => p.name === hoveredPlayer) : null
+  const annotCount      = annotations[roundIdx]?.length ?? 0
+  const hoverStats      = hoveredPlayer ? players.find(p => p.name === hoveredPlayer) : null
   const hoverRoundKills = hoveredPlayer ? kills.filter(k => k.killer_name === hoveredPlayer && k.time <= time).length : 0
-
-  // ── Layer toggle button helper ────────────────────────────────────────────
-  const LayerBtn = ({
-    label, active, onToggle, color, icon, count,
-  }: { label: string; active: boolean; onToggle: () => void; color?: string; icon: ReactNode; count?: number }) => (
-    <button
-      onClick={onToggle}
-      className={cn(
-        'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all',
-        active ? 'bg-white/[0.07] text-foreground' : 'text-muted-foreground/50 hover:bg-white/[0.03] hover:text-muted-foreground',
-      )}
-    >
-      <span className="flex-shrink-0" style={{ color: active && color ? color : 'currentColor' }}>{icon}</span>
-      <span className="flex-1 text-left">{label}</span>
-      {count !== undefined && count > 0 && (
-        <span className="text-[9px] px-1.5 rounded tabular-nums"
-          style={{ color: color ? color + '99' : undefined, background: color ? color + '15' : 'rgba(255,255,255,0.06)' }}>
-          {count}
-        </span>
-      )}
-      {active ? <Eye size={9} className="flex-shrink-0 opacity-40" /> : <EyeOff size={9} className="flex-shrink-0 opacity-20" />}
-    </button>
-  )
 
   // ── Tool button helper ────────────────────────────────────────────────────
   const ToolBtn = ({ tool, icon, tip }: { tool: AnnotationTool; icon: ReactNode; tip: string }) => (
@@ -704,7 +686,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       onClick={() => setActiveTool(tool)}
       title={tip}
       className={cn(
-        'flex items-center justify-center h-8 rounded-md border transition-all text-xs',
+        'flex items-center justify-center h-8 rounded-md border transition-all',
         activeTool === tool
           ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
           : 'border-border/25 text-muted-foreground/55 hover:border-border/50 hover:text-foreground',
@@ -717,17 +699,16 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   return (
     <div className="flex flex-col rounded-xl border border-white/[0.08] overflow-hidden bg-[#07080e] select-none">
 
-      {/* ──────────────────────────────────────────────────────────────────────
-          HEADER: map · round · filters · score
-      ────────────────────────────────────────────────────────────────────── */}
-      <header className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.015]">
+      {/* ── HEADER ──────────────────────────────────────────────────────────── */}
+      <header className="flex items-center gap-3 px-4 py-2 border-b border-white/[0.06] bg-white/[0.015] flex-shrink-0">
+        {/* Map + round */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[11px] font-black font-mono tracking-[0.14em] uppercase bg-white/[0.07] text-muted-foreground px-2.5 py-1 rounded-md">
+          <span className="text-[11px] font-black font-mono tracking-[0.14em] uppercase bg-white/[0.07] text-muted-foreground px-2 py-0.5 rounded">
             {mapName.replace('de_', '')}
           </span>
-          <span className="font-mono text-sm font-semibold">
+          <span className="font-mono text-[13px] font-semibold">
             R<span className="text-foreground">{currentRound?.number ?? roundIdx + 1}</span>
-            <span className="text-muted-foreground/35 text-xs">/{rounds.length}</span>
+            <span className="text-muted-foreground/35 text-[11px]">/{rounds.length}</span>
           </span>
           {currentRound?.bomb_planted && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 font-mono animate-pulse">
@@ -735,7 +716,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
             </span>
           )}
           {!hasFrames && (
-            <span className="text-[10px] text-amber-400/55 border border-amber-400/20 px-1.5 py-0.5 rounded font-mono">
+            <span className="text-[10px] text-amber-400/50 border border-amber-400/20 px-1.5 py-0.5 rounded font-mono">
               kill-only
             </span>
           )}
@@ -749,9 +730,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
               onClick={() => setRoundFilter(f)}
               className={cn(
                 'px-2 py-0.5 text-[10px] font-mono rounded-md transition-all',
-                roundFilter === f
-                  ? 'bg-white/12 text-foreground font-bold'
-                  : 'text-muted-foreground/45 hover:text-muted-foreground',
+                roundFilter === f ? 'bg-white/12 text-foreground font-bold' : 'text-muted-foreground/40 hover:text-muted-foreground',
               )}
             >
               {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -761,20 +740,20 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
 
         <div className="flex-1" />
 
-        {/* Match score */}
-        <div className="flex items-center gap-2 font-mono font-bold tabular-nums">
-          <span className="text-[11px] truncate max-w-[80px]" style={{ color: T1_COLOR + 'bb' }}>{team1Name}</span>
-          <span className="text-xl" style={{ color: T1_COLOR }}>{roundScore.t1}</span>
-          <span className="text-muted-foreground/35 text-sm">–</span>
-          <span className="text-xl" style={{ color: T2_COLOR }}>{roundScore.t2}</span>
-          <span className="text-[11px] truncate max-w-[80px]" style={{ color: T2_COLOR + 'bb' }}>{team2Name}</span>
+        {/* Score */}
+        <div className="flex items-center gap-2 font-mono tabular-nums">
+          <span className="text-[11px] truncate max-w-[80px] font-medium" style={{ color: T1_COLOR + 'bb' }}>{team1Name}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[22px] font-black leading-none" style={{ color: T1_COLOR }}>{roundScore.t1}</span>
+            <span className="text-muted-foreground/30">:</span>
+            <span className="text-[22px] font-black leading-none" style={{ color: T2_COLOR }}>{roundScore.t2}</span>
+          </div>
+          <span className="text-[11px] truncate max-w-[80px] font-medium" style={{ color: T2_COLOR + 'bb' }}>{team2Name}</span>
         </div>
       </header>
 
-      {/* ──────────────────────────────────────────────────────────────────────
-          ROUND NAVIGATION
-      ────────────────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-white/[0.04]">
+      {/* ── ROUND NAVIGATION ────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/[0.04] bg-white/[0.008] flex-shrink-0">
         <button
           onClick={() => setRoundIdx(i => Math.max(0, i - 1))}
           disabled={roundIdx === 0}
@@ -782,12 +761,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         >
           <ChevronLeft size={12} />
         </button>
-
-        <div
-          ref={roundBarRef}
-          className="flex gap-0.5 overflow-x-auto flex-1 min-w-0 py-0.5"
-          style={{ scrollbarWidth: 'none' }}
-        >
+        <div ref={roundBarRef} className="flex gap-0.5 overflow-x-auto flex-1 min-w-0 py-0.5" style={{ scrollbarWidth: 'none' }}>
           {rounds.map((r, i) => {
             const type   = getRoundType(r, i)
             const hidden = roundFilter !== 'all' && type !== roundFilter
@@ -801,7 +775,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
                   'relative flex-shrink-0 w-7 h-7 text-[10px] font-mono rounded transition-all duration-100 border',
                   hidden && 'opacity-18',
                   roundIdx === i
-                    ? 'border-white/30 bg-white/10 text-foreground font-bold shadow-sm'
+                    ? 'border-white/30 bg-white/10 text-foreground font-bold'
                     : 'border-border/22 text-muted-foreground/50 hover:border-border/50 hover:text-foreground',
                   type === 'pistol' && roundIdx !== i && 'border-yellow-500/22',
                 )}
@@ -809,17 +783,12 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
                 {r.number}
                 <span
                   className="absolute bottom-[2px] left-1/2 -translate-x-1/2 w-[3px] h-[3px] rounded-full"
-                  style={{
-                    background: type === 'pistol'
-                      ? '#fbbf24'
-                      : r.winner === team1Name ? T1_COLOR + 'aa' : T2_COLOR + 'aa'
-                  }}
+                  style={{ background: type === 'pistol' ? '#fbbf24' : r.winner === team1Name ? T1_COLOR + 'aa' : T2_COLOR + 'aa' }}
                 />
               </button>
             )
           })}
         </div>
-
         <button
           onClick={() => setRoundIdx(i => Math.min(rounds.length - 1, i + 1))}
           disabled={roundIdx === rounds.length - 1}
@@ -829,109 +798,162 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         </button>
       </div>
 
-      {/* ──────────────────────────────────────────────────────────────────────
-          MAIN AREA: left panel | canvas | right sidebar
-      ────────────────────────────────────────────────────────────────────── */}
-      <div className="flex min-h-0">
+      {/* ── MAIN BODY ───────────────────────────────────────────────────────── */}
+      <div className="flex min-h-0" style={{ minHeight: 560 }}>
+
+        {/* Left collapse strip */}
+        <button
+          onClick={() => setLeftOpen(v => !v)}
+          title={leftOpen ? 'Hide controls' : 'Show controls'}
+          className="w-5 flex-shrink-0 border-r border-white/[0.06] flex items-center justify-center text-muted-foreground/25 hover:text-muted-foreground hover:bg-white/[0.03] transition-all"
+        >
+          <ChevronLeft
+            size={11}
+            style={{ transform: leftOpen ? 'none' : 'rotate(180deg)', transition: 'transform 0.2s' }}
+          />
+        </button>
 
         {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
-        <aside className="w-[172px] flex-shrink-0 border-r border-white/[0.06] flex flex-col gap-0 py-3 overflow-y-auto bg-white/[0.01]"
-          style={{ scrollbarWidth: 'none' }}>
+        {leftOpen && (
+          <aside
+            className="w-[192px] flex-shrink-0 border-r border-white/[0.06] flex flex-col overflow-y-auto bg-white/[0.01]"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {/* Layers */}
+            <div className="px-3 pt-3 pb-2">
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/35 mb-2">Layers</p>
 
-          <div className="px-3 mb-1">
-            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40 mb-2">Layers</p>
-            <LayerBtn label="Smokes"     active={showSmokes}     onToggle={() => setShowSmokes(v=>!v)}     color={GREN_COLORS.smoke}   icon={<Wind  size={9}/>} count={grenadeCount.smoke}   />
-            <LayerBtn label="Flashes"    active={showFlashes}    onToggle={() => setShowFlashes(v=>!v)}    color={GREN_COLORS.flash}   icon={<Zap   size={9}/>} count={grenadeCount.flash}   />
-            <LayerBtn label="Molotovs"   active={showMolotovs}   onToggle={() => setShowMolotovs(v=>!v)}   color={GREN_COLORS.molotov} icon={<Flame size={9}/>} count={grenadeCount.molotov} />
-            <LayerBtn label="HE Nades"   active={showHE}         onToggle={() => setShowHE(v=>!v)}         color={GREN_COLORS.he}      icon={<Circle size={9}/>} count={grenadeCount.he}     />
-            <LayerBtn label="Trails"     active={showTrails}     onToggle={() => setShowTrails(v=>!v)}     icon={<Minus size={9}/>}     />
-            <LayerBtn label="Names"      active={showNames}      onToggle={() => setShowNames(v=>!v)}      icon={<Tag size={9}/>}       />
-            <LayerBtn label="Deaths"     active={showDeaths}     onToggle={() => setShowDeaths(v=>!v)}     icon={<Skull size={9}/>}     />
-            <LayerBtn label="Directions" active={showDirections} onToggle={() => setShowDirections(v=>!v)} icon={<ArrowRight size={9}/>} />
-            <button
-              onClick={() => setShowHeatmap(v => !v)}
-              className={cn(
-                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all',
-                showHeatmap
-                  ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20'
-                  : 'text-muted-foreground/50 hover:bg-white/[0.03] hover:text-muted-foreground',
-              )}
-            >
-              <Activity size={9} className="flex-shrink-0" />
-              <span className="flex-1 text-left">Heatmap</span>
-              {!hasFrames && <span className="text-[8px] text-amber-400/40">no data</span>}
-            </button>
-          </div>
+              {/* Grenades: compact 2×2 grid */}
+              <div className="grid grid-cols-2 gap-1 mb-1">
+                {([
+                  { label: 'Smokes',   active: showSmokes,   toggle: () => setShowSmokes(v=>!v),   color: GREN_COLORS.smoke,   icon: <Wind size={9}/>,   count: grenadeCount.smoke   },
+                  { label: 'Flashes',  active: showFlashes,  toggle: () => setShowFlashes(v=>!v),  color: GREN_COLORS.flash,   icon: <Zap size={9}/>,    count: grenadeCount.flash   },
+                  { label: 'Molotovs', active: showMolotovs, toggle: () => setShowMolotovs(v=>!v), color: GREN_COLORS.molotov, icon: <Flame size={9}/>,  count: grenadeCount.molotov },
+                  { label: 'HE Nades', active: showHE,       toggle: () => setShowHE(v=>!v),       color: GREN_COLORS.he,      icon: <Circle size={9}/>, count: grenadeCount.he      },
+                ] as const).map(({ label, active, toggle, color, icon, count }) => (
+                  <button
+                    key={label}
+                    onClick={toggle}
+                    className={cn(
+                      'flex flex-col items-start gap-0.5 px-2 py-1.5 rounded border text-left transition-all',
+                      active ? 'bg-white/[0.07] border-white/[0.12]' : 'border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.03]',
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span style={{ color: active ? color : 'rgba(255,255,255,0.25)' }}>{icon}</span>
+                      {count > 0 && (
+                        <span className="text-[8px] font-mono tabular-nums" style={{ color: active ? color + 'bb' : 'rgba(255,255,255,0.18)' }}>
+                          {count}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[9px] font-medium leading-none" style={{ color: active ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.28)' }}>
+                      {label}
+                    </span>
+                  </button>
+                ))}
+              </div>
 
-          <div className="mx-3 border-t border-white/[0.05] my-2" />
+              {/* Other layer toggles */}
+              {([
+                { label: 'Trails',     active: showTrails,     toggle: () => setShowTrails(v=>!v),     icon: <Minus size={9}/> },
+                { label: 'Names',      active: showNames,       toggle: () => setShowNames(v=>!v),       icon: <Tag size={9}/> },
+                { label: 'Deaths',     active: showDeaths,      toggle: () => setShowDeaths(v=>!v),      icon: <Skull size={9}/> },
+                { label: 'Directions', active: showDirections,  toggle: () => setShowDirections(v=>!v),  icon: <ArrowRight size={9}/> },
+              ] as const).map(({ label, active, toggle, icon }) => (
+                <button
+                  key={label}
+                  onClick={toggle}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-2 py-1 rounded text-[10px] font-medium transition-all',
+                    active ? 'text-foreground/80' : 'text-muted-foreground/35 hover:text-muted-foreground/65',
+                  )}
+                >
+                  <span>{icon}</span>
+                  <span className="flex-1 text-left">{label}</span>
+                  {active
+                    ? <Eye size={8} className="opacity-30 flex-shrink-0" />
+                    : <EyeOff size={8} className="opacity-18 flex-shrink-0" />}
+                </button>
+              ))}
 
-          <div className="px-3">
-            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40 mb-2">Draw</p>
-            <div className="grid grid-cols-3 gap-1 mb-2.5">
-              <ToolBtn tool="select" icon={<MousePointer size={12}/>} tip="Select / Focus player" />
-              <ToolBtn tool="pen"    icon={<Pencil size={12}/>}       tip="Freehand pen" />
-              <ToolBtn tool="line"   icon={<Minus size={12}/>}        tip="Straight line" />
-              <ToolBtn tool="arrow"  icon={<ArrowRight size={12}/>}   tip="Arrow" />
-              <ToolBtn tool="circle" icon={<Circle size={12}/>}       tip="Circle" />
+              {/* Heatmap toggle */}
               <button
-                onClick={() => setAnnotations(prev => ({ ...prev, [roundIdx]: [] }))}
-                disabled={annotCount === 0}
-                title="Clear annotations"
-                className="flex items-center justify-center h-8 rounded-md border border-red-500/20 text-red-400/50 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-15 transition-all"
+                onClick={() => setShowHeatmap(v => !v)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-2 py-1 rounded text-[10px] font-medium transition-all mt-0.5',
+                  showHeatmap ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20' : 'text-muted-foreground/35 hover:text-muted-foreground/65',
+                )}
               >
-                <Trash2 size={12} />
+                <Activity size={9} />
+                <span className="flex-1 text-left">Heatmap</span>
+                {!hasFrames && <span className="text-[8px] text-amber-400/30">no data</span>}
               </button>
             </div>
 
-            {/* Color swatches */}
-            <div className="flex gap-1.5 flex-wrap">
-              {['#ff4466', '#22d3ee', '#fbbf24', '#a3e635', '#e879f9', '#ffffff'].map(c => (
+            <div className="mx-3 border-t border-white/[0.05]" />
+
+            {/* Draw tools */}
+            <div className="px-3 pt-2.5 pb-3">
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/35 mb-2">Draw</p>
+              <div className="grid grid-cols-3 gap-1 mb-2.5">
+                <ToolBtn tool="select" icon={<MousePointer size={12}/>} tip="Select / Focus player" />
+                <ToolBtn tool="pen"    icon={<Pencil size={12}/>}       tip="Freehand pen" />
+                <ToolBtn tool="line"   icon={<Minus size={12}/>}        tip="Straight line" />
+                <ToolBtn tool="arrow"  icon={<ArrowRight size={12}/>}   tip="Arrow" />
+                <ToolBtn tool="circle" icon={<Circle size={12}/>}       tip="Circle" />
                 <button
-                  key={c}
-                  onClick={() => setAnnotColor(c)}
-                  className={cn(
-                    'w-5 h-5 rounded-full border-2 transition-all',
-                    annotColor === c ? 'border-white scale-110' : 'border-transparent opacity-55 hover:opacity-90',
-                  )}
-                  style={{ background: c }}
-                />
-              ))}
+                  onClick={() => setAnnotations(prev => ({ ...prev, [roundIdx]: [] }))}
+                  disabled={annotCount === 0}
+                  title="Clear annotations"
+                  className="flex items-center justify-center h-8 rounded-md border border-red-500/20 text-red-400/45 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-15 transition-all"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+              <div className="flex gap-1.5 flex-wrap">
+                {['#ff4466', '#22d3ee', '#fbbf24', '#a3e635', '#e879f9', '#ffffff'].map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setAnnotColor(c)}
+                    className={cn('w-4 h-4 rounded-full border-2 transition-all', annotColor === c ? 'border-white scale-110' : 'border-transparent opacity-45 hover:opacity-80')}
+                    style={{ background: c }}
+                  />
+                ))}
+              </div>
+              {annotCount > 0 && (
+                <p className="text-[9px] text-muted-foreground/28 mt-1.5 font-mono">{annotCount} annotation{annotCount !== 1 ? 's' : ''}</p>
+              )}
             </div>
 
-            {annotCount > 0 && (
-              <p className="text-[9px] text-muted-foreground/35 mt-1.5 font-mono">
-                {annotCount} annotation{annotCount !== 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
-
-          {/* Focus player badge */}
-          {focusPlayer && (
-            <>
-              <div className="mx-3 border-t border-white/[0.05] my-2" />
-              <div className="px-3">
-                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40 mb-1.5">Focus</p>
-                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-cyan-500/10 border border-cyan-500/20">
-                  <Crosshair size={10} className="text-cyan-400 flex-shrink-0" />
-                  <span className="text-[11px] font-mono text-cyan-300 truncate flex-1">{focusPlayer}</span>
-                  <button onClick={() => setFocusPlayer(null)} className="text-muted-foreground/40 hover:text-foreground text-xs leading-none">✕</button>
+            {/* Focus player badge */}
+            {focusPlayer && (
+              <>
+                <div className="mx-3 border-t border-white/[0.05]" />
+                <div className="px-3 py-2.5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/35 mb-1.5">Focus</p>
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-cyan-500/10 border border-cyan-500/20">
+                    <Crosshair size={10} className="text-cyan-400 flex-shrink-0" />
+                    <span className="text-[10px] font-mono text-cyan-300 truncate flex-1">{focusPlayer}</span>
+                    <button onClick={() => setFocusPlayer(null)} className="text-muted-foreground/35 hover:text-foreground text-xs leading-none">✕</button>
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
-        </aside>
+              </>
+            )}
+          </aside>
+        )}
 
-        {/* ── CANVAS ──────────────────────────────────────────────────────── */}
-        <div className="flex-1 flex items-center justify-center bg-[#07080e] relative overflow-hidden p-1.5 min-w-0">
+        {/* ── CANVAS AREA ─────────────────────────────────────────────────── */}
+        <div className="flex-1 flex items-center justify-center bg-[#07080e] relative overflow-hidden p-2 min-w-0">
           <canvas
             ref={canvasRef}
             width={CANVAS_SIZE}
             height={CANVAS_SIZE}
             className={cn(
-              'rounded-lg border border-white/[0.07] bg-[#07080e]',
+              'rounded-lg border border-white/[0.07]',
               activeTool !== 'select' ? 'cursor-crosshair' : 'cursor-default',
             )}
-            style={{ maxWidth: '100%', maxHeight: '100%', aspectRatio: '1/1' }}
+            style={{ width: '100%', maxWidth: CANVAS_SIZE, aspectRatio: '1 / 1' }}
             onMouseDown={handleCanvasMouseDown}
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
@@ -944,161 +966,198 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
               className="fixed z-50 bg-[#0d0f1c] border border-white/[0.12] rounded-xl px-3 py-2.5 pointer-events-none shadow-2xl"
               style={{ left: mousePos.x + 14, top: mousePos.y - 64 }}
             >
-              <div className="font-bold text-[12px] mb-0.5"
-                style={{ color: hoverStats?.team === team1Name ? T1_COLOR : T2_COLOR }}>
+              <div className="font-bold text-[12px] mb-0.5" style={{ color: hoverStats?.team === team1Name ? T1_COLOR : T2_COLOR }}>
                 {hoveredPlayer}
               </div>
               {hoverStats && (
-                <div className="text-muted-foreground/65 font-mono text-[10px]">
+                <div className="text-muted-foreground/60 font-mono text-[10px]">
                   {hoverStats.kills}K / {hoverStats.deaths}D / {hoverStats.assists}A
-                  <span className="ml-1.5 text-muted-foreground/40">· {(hoverStats.adr ?? 0).toFixed(0)} ADR</span>
+                  <span className="ml-1.5 text-muted-foreground/35">· {(hoverStats.adr ?? 0).toFixed(0)} ADR</span>
                 </div>
               )}
-              <div className="text-[10px] mt-0.5 text-muted-foreground/45">
-                This round: <span className="font-mono text-foreground/70">{hoverRoundKills} kills</span>
+              <div className="text-[10px] mt-0.5 text-muted-foreground/40">
+                This round: <span className="font-mono text-foreground/65">{hoverRoundKills} kills</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* ── RIGHT SIDEBAR ────────────────────────────────────────────────── */}
-        <aside className="w-[216px] flex-shrink-0 border-l border-white/[0.06] flex flex-col overflow-hidden bg-white/[0.01]">
+        {/* ── RIGHT PANEL ─────────────────────────────────────────────────── */}
+        {rightOpen && (
+          <aside className="w-[240px] flex-shrink-0 border-l border-white/[0.06] flex flex-col overflow-hidden bg-white/[0.01]">
 
-          {/* Player roster */}
-          <div className="p-3 border-b border-white/[0.05]">
-            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40 mb-2.5">Players</p>
-            <div className="grid grid-cols-2 gap-x-2 gap-y-0">
-              {[
-                { list: team1Players, color: T1_COLOR, teamName: team1Name },
-                { list: team2Players, color: T2_COLOR, teamName: team2Name },
-              ].map(({ list, color, teamName }) => (
-                <div key={teamName}>
-                  <div className="flex items-center gap-1 mb-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                    <span className="text-[9px] font-semibold truncate flex-1" style={{ color: color + 'bb' }}>{teamName}</span>
-                    <span className="text-[9px] text-muted-foreground/40 tabular-nums">
-                      {list.filter(p => aliveStatus.get(p.name) !== false).length}
-                    </span>
-                  </div>
-                  {list.map(p => {
-                    const alive   = aliveStatus.get(p.name) !== false
-                    const focused = focusPlayer === p.name
-                    // show health bar from frame data if available
-                    const hp      = playerPosRef.current.get(p.name)?.health
-                    const hpPct   = hp !== undefined ? Math.max(0, Math.min(100, hp)) : alive ? 100 : 0
-                    const hpCol   = hpPct > 60 ? '#4ade80' : hpPct > 30 ? '#fbbf24' : '#f87171'
-                    return (
-                      <button
-                        key={p.name}
-                        onClick={() => setFocusPlayer(focused ? null : p.name)}
-                        className={cn(
-                          'w-full flex items-center gap-1 py-[3px] px-1 rounded text-left transition-all',
-                          !alive && 'opacity-22',
-                          focused && 'bg-cyan-500/10',
-                        )}
-                      >
-                        {alive
-                          ? <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                          : <Skull size={8} className="text-muted-foreground/50 flex-shrink-0" />
-                        }
-                        <span className="text-[10px] font-mono truncate flex-1 min-w-0"
-                          style={{ color: alive ? color + 'bb' : undefined }}>
-                          {p.name}
+            {/* Tabs */}
+            <div className="flex border-b border-white/[0.06] flex-shrink-0">
+              <button
+                onClick={() => setRightTab('players')}
+                className={cn(
+                  'flex-1 py-2 text-[10px] font-bold uppercase tracking-[0.1em] transition-all border-b-2 -mb-px',
+                  rightTab === 'players'
+                    ? 'text-foreground/90 border-cyan-500/60'
+                    : 'text-muted-foreground/35 border-transparent hover:text-muted-foreground/60',
+                )}
+              >
+                Players
+              </button>
+              <button
+                onClick={() => setRightTab('kills')}
+                className={cn(
+                  'flex-1 py-2 text-[10px] font-bold uppercase tracking-[0.1em] transition-all border-b-2 -mb-px flex items-center justify-center gap-1.5',
+                  rightTab === 'kills'
+                    ? 'text-foreground/90 border-red-500/50'
+                    : 'text-muted-foreground/35 border-transparent hover:text-muted-foreground/60',
+                )}
+              >
+                Kill Feed
+                {kills.length > 0 && (
+                  <span className="font-mono text-[9px] tabular-nums opacity-60">
+                    {pastKills.length}/{kills.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Players tab */}
+            {rightTab === 'players' && (
+              <div className="flex-1 overflow-y-auto p-3" style={{ scrollbarWidth: 'none' }}>
+                <div className="grid grid-cols-2 gap-x-3">
+                  {[
+                    { list: team1Players, color: T1_COLOR, teamName: team1Name },
+                    { list: team2Players, color: T2_COLOR, teamName: team2Name },
+                  ].map(({ list, color, teamName }) => (
+                    <div key={teamName}>
+                      <div className="flex items-center gap-1 mb-2">
+                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                        <span className="text-[9px] font-semibold truncate flex-1" style={{ color: color + 'bb' }}>{teamName}</span>
+                        <span className="text-[9px] tabular-nums font-bold" style={{ color }}>
+                          {list.filter(p => aliveStatus.get(p.name) !== false).length}
+                          <span className="text-muted-foreground/30 font-normal">/{list.length}</span>
                         </span>
-                        {hasFrames && alive && (
-                          <div className="w-7 h-[3px] rounded-full bg-white/10 flex-shrink-0 overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-300"
-                              style={{ width: `${hpPct}%`, background: hpCol }} />
-                          </div>
-                        )}
-                      </button>
-                    )
-                  })}
+                      </div>
+                      {list.map(p => {
+                        const alive   = aliveStatus.get(p.name) !== false
+                        const focused = focusPlayer === p.name
+                        const hp      = playerPosRef.current.get(p.name)?.health
+                        const hpPct   = hp !== undefined ? Math.max(0, Math.min(100, hp)) : alive ? 100 : 0
+                        const hpCol   = hpPct > 60 ? '#4ade80' : hpPct > 30 ? '#fbbf24' : '#f87171'
+                        return (
+                          <button
+                            key={p.name}
+                            onClick={() => setFocusPlayer(focused ? null : p.name)}
+                            className={cn(
+                              'w-full flex flex-col gap-0.5 py-1 px-1.5 rounded text-left transition-all mb-0.5 border',
+                              !alive && 'opacity-22',
+                              focused ? 'bg-cyan-500/10 border-cyan-500/20' : 'border-transparent hover:bg-white/[0.04]',
+                            )}
+                          >
+                            <div className="flex items-center gap-1">
+                              {alive
+                                ? <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                                : <Skull size={8} className="text-muted-foreground/40 flex-shrink-0" />
+                              }
+                              <span className="text-[10px] font-mono truncate flex-1 min-w-0" style={{ color: alive ? color + 'bb' : undefined }}>
+                                {p.name}
+                              </span>
+                            </div>
+                            {hasFrames && (
+                              <div className="w-full h-[3px] rounded-full bg-white/[0.07] overflow-hidden">
+                                <div className="h-full rounded-full transition-all duration-300"
+                                  style={{ width: `${hpPct}%`, background: alive ? hpCol : 'transparent' }} />
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            )}
 
-          {/* Kill feed */}
-          <div className="flex-1 overflow-hidden flex flex-col p-3 min-h-0">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/40">Kill Feed</p>
-              <span className="text-[9px] font-mono text-muted-foreground/35 tabular-nums">
-                {pastKills.length}<span className="opacity-50">/{kills.length}</span>
-              </span>
-            </div>
-            <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 min-h-0" style={{ scrollbarWidth: 'thin' }}>
-              {kills.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground/35">No kills this round.</p>
-              ) : kills.map((k, i) => {
-                const past     = k.time <= time
-                const isActive = k.time <= time && k.time > time - KILL_FLASH
-                const kT1      = teamOf.get(k.killer_name) === team1Name
-                const vT1      = teamOf.get(k.victim_name) === team1Name
-                return (
-                  <button
-                    key={i}
-                    onClick={() => { setIsPlaying(false); setTime(k.time) }}
-                    className={cn(
-                      'w-full flex items-center gap-1 px-1.5 py-[3px] rounded text-[10px] font-mono border text-left transition-all',
-                      isActive ? 'bg-yellow-500/10 border-yellow-400/20' : 'border-transparent hover:bg-white/[0.04]',
-                      past ? 'opacity-100' : 'opacity-15',
-                    )}
-                  >
-                    <span className="text-[8px] text-muted-foreground/40 w-5 flex-shrink-0 tabular-nums">{k.time.toFixed(0)}s</span>
-                    <span className="truncate flex-1 min-w-0" style={{ color: kT1 ? T1_COLOR + 'cc' : T2_COLOR + 'cc' }}>
-                      {k.killer_name}
-                    </span>
-                    <span className="flex-shrink-0 text-[8px] text-muted-foreground/35 px-0.5">
-                      {k.headshot ? '⦿' : '›'}
-                    </span>
-                    <span className="truncate flex-1 min-w-0" style={{ color: vT1 ? T1_COLOR + 'cc' : T2_COLOR + 'cc' }}>
-                      {k.victim_name}
-                    </span>
-                    <span className="ml-0.5 flex-shrink-0 text-[8px] text-muted-foreground/40 bg-white/[0.05] px-1 rounded font-mono">
-                      {abbrevWeapon(k.weapon)}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </aside>
+            {/* Kill Feed tab */}
+            {rightTab === 'kills' && (
+              <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5" style={{ scrollbarWidth: 'thin' }}>
+                {kills.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground/35 p-2">No kills this round.</p>
+                ) : kills.map((k, i) => {
+                  const past     = k.time <= time
+                  const isActive = k.time <= time && k.time > time - KILL_FLASH
+                  const kT1      = teamOf.get(k.killer_name) === team1Name
+                  const vT1      = teamOf.get(k.victim_name) === team1Name
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => { setIsPlaying(false); setTime(k.time) }}
+                      className={cn(
+                        'w-full flex items-center gap-1 px-2 py-1.5 rounded text-left border transition-all',
+                        isActive ? 'bg-yellow-500/10 border-yellow-400/20' : 'border-transparent hover:bg-white/[0.04]',
+                        past ? 'opacity-100' : 'opacity-15',
+                      )}
+                    >
+                      <span className="text-[8px] text-muted-foreground/35 w-6 flex-shrink-0 tabular-nums font-mono">{k.time.toFixed(0)}s</span>
+                      <span className="truncate text-[10px] font-mono min-w-0" style={{ color: kT1 ? T1_COLOR + 'cc' : T2_COLOR + 'cc', flex: '1 1 0' }}>
+                        {k.killer_name}
+                      </span>
+                      <span className="flex-shrink-0 text-[8px] text-muted-foreground/30">{k.headshot ? '⦿' : '›'}</span>
+                      <span className="truncate text-[10px] font-mono min-w-0" style={{ color: vT1 ? T1_COLOR + 'cc' : T2_COLOR + 'cc', flex: '1 1 0' }}>
+                        {k.victim_name}
+                      </span>
+                      <span className="flex-shrink-0 text-[8px] text-muted-foreground/35 bg-white/[0.05] px-1 rounded font-mono">
+                        {abbrevWeapon(k.weapon)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </aside>
+        )}
+
+        {/* Right collapse strip */}
+        <button
+          onClick={() => setRightOpen(v => !v)}
+          title={rightOpen ? 'Hide stats' : 'Show stats'}
+          className="w-5 flex-shrink-0 border-l border-white/[0.06] flex items-center justify-center text-muted-foreground/25 hover:text-muted-foreground hover:bg-white/[0.03] transition-all"
+        >
+          <ChevronRight
+            size={11}
+            style={{ transform: rightOpen ? 'none' : 'rotate(180deg)', transition: 'transform 0.2s' }}
+          />
+        </button>
       </div>
 
-      {/* ──────────────────────────────────────────────────────────────────────
-          TIMELINE + CONTROLS
-      ────────────────────────────────────────────────────────────────────── */}
-      <div className="border-t border-white/[0.06] bg-white/[0.01] px-4 pt-3 pb-3 space-y-2.5">
+      {/* ── CONTROLS ────────────────────────────────────────────────────────── */}
+      <div className="border-t border-white/[0.06] bg-white/[0.015] px-4 pt-2.5 pb-3 space-y-2 flex-shrink-0">
 
-        {/* Event markers */}
-        <div className="relative h-3">
+        {/* Event marker track */}
+        <div className="relative h-3.5 mx-0.5">
           {kills.map((k, i) => (
             <button
               key={i}
               onClick={() => { setIsPlaying(false); setTime(k.time) }}
-              className="absolute top-0 w-0.5 h-full rounded-full cursor-pointer hover:scale-x-150 transition-transform"
+              title={`${k.killer_name} → ${k.victim_name} (${k.time.toFixed(1)}s)`}
+              className="absolute top-0.5 h-2.5 w-0.5 rounded-full cursor-pointer hover:scale-x-[3] transition-transform"
               style={{
                 left: `${(k.time / maxTime) * 100}%`,
-                background: k.time <= time ? '#ff4466' : 'rgba(255,68,102,0.22)',
                 transform: 'translateX(-50%)',
+                background: k.time <= time ? '#ff4466' : 'rgba(255,68,102,0.18)',
               }}
-              title={`${k.killer_name} → ${k.victim_name} (${k.time.toFixed(1)}s)`}
             />
           ))}
           {visibleGrenades.filter(g => g.land_time > 0 && g.land_time <= maxTime).map((g, i) => (
             <div
               key={i}
-              className="absolute top-1 w-1 h-1 rounded-full pointer-events-none"
+              className="absolute top-1.5 w-1 h-1 rounded-full pointer-events-none"
               style={{
                 left: `${(g.land_time / maxTime) * 100}%`,
-                background: (GREN_COLORS[g.type] ?? '#fff') + '77',
                 transform: 'translateX(-50%)',
+                background: (GREN_COLORS[g.type] ?? '#fff') + '66',
               }}
             />
           ))}
         </div>
 
+        {/* Scrubber */}
         <input
           type="range"
           min={0}
@@ -1110,34 +1169,31 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
           style={{ accentColor: T1_COLOR }}
         />
 
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Controls row */}
+        <div className="flex items-center gap-2">
           <button
             onClick={restart}
-            className="p-1.5 rounded-lg border border-border/35 text-muted-foreground hover:text-foreground transition-colors"
             title="Restart"
+            className="p-1.5 rounded-lg border border-border/35 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
           >
             <RotateCcw size={13} />
           </button>
 
           <button
             onClick={toggle}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold border transition-all"
+            className="flex items-center gap-2 px-5 py-1.5 rounded-full text-[13px] font-semibold border transition-all flex-shrink-0"
             style={{ background: 'rgba(34,211,238,0.12)', borderColor: 'rgba(34,211,238,0.28)', color: T1_COLOR }}
           >
-            {isPlaying ? <Pause size={13} /> : <Play size={13} />}
+            {isPlaying ? <Pause size={14} /> : <Play size={14} />}
             {isPlaying ? 'Pause' : 'Play'}
           </button>
 
-          <div className="flex border border-border/35 rounded-full overflow-hidden text-xs font-mono">
+          <div className="flex border border-border/35 rounded-full overflow-hidden text-[11px] font-mono flex-shrink-0">
             {([0.5, 1, 2, 4] as SpeedValue[]).map(s => (
               <button
                 key={s}
                 onClick={() => setSpeed(s)}
-                className={cn(
-                  'px-2.5 py-1 transition-colors',
-                  speed === s ? 'text-cyan-300' : 'text-muted-foreground hover:text-foreground',
-                )}
+                className={cn('px-2.5 py-1 transition-colors', speed === s ? 'text-cyan-300' : 'text-muted-foreground hover:text-foreground')}
                 style={speed === s ? { background: 'rgba(34,211,238,0.15)' } : undefined}
               >
                 {s}×
@@ -1145,37 +1201,39 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
             ))}
           </div>
 
-          <span className="text-xs font-mono text-muted-foreground/55 tabular-nums ml-auto">
-            {time.toFixed(1)}s <span className="opacity-40">/</span> {maxTime.toFixed(1)}s
+          <span className="text-[11px] font-mono text-muted-foreground/45 tabular-nums">
+            {time.toFixed(1)}<span className="opacity-40">s / </span>{maxTime.toFixed(1)}<span className="opacity-40">s</span>
           </span>
+
+          <div className="flex-1" />
 
           <button
             onClick={toggleRecord}
             disabled={recordState === 'processing'}
             className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs transition-all',
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] transition-all flex-shrink-0',
               recordState === 'recording'
                 ? 'border-red-400/35 bg-red-400/10 text-red-400'
                 : 'border-border/35 text-muted-foreground hover:text-foreground',
             )}
           >
-            {recordState === 'recording' ? <><StopCircle size={11}/>Stop</> : <><Video size={11}/>Clip</>}
+            {recordState === 'recording' ? <><StopCircle size={12}/>Stop</> : <><Video size={12}/>Clip</>}
           </button>
         </div>
 
         {/* Keyboard hints + legend */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground/30">
-          {[['Space','play'],['← →','±2s'],['↑ ↓','rounds'],['Esc','reset']].map(([k,v]) => (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground/28">
+          {[['Space','play/pause'],['← →','±2s'],['↑ ↓','rounds'],['Esc','reset']].map(([k,v]) => (
             <span key={k}>
-              <kbd className="bg-white/[0.05] px-1 py-0.5 rounded text-[8px] text-muted-foreground/50">{k}</kbd> {v}
+              <kbd className="bg-white/[0.05] px-1 py-0.5 rounded text-[8px] text-muted-foreground/40">{k}</kbd> {v}
             </span>
           ))}
-          <div className="flex items-center gap-2.5 ml-auto">
-            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T1_COLOR }}/><span>{team1Name}</span></div>
-            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T2_COLOR }}/><span>{team2Name}</span></div>
+          <div className="flex items-center gap-3 ml-auto">
+            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T1_COLOR }}/><span style={{ color: T1_COLOR + '77' }}>{team1Name}</span></div>
+            <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: T2_COLOR }}/><span style={{ color: T2_COLOR + '77' }}>{team2Name}</span></div>
             {hasFrames
-              ? <span className="text-cyan-400/25">{frames.length} frames</span>
-              : <span className="text-amber-400/30">kill-only replay</span>
+              ? <span className="text-cyan-400/20">{frames.length} frames</span>
+              : <span className="text-amber-400/22">kill-only replay</span>
             }
           </div>
         </div>
