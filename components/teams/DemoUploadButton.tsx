@@ -34,7 +34,7 @@ interface FileUpload {
   demoId?: string
 }
 
-function isValidDemoFile(name: string) {
+export function isValidDemoFile(name: string) {
   const lower = name.toLowerCase()
   return lower.endsWith('.dem') || lower.endsWith('.zst')
 }
@@ -58,7 +58,8 @@ async function hashFile(file: File): Promise<string> {
 // R2 multipart upload requires parts ≥ 5 MB except the last one, so 9 MB works.
 const CHUNK_SIZE = 9 * 1024 * 1024
 
-async function uploadViaServer(
+// Exported for reuse by other import flows (e.g. Pro Match Library).
+export async function uploadViaServer(
   file: File,
   params: { teamId: string; opponentName: string; demoType: string; fileHash?: string },
   onProgress: (pct: number) => void,

@@ -8,18 +8,22 @@ import {
   ExternalLink, Loader2, Star, Filter, Database,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import ImportProMatchModal from './ImportProMatchModal'
 
 interface Team { id: string; name: string }
 
-interface ProMatch {
+export interface ProMatch {
   id: string
   team1: string
   team2: string
-  map: string
+  team1_logo: string | null
+  team2_logo: string | null
+  map: string | null
+  maps: string[]
+  best_of: number | null
   date: string | null
   event: string
   score: string | null
-  demo_url: string | null
 }
 
 const CS2_MAPS = [
@@ -31,8 +35,14 @@ const CS2_MAPS = [
   { value: 'de_ancient', label: 'Ancient' },
   { value: 'de_anubis',  label: 'Anubis' },
   { value: 'de_overpass',label: 'Overpass' },
-  { value: 'de_vertigo', label: 'Vertigo' },
+  { value: 'de_train',   label: 'Train' },
 ]
+
+function hltvSearchUrl(match: ProMatch) {
+  return `https://www.google.com/search?q=${encodeURIComponent(
+    `site:hltv.org ${match.team1} vs ${match.team2} ${match.event}`
+  )}`
+}
 
 export default function ProDemosClient({
   teams,
@@ -43,71 +53,55 @@ export default function ProDemosClient({
 }) {
   const [selectedTeamId, setSelectedTeamId] = useState(defaultTeamId ?? '')
   const [matches, setMatches] = useState<ProMatch[]>([])
-  const [total, setTotal] = useState(0)
-  const [offset, setOffset] = useState(0)
+  const [total, setTotal] = useState<number | null>(null)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
   const [mapFilter, setMapFilter] = useState('')
   const [teamSearch, setTeamSearch] = useState('')
+  const [query, setQuery] = useState('') // debounced server-side search
   const [loading, setLoading] = useState(false)
   const [fallback, setFallback] = useState(false)
-  const [importing, setImporting] = useState<Record<string, boolean>>({})
+  const [fallbackReason, setFallbackReason] = useState<string | null>(null)
+  const [activeMatch, setActiveMatch] = useState<ProMatch | null>(null)
   const [imported, setImported] = useState<Record<string, string>>({})
   const PAGE_SIZE = 20
 
-  const fetchMatches = useCallback(async (off: number, map: string) => {
+  const fetchMatches = useCallback(async (pg: number, map: string, q: string) => {
     setLoading(true)
     try {
-      const p = new URLSearchParams({ offset: off.toString(), limit: PAGE_SIZE.toString() })
+      const p = new URLSearchParams({ page: pg.toString(), limit: PAGE_SIZE.toString() })
       if (map) p.set('map', map)
+      if (q) p.set('q', q)
       const res = await fetch(`/api/pro-demos?${p}`)
       const data = await res.json()
       setMatches(data.matches ?? [])
-      setTotal(data.total ?? 0)
+      setTotal(data.total ?? null)
+      setHasMore(data.hasMore ?? false)
       setFallback(data.fallback ?? false)
+      setFallbackReason(data.reason ?? null)
     } finally {
       setLoading(false)
     }
   }, [])
 
+  // Debounce the team search before hitting the API
   useEffect(() => {
-    fetchMatches(0, mapFilter)
-  }, [fetchMatches, mapFilter])
+    const t = setTimeout(() => setQuery(teamSearch.trim()), 400)
+    return () => clearTimeout(t)
+  }, [teamSearch])
 
-  async function handleImport(match: ProMatch) {
-    if (!selectedTeamId) return
-    setImporting((p: Record<string, boolean>) => ({ ...p, [match.id]: true }))
-    try {
-      // Build the opponent name from team names
-      const opponentName = match.team2
+  useEffect(() => {
+    setPage(1)
+    fetchMatches(1, mapFilter, query)
+  }, [fetchMatches, mapFilter, query])
 
-      if (match.demo_url) {
-        // Try FaceIt-style streaming import
-        const res = await fetch('/api/demos/faceit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'import',
-            teamId: selectedTeamId,
-            matchId: `pro-${match.id}`,
-            opponentName,
-            playerFaction: 'faction1',
-          }),
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setImported((p: Record<string, string>) => ({ ...p, [match.id]: data.demoId }))
-          return
-        }
-      }
-
-      // Fallback: open HLTV results for this match
-      const query = encodeURIComponent(`site:hltv.org ${match.team1} vs ${match.team2} ${match.event}`)
-      window.open(`https://www.google.com/search?q=${query}`, '_blank')
-    } finally {
-      setImporting((p: Record<string, boolean>) => ({ ...p, [match.id]: false }))
-    }
+  const goToPage = (pg: number) => {
+    setPage(pg)
+    fetchMatches(pg, mapFilter, query)
   }
 
-  const filtered = teamSearch
+  // Fallback (curated) data isn't searchable server-side — filter locally
+  const filtered = fallback && teamSearch
     ? matches.filter(m =>
         m.team1.toLowerCase().includes(teamSearch.toLowerCase()) ||
         m.team2.toLowerCase().includes(teamSearch.toLowerCase())
@@ -137,7 +131,7 @@ export default function ProDemosClient({
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {fallback
                     ? 'Curated pro matches — import to your scouting library'
-                    : `${total.toLocaleString()}+ professional CS2 matches`
+                    : `Recent pro matches${total ? ` · ${total.toLocaleString()} tracked` : ''} — import to your scouting library`
                   }
                 </p>
               </div>
@@ -160,11 +154,9 @@ export default function ProDemosClient({
           <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-400/10 border border-blue-400/20 text-xs text-blue-300">
             <Database size={14} className="shrink-0 mt-0.5" />
             <p>
-              Showing curated matches. For the full 200K+ match database, the{' '}
-              <a href="https://huggingface.co/datasets/blanchon/opencs2_dataset" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-200">
-                OpenCS2 dataset
-              </a>{' '}
-              is temporarily unavailable.
+              {fallbackReason === 'missing-key'
+                ? <>Showing curated matches. Live recent results need a PandaScore API key — add <code className="font-mono">PANDASCORE_API_KEY</code> to the server environment (free tier at <a href="https://www.pandascore.co" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-200">pandascore.co</a>).</>
+                : 'Showing curated matches — live match data is temporarily unavailable.'}
             </p>
           </div>
         )}
@@ -178,7 +170,7 @@ export default function ProDemosClient({
               {CS2_MAPS.map(m => (
                 <button
                   key={m.value}
-                  onClick={() => { setMapFilter(m.value); setOffset(0) }}
+                  onClick={() => setMapFilter(m.value)}
                   className={cn(
                     'px-3 py-1.5 font-medium transition-colors whitespace-nowrap',
                     mapFilter === m.value
@@ -217,24 +209,25 @@ export default function ProDemosClient({
           <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
             {/* Table header */}
             <div className="grid px-4 py-2.5 bg-muted/30 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
-              style={{ gridTemplateColumns: '1fr 80px 100px 160px auto' }}>
+              style={{ gridTemplateColumns: '1fr 110px 70px 160px auto' }}>
               <div>Match</div>
-              <div>Map</div>
+              <div>Maps</div>
               <div>Score</div>
               <div>Event</div>
               <div className="text-right">Action</div>
             </div>
 
             {filtered.map(match => {
-              const isImporting = importing[match.id]
               const demoId = imported[match.id]
-              const mapShort = match.map.replace('de_', '').replace('cs_', '')
+              const mapsLabel = match.maps.length > 0
+                ? match.maps.map(m => m.replace(/^(de|cs)_/, '')).join(', ')
+                : match.best_of ? `BO${match.best_of}` : '—'
 
               return (
                 <div
                   key={match.id}
                   className="grid items-center gap-3 px-4 py-3 hover:bg-accent/20 transition-colors"
-                  style={{ gridTemplateColumns: '1fr 80px 100px 160px auto' }}
+                  style={{ gridTemplateColumns: '1fr 110px 70px 160px auto' }}
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">
@@ -249,8 +242,10 @@ export default function ProDemosClient({
                     )}
                   </div>
 
-                  <div>
-                    <span className="text-xs font-mono text-foreground capitalize">{mapShort}</span>
+                  <div className="min-w-0">
+                    <span className="text-xs font-mono text-foreground capitalize truncate block" title={mapsLabel}>
+                      {mapsLabel}
+                    </span>
                   </div>
 
                   <div>
@@ -273,30 +268,28 @@ export default function ProDemosClient({
                           View
                         </Button>
                       </Link>
-                    ) : match.demo_url ? (
+                    ) : (
                       <Button
                         size="sm"
                         variant="secondary"
                         className="h-7 text-xs gap-1"
-                        onClick={() => handleImport(match)}
-                        disabled={isImporting || !selectedTeamId}
+                        onClick={() => setActiveMatch(match)}
+                        disabled={!selectedTeamId}
+                        title={!selectedTeamId ? 'Select a team first' : undefined}
                       >
-                        {isImporting
-                          ? <><Loader2 size={10} className="animate-spin" /> Importing…</>
-                          : <><Download size={10} /> Import</>
-                        }
+                        <Download size={10} />
+                        Import
                       </Button>
-                    ) : (
-                      <a
-                        href={`https://www.google.com/search?q=${encodeURIComponent(`site:hltv.org ${match.team1} vs ${match.team2} ${match.event}`)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors"
-                      >
-                        <ExternalLink size={10} />
-                        HLTV
-                      </a>
                     )}
+                    <a
+                      href={hltvSearchUrl(match)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Find on HLTV"
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors"
+                    >
+                      <ExternalLink size={11} />
+                    </a>
                   </div>
                 </div>
               )
@@ -305,26 +298,26 @@ export default function ProDemosClient({
         )}
 
         {/* Pagination */}
-        {!fallback && total > PAGE_SIZE && (
+        {!fallback && (page > 1 || hasMore) && (
           <div className="flex items-center justify-between">
             <Button
               variant="ghost"
               size="sm"
-              disabled={offset === 0 || loading}
-              onClick={() => { const next = Math.max(0, offset - PAGE_SIZE); setOffset(next); fetchMatches(next, mapFilter) }}
+              disabled={page <= 1 || loading}
+              onClick={() => goToPage(page - 1)}
               className="gap-1.5"
             >
               <ChevronLeft size={14} />
               Previous
             </Button>
             <span className="text-xs text-muted-foreground">
-              {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total.toLocaleString()}
+              Page {page}{total ? ` · ${total.toLocaleString()} matches` : ''}
             </span>
             <Button
               variant="ghost"
               size="sm"
-              disabled={offset + PAGE_SIZE >= total || loading}
-              onClick={() => { const next = offset + PAGE_SIZE; setOffset(next); fetchMatches(next, mapFilter) }}
+              disabled={!hasMore || loading}
+              onClick={() => goToPage(page + 1)}
               className="gap-1.5"
             >
               Next
@@ -339,16 +332,25 @@ export default function ProDemosClient({
           <div className="text-xs text-muted-foreground space-y-1">
             <p className="font-semibold text-foreground">About this library</p>
             <p>
-              Matches are sourced from the{' '}
-              <a href="https://huggingface.co/datasets/blanchon/opencs2_dataset" target="_blank" rel="noopener noreferrer" className="text-neon-green hover:underline">
-                OpenCS2 dataset
-              </a>{' '}
-              (200K+ professional matches). To import a demo, click HLTV to find the match, download the .dem file, then upload it via the{' '}
-              <Link href="/opponents" className="text-neon-green hover:underline">Opponents</Link> page.
+              Recent professional CS2 results provided by{' '}
+              <a href="https://www.pandascore.co" target="_blank" rel="noopener noreferrer" className="text-neon-green hover:underline">
+                PandaScore
+              </a>.
+              Demo files aren&apos;t distributed by any public API — click <span className="text-foreground font-medium">Import</span> on a match
+              to grab the .dem from HLTV and drop it straight into your scouting library, or paste a direct demo URL.
             </p>
           </div>
         </div>
       </div>
+
+      {activeMatch && selectedTeamId && (
+        <ImportProMatchModal
+          match={activeMatch}
+          teamId={selectedTeamId}
+          onClose={() => setActiveMatch(null)}
+          onImported={(demoId) => setImported(prev => ({ ...prev, [activeMatch.id]: demoId }))}
+        />
+      )}
     </div>
   )
 }
