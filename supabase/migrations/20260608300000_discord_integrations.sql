@@ -5,7 +5,7 @@ CREATE TABLE discord_integrations (
   guild_id    TEXT NOT NULL UNIQUE,
   guild_name  TEXT,
   channel_id  TEXT,
-  webhook_url TEXT NOT NULL,
+  webhook_url TEXT,
   created_by  UUID REFERENCES profiles(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
