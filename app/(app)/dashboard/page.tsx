@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
-import DashboardPageClient, { type RecentDemoItem, type MapPerfItem } from '@/components/dashboard/DashboardPageClient'
+import DashboardPageClient, { type RecentDemoItem, type MapPerfItem, type CommunityFeedItem } from '@/components/dashboard/DashboardPageClient'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -207,6 +207,52 @@ export default async function DashboardPage() {
       ct: v.total > 0 ? Math.round(v.wins / v.total * 100) : 50,
     }))
 
+  // ── Community feed (recently published public opponent folders) ───────────────
+  const { data: publicFolders } = await admin
+    .from('team_folders')
+    .select('id, opponent_display_name, published_at, aggregated_stats')
+    .eq('is_public', true)
+    .order('published_at', { ascending: false })
+    .limit(6)
+
+  type RatingRow = { folder_id: string; rating: number }
+  const folderIds = (publicFolders ?? []).map(f => f.id)
+
+  const { data: communityRatings } = folderIds.length
+    ? await admin
+        .from('opponent_ratings')
+        .select('folder_id, rating')
+        .in('folder_id', folderIds)
+        .eq('rating', 1)
+    : { data: [] }
+
+  const upCountMap: Record<string, number> = {}
+  for (const r of (communityRatings ?? []) as RatingRow[]) {
+    upCountMap[r.folder_id] = (upCountMap[r.folder_id] ?? 0) + 1
+  }
+
+  const communityFeed: CommunityFeedItem[] = (publicFolders ?? []).map(f => {
+    const s = f.aggregated_stats as Record<string, unknown> | null
+    const wins   = (s?.wins   as number | undefined) ?? 0
+    const losses = (s?.losses as number | undefined) ?? 0
+    const draws  = (s?.draws  as number | undefined) ?? 0
+    const total  = wins + losses + draws
+    const wr     = total > 0 ? Math.round((wins / total) * 100) : null
+    const mapPerf = s?.map_performance as Record<string, { wins: number; total: number }> | undefined
+    const topMap  = mapPerf
+      ? Object.entries(mapPerf).sort((a, b) => b[1].total - a[1].total)[0]?.[0] ?? null
+      : null
+    return {
+      id:          f.id,
+      name:        f.opponent_display_name,
+      publishedAt: f.published_at ?? new Date().toISOString(),
+      winRate:     wr,
+      total,
+      upRatings:   upCountMap[f.id] ?? 0,
+      topMap,
+    }
+  })
+
   return (
     <DashboardPageClient
       winRate={winRateDisplay}
@@ -216,6 +262,7 @@ export default async function DashboardPage() {
       nextOpponent={nextOpponent}
       recentDemos={recentDemos}
       mapPerformance={mapPerformance}
+      communityFeed={communityFeed}
     />
   )
 }

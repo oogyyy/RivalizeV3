@@ -56,6 +56,7 @@ export async function middleware(request: NextRequest) {
   const publicPaths = ['/', '/login', '/signup', '/auth/callback']
   const isPublicPath =
     request.nextUrl.pathname.startsWith('/api/') ||
+    request.nextUrl.pathname.startsWith('/scouts') ||
     publicPaths.some(path =>
       request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith('/auth/')
     )

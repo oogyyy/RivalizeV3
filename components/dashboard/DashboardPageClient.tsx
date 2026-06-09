@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Sparkles, Brain } from 'lucide-react'
+import { ArrowRight, Sparkles, Brain, Globe, ThumbsUp } from 'lucide-react'
 
 export interface RecentDemoItem {
   id: string
@@ -19,6 +19,16 @@ export interface MapPerfItem {
   ct: number
 }
 
+export interface CommunityFeedItem {
+  id: string
+  name: string
+  publishedAt: string
+  winRate: number | null
+  total: number
+  upRatings: number
+  topMap: string | null
+}
+
 interface Props {
   winRate: string
   mapsPlayed: number
@@ -27,6 +37,7 @@ interface Props {
   nextOpponent: string | null
   recentDemos: RecentDemoItem[]
   mapPerformance: MapPerfItem[]
+  communityFeed: CommunityFeedItem[]
 }
 
 function StatCard({ label, value, sub, accent }: {
@@ -97,9 +108,22 @@ const MAP_POOL_STATIC = [
   { name: 'Ancient', win: 50 },
 ]
 
+function mapLabel(raw: string): string {
+  return raw.replace(/^(de_|cs_|ar_)/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins  = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
 export default function DashboardPageClient({
   winRate, mapsPlayed, demosAnalyzed, avgRating,
-  nextOpponent, recentDemos, mapPerformance,
+  nextOpponent, recentDemos, mapPerformance, communityFeed,
 }: Props) {
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '28px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -240,6 +264,63 @@ export default function DashboardPageClient({
           </div>
         </div>
       </div>
+
+      {/* ── Community Library Feed ── */}
+      {communityFeed.length > 0 && (
+        <div style={{ borderRadius: 12, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Globe size={14} style={{ color: 'var(--accent)' }} />
+              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Community Scout Reports</p>
+            </div>
+            <Link href="/scouts" style={{ textDecoration: 'none' }}>
+              <span style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                View all <ArrowRight size={11} />
+              </span>
+            </Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 1, borderTop: 'none' }}>
+            {communityFeed.map(item => (
+              <Link key={item.id} href={`/scouts/${item.id}`} style={{ textDecoration: 'none' }}>
+                <div
+                  style={{ padding: '14px 18px', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: 'var(--accent)', flexShrink: 0 }}>
+                      {item.name.charAt(0).toUpperCase()}
+                    </div>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    {item.winRate !== null && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: item.winRate >= 50 ? 'var(--loss)' : 'var(--win)' }}>
+                        {item.winRate}% WR
+                      </span>
+                    )}
+                    {item.total > 0 && (
+                      <span style={{ fontSize: 10, color: 'var(--muted)' }}>{item.total} demos</span>
+                    )}
+                    {item.topMap && (
+                      <span style={{ fontSize: 10, color: 'var(--faint)' }}>{mapLabel(item.topMap)}</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                    <span style={{ fontSize: 10, color: 'var(--faint)' }}>{timeAgo(item.publishedAt)}</span>
+                    {item.upRatings > 0 && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--muted)' }}>
+                        <ThumbsUp size={9} />
+                        {item.upRatings}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── AI Brief ── */}
       <div style={{

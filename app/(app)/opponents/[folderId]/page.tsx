@@ -13,6 +13,7 @@ import DemoUploadButton from '@/components/teams/DemoUploadButton'
 import DeleteFolderButton from '@/components/teams/DeleteFolderButton'
 import OpponentDemoList from '@/components/teams/OpponentDemoList'
 import TeamNotes from '@/components/teams/TeamNotes'
+import PublishToggle from '@/components/teams/PublishToggle'
 import RoundSearchPanel from '@/components/demos/RoundSearchPanel'
 import RoutinesPanel from '@/components/demos/RoutinesPanel'
 import type { AggregatedStats, PlayerStats } from '@/types/database'
@@ -405,6 +406,11 @@ export default async function OpponentPage({
                 </div>
               )}
             </div>
+
+            {/* Publish to Library */}
+            {isOwnerOrAdmin && (
+              <PublishToggle folderId={folderId} initialIsPublic={folder.is_public ?? false} />
+            )}
 
             {/* Team Notes */}
             <TeamNotes teamId={teamId} folderId={folderId} currentUserId={user.id} />
