@@ -14,10 +14,7 @@ export default function MobileTopBar() {
       fetch('/api/friends/pending-count').then(r => r.ok ? r.json() : { count: 0 }),
       fetch('/api/notifications').then(r => r.ok ? r.json() : { notifications: [] }),
     ]).then(([friends, notifs]) => {
-      const demoCount = (notifs.notifications ?? []).filter(
-        (n: { type: string }) => n.type === 'demo_ready'
-      ).length
-      setNotifCount((friends.count ?? 0) + demoCount)
+      setNotifCount((friends.count ?? 0) + (notifs.notifications?.length ?? 0))
     }).catch(() => {})
   }, [])
 
@@ -127,7 +124,7 @@ export default function MobileTopBar() {
               minWidth: 16,
               height: 16,
               borderRadius: 9,
-              background: 'var(--loss)',
+              background: 'var(--signal)',
               color: '#fff',
               fontSize: 9,
               fontWeight: 700,

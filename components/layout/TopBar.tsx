@@ -27,6 +27,18 @@ interface DemoNotification {
   created_at: string
 }
 
+function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 export default function TopBar({ profile }: { profile: Profile | null }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -38,6 +50,7 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
   const [demoNotifs, setDemoNotifs] = useState<DemoNotification[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
   const [actioning, setActioning] = useState<string | null>(null)
+  const [markingAll, setMarkingAll] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
 
@@ -53,24 +66,31 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Close notification panel on outside click
+  // Close notification panel on outside click or Escape
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const clickHandler = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNotifOpen(false)
+    }
+    document.addEventListener('mousedown', clickHandler)
+    document.addEventListener('keydown', keyHandler)
+    return () => {
+      document.removeEventListener('mousedown', clickHandler)
+      document.removeEventListener('keydown', keyHandler)
+    }
   }, [])
 
-  // Fetch pending counts on mount (friend requests + demo notifications)
+  // Fetch pending counts on mount — all notification types + friend requests
   useEffect(() => {
     Promise.all([
       fetch('/api/friends/pending-count').then(r => r.ok ? r.json() : { count: 0 }),
       fetch('/api/notifications').then(r => r.ok ? r.json() : { notifications: [] }),
     ]).then(([friends, notifs]: [{ count: number }, { notifications: DemoNotification[] }]) => {
-      const demoCount = (notifs.notifications ?? []).filter(n => n.type === 'demo_ready').length
-      setPendingCount((friends.count ?? 0) + demoCount)
-      setDemoNotifs(notifs.notifications ?? [])
+      const allNotifs = notifs.notifications ?? []
+      setPendingCount((friends.count ?? 0) + allNotifs.length)
+      setDemoNotifs(allNotifs)
     }).catch(() => {})
   }, [])
 
@@ -96,9 +116,11 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
       const friendsData = friendsRes.ok ? await friendsRes.json() as { incoming: FriendEntry[] } : { incoming: [] }
       const notifsData  = notifsRes.ok  ? await notifsRes.json() as { notifications: DemoNotification[] } : { notifications: [] }
 
-      setIncoming(friendsData.incoming ?? [])
-      setDemoNotifs(notifsData.notifications ?? [])
-      setPendingCount((friendsData.incoming?.length ?? 0) + (notifsData.notifications?.length ?? 0))
+      const allNotifs = notifsData.notifications ?? []
+      const allIncoming = friendsData.incoming ?? []
+      setIncoming(allIncoming)
+      setDemoNotifs(allNotifs)
+      setPendingCount(allIncoming.length + allNotifs.length)
     } catch {}
     setNotifLoading(false)
   }, [])
@@ -122,7 +144,6 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
 
   const handleDemoNotifClick = async (notif: DemoNotification) => {
     setNotifOpen(false)
-    // Mark this notification read
     await fetch('/api/notifications', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -131,6 +152,25 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
     setDemoNotifs(prev => prev.filter(n => n.id !== notif.id))
     setPendingCount(prev => Math.max(0, prev - 1))
     if (notif.link) router.push(notif.link)
+  }
+
+  const handleDismissNotif = async (e: React.MouseEvent, notif: DemoNotification) => {
+    e.stopPropagation()
+    await fetch('/api/notifications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [notif.id] }),
+    }).catch(() => {})
+    setDemoNotifs(prev => prev.filter(n => n.id !== notif.id))
+    setPendingCount(prev => Math.max(0, prev - 1))
+  }
+
+  const handleMarkAllRead = async () => {
+    setMarkingAll(true)
+    await fetch('/api/notifications', { method: 'PATCH' }).catch(() => {})
+    setDemoNotifs([])
+    setPendingCount(prev => Math.max(0, prev - demoNotifs.length))
+    setMarkingAll(false)
   }
 
   const handleLogout = async () => {
@@ -166,6 +206,8 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
       {label}
     </Link>
   )
+
+  const totalCount = demoNotifs.length + incoming.length
 
   return (
     <>
@@ -244,6 +286,9 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
         <div ref={notifRef} style={{ position: 'relative' }}>
           <button
             onClick={handleNotifToggle}
+            aria-label={pendingCount > 0 ? `Notifications (${pendingCount} unread)` : 'Notifications'}
+            aria-expanded={notifOpen}
+            aria-haspopup="dialog"
             style={{
               width: 37, height: 37, borderRadius: 10, cursor: 'pointer',
               background: notifOpen ? 'var(--card)' : 'transparent',
@@ -252,7 +297,6 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all .13s ease', position: 'relative',
             }}
-            title="Notifications"
             onMouseEnter={e => {
               if (!notifOpen) {
                 e.currentTarget.style.background = 'var(--card)'
@@ -270,55 +314,80 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
           >
             <Bell size={17} />
             {pendingCount > 0 && (
-              <span style={{
-                position: 'absolute', top: 7, right: 7,
-                width: 7, height: 7, borderRadius: '50%',
-                background: 'var(--signal)', boxShadow: '0 0 6px var(--signal)',
-              }} />
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute', top: 7, right: 7,
+                  width: 7, height: 7, borderRadius: '50%',
+                  background: 'var(--signal)', boxShadow: '0 0 6px var(--signal)',
+                }}
+              />
             )}
           </button>
 
           {/* Notification dropdown */}
           {notifOpen && (
-            <div style={{
-              position: 'absolute', top: 'calc(100% + 6px)', right: 0,
-              width: 280,
-              background: 'var(--elevated)',
-              border: '1px solid var(--border-2)',
-              borderRadius: 12,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)',
-              backdropFilter: 'blur(20px)',
-              zIndex: 50,
-              overflow: 'hidden',
-            }}>
+            <div
+              role="dialog"
+              aria-label="Notifications"
+              style={{
+                position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+                width: 320,
+                background: 'var(--elevated)',
+                border: '1px solid var(--border-2)',
+                borderRadius: 12,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                zIndex: 50,
+                overflow: 'hidden',
+              }}
+            >
               {/* Header */}
               <div style={{
                 padding: '12px 14px 10px',
                 borderBottom: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
               }}>
-                <span style={{
-                  fontSize: 12, fontWeight: 700, color: 'var(--text)',
-                  fontFamily: 'var(--font-ui)', textTransform: 'uppercase', letterSpacing: '0.08em',
-                }}>
-                  Notifications
-                </span>
-                {pendingCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{
-                    fontSize: 10, fontWeight: 700, padding: '2px 7px',
-                    background: 'rgba(0,255,200,0.12)', color: '#00ffc8',
-                    borderRadius: 20, fontFamily: 'var(--font-mono)',
+                    fontSize: 12, fontWeight: 700, color: 'var(--text)',
+                    fontFamily: 'var(--font-ui)', textTransform: 'uppercase', letterSpacing: '0.08em',
                   }}>
-                    {pendingCount}
+                    Notifications
                   </span>
+                  {totalCount > 0 && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 7px',
+                      background: 'color-mix(in srgb, var(--signal) 12%, transparent)',
+                      color: 'var(--signal)',
+                      borderRadius: 20, fontFamily: 'var(--font-mono)',
+                    }}>
+                      {totalCount}
+                    </span>
+                  )}
+                </div>
+                {demoNotifs.length > 0 && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    disabled={markingAll}
+                    style={{
+                      fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none',
+                      cursor: 'pointer', fontFamily: 'var(--font-ui)', fontWeight: 500,
+                      opacity: markingAll ? 0.5 : 1, padding: '2px 4px', borderRadius: 4,
+                      transition: 'opacity 0.12s',
+                    }}
+                  >
+                    {markingAll ? 'Clearing…' : 'Mark all read'}
+                  </button>
                 )}
               </div>
 
               {/* Body */}
-              <div style={{ maxHeight: 360, overflowY: 'auto', padding: '6px 0' }}>
+              <div style={{ maxHeight: 380, overflowY: 'auto', padding: '6px 0' }}>
                 {notifLoading ? (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: '28px 0' }}>
-                    <Loader2 size={18} style={{ color: '#00ffc8', animation: 'spin 1s linear infinite' }} />
+                    <Loader2 size={18} className="animate-spin" style={{ color: 'var(--signal)' }} />
                   </div>
                 ) : incoming.length === 0 && demoNotifs.length === 0 ? (
                   <div style={{ padding: '28px 16px', textAlign: 'center' }}>
@@ -329,7 +398,7 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
                   </div>
                 ) : (
                   <>
-                    {/* Demo ready notifications */}
+                    {/* Demo / system notifications */}
                     {demoNotifs.length > 0 && (
                       <>
                         <p style={{
@@ -337,43 +406,79 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
                           letterSpacing: '0.1em', color: 'var(--faint)',
                           fontFamily: 'var(--font-ui)', padding: '4px 14px 6px',
                         }}>
-                          Demo Updates
+                          Updates
                         </p>
                         {demoNotifs.map(notif => (
-                          <button
+                          <div
                             key={notif.id}
-                            onClick={() => handleDemoNotifClick(notif)}
-                            style={{
-                              display: 'flex', alignItems: 'flex-start', gap: 10,
-                              padding: '8px 14px', width: '100%', background: 'transparent',
-                              border: 'none', cursor: 'pointer', textAlign: 'left',
-                              transition: 'background 0.12s',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--hairline)' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                            style={{ position: 'relative' }}
                           >
-                            <div style={{
-                              width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                              background: 'rgba(0,255,200,0.1)', border: '1px solid rgba(0,255,200,0.2)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                              <FileVideo size={14} style={{ color: '#00ffc8' }} />
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{
-                                fontSize: 12, fontWeight: 600, color: 'var(--text)',
-                                fontFamily: 'var(--font-ui)', lineHeight: 1.3,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            <button
+                              onClick={() => handleDemoNotifClick(notif)}
+                              style={{
+                                display: 'flex', alignItems: 'flex-start', gap: 10,
+                                padding: '9px 40px 9px 14px', width: '100%', background: 'transparent',
+                                border: 'none', cursor: notif.link ? 'pointer' : 'default', textAlign: 'left',
+                                transition: 'background 0.12s', minHeight: 52,
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'var(--hairline)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                            >
+                              <div style={{
+                                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                                background: 'color-mix(in srgb, var(--signal) 10%, transparent)',
+                                border: '1px solid color-mix(in srgb, var(--signal) 20%, transparent)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
                               }}>
-                                {notif.title}
-                              </p>
-                              {notif.body && (
-                                <p style={{ fontSize: 10, color: 'var(--faint)', fontFamily: 'var(--font-ui)', marginTop: 1 }}>
-                                  {notif.body}
+                                <FileVideo size={14} style={{ color: 'var(--signal)' }} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{
+                                  fontSize: 12.5, fontWeight: 600, color: 'var(--text)',
+                                  fontFamily: 'var(--font-ui)', lineHeight: 1.3,
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                }}>
+                                  {notif.title}
                                 </p>
-                              )}
-                            </div>
-                          </button>
+                                {notif.body && (
+                                  <p style={{
+                                    fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ui)',
+                                    marginTop: 2, lineHeight: 1.4,
+                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  }}>
+                                    {notif.body}
+                                  </p>
+                                )}
+                                <p style={{ fontSize: 10, color: 'var(--faint)', fontFamily: 'var(--font-ui)', marginTop: 3 }}>
+                                  {formatRelativeTime(notif.created_at)}
+                                </p>
+                              </div>
+                            </button>
+                            {/* Dismiss button */}
+                            <button
+                              onClick={e => handleDismissNotif(e, notif)}
+                              aria-label="Dismiss notification"
+                              style={{
+                                position: 'absolute', top: '50%', right: 10,
+                                transform: 'translateY(-50%)',
+                                width: 22, height: 22, borderRadius: 6,
+                                background: 'transparent', border: 'none',
+                                color: 'var(--faint)', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'color 0.12s, background 0.12s',
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.color = 'var(--text)'
+                                e.currentTarget.style.background = 'var(--hairline)'
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.color = 'var(--faint)'
+                                e.currentTarget.style.background = 'transparent'
+                              }}
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
                         ))}
                       </>
                     )}
@@ -394,60 +499,74 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
                           return (
                             <div key={entry.id} style={{
                               display: 'flex', alignItems: 'center', gap: 10,
-                              padding: '8px 14px',
+                              padding: '8px 14px', minHeight: 52,
                             }}>
                               {entry.profile.avatar_url ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={entry.profile.avatar_url} alt={name}
-                                  style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                                <img
+                                  src={entry.profile.avatar_url}
+                                  alt={name}
+                                  style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                                />
                               ) : (
                                 <div style={{
-                                  width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                                  background: 'rgba(0,255,200,0.1)', border: '1px solid rgba(0,255,200,0.2)',
+                                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                                  background: 'color-mix(in srgb, var(--signal) 10%, transparent)',
+                                  border: '1px solid color-mix(in srgb, var(--signal) 20%, transparent)',
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  fontSize: 11, fontWeight: 700, color: '#00ffc8',
+                                  fontSize: 11, fontWeight: 700, color: 'var(--signal)',
                                 }}>
                                   {name.slice(0, 2).toUpperCase()}
                                 </div>
                               )}
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <p style={{
-                                  fontSize: 12, fontWeight: 600, color: 'var(--text)',
+                                  fontSize: 12.5, fontWeight: 600, color: 'var(--text)',
                                   fontFamily: 'var(--font-ui)',
                                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                 }}>
                                   {name}
                                 </p>
-                                <p style={{ fontSize: 10, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
+                                <p style={{ fontSize: 10.5, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
                                   @{entry.profile.username}
                                 </p>
                               </div>
-                              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                                 <button
                                   onClick={() => handleFriendAction(entry.id, 'accept')}
                                   disabled={actioning === entry.id}
+                                  aria-label={`Accept friend request from ${name}`}
                                   title="Accept"
                                   style={{
-                                    width: 26, height: 26, borderRadius: 6, border: 'none',
-                                    background: 'rgba(0,255,200,0.12)', color: '#00ffc8',
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    width: 36, height: 36, borderRadius: 8, border: 'none',
+                                    background: 'color-mix(in srgb, var(--signal) 12%, transparent)',
+                                    color: 'var(--signal)',
+                                    cursor: actioning === entry.id ? 'not-allowed' : 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    opacity: actioning === entry.id ? 0.6 : 1,
+                                    transition: 'opacity 0.12s, background 0.12s',
                                   }}
                                 >
                                   {actioning === entry.id
-                                    ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
-                                    : <Check size={11} />}
+                                    ? <Loader2 size={13} className="animate-spin" />
+                                    : <Check size={14} />}
                                 </button>
                                 <button
                                   onClick={() => handleFriendAction(entry.id, 'reject')}
                                   disabled={actioning === entry.id}
+                                  aria-label={`Decline friend request from ${name}`}
                                   title="Decline"
                                   style={{
-                                    width: 26, height: 26, borderRadius: 6, border: 'none',
-                                    background: 'rgba(255,80,80,0.1)', color: 'rgba(255,80,80,0.7)',
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    width: 36, height: 36, borderRadius: 8, border: 'none',
+                                    background: 'color-mix(in srgb, var(--loss) 10%, transparent)',
+                                    color: 'var(--loss)',
+                                    cursor: actioning === entry.id ? 'not-allowed' : 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    opacity: actioning === entry.id ? 0.6 : 1,
+                                    transition: 'opacity 0.12s, background 0.12s',
                                   }}
                                 >
-                                  <X size={11} />
+                                  <X size={14} />
                                 </button>
                               </div>
                             </div>
@@ -460,10 +579,7 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
               </div>
 
               {/* Footer */}
-              <div style={{
-                padding: '8px 10px',
-                borderTop: '1px solid var(--border)',
-              }}>
+              <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border)' }}>
                 <Link
                   href="/friends"
                   onClick={() => setNotifOpen(false)}
@@ -501,6 +617,8 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
         <div ref={ref} style={{ position: 'relative' }}>
           <button
             onClick={() => setOpen(v => !v)}
+            aria-expanded={open}
+            aria-haspopup="menu"
             style={{
               display: 'flex', alignItems: 'center', gap: 9,
               background: open ? 'var(--hairline)' : 'transparent',
@@ -570,17 +688,20 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
 
           {/* Dropdown menu */}
           {open && (
-            <div style={{
-              position: 'absolute', top: 'calc(100% + 6px)', right: 0,
-              minWidth: 190,
-              background: 'var(--elevated)',
-              border: '1px solid var(--border-2)',
-              borderRadius: 12,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)',
-              backdropFilter: 'blur(20px)',
-              padding: '6px',
-              zIndex: 50,
-            }}>
+            <div
+              role="menu"
+              style={{
+                position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+                minWidth: 190,
+                background: 'var(--elevated)',
+                border: '1px solid var(--border-2)',
+                borderRadius: 12,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)',
+                backdropFilter: 'blur(20px)',
+                padding: '6px',
+                zIndex: 50,
+              }}
+            >
               {/* User header */}
               <div style={{
                 padding: '8px 14px 10px',
@@ -606,6 +727,7 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
+                role="menuitem"
                 style={{
                   display: 'flex', alignItems: 'center', gap: 9, width: '100%',
                   padding: '8px 14px', background: 'transparent', border: 'none',
