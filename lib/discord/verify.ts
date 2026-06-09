@@ -16,7 +16,7 @@ export async function verifyDiscordSignature(
     const key = await crypto.subtle.importKey(
       'raw',
       hexToBuffer(publicKey),
-      { name: 'Ed25519', namedCurve: 'Ed25519' } as EcKeyImportParams,
+      { name: 'Ed25519' } as AlgorithmIdentifier,
       false,
       ['verify'],
     )
