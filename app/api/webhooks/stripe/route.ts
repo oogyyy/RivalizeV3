@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type Stripe from 'stripe'
 
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, secret)
+    event = getStripe().webhooks.constructEvent(rawBody, sig, secret)
   } catch {
     return new NextResponse('Invalid signature', { status: 400 })
   }
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       if (!teamId || !plan) break
 
       const subId = session.subscription as string
-      const stripeSub = await stripe.subscriptions.retrieve(subId) as unknown as Stripe.Subscription
+      const stripeSub = await getStripe().subscriptions.retrieve(subId) as unknown as Stripe.Subscription
 
       await admin.from('subscriptions').upsert({
         team_id:                teamId,
