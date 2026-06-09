@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { BookOpen, Plus, Trash2, Loader2, Map, Target, Swords } from 'lucide-react'
+import { BookOpen, Plus, Trash2, Loader2, Map, Target, Swords, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CS2_MAPS } from '@/types/database'
 import { cn } from '@/lib/utils'
@@ -31,17 +31,19 @@ function PlaybookListInner() {
   const router       = useRouter()
   const searchParams = useSearchParams()
 
-  const [playbooks, setPlaybooks]     = useState<PlaybookMeta[]>([])
-  const [teams, setTeams]             = useState<Team[]>([])
-  const [opponents, setOpponents]     = useState<Opponent[]>([])
-  const [loading, setLoading]         = useState(true)
-  const [creating, setCreating]       = useState(false)
-  const [showNew, setShowNew]         = useState(false)
-  const [newMap, setNewMap]           = useState(searchParams.get('map') ?? '')
-  const [newName, setNewName]         = useState('')
-  const [selectedTeam, setSelectedTeam]     = useState(searchParams.get('team') ?? '')
+  const [playbooks, setPlaybooks]       = useState<PlaybookMeta[]>([])
+  const [teams, setTeams]               = useState<Team[]>([])
+  const [opponents, setOpponents]       = useState<Opponent[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [creating, setCreating]         = useState(false)
+  const [showNew, setShowNew]           = useState(false)
+  const [search, setSearch]             = useState('')
+  const [newMap, setNewMap]             = useState(searchParams.get('map') ?? '')
+  const [newName, setNewName]           = useState('')
+  const [selectedTeam, setSelectedTeam] = useState(searchParams.get('team') ?? '')
   const [selectedFolder, setSelectedFolder] = useState('')
-  const [deleting, setDeleting]       = useState<string | null>(null)
+  const [deleting, setDeleting]         = useState<string | null>(null)
+  const [hoveredCard, setHoveredCard]   = useState<string | null>(null)
   const [availablePlayers, setAvailablePlayers] = useState<string[]>([])
   const [selectedPlayers, setSelectedPlayers]   = useState<string[]>([])
   const [playerRoles, setPlayerRoles]           = useState<Record<string, string>>({})
@@ -58,27 +60,23 @@ function PlaybookListInner() {
       if (!selectedTeam && ts.length > 0) setSelectedTeam(ts[0].id)
     }).finally(() => setLoading(false))
 
-    // Auto-open create form if arriving from AI Scout CTA
     if (searchParams.get('map')) setShowNew(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedOpponent = opponents.find(o => o.id === selectedFolder)
 
-  // Maps with demos for the selected opponent, sorted by most played
   const opponentMaps: string[] = selectedOpponent
     ? Object.entries(selectedOpponent.aggregated_stats?.maps_played ?? {})
         .sort((a, b) => b[1] - a[1])
         .map(([map]) => map)
     : []
 
-  // Reset map if it's not in the opponent's available maps
   useEffect(() => {
     if (selectedOpponent && opponentMaps.length > 0 && newMap && !opponentMaps.includes(newMap)) {
       setNewMap(opponentMaps[0])
     }
   }, [selectedFolder]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch player names from self demos when team changes
   useEffect(() => {
     if (!selectedTeam) return
     fetch(`/api/teams/players?teamId=${selectedTeam}`)
@@ -125,52 +123,101 @@ function PlaybookListInner() {
     setDeleting(null)
   }
 
+  const filtered = search
+    ? playbooks.filter(p =>
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        (p.opponent_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        p.map.toLowerCase().includes(search.toLowerCase())
+      )
+    : playbooks
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'var(--card)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontSize: 13,
+    color: 'var(--text)',
+    outline: 'none',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11,
+    color: 'var(--muted)',
+    display: 'block',
+    marginBottom: 5,
+  }
+
   return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div style={{ flex: 1, overflowY: 'auto', padding: '28px 28px' }}>
+
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16 }}>
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-            <BookOpen className="text-[#00ffc8]" size={22} />
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 5, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BookOpen size={24} style={{ color: 'var(--accent)' }} />
             Playbooks
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>
             Build and save tactical playbooks for your team with AI assistance.
           </p>
         </div>
-        <Button variant="neon" size="sm" onClick={() => setShowNew(true)} className="gap-1.5">
+        <button
+          onClick={() => setShowNew(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px',
+            borderRadius: 9, border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)',
+            background: 'color-mix(in srgb, var(--accent) 14%, transparent)',
+            color: 'var(--accent)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            transition: 'all 0.14s', flexShrink: 0,
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--accent) 22%, transparent)'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--accent) 60%, transparent)'
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--accent) 14%, transparent)'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--accent) 40%, transparent)'
+          }}
+        >
           <Plus size={15} />
           New Playbook
-        </Button>
+        </button>
       </div>
 
-      {/* New playbook form */}
+      {/* ── New playbook form ── */}
       {showNew && (
-        <div className="mb-6 p-5 rounded-xl border border-[rgba(0,255,200,0.25)] bg-[rgba(0,255,200,0.04)]">
-          <h2 className="text-sm font-semibold text-foreground mb-1">Create New Playbook</h2>
-          <p className="text-xs text-muted-foreground mb-4">
+        <div style={{
+          marginBottom: 24, padding: 20, borderRadius: 14,
+          border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
+          background: 'color-mix(in srgb, var(--accent) 5%, var(--card))',
+        }}>
+          {/* Form header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 7, background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Plus size={13} style={{ color: 'var(--accent)' }} />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Create New Playbook</span>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 18, paddingLeft: 38 }}>
             Optionally link an opponent to generate targeted anti-strat tactics based on their uploaded demos.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">
+              <label style={labelStyle}>
                 Map
                 {selectedOpponent && opponentMaps.length > 0 && (
-                  <span className="ml-1.5 text-[#00ffc8]/70">
+                  <span style={{ marginLeft: 6, color: 'var(--accent)', opacity: 0.7 }}>
                     — {opponentMaps.length} map{opponentMaps.length !== 1 ? 's' : ''} with demos
                   </span>
                 )}
               </label>
               {selectedOpponent && opponentMaps.length === 0 ? (
-                <div className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-muted-foreground">
-                  No demos uploaded for this opponent yet
-                </div>
+                <div style={{ ...inputStyle, color: 'var(--muted)' }}>No demos uploaded for this opponent yet</div>
               ) : (
-                <select
-                  value={newMap}
-                  onChange={e => setNewMap(e.target.value)}
-                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
-                >
+                <select value={newMap} onChange={e => setNewMap(e.target.value)} style={inputStyle}>
                   <option value="">Select map…</option>
                   {availableMaps.map(m => (
                     <option key={m} value={m}>
@@ -183,7 +230,7 @@ function PlaybookListInner() {
               )}
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Name (optional)</label>
+              <label style={labelStyle}>Name <span style={{ opacity: 0.5 }}>(optional)</span></label>
               <input
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
@@ -191,26 +238,20 @@ function PlaybookListInner() {
                   selectedOpponent && newMap ? `vs ${selectedOpponent.opponent_display_name} — ${newMap}`
                   : newMap ? `${newMap} Playbook` : 'Playbook name…'
                 }
-                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
+                style={inputStyle}
               />
             </div>
           </div>
 
           {/* Opponent selector */}
-          <div className="mb-3">
-            <label className="text-xs text-muted-foreground mb-1 block">
-              Anti-strat opponent <span className="text-muted-foreground/60">(optional)</span>
-            </label>
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Anti-strat opponent <span style={{ opacity: 0.5 }}>(optional)</span></label>
             {opponents.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">
-                No opponents yet — <Link href="/opponents" className="text-[#00ffc8] hover:underline">upload demos first</Link> to enable anti-strat playbooks.
+              <p style={{ fontSize: 12, color: 'var(--muted)', padding: '8px 0' }}>
+                No opponents yet — <Link href="/opponents" style={{ color: 'var(--accent)' }}>upload demos first</Link> to enable anti-strat playbooks.
               </p>
             ) : (
-              <select
-                value={selectedFolder}
-                onChange={e => setSelectedFolder(e.target.value)}
-                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
-              >
+              <select value={selectedFolder} onChange={e => setSelectedFolder(e.target.value)} style={inputStyle}>
                 <option value="">No opponent (general playbook)</option>
                 {opponents.map(o => (
                   <option key={o.id} value={o.id}>{o.opponent_display_name}</option>
@@ -220,17 +261,15 @@ function PlaybookListInner() {
           </div>
 
           {/* Teammate selector */}
-          <div className="mb-3">
-            <label className="text-xs text-muted-foreground mb-1 block">
-              Teammates <span className="text-muted-foreground/60">(optional — names used in tactics)</span>
-            </label>
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Teammates <span style={{ opacity: 0.5 }}>(optional — names used in tactics)</span></label>
             {availablePlayers.length === 0 ? (
-              <p className="text-xs text-muted-foreground/60 py-1">
+              <p style={{ fontSize: 12, color: 'var(--faint)', padding: '4px 0' }}>
                 No self demos uploaded yet — AI will use role labels (Entry Fragger, AWPer, etc.)
               </p>
             ) : (
               <>
-                <div className="flex flex-wrap gap-1.5">
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {availablePlayers.slice(0, 10).map(name => {
                     const on = selectedPlayers.includes(name)
                     return (
@@ -245,13 +284,15 @@ function PlaybookListInner() {
                             setSelectedPlayers(prev => [...prev, name])
                           }
                         }}
-                        className={cn(
-                          'text-xs px-2.5 py-1 rounded-full border transition-colors',
-                          on
-                            ? 'bg-neon-green/15 border-neon-green/50 text-neon-green'
-                            : 'bg-background border-border text-muted-foreground hover:border-neon-green/30 hover:text-foreground',
-                          !on && selectedPlayers.length >= 5 && 'opacity-40 cursor-not-allowed'
-                        )}
+                        style={{
+                          fontSize: 11, padding: '4px 10px', borderRadius: 20,
+                          border: `1px solid ${on ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'var(--border)'}`,
+                          background: on ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'transparent',
+                          color: on ? 'var(--accent)' : 'var(--muted)',
+                          cursor: !on && selectedPlayers.length >= 5 ? 'not-allowed' : 'pointer',
+                          opacity: !on && selectedPlayers.length >= 5 ? 0.4 : 1,
+                          transition: 'all 0.12s',
+                        }}
                       >
                         {name}
                       </button>
@@ -259,20 +300,20 @@ function PlaybookListInner() {
                   })}
                 </div>
                 {selectedPlayers.length > 0 && (
-                  <div className="mt-2 space-y-1.5">
-                    <p className="text-[10px] text-muted-foreground/60">
+                  <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <p style={{ fontSize: 10, color: 'var(--faint)' }}>
                       {selectedPlayers.length}/5 selected · Assign roles so AI knows each player&apos;s responsibilities
                     </p>
                     {selectedPlayers.map(name => (
-                      <div key={name} className="flex items-center gap-2">
-                        <span className="text-xs text-neon-green font-medium w-28 truncate">{name}</span>
+                      <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 500, width: 112, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
                         <select
                           value={playerRoles[name] ?? ''}
                           onChange={e => setPlayerRoles(prev => {
                             if (!e.target.value) { const next = { ...prev }; delete next[name]; return next }
                             return { ...prev, [name]: e.target.value }
                           })}
-                          className="flex-1 bg-background border border-border rounded px-2 py-0.5 text-xs text-foreground focus:outline-none focus:border-neon-green/50"
+                          style={{ ...inputStyle, flex: 1, padding: '4px 8px', fontSize: 12 }}
                         >
                           <option value="">No role assigned</option>
                           <option value="Entry">Entry Fragger</option>
@@ -291,118 +332,191 @@ function PlaybookListInner() {
           </div>
 
           {selectedOpponent && (
-            <div className="mb-3 px-3 py-2 rounded-md bg-orange-500/10 border border-orange-500/25 flex items-center gap-2">
-              <Target size={13} className="text-orange-400 shrink-0" />
-              <p className="text-xs text-orange-300">
+            <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Target size={13} style={{ color: '#fb923c', flexShrink: 0 }} />
+              <p style={{ fontSize: 12, color: '#fdba74', margin: 0 }}>
                 AI will generate anti-strat content specifically countering <strong>{selectedOpponent.opponent_display_name}</strong> based on their uploaded demos.
               </p>
             </div>
           )}
 
           {teams.length > 1 && (
-            <div className="mb-3">
-              <label className="text-xs text-muted-foreground mb-1 block">Team</label>
-              <select
-                value={selectedTeam}
-                onChange={e => setSelectedTeam(e.target.value)}
-                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon-green/50"
-              >
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Team</label>
+              <select value={selectedTeam} onChange={e => setSelectedTeam(e.target.value)} style={inputStyle}>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
           )}
 
-          <div className="flex gap-2 pt-1">
-            <Button variant="neon" size="sm" onClick={handleCreate} disabled={!newMap || creating || (!!selectedOpponent && opponentMaps.length === 0)} className="gap-1.5">
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button
+              onClick={handleCreate}
+              disabled={!newMap || creating || (!!selectedOpponent && opponentMaps.length === 0)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+                borderRadius: 8, border: 'none',
+                background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
+                cursor: !newMap || creating ? 'not-allowed' : 'pointer',
+                opacity: !newMap || creating || (!!selectedOpponent && opponentMaps.length === 0) ? 0.5 : 1,
+                transition: 'opacity 0.12s',
+              }}
+            >
               {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
               {selectedOpponent ? 'Create Anti-Strat Playbook' : 'Create & Open'}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setShowNew(false)}>Cancel</Button>
+            </button>
+            <button
+              onClick={() => setShowNew(false)}
+              style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-muted-foreground" size={24} />
+      {/* ── Search ── */}
+      {!loading && playbooks.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '9px 14px', borderRadius: 10,
+          border: '1px solid var(--border)', background: 'var(--card)',
+          marginBottom: 18, transition: 'border-color 0.14s',
+        }}>
+          <Search size={13} style={{ color: 'var(--faint)', flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder="Search playbooks…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onFocus={e => ((e.currentTarget.parentElement as HTMLDivElement).style.borderColor = 'var(--accent)')}
+            onBlur={e => ((e.currentTarget.parentElement as HTMLDivElement).style.borderColor = 'var(--border)')}
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'var(--text)' }}
+          />
         </div>
-      ) : playbooks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[rgba(0,255,200,0.08)] border border-[rgba(0,255,200,0.15)] flex items-center justify-center mb-4">
-            <BookOpen size={24} className="text-[#00ffc8]" />
+      )}
+
+      {/* ── Content ── */}
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 24px' }}>
+          <Loader2 size={24} style={{ color: 'var(--muted)' }} className="animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 24px', textAlign: 'center', borderRadius: 14, border: '1px dashed var(--border)' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <BookOpen size={24} style={{ color: 'var(--accent)' }} />
           </div>
-          <h2 className="text-lg font-semibold text-foreground mb-1">No playbooks yet</h2>
-          <p className="text-muted-foreground text-sm mb-5">
-            Build your first playbook to get structured AI-generated tactics for your team.
+          <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
+            {search ? 'No playbooks match that search' : 'No playbooks yet'}
           </p>
-          <Button variant="neon" size="sm" onClick={() => setShowNew(true)} className="gap-1.5">
-            <Plus size={14} />
-            Create your first playbook
-          </Button>
+          <p style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 280, marginBottom: 20 }}>
+            {search ? 'Try a different search term' : 'Build your first playbook to get structured AI-generated tactics for your team.'}
+          </p>
+          {!search && (
+            <button
+              onClick={() => setShowNew(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <Plus size={14} />
+              Create your first playbook
+            </button>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {playbooks.map(pb => {
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+          {filtered.map(pb => {
             const thumb = MAP_THUMBS[pb.map]
+            const isAntiStrat = !!pb.opponent_name
             return (
               <div
                 key={pb.id}
-                className={cn(
-                  'rv-panel group relative overflow-hidden transition-all duration-150',
-                  pb.opponent_name
-                    ? 'hover:border-orange-500/50'
-                    : 'hover:border-[rgba(0,255,200,0.3)]'
-                )}
+                style={{
+                  borderRadius: 12,
+                  border: `1px solid ${hoveredCard === pb.id ? (isAntiStrat ? 'rgba(251,146,60,0.45)' : 'color-mix(in srgb, var(--accent) 45%, transparent)') : 'var(--border)'}`,
+                  boxShadow: hoveredCard === pb.id ? (isAntiStrat ? '0 4px 20px rgba(251,146,60,0.08)' : '0 4px 20px color-mix(in srgb, var(--accent) 8%, transparent)') : 'none',
+                  background: 'var(--card)',
+                  overflow: 'hidden', transition: 'border-color 0.14s, box-shadow 0.14s', position: 'relative',
+                }}
+                onMouseEnter={() => setHoveredCard(pb.id)}
+                onMouseLeave={() => setHoveredCard(null)}
               >
-                {/* Map thumbnail banner */}
-                <div className="relative h-28 overflow-hidden">
+                {/* Map thumbnail */}
+                <div style={{ position: 'relative', height: 112, overflow: 'hidden' }}>
                   {thumb ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumb} alt={pb.map} className="w-full h-full object-cover" />
+                    <img src={thumb} alt={pb.map} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <div className="w-full h-full bg-muted/20" />
+                    <div style={{ width: '100%', height: '100%', background: 'var(--elevated)' }} />
                   )}
-                  {/* Gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-card/40 to-transparent" />
+                  {/* Gradient overlays */}
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, var(--card) 0%, rgba(0,0,0,0.55) 60%, transparent 100%)' }} />
 
-                  {/* Map name badge pinned to bottom-left */}
-                  <div className="absolute bottom-2 left-3 flex items-center gap-1.5">
-                    <div className={cn(
-                      'w-6 h-6 rounded-md border flex items-center justify-center shrink-0',
-                      pb.opponent_name ? 'bg-orange-500/20 border-orange-500/40' : 'bg-[rgba(0,255,200,0.15)] border-[rgba(0,255,200,0.3)]'
-                    )}>
-                      {pb.opponent_name ? <Swords size={11} className="text-orange-400" /> : <Map size={11} className="text-[#00ffc8]" />}
+                  {/* Map badge */}
+                  <div style={{ position: 'absolute', bottom: 10, left: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 6,
+                      background: isAntiStrat ? 'rgba(251,146,60,0.2)' : 'color-mix(in srgb, var(--accent) 18%, transparent)',
+                      border: `1px solid ${isAntiStrat ? 'rgba(251,146,60,0.4)' : 'color-mix(in srgb, var(--accent) 35%, transparent)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {isAntiStrat
+                        ? <Swords size={11} style={{ color: '#fb923c' }} />
+                        : <Map size={11} style={{ color: 'var(--accent)' }} />
+                      }
                     </div>
-                    <span className={cn(
-                      'text-[10px] font-mono font-semibold px-2 py-0.5 rounded backdrop-blur-sm',
-                      pb.opponent_name ? 'text-orange-400 bg-orange-500/15' : 'text-[#00ffc8] bg-[rgba(0,255,200,0.1)]'
-                    )}>
+                    <span style={{
+                      fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, padding: '2px 8px', borderRadius: 5,
+                      background: isAntiStrat ? 'rgba(251,146,60,0.14)' : 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                      color: isAntiStrat ? '#fb923c' : 'var(--accent)',
+                      backdropFilter: 'blur(4px)',
+                    }}>
                       {pb.map}
                     </span>
                   </div>
 
-                  {/* Delete button */}
+                  {/* Delete button — visible on card hover */}
                   <button
-                    onClick={() => handleDelete(pb.id)}
+                    onClick={e => { e.preventDefault(); handleDelete(pb.id) }}
                     disabled={deleting === pb.id}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity text-white/60 hover:text-red-400 hover:bg-red-400/20"
+                    style={{
+                      position: 'absolute', top: 8, right: 8,
+                      padding: 6, borderRadius: 7, border: 'none',
+                      background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+                      color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
+                      opacity: hoveredCard === pb.id ? 1 : 0,
+                      transition: 'opacity 0.14s, color 0.14s, background 0.14s',
+                    }}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLButtonElement
+                      el.style.color = '#FF6B7A'
+                      el.style.background = 'rgba(255,107,122,0.18)'
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLButtonElement
+                      el.style.color = 'rgba(255,255,255,0.5)'
+                      el.style.background = 'rgba(0,0,0,0.45)'
+                    }}
                   >
                     {deleting === pb.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                   </button>
                 </div>
 
                 {/* Card content */}
-                <Link href={`/playbook/${pb.id}`} className="block px-4 py-3">
+                <Link href={`/playbook/${pb.id}`} style={{ display: 'block', padding: '12px 14px 14px', textDecoration: 'none' }}>
                   {pb.opponent_name && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20 mb-1.5">
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 6,
+                      fontSize: 10, fontWeight: 600, color: '#fb923c',
+                      background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.2)',
+                      padding: '2px 8px', borderRadius: 5,
+                    }}>
                       <Target size={9} /> vs {pb.opponent_name}
-                    </span>
+                    </div>
                   )}
-                  <h3 className="text-sm font-semibold text-foreground group-hover:text-[#00ffc8] transition-colors truncate">
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {pb.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>
                     Updated {new Date(pb.updated_at).toLocaleDateString()}
                   </p>
                 </Link>
