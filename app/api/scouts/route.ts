@@ -50,5 +50,8 @@ export async function GET(req: Request) {
     ratings:     ratingMap[f.id] ?? { up: 0, down: 0 },
   }))
 
-  return NextResponse.json(result)
+  const res = NextResponse.json(result)
+  // Cache public listings for 60 s, serve stale up to 5 min while revalidating
+  res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+  return res
 }

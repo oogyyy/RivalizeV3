@@ -74,14 +74,31 @@ export default async function OpponentPage({
 
   const stats = folder.aggregated_stats as AggregatedStats | null
 
-  const { data: demos } = await admin
-    .from('demos')
-    .select('id, status, map, match_date, created_at, opponent_slug, parsed_data')
-    .eq('team_id', teamId)
-    .eq('opponent_slug', folder.opponent_slug)
-    .eq('demo_type', 'opponent')
-    .order('created_at', { ascending: false })
-    .limit(500)
+  type DemoListRow  = { id: string; status: string; map: string; match_date: string | null; created_at: string; opponent_slug: string }
+  type DemoStatRow  = { map: string; parsed_data: unknown }
+
+  // Two parallel queries: display list (no heavy parsed_data) + stat computation (completed only)
+  const [listResult, statResult] = await Promise.all([
+    admin
+      .from('demos')
+      .select('id, status, map, match_date, created_at, opponent_slug')
+      .eq('team_id', teamId)
+      .eq('opponent_slug', folder.opponent_slug)
+      .eq('demo_type', 'opponent')
+      .order('created_at', { ascending: false })
+      .limit(200),
+    admin
+      .from('demos')
+      .select('map, parsed_data')
+      .eq('team_id', teamId)
+      .eq('opponent_slug', folder.opponent_slug)
+      .eq('demo_type', 'opponent')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(100),
+  ])
+  const demos     = listResult.data as DemoListRow[] | null
+  const statDemos = statResult.data as DemoStatRow[] | null
 
   const totalDemos = (demos ?? []).length
   const wins    = stats?.wins    ?? 0
@@ -90,10 +107,10 @@ export default async function OpponentPage({
   const winRate = stats?.win_rate ?? 0
   const isOwnerOrAdmin = membership.role === 'owner' || membership.role === 'admin'
 
-  /* ── per-map opponent win rates (computed from demo data) ── */
+  /* ── per-map opponent win rates (computed from completed demos only) ── */
   const mapStats: Record<string, { w: number; l: number; d: number }> = {}
-  for (const demo of demos ?? []) {
-    if (demo.status !== 'completed' || !demo.map || !demo.parsed_data) continue
+  for (const demo of statDemos ?? []) {
+    if (!demo.map || !demo.parsed_data) continue
     const h  = (demo.parsed_data as { header?: { score_team1?: number; score_team2?: number }; opponentSide?: string }).header
     const os = (demo.parsed_data as { opponentSide?: string }).opponentSide ?? 'team2'
     if (!h) continue
@@ -117,10 +134,10 @@ export default async function OpponentPage({
 
   /* ── top players ── */
   let topPlayers: PlayerStats[] = stats?.top_players ?? []
-  if (topPlayers.length === 0 && (demos ?? []).length > 0) {
+  if (topPlayers.length === 0 && (statDemos ?? []).length > 0) {
     const playerMap: Record<string, PlayerStats & { count: number }> = {}
-    for (const demo of demos ?? []) {
-      if (demo.status !== 'completed' || !demo.parsed_data) continue
+    for (const demo of statDemos ?? []) {
+      if (!demo.parsed_data) continue
       const pd = demo.parsed_data as {
         header?: { team1?: string; team2?: string }
         opponentSide?: string
@@ -310,7 +327,7 @@ export default async function OpponentPage({
               </div>
               <div className="p-2">
                 <OpponentDemoList
-                  demos={demos ?? []}
+                  demos={(demos ?? []).map(d => ({ ...d, parsed_data: null }))}
                   folderId={folderId}
                   teamId={teamId}
                   isOwnerOrAdmin={isOwnerOrAdmin}

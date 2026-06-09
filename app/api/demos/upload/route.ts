@@ -13,6 +13,7 @@ import {
 import { getPublicUrl } from '@/lib/r2'
 import { slugify } from '@/lib/utils'
 import { checkDemoQuota, incrementDemoCount } from '@/lib/billing'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const MAX_FILE_SIZE  = 500 * 1024 * 1024
 const MAX_CHUNK_SIZE =  10 * 1024 * 1024  // stay under Railway's 10 MB proxy limit
@@ -44,6 +45,11 @@ export async function POST(request: NextRequest) {
 
   const q      = request.nextUrl.searchParams
   const action = q.get('action') ?? 'init'
+
+  // 10 upload inits per user per 60 s — prevents spam without blocking legitimate use
+  if (action === 'init' && !rateLimit(`upload:init:${user.id}`, 10, 60_000)) {
+    return rateLimitResponse()
+  }
 
   if (action === 'init')     return handleInit(request, user.id, q)
   if (action === 'part')     return handlePart(request, q)

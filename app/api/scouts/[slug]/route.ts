@@ -38,7 +38,7 @@ export async function GET(
   const up   = (ratings ?? []).filter(r => r.rating ===  1).length
   const down = (ratings ?? []).filter(r => r.rating === -1).length
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     id:          folder.id,
     name:        folder.opponent_display_name,
     slug:        folder.opponent_slug,
@@ -49,4 +49,6 @@ export async function GET(
     demos:       demos ?? [],
     ratings:     { up, down },
   })
+  res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+  return res
 }

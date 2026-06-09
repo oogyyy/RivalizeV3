@@ -53,6 +53,7 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const admin = createAdminClient()
 
+  // ── Fetch memberships first (needed to scope all other queries) ──────────────
   const { data: memberships } = await admin
     .from('team_members')
     .select('role, team_id')
@@ -61,26 +62,69 @@ export default async function DashboardPage() {
   const teamIds       = (memberships ?? []).map((m) => m.team_id).filter(Boolean)
   const primaryTeamId = teamIds[0] ?? null
 
-  const { data: primaryTeam } = primaryTeamId
-    ? await admin.from('teams').select('name').eq('id', primaryTeamId).single()
-    : { data: null }
-  const myTeamName = (primaryTeam as { name?: string } | null)?.name ?? 'My Team'
+  // ── Parallel fetch: all queries that depend only on teamIds ──────────────────
+  const none = { data: null as null }
+  const empty = { data: [] as unknown[] }
 
-  type FolderRow = {
-    id: string; opponent_display_name: string; opponent_slug: string
-  }
+  const [
+    teamResult,
+    folderResult,
+    recentResult,
+    metaResult,
+    statsResult,
+    publicResult,
+  ] = await Promise.all([
+    primaryTeamId
+      ? admin.from('teams').select('name').eq('id', primaryTeamId).single()
+      : Promise.resolve(none),
+    primaryTeamId
+      ? admin
+          .from('team_folders')
+          .select('id, opponent_display_name, opponent_slug')
+          .eq('user_team_id', primaryTeamId)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .single()
+      : Promise.resolve(none),
+    teamIds.length
+      ? admin
+          .from('demos')
+          .select('id, team_id, opponent_name, opponent_slug, map, match_date, status, created_at, parsed_data')
+          .in('team_id', teamIds)
+          .eq('demo_type', 'self')
+          .order('created_at', { ascending: false })
+          .limit(5)
+      : Promise.resolve(empty),
+    teamIds.length
+      ? admin.from('demos').select('status').in('team_id', teamIds)
+      : Promise.resolve(empty),
+    teamIds.length
+      ? admin
+          .from('demos')
+          .select('parsed_data')
+          .in('team_id', teamIds)
+          .eq('demo_type', 'self')
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(30)
+      : Promise.resolve(empty),
+    admin
+      .from('team_folders')
+      .select('id, opponent_display_name, published_at, aggregated_stats')
+      .eq('is_public', true)
+      .order('published_at', { ascending: false })
+      .limit(6),
+  ])
 
-  const { data: topFolder } = primaryTeamId
-    ? await admin
-        .from('team_folders')
-        .select('id, opponent_display_name, opponent_slug')
-        .eq('user_team_id', primaryTeamId)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single()
-    : { data: null }
+  const primaryTeam    = teamResult.data   as { name?: string } | null
+  const topFolder      = folderResult.data as { id: string; opponent_display_name: string; opponent_slug: string } | null
+  const recentSelfDemos = recentResult.data as unknown[]
+  const allDemosMeta   = metaResult.data   as unknown[]
+  const allSelfDemosData = statsResult.data as unknown[]
+  const publicFolders  = publicResult.data as Array<{ id: string; opponent_display_name: string; published_at: string | null; aggregated_stats: unknown }> | null
 
-  const nextOpponent = (topFolder as FolderRow | null)?.opponent_display_name ?? null
+  const myTeamName   = primaryTeam?.name ?? 'My Team'
+  const nextOpponent = topFolder?.opponent_display_name ?? null
 
   type DemoRow = {
     id: string; team_id: string; opponent_name: string
@@ -88,34 +132,6 @@ export default async function DashboardPage() {
     match_date: string | null; status: string; created_at: string
     parsed_data?: unknown
   }
-
-  const { data: recentSelfDemos } = teamIds.length
-    ? await admin
-        .from('demos')
-        .select('id, team_id, opponent_name, opponent_slug, map, match_date, status, created_at, parsed_data')
-        .in('team_id', teamIds)
-        .eq('demo_type', 'self')
-        .order('created_at', { ascending: false })
-        .limit(5)
-    : { data: [] }
-
-  const { data: allDemosMeta } = teamIds.length
-    ? await admin
-        .from('demos')
-        .select('status')
-        .in('team_id', teamIds)
-    : { data: [] }
-
-  const { data: allSelfDemosData } = teamIds.length
-    ? await admin
-        .from('demos')
-        .select('parsed_data')
-        .in('team_id', teamIds)
-        .eq('demo_type', 'self')
-        .eq('status', 'completed')
-        .order('created_at', { ascending: false })
-        .limit(50)
-    : { data: [] }
 
   type SelfDemoMeta = { parsed_data: unknown }
   const selfCompleted = (allSelfDemosData ?? []) as SelfDemoMeta[]
@@ -161,7 +177,7 @@ export default async function DashboardPage() {
     : '—'
 
   const totalDemos    = (allDemosMeta ?? []).length
-  const analyzedDemos = (allDemosMeta ?? []).filter((d) => d.status === 'completed').length
+  const analyzedDemos = (allDemosMeta ?? []).filter((d) => (d as { status: string }).status === 'completed').length
 
   // ── Recent demos list ────────────────────────────────────────────────────────
   const recentDemos: RecentDemoItem[] = ((recentSelfDemos ?? []) as DemoRow[]).map((d) => {
@@ -207,14 +223,7 @@ export default async function DashboardPage() {
       ct: v.total > 0 ? Math.round(v.wins / v.total * 100) : 50,
     }))
 
-  // ── Community feed (recently published public opponent folders) ───────────────
-  const { data: publicFolders } = await admin
-    .from('team_folders')
-    .select('id, opponent_display_name, published_at, aggregated_stats')
-    .eq('is_public', true)
-    .order('published_at', { ascending: false })
-    .limit(6)
-
+  // ── Community feed ratings ───────────────────────────────────────────────────
   type RatingRow = { folder_id: string; rating: number }
   const folderIds = (publicFolders ?? []).map(f => f.id)
 

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { createOpenAI } from '@ai-sdk/openai'
 import { streamText, tool } from 'ai'
 import { z } from 'zod'
@@ -213,6 +214,11 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // 20 AI coach messages per user per 60 s
+  if (!rateLimit(`ai:coach:${user.id}`, 20, 60_000)) {
+    return rateLimitResponse()
   }
 
   let rawBody: unknown

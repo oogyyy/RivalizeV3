@@ -30,7 +30,7 @@ export async function PATCH(
   await admin.from('team_folders').update({
     is_public:    isPublic,
     published_at: isPublic ? new Date().toISOString() : null,
-  }).eq('id', folderId)
+  } as Record<string, unknown>).eq('id', folderId)
 
   return NextResponse.json({ isPublic })
 }
