@@ -970,6 +970,25 @@ export default function MyTeamDashboard({
                   {discordConnecting && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
                   Connect Discord
                 </button>
+
+                {discordLinkCode && (
+                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Slash Command Link Code</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+                      <code style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, letterSpacing: '0.1em', color: '#5865F2' }}>{discordLinkCode}</code>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(discordLinkCode); setDiscordCodeCopied(true); setTimeout(() => setDiscordCodeCopied(false), 2000) }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: discordCodeCopied ? '#57F287' : 'var(--muted)', cursor: 'pointer', fontSize: 12 }}
+                      >
+                        {discordCodeCopied ? <CheckCheck size={13} /> : <Copy size={13} />}
+                        {discordCodeCopied ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+                      Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)', background: 'var(--elevated)', padding: '1px 5px', borderRadius: 4 }}>/rivalize link {discordLinkCode}</code> in any Discord server to enable slash commands there.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
