@@ -2,14 +2,22 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { LucideIcon } from 'lucide-react'
 import { LayoutDashboard, Target, Brain, Shield, MoreHorizontal } from 'lucide-react'
 
-const BOTTOM_NAV = [
-  { href: '/dashboard',  label: 'Dashboard', Icon: LayoutDashboard },
-  { href: '/opponents',  label: 'Scout',      Icon: Target },
-  { href: '/ai-coach',   label: 'AI',         Icon: Brain,   live: true },
-  { href: '/my-team',    label: 'Team',       Icon: Shield },
-] as const
+interface BottomNavItem {
+  href: string
+  label: string
+  Icon: LucideIcon
+  live?: boolean
+}
+
+const BOTTOM_NAV: BottomNavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { href: '/opponents', label: 'Scout',     Icon: Target },
+  { href: '/ai-coach',  label: 'AI',        Icon: Brain,  live: true },
+  { href: '/my-team',   label: 'Team',      Icon: Shield },
+]
 
 export default function BottomNav() {
   const pathname = usePathname()
