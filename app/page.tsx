@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -164,6 +164,113 @@ function ChatWidget() {
   )
 }
 
+/* ── Platform stats (live counters) ───────────────────────── */
+interface PlatformStats {
+  teams: number
+  demos: number
+  rounds: number
+  parse_time_avg_seconds: number | null
+}
+
+function formatStat(value: number, key: keyof PlatformStats): string {
+  if (key === 'parse_time_avg_seconds') {
+    if (value === 0) return '< 3 min'
+    const mins = value / 60
+    if (mins < 1) return `< 1 min`
+    return `< ${Math.ceil(mins)} min`
+  }
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)} M+`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)} K+`
+  return `${value.toLocaleString()}+`
+}
+
+function useCountUp(target: number, duration = 1500, active = false) {
+  const [display, setDisplay] = useState(0)
+  const raf = useRef<number | null>(null)
+  const start = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!active || target === 0) { setDisplay(target); return }
+    start.current = null
+    const step = (ts: number) => {
+      if (start.current === null) start.current = ts
+      const progress = Math.min((ts - start.current) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(eased * target))
+      if (progress < 1) raf.current = requestAnimationFrame(step)
+    }
+    raf.current = requestAnimationFrame(step)
+    return () => { if (raf.current) cancelAnimationFrame(raf.current) }
+  }, [target, duration, active])
+
+  return display
+}
+
+function StatNumber({ value, statKey }: { value: number; statKey: keyof PlatformStats }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+  const count = useCountUp(value, 1400, visible)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect() } },
+      { threshold: 0.3 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  const formatted = statKey === 'parse_time_avg_seconds'
+    ? formatStat(value, statKey)
+    : formatStat(count, statKey)
+
+  return <div ref={ref} className="lp-stat-v">{formatted}</div>
+}
+
+function StatsBand() {
+  const [stats, setStats] = useState<PlatformStats | null>(null)
+  const fetched = useRef(false)
+
+  const fetchStats = useCallback(async () => {
+    if (fetched.current) return
+    fetched.current = true
+    try {
+      const res = await fetch('/api/stats')
+      if (res.ok) setStats(await res.json())
+    } catch {}
+  }, [])
+
+  useEffect(() => { fetchStats() }, [fetchStats])
+
+  const items: { key: keyof PlatformStats; label: string; fallback: string }[] = [
+    { key: 'teams',                  label: 'Teams active',    fallback: '—'      },
+    { key: 'rounds',                 label: 'Rounds parsed',   fallback: '—'      },
+    { key: 'demos',                  label: 'Demos analysed',  fallback: '—'      },
+    { key: 'parse_time_avg_seconds', label: 'Parse time avg',  fallback: '< 3 min' },
+  ]
+
+  return (
+    <div className="lp-wrap">
+      <div className="lp-panel lp-stats-band">
+        <div className="lp-stats">
+          {items.map(({ key, label, fallback }) => (
+            <div key={label} className="lp-stat">
+              {stats ? (
+                <StatNumber value={stats[key] ?? 0} statKey={key} />
+              ) : (
+                <div className="lp-stat-v">{fallback}</div>
+              )}
+              <div className="lp-stat-l">{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Page ──────────────────────────────────────────────────── */
 export default function LandingPage() {
   return (
@@ -247,23 +354,7 @@ export default function LandingPage() {
       </div>
 
       {/* ── STATS BAND ── */}
-      <div className="lp-wrap">
-        <div className="lp-panel lp-stats-band">
-          <div className="lp-stats">
-            {[
-              { v: '2,400+', l: 'Teams active' },
-              { v: '18 M+', l: 'Rounds parsed' },
-              { v: '94 K+', l: 'Demos analysed' },
-              { v: '<3 min', l: 'Parse time avg' },
-            ].map(s => (
-              <div key={s.l} className="lp-stat">
-                <div className="lp-stat-v">{s.v}</div>
-                <div className="lp-stat-l">{s.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <StatsBand />
 
       {/* ── HOW IT WORKS ── */}
       <div className="lp-wrap">
