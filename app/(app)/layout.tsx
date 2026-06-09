@@ -9,7 +9,6 @@ import MobileTopBar from '@/components/layout/MobileTopBar'
 import BottomNav from '@/components/layout/BottomNav'
 import TopBar from '@/components/layout/TopBar'
 import SocialPanel from '@/components/layout/SocialPanel'
-import FeedbackBubble from '@/components/feedback/FeedbackBubble'
 import { NavigationRefresh } from '@/components/layout/NavigationRefresh'
 import ExtensionModal from '@/components/extension/ExtensionModal'
 
@@ -61,9 +60,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Mobile full-screen menu drawer */}
       <MobileMenu profile={profile} />
-
-      {/* Global Feedback Bubble */}
-      <FeedbackBubble />
 
       {/* Extension install prompt (first-time only, auto-hides if installed) */}
       <ExtensionModal />
