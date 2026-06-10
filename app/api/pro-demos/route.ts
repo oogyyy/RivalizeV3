@@ -21,7 +21,7 @@ type PSMatch = {
   number_of_games?: number
   league?: { name?: string; image_url?: string | null }
   serie?: { full_name?: string }
-  tournament?: { name?: string }
+  tournament?: { name?: string; prizepool?: string | null }
   opponents?: Array<{ opponent?: PSTeam }>
   results?: Array<{ team_id?: number; score?: number }>
   // Map info per game is included for CS matches when available.
@@ -42,6 +42,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const mapFilter = (searchParams.get('map') ?? '').toLowerCase()
   const query = searchParams.get('q')?.trim() ?? ''
+  const date = searchParams.get('date') ?? '' // YYYY-MM-DD — limit results to one day
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
   const limit = Math.min(50, parseInt(searchParams.get('limit') ?? '20', 10) || 20)
 
@@ -59,7 +60,7 @@ export async function GET(request: Request) {
 
   // PandaScore has no per-map filter, so over-fetch when one is active and
   // filter server-side. Pagination stays page-based in both modes.
-  const pageSize = mapFilter ? 100 : limit
+  const pageSize = mapFilter ? 100 : date ? 50 : limit
 
   try {
     const params = new URLSearchParams({
@@ -70,6 +71,9 @@ export async function GET(request: Request) {
     // Match slugs look like "navi-vs-faze-2026-06-01" — partial slug search
     // is the most reliable way to find matches by team name.
     if (query) params.set('search[slug]', query.toLowerCase().replace(/\s+/g, '-'))
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      params.set('range[begin_at]', `${date}T00:00:00Z,${date}T23:59:59Z`)
+    }
 
     const res = await fetch(`${PANDASCORE_API}?${params}`, {
       headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -104,11 +108,16 @@ export async function GET(request: Request) {
         team2: t2?.name ?? t2?.acronym ?? 'TBD',
         team1_logo: t1?.image_url ?? null,
         team2_logo: t2?.image_url ?? null,
+        team1_score: s1 ?? null,
+        team2_score: s2 ?? null,
+        winner: s1 !== undefined && s2 !== undefined && s1 !== s2 ? (s1 > s2 ? 1 : 2) : null,
         map: maps[0] ?? null,
         maps,
         best_of: m.number_of_games ?? null,
         date: m.end_at ?? m.begin_at ?? null,
         event: eventParts.join(' — ') || 'Pro Match',
+        league_logo: m.league?.image_url ?? null,
+        prizepool: m.tournament?.prizepool ?? null,
         score: s1 !== undefined && s2 !== undefined ? `${s1}–${s2}` : null,
       }
     })
