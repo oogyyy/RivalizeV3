@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import {
-  Film, TrendingUp, Zap, ExternalLink, Loader2, Info,
+  Film, TrendingUp, Zap, ExternalLink, Loader2, Info, BarChart3,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
@@ -224,6 +224,7 @@ export default function MyMatchesDashboard({
   faceitPlayerId: string | null
 }) {
   const [demos] = useState(initialDemos)
+  const [activeTab, setActiveTab] = useState<'overview' | 'matches' | 'trends' | 'demos'>('overview')
   const [faceit, setFaceit] = useState<{ matches: FaceitRecentMatch[]; loading: boolean; linked: boolean }>({
     matches: [],
     loading: !!faceitPlayerId,
@@ -345,172 +346,202 @@ export default function MyMatchesDashboard({
         </div>
       )}
 
-      {/* Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        {STAT_CARDS.map((s, i) => (
-          <div key={i} style={{ padding: 16, position: 'relative', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: s.color }} />
-            <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</p>
-            <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 4 }}>{s.stat}</p>
-            <p style={{ fontSize: 11, color: 'var(--muted)' }}>{s.sub}</p>
-          </div>
+      {/* Tab Bar */}
+      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--card)', border: '1px solid var(--border)', alignSelf: 'flex-start' }}>
+        {([
+          { id: 'overview', label: 'Overview', icon: BarChart3 },
+          { id: 'matches',  label: 'Matches',  icon: Zap },
+          { id: 'trends',   label: 'Trends',   icon: TrendingUp },
+          { id: 'demos',    label: 'Demos',    icon: Film },
+        ] as const).map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => setActiveTab(id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: activeTab === id ? 'var(--accent)' : 'transparent',
+              color: activeTab === id ? '#fff' : 'var(--muted)',
+              fontSize: 12, fontWeight: 600, transition: 'all 0.13s',
+            }}
+          >
+            <Icon size={13} />
+            {label}
+          </button>
         ))}
       </div>
 
-      {/* Match History: CS2 + FACEIT columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-
-        {/* CS2 Premier / Competitive */}
-        <div style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(59,130,246,0.14)', flexShrink: 0 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#60a5fa' }}>
-              <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
-            </svg>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>CS2 Premier / Competitive</span>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', maxHeight: 440 }}>
-            <CS2MatchPanel personalTeamId={personalTeamId} />
-          </div>
+      {/* ── Overview Tab ── */}
+      {activeTab === 'overview' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {STAT_CARDS.map((s, i) => (
+            <div key={i} style={{ padding: 16, position: 'relative', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: s.color }} />
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</p>
+              <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 4 }}>{s.stat}</p>
+              <p style={{ fontSize: 11, color: 'var(--muted)' }}>{s.sub}</p>
+            </div>
+          ))}
         </div>
+      )}
 
-        {/* FACEIT */}
-        <div style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(251,146,60,0.14)', flexShrink: 0 }}>
-            <Zap size={13} style={{ color: '#fb923c' }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>FACEIT</span>
-          </div>
-          <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', maxHeight: 440 }}>
-            {faceit.loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: 8 }}>
-                <Loader2 size={16} style={{ color: 'var(--muted)', animation: 'spin 1s linear infinite' }} />
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>Loading matches…</span>
-              </div>
-            ) : !faceit.linked ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', textAlign: 'center', gap: 6 }}>
-                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', margin: 0 }}>FACEIT not linked</p>
-                <p style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4, maxWidth: 200, margin: 0 }}>
-                  Run an ELO check in the AI Scout section to link your FACEIT account.
-                </p>
-              </div>
-            ) : faceit.matches.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', textAlign: 'center', gap: 6 }}>
-                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', margin: 0 }}>No FACEIT matches found</p>
-                <p style={{ fontSize: 11, color: 'var(--muted)', margin: 0 }}>No recent CS2 match history available.</p>
-              </div>
-            ) : (
-              faceit.matches.map(m => <FaceitMatchRow key={m.match_id} match={m} />)
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Performance Trends */}
-      {perfTrends && (
-        <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
-          {/* Header row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TrendingUp size={16} style={{ color: 'var(--accent)' }} /> Performance Trends
-            </p>
-            <div style={{ display: 'flex', gap: 10, fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-              <span style={{ color: '#00ffc8' }}>{perfTrends.totalW}W</span>
-              <span style={{ color: '#ff4466' }}>{perfTrends.totalL}L</span>
-              {perfTrends.totalD > 0 && <span style={{ color: '#facc15' }}>{perfTrends.totalD}D</span>}
+      {/* ── Matches Tab ── */}
+      {activeTab === 'matches' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {/* CS2 Premier / Competitive */}
+          <div style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(59,130,246,0.14)', flexShrink: 0 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#60a5fa' }}>
+                <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>CS2 Premier / Competitive</span>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', maxHeight: 520 }}>
+              <CS2MatchPanel personalTeamId={personalTeamId} />
             </div>
           </div>
-          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 0, marginBottom: 12 }}>
-            Running win rate · hover bars for match details
-          </p>
-
-          {/* Recharts bar chart */}
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={perfTrends.points} margin={{ top: 6, right: 4, bottom: 0, left: -16 }} barCategoryGap="18%">
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis
-                dataKey="idx"
-                tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.35)' }}
-                tickLine={false}
-                axisLine={false}
-                label={{ value: 'Match #', position: 'insideBottomRight', offset: 0, fontSize: 9, fill: 'rgba(255,255,255,0.3)' }}
-              />
-              <YAxis
-                domain={[0, 100]}
-                tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.35)' }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v: number) => `${v}%`}
-                ticks={[0, 25, 50, 75, 100]}
-              />
-              <ReferenceLine
-                y={50}
-                stroke="rgba(255,255,255,0.12)"
-                strokeDasharray="4 3"
-                label={{ value: '50%', position: 'right', fontSize: 8, fill: 'rgba(255,255,255,0.3)' }}
-              />
-              <Tooltip content={<PerfTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-              <Bar dataKey="runningRate" radius={[3, 3, 0, 0]} maxBarSize={28}>
-                {perfTrends.points.map((p, i) => (
-                  <Cell
-                    key={i}
-                    fill={p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.15)'}
-                    fillOpacity={0.75}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-
-          {/* Result dots row + legend */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', gap: 3, flex: 1, flexWrap: 'wrap' }}>
-              {perfTrends.points.map((p, i) => (
-                <span
-                  key={i}
-                  title={`Match ${p.idx}: ${p.result === 'w' ? 'Win' : p.result === 'l' ? 'Loss' : p.result === 'd' ? 'Draw' : '?'} on ${p.map}${(p.ourScore > 0 || p.theirScore > 0) ? ` · ${p.ourScore}–${p.theirScore}` : ''}`}
-                  style={{
-                    width: 10, height: 10, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
-                    background: p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.2)',
-                    boxShadow: p.result === 'w' ? '0 0 5px rgba(0,255,200,0.5)' : p.result === 'l' ? '0 0 5px rgba(255,68,102,0.4)' : 'none',
-                  }}
-                />
-              ))}
+          {/* FACEIT */}
+          <div style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(251,146,60,0.14)', flexShrink: 0 }}>
+              <Zap size={13} style={{ color: '#fb923c' }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>FACEIT</span>
             </div>
-            <div style={{ display: 'flex', gap: 8, flexShrink: 0, fontSize: 9, color: 'var(--muted)', alignItems: 'center' }}>
-              {[['#00ffc8', 'W'], ['#ff4466', 'L'], ['#facc15', 'D']].map(([color, label]) => (
-                <span key={label as string} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: color as string, display: 'inline-block' }} />
-                  {label}
-                </span>
-              ))}
+            <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', maxHeight: 520 }}>
+              {faceit.loading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: 8 }}>
+                  <Loader2 size={16} style={{ color: 'var(--muted)', animation: 'spin 1s linear infinite' }} />
+                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>Loading matches…</span>
+                </div>
+              ) : !faceit.linked ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', textAlign: 'center', gap: 6 }}>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', margin: 0 }}>FACEIT not linked</p>
+                  <p style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4, maxWidth: 200, margin: 0 }}>
+                    Run an ELO check in the AI Scout section to link your FACEIT account.
+                  </p>
+                </div>
+              ) : faceit.matches.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', textAlign: 'center', gap: 6 }}>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', margin: 0 }}>No FACEIT matches found</p>
+                  <p style={{ fontSize: 11, color: 'var(--muted)', margin: 0 }}>No recent CS2 match history available.</p>
+                </div>
+              ) : (
+                faceit.matches.map(m => <FaceitMatchRow key={m.match_id} match={m} />)
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Demo Browser */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <Film size={16} style={{ color: 'var(--signal)' }} />
-          <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Demo Browser</p>
-          {hasDemos && (
-            <span style={{ fontSize: 10, color: 'var(--muted)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4, fontFamily: 'var(--font-mono)' }}>
-              {demos.length} · {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').length} maps
-            </span>
-          )}
-        </div>
-        {!hasDemos ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
-            <Film size={28} style={{ color: 'var(--faint)', margin: '0 auto 12px' }} />
-            <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>No demos uploaded yet</p>
-            <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
-              Upload a .dem file to start tracking your performance
+      {/* ── Trends Tab ── */}
+      {activeTab === 'trends' && (
+        perfTrends ? (
+          <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <TrendingUp size={16} style={{ color: 'var(--accent)' }} /> Performance Trends
+              </p>
+              <div style={{ display: 'flex', gap: 10, fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                <span style={{ color: '#00ffc8' }}>{perfTrends.totalW}W</span>
+                <span style={{ color: '#ff4466' }}>{perfTrends.totalL}L</span>
+                {perfTrends.totalD > 0 && <span style={{ color: '#facc15' }}>{perfTrends.totalD}D</span>}
+              </div>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 0, marginBottom: 12 }}>
+              Running win rate · hover bars for match details
             </p>
-            <DemoUploadButton teamId={personalTeamId} demoType="self" />
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={perfTrends.points} margin={{ top: 6, right: 4, bottom: 0, left: -16 }} barCategoryGap="18%">
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis
+                  dataKey="idx"
+                  tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.35)' }}
+                  tickLine={false}
+                  axisLine={false}
+                  label={{ value: 'Match #', position: 'insideBottomRight', offset: 0, fontSize: 9, fill: 'rgba(255,255,255,0.3)' }}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.35)' }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => `${v}%`}
+                  ticks={[0, 25, 50, 75, 100]}
+                />
+                <ReferenceLine
+                  y={50}
+                  stroke="rgba(255,255,255,0.12)"
+                  strokeDasharray="4 3"
+                  label={{ value: '50%', position: 'right', fontSize: 8, fill: 'rgba(255,255,255,0.3)' }}
+                />
+                <Tooltip content={<PerfTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                <Bar dataKey="runningRate" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                  {perfTrends.points.map((p, i) => (
+                    <Cell
+                      key={i}
+                      fill={p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.15)'}
+                      fillOpacity={0.75}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', gap: 3, flex: 1, flexWrap: 'wrap' }}>
+                {perfTrends.points.map((p, i) => (
+                  <span
+                    key={i}
+                    title={`Match ${p.idx}: ${p.result === 'w' ? 'Win' : p.result === 'l' ? 'Loss' : p.result === 'd' ? 'Draw' : '?'} on ${p.map}${(p.ourScore > 0 || p.theirScore > 0) ? ` · ${p.ourScore}–${p.theirScore}` : ''}`}
+                    style={{
+                      width: 10, height: 10, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
+                      background: p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.2)',
+                      boxShadow: p.result === 'w' ? '0 0 5px rgba(0,255,200,0.5)' : p.result === 'l' ? '0 0 5px rgba(255,68,102,0.4)' : 'none',
+                    }}
+                  />
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0, fontSize: 9, color: 'var(--muted)', alignItems: 'center' }}>
+                {[['#00ffc8', 'W'], ['#ff4466', 'L'], ['#facc15', 'D']].map(([color, label]) => (
+                  <span key={label as string} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: color as string, display: 'inline-block' }} />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
-          <MapFolderList mapGroups={mapGroups} demoHrefPrefix="/my-team/demos?from=pugs" />
-        )}
-      </div>
+          <div style={{ padding: '48px 16px', textAlign: 'center', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
+            <TrendingUp size={28} style={{ color: 'var(--faint)', margin: '0 auto 12px' }} />
+            <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>Not enough data yet</p>
+            <p style={{ fontSize: 12, color: 'var(--muted)' }}>Upload at least 2 demos to see performance trends.</p>
+          </div>
+        )
+      )}
+
+      {/* ── Demos Tab ── */}
+      {activeTab === 'demos' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Film size={16} style={{ color: 'var(--signal)' }} />
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Demo Browser</p>
+            {hasDemos && (
+              <span style={{ fontSize: 10, color: 'var(--muted)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4, fontFamily: 'var(--font-mono)' }}>
+                {demos.length} · {mapGroups.filter(g => g.demos.length > 0 && g.map !== 'unknown').length} maps
+              </span>
+            )}
+          </div>
+          {!hasDemos ? (
+            <div style={{ padding: '32px 16px', textAlign: 'center', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
+              <Film size={28} style={{ color: 'var(--faint)', margin: '0 auto 12px' }} />
+              <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>No demos uploaded yet</p>
+              <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
+                Upload a .dem file to start tracking your performance
+              </p>
+              <DemoUploadButton teamId={personalTeamId} demoType="self" />
+            </div>
+          ) : (
+            <MapFolderList mapGroups={mapGroups} demoHrefPrefix="/my-team/demos?from=pugs" />
+          )}
+        </div>
+      )}
 
     </div>
   )
