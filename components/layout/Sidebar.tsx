@@ -56,6 +56,8 @@ const NAV_GROUPS = [
   },
 ]
 
+const ALL_NAV_HREFS = NAV_GROUPS.flatMap(g => g.items.map(i => i.href))
+
 interface NavItemProps {
   href: string
   label: string
@@ -197,7 +199,12 @@ export function SidebarNav({ onLinkClick, collapsed }: SidebarNavProps) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {group.items.map(({ href, label, Icon, live }) => {
-              const isActive = pathname === href || pathname.startsWith(href + '/')
+              // Longest-prefix wins so a parent item (e.g. /opponents) isn't
+              // also highlighted on a nested route (/opponents/pro-demos).
+              const matchesHere = pathname === href || pathname.startsWith(href + '/')
+              const isActive = matchesHere && !ALL_NAV_HREFS.some(h =>
+                h.length > href.length && (pathname === h || pathname.startsWith(h + '/'))
+              )
               return (
                 <NavItem
                   key={href}
