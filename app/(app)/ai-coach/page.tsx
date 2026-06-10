@@ -880,6 +880,9 @@ export default function AIScoutPage() {
                   const replayInvocations = (msg.toolInvocations ?? []).filter(
                     inv => inv.toolName === 'showRoundReplay'
                   )
+                  const pendingDataLookups = (msg.toolInvocations ?? []).filter(
+                    inv => inv.toolName !== 'showRoundReplay' && inv.state !== 'result'
+                  )
 
                   return (
                     <div key={msg.id} style={{ marginBottom: 16 }}>
@@ -917,6 +920,13 @@ export default function AIScoutPage() {
                           )}
                         </div>
                       </div>
+
+                      {pendingDataLookups.length > 0 && (
+                        <div style={{ paddingLeft: 42, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
+                          <Loader2 size={11} className="animate-spin" style={{ color: 'var(--signal)' }} />
+                          Looking up match data…
+                        </div>
+                      )}
 
                       {replayInvocations.length > 0 && (
                         <div style={{ paddingLeft: 42, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
