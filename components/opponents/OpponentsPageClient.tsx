@@ -263,21 +263,15 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
                     <button
                       style={{
                         padding: '9px 13px', borderRadius: 8,
-                        border: '1px solid color-mix(in srgb, var(--signal) 35%, transparent)',
+                        border: 'none',
                         cursor: 'pointer', fontSize: 12, fontWeight: 600,
                         display: 'flex', alignItems: 'center', gap: 6,
-                        background: 'color-mix(in srgb, var(--signal) 8%, transparent)',
-                        color: 'var(--signal)', transition: 'all 0.12s',
+                        background: 'var(--signal)',
+                        color: '#07111a', transition: 'opacity 0.12s',
                         whiteSpace: 'nowrap',
                       }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--signal) 14%, transparent)'
-                        ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--signal) 55%, transparent)'
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--signal) 8%, transparent)'
-                        ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--signal) 35%, transparent)'
-                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.88' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
                     >
                       <Sparkles size={11} /> AI Insight
                     </button>

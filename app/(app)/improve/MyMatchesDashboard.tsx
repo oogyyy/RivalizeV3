@@ -362,7 +362,7 @@ export default function MyMatchesDashboard({
 
         {/* CS2 Premier / Competitive */}
         <div style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(59,130,246,0.06)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(59,130,246,0.14)', flexShrink: 0 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#60a5fa' }}>
               <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
             </svg>
@@ -375,7 +375,7 @@ export default function MyMatchesDashboard({
 
         {/* FACEIT */}
         <div style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(251,146,60,0.06)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(251,146,60,0.14)', flexShrink: 0 }}>
             <Zap size={13} style={{ color: '#fb923c' }} />
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>FACEIT</span>
           </div>
