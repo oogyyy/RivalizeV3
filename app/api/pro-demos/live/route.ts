@@ -88,19 +88,22 @@ export async function GET() {
   }
 
   const headers = { Accept: 'application/json', Authorization: `Bearer ${apiKey}` }
+  // Keep the live/upcoming rails to notable tournaments — low-tier qualifiers
+  // drown out the matches worth watching.
+  const tierFilter = '&filter[tournament_tier]=s,a,b'
 
   try {
-    const [liveRes, upcomingRes] = await Promise.all([
+    const fetchList = async (path: string, init: RequestInit & { next?: { revalidate: number } }) => {
       // /csgo/matches/running returns plain match objects (the top-level
       // /lives endpoint wraps them differently and mixes all videogames).
-      fetch(`${PS_BASE}/matches/running?sort=begin_at&page[size]=10`, {
-        headers,
-        cache: 'no-store',
-      }),
-      fetch(`${PS_BASE}/matches/upcoming?sort=begin_at&page[size]=8`, {
-        headers,
-        next: { revalidate: 120 },
-      }),
+      let res = await fetch(`${PS_BASE}${path}${tierFilter}`, init)
+      if (!res.ok) res = await fetch(`${PS_BASE}${path}`, init) // plan may not allow tier filter
+      return res
+    }
+
+    const [liveRes, upcomingRes] = await Promise.all([
+      fetchList('/matches/running?sort=begin_at&page[size]=10', { headers, cache: 'no-store' }),
+      fetchList('/matches/upcoming?sort=begin_at&page[size]=8', { headers, next: { revalidate: 120 } }),
     ])
 
     const live: ReturnType<typeof shapeMatch>[] = liveRes.ok

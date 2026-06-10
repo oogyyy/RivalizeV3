@@ -43,7 +43,33 @@ export interface ProMatch {
   event: string
   league_logo?: string | null
   prizepool?: string | null
+  tier?: string | null
   score: string | null
+}
+
+/** Team/league logo with a letter-avatar fallback for missing or broken images. */
+function TeamLogo({ src, name, size }: { src: string | null | undefined; name: string; size: number }) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return (
+      <span style={{
+        width: size, height: size, borderRadius: size * 0.28, flexShrink: 0,
+        background: 'var(--elevated)', border: '1px solid var(--hairline)',
+        color: 'var(--faint)', fontSize: Math.round(size * 0.5), fontWeight: 700, lineHeight: 1,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {name.charAt(0).toUpperCase()}
+      </span>
+    )
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      onError={() => setFailed(true)}
+      style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }}
+    />
+  )
 }
 
 const CS2_MAPS = [
@@ -108,6 +134,7 @@ export default function ProDemosClient({
   const [hasMore, setHasMore] = useState(false)
   const [mapFilter, setMapFilter] = useState('')
   const [dayFilter, setDayFilter] = useState('')
+  const [tierFilter, setTierFilter] = useState<'top' | ''>('top')
   const [teamSearch, setTeamSearch] = useState('')
   const [query, setQuery] = useState('') // debounced server-side search
   const [loading, setLoading] = useState(false)
@@ -140,13 +167,14 @@ export default function ProDemosClient({
     return () => { cancelled = true; clearInterval(t) }
   }, [])
 
-  const fetchMatches = useCallback(async (pg: number, map: string, q: string, day: string) => {
+  const fetchMatches = useCallback(async (pg: number, map: string, q: string, day: string, tier: string) => {
     setLoading(true)
     try {
       const p = new URLSearchParams({ page: pg.toString(), limit: PAGE_SIZE.toString() })
       if (map) p.set('map', map)
       if (q) p.set('q', q)
       if (day) p.set('date', day)
+      if (tier) p.set('tier', tier)
       const res = await fetch(`/api/pro-demos?${p}`)
       const data = await res.json()
       setMatches(data.matches ?? [])
@@ -167,12 +195,12 @@ export default function ProDemosClient({
 
   useEffect(() => {
     setPage(1)
-    fetchMatches(1, mapFilter, query, dayFilter)
-  }, [fetchMatches, mapFilter, query, dayFilter])
+    fetchMatches(1, mapFilter, query, dayFilter, tierFilter)
+  }, [fetchMatches, mapFilter, query, dayFilter, tierFilter])
 
   const goToPage = (pg: number) => {
     setPage(pg)
-    fetchMatches(pg, mapFilter, query, dayFilter)
+    fetchMatches(pg, mapFilter, query, dayFilter, tierFilter)
   }
 
   // Fallback (curated) data isn't searchable server-side — filter locally
@@ -185,18 +213,20 @@ export default function ProDemosClient({
 
   // Group consecutive matches by event/tournament (results arrive date-sorted)
   const grouped = useMemo(() => {
-    const groups: { event: string; league_logo: string | null; prizepool: string | null; matches: ProMatch[] }[] = []
+    const groups: { event: string; league_logo: string | null; prizepool: string | null; tier: string | null; matches: ProMatch[] }[] = []
     for (const m of filtered) {
       const last = groups[groups.length - 1]
       if (last && last.event === m.event) {
         last.matches.push(m)
         if (!last.league_logo && m.league_logo) last.league_logo = m.league_logo
         if (!last.prizepool && m.prizepool) last.prizepool = m.prizepool
+        if (!last.tier && m.tier) last.tier = m.tier
       } else {
         groups.push({
           event: m.event,
           league_logo: m.league_logo ?? null,
           prizepool: m.prizepool ?? null,
+          tier: m.tier ?? null,
           matches: [m],
         })
       }
@@ -215,22 +245,18 @@ export default function ProDemosClient({
     name: string, logo: string | null, score: number | null | undefined, isWinner: boolean, finished: boolean
   ) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-      <div style={{ width: 16, height: 16, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {logo
-          ? <img src={logo} alt="" style={{ maxWidth: 16, maxHeight: 16, objectFit: 'contain' }} />
-          : <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--elevated)', border: '1px solid var(--hairline)' }} />}
-      </div>
+      <TeamLogo src={logo} name={name} size={18} />
       <span style={{
-        fontSize: 12.5, fontWeight: isWinner ? 650 : 500,
+        fontSize: 13, fontWeight: isWinner ? 650 : 500,
         color: finished ? (isWinner ? 'var(--text)' : 'var(--muted)') : 'var(--text)',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
       }}>
         {name}
       </span>
       <span style={{
-        fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font-mono)', flexShrink: 0,
+        fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', flexShrink: 0,
         color: score == null ? 'var(--faint)' : isWinner ? 'var(--win)' : 'var(--muted)',
-        minWidth: 14, textAlign: 'right',
+        minWidth: 16, textAlign: 'right',
       }}>
         {score ?? '–'}
       </span>
@@ -324,7 +350,7 @@ export default function ProDemosClient({
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-                    {lm.team1_logo && <img src={lm.team1_logo} alt="" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }} />}
+                    <TeamLogo src={lm.team1_logo} name={lm.team1} size={18} />
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lm.team1}</span>
                   </div>
                   <span style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text)', flexShrink: 0 }}>
@@ -332,7 +358,7 @@ export default function ProDemosClient({
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1, justifyContent: 'flex-end' }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lm.team2}</span>
-                    {lm.team2_logo && <img src={lm.team2_logo} alt="" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }} />}
+                    <TeamLogo src={lm.team2_logo} name={lm.team2} size={18} />
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
@@ -380,11 +406,11 @@ export default function ProDemosClient({
                 padding: '8px 12px',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {um.team1_logo && <img src={um.team1_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} />}
+                  <TeamLogo src={um.team1_logo} name={um.team1} size={14} />
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{um.team1}</span>
                   <span style={{ fontSize: 10, color: 'var(--faint)' }}>vs</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{um.team2}</span>
-                  {um.team2_logo && <img src={um.team2_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} />}
+                  <TeamLogo src={um.team2_logo} name={um.team2} size={14} />
                 </div>
                 <span style={{
                   fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
@@ -445,7 +471,7 @@ export default function ProDemosClient({
         />
       </div>
 
-      {/* ── Map filter ── */}
+      {/* ── Map filter + tier toggle ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22, flexWrap: 'wrap' }}>
         <Filter size={13} style={{ color: 'var(--faint)', flexShrink: 0 }} />
         <div style={{ display: 'flex', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0 }}>
@@ -465,6 +491,25 @@ export default function ProDemosClient({
             </button>
           ))}
         </div>
+        {!fallback && (
+          <div style={{ display: 'flex', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, marginLeft: 'auto' }}>
+            {([['top', 'Top tier'], ['', 'All matches']] as const).map(([value, label], i) => (
+              <button
+                key={label}
+                onClick={() => setTierFilter(value)}
+                style={{
+                  padding: '6px 12px', fontSize: 11, fontWeight: 600,
+                  background: tierFilter === value ? 'var(--accent-soft)' : 'transparent',
+                  color: tierFilter === value ? 'var(--text)' : 'var(--muted)',
+                  border: 'none', borderLeft: i > 0 ? '1px solid var(--border)' : 'none',
+                  cursor: 'pointer', transition: 'background 0.12s, color 0.12s', whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Match list grouped by tournament ── */}
@@ -489,17 +534,26 @@ export default function ProDemosClient({
 
               {/* Tournament header */}
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px',
                 background: 'var(--elevated)', borderBottom: '1px solid var(--border)',
               }}>
-                <div style={{ width: 20, height: 20, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {group.league_logo
-                    ? <img src={group.league_logo} alt="" style={{ maxWidth: 20, maxHeight: 20, objectFit: 'contain' }} />
-                    : <Trophy size={13} style={{ color: 'var(--faint)' }} />}
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                <TeamLogo src={group.league_logo} name={group.event} size={18} />
+                <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {group.event}
                 </span>
+                {group.tier && ['s', 'a'].includes(group.tier) && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', flexShrink: 0,
+                    padding: '2px 6px', borderRadius: 5, lineHeight: 1.2,
+                    color: group.tier === 's' ? '#facc15' : 'var(--accent)',
+                    background: group.tier === 's'
+                      ? 'rgba(250,204,21,0.1)'
+                      : 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                  }}>
+                    {group.tier === 's' ? 'S-TIER' : 'A-TIER'}
+                  </span>
+                )}
+                <span style={{ flex: 1 }} />
                 {group.prizepool && (
                   <span style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--faint)', flexShrink: 0 }}>
                     {group.prizepool}
@@ -511,9 +565,11 @@ export default function ProDemosClient({
               {group.matches.map((match, idx) => {
                 const demoId = imported[match.id]
                 const finished = match.score != null
+                // 0–0 on a finished match means the score never arrived — don't show it
+                const hasScore = finished && !(match.winner == null && !match.team1_score && !match.team2_score)
                 const mapsLabel = match.maps.length > 0
                   ? match.maps.map(m => m.replace(/^(de|cs)_/, '')).join(' · ')
-                  : match.best_of ? `BO${match.best_of}` : '—'
+                  : null
 
                 return (
                   <div
@@ -522,47 +578,53 @@ export default function ProDemosClient({
                     onMouseLeave={() => setHoveredRow(null)}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '64px minmax(0,1fr) 150px 150px',
-                      gap: 14, alignItems: 'center', padding: '10px 14px',
+                      gridTemplateColumns: '52px minmax(180px,340px) minmax(0,1fr) auto',
+                      gap: 16, alignItems: 'center', padding: '9px 14px',
                       borderBottom: idx < group.matches.length - 1 ? '1px solid var(--hairline)' : 'none',
                       background: hoveredRow === match.id ? 'color-mix(in srgb, var(--accent) 4%, transparent)' : 'transparent',
                       transition: 'background 0.12s',
                     }}
                   >
                     {/* Status + time */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
                       <span style={{
-                        fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em',
-                        color: finished ? 'var(--faint)' : 'var(--signal)',
-                        padding: '2px 6px', borderRadius: 5, textAlign: 'center',
-                        background: 'var(--elevated)', border: '1px solid var(--hairline)',
+                        fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                        color: 'var(--faint)',
                       }}>
                         {finished ? 'Ended' : 'TBD'}
                       </span>
                       {match.date && (
-                        <span style={{ fontSize: 9.5, color: 'var(--faint)', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+                        <span style={{ fontSize: 10, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
                           {new Date(match.date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       )}
                     </div>
 
                     {/* Stacked teams */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0, maxWidth: 280 }}>
-                      {teamLine(match.team1, match.team1_logo, match.team1_score, match.winner === 1, finished)}
-                      {teamLine(match.team2, match.team2_logo, match.team2_score, match.winner === 2, finished)}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                      {teamLine(match.team1, match.team1_logo, hasScore ? match.team1_score : null, match.winner === 1, finished)}
+                      {teamLine(match.team2, match.team2_logo, hasScore ? match.team2_score : null, match.winner === 2, finished)}
                     </div>
 
                     {/* Maps */}
-                    <div style={{ minWidth: 0 }}>
-                      <span title={mapsLabel} style={{
-                        fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--muted)',
-                        textTransform: 'capitalize', display: 'block',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {mapsLabel}
-                      </span>
-                      {match.best_of && match.maps.length > 0 && (
-                        <span style={{ fontSize: 9.5, color: 'var(--faint)' }}>BO{match.best_of}</span>
+                    <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      {match.best_of && (
+                        <span style={{
+                          fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--faint)',
+                          padding: '2px 6px', borderRadius: 5, background: 'var(--elevated)', border: '1px solid var(--hairline)',
+                          flexShrink: 0,
+                        }}>
+                          BO{match.best_of}
+                        </span>
+                      )}
+                      {mapsLabel && (
+                        <span title={mapsLabel} style={{
+                          fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--muted)',
+                          textTransform: 'capitalize',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {mapsLabel}
+                        </span>
                       )}
                     </div>
 

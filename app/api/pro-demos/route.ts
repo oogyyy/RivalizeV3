@@ -21,7 +21,7 @@ type PSMatch = {
   number_of_games?: number
   league?: { name?: string; image_url?: string | null }
   serie?: { full_name?: string }
-  tournament?: { name?: string; prizepool?: string | null }
+  tournament?: { name?: string; prizepool?: string | null; tier?: string | null }
   opponents?: Array<{ opponent?: PSTeam }>
   results?: Array<{ team_id?: number; score?: number }>
   // Map info per game is included for CS matches when available.
@@ -34,6 +34,20 @@ function normalizeMap(name: string): string {
   return n.startsWith('de_') || n.startsWith('cs_') ? n : `de_${n}`
 }
 
+/** "10000 United States Dollar" → "$10,000". Falls back to the raw string. */
+function formatPrizepool(p?: string | null): string | null {
+  if (!p) return null
+  const m = p.match(/^([\d,.]+)\s+(.+)$/)
+  if (!m) return p
+  const symbols: Record<string, string> = {
+    'United States Dollar': '$', Euro: '€', 'British Pound': '£',
+  }
+  const sym = symbols[m[2]]
+  const amount = Number(m[1].replace(/,/g, ''))
+  if (!sym || !Number.isFinite(amount)) return p
+  return `${sym}${amount.toLocaleString('en-US')}`
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -43,6 +57,7 @@ export async function GET(request: Request) {
   const mapFilter = (searchParams.get('map') ?? '').toLowerCase()
   const query = searchParams.get('q')?.trim() ?? ''
   const date = searchParams.get('date') ?? '' // YYYY-MM-DD — limit results to one day
+  const tier = searchParams.get('tier') ?? '' // "top" → only S/A/B tier tournaments
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
   const limit = Math.min(50, parseInt(searchParams.get('limit') ?? '20', 10) || 20)
 
@@ -74,11 +89,21 @@ export async function GET(request: Request) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       params.set('range[begin_at]', `${date}T00:00:00Z,${date}T23:59:59Z`)
     }
+    if (tier === 'top') params.set('filter[tournament_tier]', 's,a,b')
 
-    const res = await fetch(`${PANDASCORE_API}?${params}`, {
+    let res = await fetch(`${PANDASCORE_API}?${params}`, {
       headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}` },
       next: { revalidate: 300 },
     })
+
+    // Older PandaScore plans may not accept the tier filter — degrade to all tiers.
+    if (!res.ok && tier === 'top') {
+      params.delete('filter[tournament_tier]')
+      res = await fetch(`${PANDASCORE_API}?${params}`, {
+        headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}` },
+        next: { revalidate: 300 },
+      })
+    }
 
     if (!res.ok) {
       throw new Error(`PandaScore API returned ${res.status}`)
@@ -117,7 +142,8 @@ export async function GET(request: Request) {
         date: m.end_at ?? m.begin_at ?? null,
         event: eventParts.join(' — ') || 'Pro Match',
         league_logo: m.league?.image_url ?? null,
-        prizepool: m.tournament?.prizepool ?? null,
+        prizepool: formatPrizepool(m.tournament?.prizepool),
+        tier: m.tournament?.tier ?? null,
         score: s1 !== undefined && s2 !== undefined ? `${s1}–${s2}` : null,
       }
     })
