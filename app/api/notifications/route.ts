@@ -1,23 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// GET /api/notifications — list unread notifications for the current user
-export async function GET() {
+// GET /api/notifications — list notifications for the current user
+//   default        → unread only (badge + dropdown)
+//   ?filter=all    → full history incl. read (notifications page), plus unreadCount
+export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
-  const { data } = await admin
-    .from('notifications')
-    .select('id, type, title, body, link, created_at')
-    .eq('user_id', user.id)
-    .eq('read', false)
-    .order('created_at', { ascending: false })
-    .limit(30)
+  const includeRead = new URL(request.url).searchParams.get('filter') === 'all'
 
-  return NextResponse.json({ notifications: data ?? [] })
+  const admin = createAdminClient()
+  let query = admin
+    .from('notifications')
+    .select('id, type, title, body, link, read, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
+  if (!includeRead) query = query.eq('read', false)
+
+  const { data } = await query.limit(includeRead ? 50 : 30)
+  const notifications = data ?? []
+
+  let unreadCount = notifications.length
+  if (includeRead) {
+    const { count } = await admin
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('read', false)
+    unreadCount = count ?? notifications.filter(n => !n.read).length
+  }
+
+  return NextResponse.json({ notifications, unreadCount })
 }
 
 // PATCH /api/notifications — mark notifications as read

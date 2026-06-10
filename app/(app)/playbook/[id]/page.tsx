@@ -102,6 +102,7 @@ export default function PlaybookBuilderPage() {
   const [playerRoles, setPlayerRoles] = useState<Record<string, PlayerRole>>({})
   const [activeSection, setActiveSection] = useState<SectionId>('t_side')
   const [generating, setGenerating]       = useState<SectionId | null>(null)
+  const [generatingAll, setGeneratingAll] = useState(false)
   const [saving, setSaving]               = useState(false)
   const [saved, setSaved]                 = useState(false)
   const [editing, setEditing]             = useState(false)
@@ -203,6 +204,23 @@ export default function PlaybookBuilderPage() {
     }
   }
 
+  // Generates every section sequentially (one request per section, matching
+  // the per-section API). Fills empty sections first; if all sections already
+  // have content, regenerates everything.
+  const generateAll = async () => {
+    if (generating || generatingAll) return
+    const empty   = SECTIONS.filter(s => !sections[s.id])
+    const targets = empty.length > 0 ? empty : SECTIONS
+    setGeneratingAll(true)
+    try {
+      for (const s of targets) {
+        await generateSection(s.id)
+      }
+    } finally {
+      setGeneratingAll(false)
+    }
+  }
+
   const handleSave = async () => {
     if (!playbook) return
     setSaving(true)
@@ -282,6 +300,20 @@ export default function PlaybookBuilderPage() {
             </button>
           )}
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={generateAll}
+          disabled={!!generating || generatingAll}
+          className="gap-1.5 shrink-0"
+          title={Object.values(sections).some(Boolean) ? 'Generate remaining empty sections (or regenerate all if complete)' : 'Generate all six sections with AI'}
+        >
+          {generatingAll ? (
+            <><Loader2 size={13} className="animate-spin" /> <span className="hidden sm:inline">Generating…</span></>
+          ) : (
+            <><Sparkles size={13} /> <span className="hidden sm:inline">Generate All</span></>
+          )}
+        </Button>
         <Button
           variant="neon"
           size="sm"
@@ -394,7 +426,7 @@ export default function PlaybookBuilderPage() {
                 variant={activeContent ? 'outline' : 'neon'}
                 size="sm"
                 onClick={() => generateSection(activeSection)}
-                disabled={!!generating}
+                disabled={!!generating || generatingAll}
                 className="gap-1.5 shrink-0"
               >
                 {generating === activeSection ? (
@@ -457,7 +489,7 @@ export default function PlaybookBuilderPage() {
                     variant="neon"
                     size="sm"
                     onClick={() => generateSection(activeSection)}
-                    disabled={!!generating}
+                    disabled={!!generating || generatingAll}
                     className="gap-1.5"
                   >
                     <Sparkles size={13} />

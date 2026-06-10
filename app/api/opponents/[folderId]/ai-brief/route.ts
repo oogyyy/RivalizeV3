@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
 import type { PlayerStats, Round, Kill, GrenadeEvent } from '@/types/database'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { aiConfigured, getAIModel, logAIUsage } from '@/lib/ai'
 
 type ParsedDemo = {
   header?: { map?: string; team1?: string; team2?: string; score_team1?: number; score_team2?: number; total_rounds?: number }
@@ -133,8 +134,12 @@ export async function POST(
     return NextResponse.json({ brief: folder.ai_brief, cached: true, updatedAt: folder.ai_brief_updated_at })
   }
 
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
+  // 5 brief generations per user per minute (cache hits above are unaffected)
+  if (!rateLimit(`ai:brief:${user.id}`, 5, 60_000)) {
+    return rateLimitResponse()
+  }
+
+  if (!aiConfigured()) return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
 
   // Fetch analyzed demos
   const { data: demos } = await admin
@@ -179,17 +184,19 @@ Their CT-side tendencies: anchor positions, aggression level, rotation speed.
 Be specific and data-driven. Use real player names. Keep the brief printable and scannable — 400 words max.`
 
   try {
-    const groq = createOpenAI({
-      apiKey,
-      baseURL: 'https://api.groq.com/openai/v1',
-    })
-
-    const { text } = await generateText({
-      model: groq('llama-3.3-70b-versatile'),
+    const { text, usage } = await generateText({
+      model: getAIModel(),
       system: systemPrompt,
       prompt: `Intelligence data:\n${context}`,
       maxTokens: 900,
       temperature: 0.5,
+    })
+
+    await logAIUsage({
+      userId: user.id,
+      feature: 'opponent_brief',
+      promptTokens: usage?.promptTokens,
+      completionTokens: usage?.completionTokens,
     })
 
     await admin.from('team_folders').update({

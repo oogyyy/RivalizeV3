@@ -49,13 +49,18 @@ export default function MobileTopBar() {
 
   useEffect(() => {
     setMounted(true)
-    Promise.all([
-      fetch('/api/friends/pending-count').then(r => r.ok ? r.json() : { count: 0 }),
-      fetch('/api/notifications').then(r => r.ok ? r.json() : { notifications: [] }),
-    ]).then(([friends, notifs]) => {
-      setNotifCount((friends.count ?? 0) + (notifs.notifications?.length ?? 0))
-      setDemoNotifs(notifs.notifications ?? [])
-    }).catch(() => {})
+    const fetchCounts = () => {
+      Promise.all([
+        fetch('/api/friends/pending-count').then(r => r.ok ? r.json() : { count: 0 }),
+        fetch('/api/notifications').then(r => r.ok ? r.json() : { notifications: [] }),
+      ]).then(([friends, notifs]) => {
+        setNotifCount((friends.count ?? 0) + (notifs.notifications?.length ?? 0))
+        setDemoNotifs(notifs.notifications ?? [])
+      }).catch(() => {})
+    }
+    fetchCounts()
+    const interval = setInterval(fetchCounts, 60_000)
+    return () => clearInterval(interval)
   }, [])
 
   // Close on Escape + lock body scroll when sheet open
@@ -504,22 +509,28 @@ export default function MobileTopBar() {
             </div>
 
             {/* Footer */}
-            <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-              <Link
-                href="/friends"
-                onClick={() => setSheetOpen(false)}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  width: '100%', padding: '11px 0', borderRadius: 10,
-                  border: '1px solid var(--border)',
-                  color: 'var(--muted)', fontSize: 13,
-                  textDecoration: 'none', fontFamily: 'var(--font-ui)',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <UserPlus size={14} />
-                Manage Friends
-              </Link>
+            <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', gap: 8 }}>
+              {([
+                { href: '/notifications', Icon: Bell, label: 'All notifications' },
+                { href: '/friends', Icon: UserPlus, label: 'Manage Friends' },
+              ] as const).map(({ href, Icon, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setSheetOpen(false)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    flex: 1, padding: '11px 0', borderRadius: 10,
+                    border: '1px solid var(--border)',
+                    color: 'var(--muted)', fontSize: 13,
+                    textDecoration: 'none', fontFamily: 'var(--font-ui)',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <Icon size={14} />
+                  {label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>

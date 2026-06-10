@@ -82,16 +82,22 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
     }
   }, [])
 
-  // Fetch pending counts on mount — all notification types + friend requests
+  // Fetch pending counts on mount and refresh every 60s so the badge stays
+  // live while demos parse in the background
   useEffect(() => {
-    Promise.all([
-      fetch('/api/friends/pending-count').then(r => r.ok ? r.json() : { count: 0 }),
-      fetch('/api/notifications').then(r => r.ok ? r.json() : { notifications: [] }),
-    ]).then(([friends, notifs]: [{ count: number }, { notifications: DemoNotification[] }]) => {
-      const allNotifs = notifs.notifications ?? []
-      setPendingCount((friends.count ?? 0) + allNotifs.length)
-      setDemoNotifs(allNotifs)
-    }).catch(() => {})
+    const fetchCounts = () => {
+      Promise.all([
+        fetch('/api/friends/pending-count').then(r => r.ok ? r.json() : { count: 0 }),
+        fetch('/api/notifications').then(r => r.ok ? r.json() : { notifications: [] }),
+      ]).then(([friends, notifs]: [{ count: number }, { notifications: DemoNotification[] }]) => {
+        const allNotifs = notifs.notifications ?? []
+        setPendingCount((friends.count ?? 0) + allNotifs.length)
+        setDemoNotifs(allNotifs)
+      }).catch(() => {})
+    }
+    fetchCounts()
+    const interval = setInterval(fetchCounts, 60_000)
+    return () => clearInterval(interval)
   }, [])
 
   // Global ⌘K / Ctrl+K shortcut
@@ -579,32 +585,38 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
               </div>
 
               {/* Footer */}
-              <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border)' }}>
-                <Link
-                  href="/friends"
-                  onClick={() => setNotifOpen(false)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    width: '100%', padding: '7px 0', borderRadius: 7,
-                    border: '1px solid var(--border)',
-                    color: 'var(--muted)', fontSize: 11,
-                    textDecoration: 'none', fontFamily: 'var(--font-ui)',
-                    transition: 'all 0.12s',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.color = 'var(--text)'
-                    e.currentTarget.style.borderColor = 'var(--border-2)'
-                    e.currentTarget.style.background = 'var(--hairline)'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.color = 'var(--muted)'
-                    e.currentTarget.style.borderColor = 'var(--border)'
-                    e.currentTarget.style.background = 'transparent'
-                  }}
-                >
-                  <UserPlus size={12} />
-                  Manage Friends
-                </Link>
+              <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border)', display: 'flex', gap: 6 }}>
+                {([
+                  { href: '/notifications', Icon: Bell, label: 'All notifications' },
+                  { href: '/friends', Icon: UserPlus, label: 'Manage Friends' },
+                ] as const).map(({ href, Icon, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setNotifOpen(false)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      flex: 1, padding: '7px 0', borderRadius: 7,
+                      border: '1px solid var(--border)',
+                      color: 'var(--muted)', fontSize: 11,
+                      textDecoration: 'none', fontFamily: 'var(--font-ui)',
+                      transition: 'all 0.12s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.color = 'var(--text)'
+                      e.currentTarget.style.borderColor = 'var(--border-2)'
+                      e.currentTarget.style.background = 'var(--hairline)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.color = 'var(--muted)'
+                      e.currentTarget.style.borderColor = 'var(--border)'
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    <Icon size={12} />
+                    {label}
+                  </Link>
+                ))}
               </div>
             </div>
           )}

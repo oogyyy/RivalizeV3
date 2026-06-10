@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createOpenAI } from '@ai-sdk/openai'
 import { streamText } from 'ai'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { aiConfigured, getAIModel, logAIUsage } from '@/lib/ai'
 import { z } from 'zod'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
@@ -378,6 +379,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // 30/min — a full playbook generates one section per request (6 sections)
+  if (!rateLimit(`ai:playbook:${user.id}`, 30, 60_000)) {
+    return rateLimitResponse()
+  }
+
   let raw: unknown
   try { raw = await req.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -396,8 +402,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (!playbook) return NextResponse.json({ error: 'Playbook not found' }, { status: 404 })
 
-  if (!process.env.GROQ_API_KEY) {
-    return NextResponse.json({ error: 'Groq API key not configured' }, { status: 503 })
+  if (!aiConfigured()) {
+    return NextResponse.json({ error: 'AI provider not configured' }, { status: 503 })
   }
 
   const isAntistrat = !!playbook.folder_id
@@ -522,17 +528,20 @@ ${knowledgeContext ? `\n${knowledgeContext}\nUse the knowledge base above as you
 ${demoContext ? 'Where relevant, incorporate the team demo data above to tailor recommendations.' : ''}
 Keep it practical and specific — every position, throw, and timing must be named with real ${playbook.map} callouts.`
 
-  const groq = createOpenAI({
-    apiKey: process.env.GROQ_API_KEY,
-    baseURL: 'https://api.groq.com/openai/v1',
-  })
-
   const result = streamText({
-    model: groq('llama-3.3-70b-versatile'),
+    model: getAIModel(),
     system: systemPrompt,
     prompt,
     maxTokens: 2000,
     temperature: 0.35,
+    onFinish: async ({ usage }) => {
+      await logAIUsage({
+        userId: user.id,
+        feature: 'playbook',
+        promptTokens: usage?.promptTokens,
+        completionTokens: usage?.completionTokens,
+      })
+    },
   })
 
   return new Response(
