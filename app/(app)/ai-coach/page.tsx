@@ -351,7 +351,40 @@ export default function AIScoutPage() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+
+      {/* ── Mode tab bar ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--panel)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--card)', border: '1px solid var(--border)' }}>
+          {(['opponent', 'myteam'] as const).map(m => {
+            const active = mode === m
+            const modeColor = m === 'opponent' ? 'var(--signal)' : 'var(--accent)'
+            return (
+              <button
+                key={m}
+                onClick={() => { setMode(m); setFocusArea('general'); setMessages([]) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  background: active ? `color-mix(in srgb, ${modeColor} 15%, var(--card))` : 'transparent',
+                  color: active ? modeColor : 'var(--muted)',
+                  fontSize: 12, fontWeight: 600, transition: 'all 0.13s',
+                  outline: active ? `1px solid color-mix(in srgb, ${modeColor} 30%, transparent)` : 'none',
+                }}
+              >
+                {m === 'opponent' ? <Target size={13} /> : <Shield size={13} />}
+                {m === 'opponent' ? 'Opponent Scout' : 'My Team'}
+              </button>
+            )
+          })}
+        </div>
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span className="rv-pulse" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--signal)', display: 'block' }} />
+          <span style={{ padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 25%, transparent)', fontSize: 10, fontWeight: 700, color: 'var(--signal)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>LIVE</span>
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
       {/* ── Left sidebar ── */}
       <div
@@ -385,30 +418,6 @@ export default function AIScoutPage() {
             </span>
           </div>
 
-          {/* Mode toggle */}
-          <div style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 9, background: 'var(--bg)', border: '1px solid var(--border)' }}>
-            {(['opponent', 'myteam'] as const).map(m => {
-              const active = mode === m
-              const modeColor = m === 'opponent' ? 'var(--signal)' : 'var(--accent)'
-              return (
-                <button
-                  key={m}
-                  onClick={() => { setMode(m); setFocusArea('general'); setMessages([]) }}
-                  style={{
-                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                    padding: '6px 8px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    background: active ? `color-mix(in srgb, ${modeColor} 10%, var(--card))` : 'transparent',
-                    color: active ? modeColor : 'var(--muted)',
-                    border: active ? `1px solid color-mix(in srgb, ${modeColor} 28%, transparent)` : '1px solid transparent',
-                    transition: 'all 0.13s',
-                  }}
-                >
-                  {m === 'opponent' ? <Target size={11} /> : <Shield size={11} />}
-                  {m === 'opponent' ? 'Opponent' : 'My Team'}
-                </button>
-              )
-            })}
-          </div>
         </div>
 
         {/* Body */}
@@ -989,6 +998,8 @@ export default function AIScoutPage() {
             ))}
           </div>
         </div>
+
+      </div>
 
       </div>
     </div>

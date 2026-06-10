@@ -355,22 +355,28 @@ export default function SettingsPage() {
       )}
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 3, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 3, marginBottom: 24, flexWrap: 'wrap' }}>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9,
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: activeTab === tab.id ? 600 : 500,
-              background: activeTab === tab.id ? 'var(--accent-soft)' : 'transparent',
-              color: activeTab === tab.id ? 'var(--text)' : 'var(--muted)',
-              transition: 'all 0.14s',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div style={{ display: 'flex', gap: 2, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 2, marginBottom: 24, width: 'fit-content' }}>
+          {TABS.map(tab => {
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8,
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                  background: activeTab === tab.id ? 'var(--accent)' : 'transparent',
+                  color: activeTab === tab.id ? '#fff' : 'var(--muted)',
+                  transition: 'all 0.13s', whiteSpace: 'nowrap', flexShrink: 0,
+                }}
+              >
+                <Icon size={13} />
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Account tab */}

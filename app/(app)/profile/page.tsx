@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import {
   User, Save, Link2, Upload, Check, Loader2, Shield,
   AlertCircle, ExternalLink, Crosshair, Users, FileVideo,
-  Unlink, X, Edit3, ArrowLeft, Calendar, Target,
+  Unlink, X, Edit3, Calendar, Target,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 import { CS2_MAPS, PLAYER_ROLES } from '@/types/database'
@@ -435,14 +435,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 gap-2 text-xs"
-              onClick={() => setMode(mode === 'edit' ? 'view' : 'edit')}
-            >
-              {mode === 'edit' ? <><ArrowLeft size={13} />View Profile</> : <><Edit3 size={13} />Edit Profile</>}
-            </Button>
           </div>
 
           {/* Stats strip */}
@@ -460,6 +452,30 @@ export default function ProfilePage() {
                   <p className="text-[11px] text-muted-foreground mt-0.5">{s.label}</p>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── TAB BAR ─────────────────────────────────────────────────────────────── */}
+      <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--panel)' }}>
+        <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '10px 24px' }}>
+          <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--card)', border: '1px solid var(--border)', width: 'fit-content' }}>
+            {([
+              { id: 'view', label: 'Overview',     icon: User  },
+              { id: 'edit', label: 'Edit Profile',  icon: Edit3 },
+            ] as const).map(({ id, label, icon: Icon }) => (
+              <button key={id} onClick={() => setMode(id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  background: mode === id ? 'var(--accent)' : 'transparent',
+                  color: mode === id ? '#fff' : 'var(--muted)',
+                  fontSize: 12, fontWeight: 600, transition: 'all 0.13s',
+                }}
+              >
+                <Icon size={13} />{label}
+              </button>
             ))}
           </div>
         </div>
@@ -818,10 +834,7 @@ export default function ProfilePage() {
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-between pb-6">
-              <Button variant="ghost" size="sm" onClick={() => setMode('view')} className="gap-2 text-xs">
-                <ArrowLeft size={13} />Back to Profile
-              </Button>
+            <div className="flex items-center justify-end pb-6">
               <Button onClick={handleSave} disabled={saving || uploadingAvatar} className="gap-2 min-w-[130px]"
                 style={saved ? {} : { background: 'var(--accent)', color: '#fff' }}>
                 {saving
