@@ -185,26 +185,28 @@ export default function DashboardPageClient({
     <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Tab Bar */}
-      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--card)', border: '1px solid var(--border)', alignSelf: 'flex-start' }}>
-        {([
-          { id: 'overview',     label: 'Overview',     icon: TrendingUp },
-          { id: 'performance',  label: 'Performance',  icon: BarChart2 },
-          { id: 'community',    label: 'Community',    icon: Users },
-          { id: 'ai-brief',     label: 'AI Brief',     icon: Brain },
-        ] as const).map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: activeTab === id ? 'var(--accent)' : 'transparent',
-              color: activeTab === id ? '#fff' : 'var(--muted)',
-              fontSize: 12, fontWeight: 600, transition: 'all 0.13s',
-            }}
-          >
-            <Icon size={13} />
-            {label}
-          </button>
-        ))}
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--card)', border: '1px solid var(--border)', width: 'fit-content' }}>
+          {([
+            { id: 'overview',     label: 'Overview',     icon: TrendingUp },
+            { id: 'performance',  label: 'Performance',  icon: BarChart2 },
+            { id: 'community',    label: 'Community',    icon: Users },
+            { id: 'ai-brief',     label: 'AI Brief',     icon: Brain },
+          ] as const).map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: activeTab === id ? 'var(--accent)' : 'transparent',
+                color: activeTab === id ? '#fff' : 'var(--muted)',
+                fontSize: 12, fontWeight: 600, transition: 'all 0.13s', whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Overview Tab: Stat Cards + Next Match Hero ── */}

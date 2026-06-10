@@ -2,18 +2,17 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Users, Trophy, Download } from 'lucide-react'
+import { BookMarked, Globe } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 const TABS = [
-  { href: '/opponents',           label: 'Library',   icon: Users    },
-  { href: '/opponents/pro-demos', label: 'Pro Demos', icon: Trophy   },
-  { href: '/opponents/import',    label: 'Import',    icon: Download },
+  { href: '/lineups',           label: 'My Lineups', icon: BookMarked },
+  { href: '/lineups/community', label: 'Community',  icon: Globe      },
 ] as const
 
-const SECTION_PATHS = new Set(['/opponents', '/opponents/pro-demos', '/opponents/import'])
+const SECTION_PATHS = new Set(['/lineups', '/lineups/community'])
 
-export default function OpponentsLayout({ children }: { children: ReactNode }) {
+export default function LineupsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const showTabs = SECTION_PATHS.has(pathname)
 
@@ -21,7 +20,7 @@ export default function OpponentsLayout({ children }: { children: ReactNode }) {
     <>
       {showTabs && (
         <div style={{
-          padding: '10px 28px', borderBottom: '1px solid var(--border)',
+          padding: '10px 24px', borderBottom: '1px solid var(--border)',
           background: 'var(--panel)', flexShrink: 0,
           position: 'sticky', top: 0, zIndex: 10,
           overflowX: 'auto',
@@ -38,7 +37,7 @@ export default function OpponentsLayout({ children }: { children: ReactNode }) {
                       background: active ? 'var(--accent)' : 'transparent',
                       color: active ? '#fff' : 'var(--muted)',
                       fontSize: 12, fontWeight: 600, transition: 'all 0.13s',
-                      whiteSpace: 'nowrap', flexShrink: 0,
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     <Icon size={13} />

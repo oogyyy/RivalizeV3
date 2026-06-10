@@ -347,26 +347,28 @@ export default function MyMatchesDashboard({
       )}
 
       {/* Tab Bar */}
-      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--card)', border: '1px solid var(--border)', alignSelf: 'flex-start' }}>
-        {([
-          { id: 'overview', label: 'Overview', icon: BarChart3 },
-          { id: 'matches',  label: 'Matches',  icon: Zap },
-          { id: 'trends',   label: 'Trends',   icon: TrendingUp },
-          { id: 'demos',    label: 'Demos',    icon: Film },
-        ] as const).map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: activeTab === id ? 'var(--accent)' : 'transparent',
-              color: activeTab === id ? '#fff' : 'var(--muted)',
-              fontSize: 12, fontWeight: 600, transition: 'all 0.13s',
-            }}
-          >
-            <Icon size={13} />
-            {label}
-          </button>
-        ))}
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--card)', border: '1px solid var(--border)', width: 'fit-content' }}>
+          {([
+            { id: 'overview', label: 'Overview', icon: BarChart3 },
+            { id: 'matches',  label: 'Matches',  icon: Zap },
+            { id: 'trends',   label: 'Trends',   icon: TrendingUp },
+            { id: 'demos',    label: 'Demos',    icon: Film },
+          ] as const).map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: activeTab === id ? 'var(--accent)' : 'transparent',
+                color: activeTab === id ? '#fff' : 'var(--muted)',
+                fontSize: 12, fontWeight: 600, transition: 'all 0.13s', whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Overview Tab ── */}
