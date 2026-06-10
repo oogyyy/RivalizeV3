@@ -11,7 +11,7 @@ import {
   Target, Crosshair, Shield, Users,
   Sparkles, ChevronRight, ExternalLink, Database,
   SlidersHorizontal, X, ChevronDown, BarChart3, AlertCircle, RefreshCw,
-  BookOpen, Zap,
+  BookOpen, Zap, History, Trash2,
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
 import { CS2_MAPS } from '@/types/database'
@@ -21,6 +21,17 @@ const ChatRoundReplay = dynamic(() => import('@/components/demos/ChatRoundReplay
 
 type Mode = 'opponent' | 'myteam'
 type FocusArea = 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player' | 'executes' | 'rounds' | 'drills'
+
+type CoachSession = {
+  id: string
+  mode: Mode
+  focus_area: string | null
+  team_id: string | null
+  folder_id: string | null
+  title: string | null
+  created_at: string
+  updated_at: string
+}
 
 const OPPONENT_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
   { id: 'general',   label: 'Scouting Report', icon: <Brain size={13} />,     description: 'Full opponent overview' },
@@ -205,10 +216,13 @@ export default function AIScoutPage() {
   const [includeProDataset, setIncludeProDataset] = useState(false)
   const [isContextOpen, setIsContextOpen] = useState(false)
   const [myTeamId, setMyTeamId] = useState<string | null>(null)
+  const [sessions, setSessions] = useState<CoachSession[]>([])
+  const [sessionId, setSessionId] = useState<string | null>(null)
 
   const messagesEndRef    = useRef<HTMLDivElement>(null)
   const textareaRef       = useRef<HTMLTextAreaElement>(null)
   const lastSentMessageRef = useRef<string>('')
+  const sessionIdRef       = useRef<string | null>(null)
 
   const modeRef             = useRef(mode)
   const selectedFolderIdRef = useRef(selectedFolderId)
@@ -225,6 +239,7 @@ export default function AIScoutPage() {
   useEffect(() => { selectedMapRef.current = selectedMap }, [selectedMap])
   useEffect(() => { includeProDatasetRef.current = includeProDataset }, [includeProDataset])
   useEffect(() => { myTeamIdRef.current = myTeamId },     [myTeamId])
+  useEffect(() => { sessionIdRef.current = sessionId },   [sessionId])
 
   const selectedFolder = opponents.find(f => f.id === selectedFolderId)
 
@@ -247,6 +262,14 @@ export default function AIScoutPage() {
       .then((teams: Array<{ id: string }>) => {
         if (teams.length > 0) setMyTeamId(teams[0].id)
       })
+      .catch(() => {})
+  }, [])
+
+  // Load persisted coach sessions for the history panel
+  useEffect(() => {
+    fetch('/api/ai/coach/sessions')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: CoachSession[]) => setSessions(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [])
 
@@ -291,13 +314,44 @@ export default function AIScoutPage() {
       mapName:          (focusAreaRef.current === 'strategy' || focusAreaRef.current === 'executes')
                           ? selectedMapRef.current : undefined,
       includeProDataset: modeRef.current === 'opponent' ? includeProDatasetRef.current : false,
+      sessionId:         sessionIdRef.current ?? undefined,
     }
   }, [opponents])
 
-  const sendMessage = useCallback((userMessage: string) => {
+  // Creates a DB-backed session lazily on the first message so the
+  // conversation survives page refreshes. Falls back to ephemeral chat if the
+  // request fails.
+  const ensureSession = useCallback(async (firstMessage: string): Promise<void> => {
+    if (sessionIdRef.current) return
+    try {
+      const currentFolder = opponents.find(f => f.id === selectedFolderIdRef.current)
+      const res = await fetch('/api/ai/coach/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode:      modeRef.current,
+          teamId:    modeRef.current === 'myteam'
+                       ? (myTeamIdRef.current ?? undefined)
+                       : (currentFolder?.user_team_id ?? undefined),
+          folderId:  modeRef.current === 'opponent' ? (selectedFolderIdRef.current || undefined) : undefined,
+          focusArea: focusAreaRef.current,
+        }),
+      })
+      if (!res.ok) return
+      const session = (await res.json()) as CoachSession
+      sessionIdRef.current = session.id
+      setSessionId(session.id)
+      setSessions(prev => [{ ...session, title: firstMessage.slice(0, 80) }, ...prev])
+    } catch {
+      // Ephemeral chat still works without a session
+    }
+  }, [opponents])
+
+  const sendMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return
     lastSentMessageRef.current = userMessage.trim()
     setIsContextOpen(false)
+    await ensureSession(userMessage.trim())
     append(
       { role: 'user', content: userMessage.trim() },
       { body: buildBody() }
@@ -306,7 +360,46 @@ export default function AIScoutPage() {
     if (textareaRef.current) {
       textareaRef.current.style.height = '36px'
     }
-  }, [isLoading, append, buildBody, setInput])
+  }, [isLoading, append, buildBody, setInput, ensureSession])
+
+  const startNewSession = useCallback(() => {
+    setMessages([])
+    setInput('')
+    setSessionId(null)
+    sessionIdRef.current = null
+  }, [setMessages, setInput])
+
+  const loadSession = useCallback(async (id: string) => {
+    if (isLoading || sessionIdRef.current === id) return
+    try {
+      const res = await fetch(`/api/ai/coach/sessions/${id}`)
+      if (!res.ok) return
+      const data = (await res.json()) as {
+        session: CoachSession
+        messages: { id: string; role: 'user' | 'assistant'; content: string; created_at: string }[]
+      }
+      const s = data.session
+      setMode(s.mode === 'myteam' ? 'myteam' : 'opponent')
+      if (s.focus_area) setFocusArea(s.focus_area as FocusArea)
+      setSelectedFolderId(s.folder_id ?? '')
+      sessionIdRef.current = s.id
+      setSessionId(s.id)
+      setMessages(data.messages.map(m => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        createdAt: new Date(m.created_at),
+      })))
+    } catch {
+      // Keep current view on failure
+    }
+  }, [isLoading, setMessages])
+
+  const deleteSession = useCallback(async (id: string) => {
+    setSessions(prev => prev.filter(s => s.id !== id))
+    if (sessionIdRef.current === id) startNewSession()
+    await fetch(`/api/ai/coach/sessions/${id}`, { method: 'DELETE' }).catch(() => {})
+  }, [startNewSession])
 
   const retryLastMessage = useCallback(() => {
     const text = lastSentMessageRef.current
@@ -362,7 +455,7 @@ export default function AIScoutPage() {
             return (
               <button
                 key={m}
-                onClick={() => { setMode(m); setFocusArea('general'); setMessages([]) }}
+                onClick={() => { setMode(m); setFocusArea('general'); startNewSession() }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -611,6 +704,53 @@ export default function AIScoutPage() {
               </p>
             </div>
           )}
+
+          {/* Session history */}
+          {sessions.length > 0 && (
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <History size={10} /> History
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {sessions.slice(0, 10).map(s => {
+                  const active = sessionId === s.id
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => loadSession(s.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '7px 10px', borderRadius: 9, cursor: 'pointer',
+                        background: active ? 'color-mix(in srgb, var(--signal) 8%, var(--card))' : 'transparent',
+                        border: active ? '1px solid color-mix(in srgb, var(--signal) 28%, transparent)' : '1px solid transparent',
+                        transition: 'all 0.12s',
+                      }}
+                      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = 'var(--hairline)' }}
+                      onMouseLeave={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 11.5, fontWeight: 500, color: active ? 'var(--signal)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.title || 'New conversation'}
+                        </p>
+                        <p style={{ fontSize: 9.5, color: 'var(--faint)', marginTop: 1 }}>
+                          {s.mode === 'myteam' ? 'My Team' : 'Opponent'} · {new Date(s.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); deleteSession(s.id) }}
+                        aria-label="Delete conversation"
+                        style={{ flexShrink: 0, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer', padding: 3, borderRadius: 5, display: 'flex' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--loss)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--faint)'}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Active context footer */}
@@ -658,7 +798,7 @@ export default function AIScoutPage() {
               )}
             </div>
             <button
-              onClick={() => { setMessages([]); setInput('') }}
+              onClick={startNewSession}
               style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--muted)', padding: '5px 9px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', transition: 'all 0.12s' }}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)'}

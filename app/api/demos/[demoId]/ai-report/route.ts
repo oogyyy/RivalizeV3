@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
 import type { PlayerStats, Round, Kill, GrenadeEvent } from '@/types/database'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { aiConfigured, getAIModel, logAIUsage } from '@/lib/ai'
 
 type ParsedData = {
   header?: {
@@ -118,8 +119,12 @@ export async function POST(
     .single()
   if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
+  // 5 report generations per user per minute (cache hits above are unaffected)
+  if (!rateLimit(`ai:report:${user.id}`, 5, 60_000)) {
+    return rateLimitResponse()
+  }
+
+  if (!aiConfigured()) return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
 
   const pd = demo.parsed_data as ParsedData | null
   if (!pd) return NextResponse.json({ error: 'No parsed data' }, { status: 400 })
@@ -148,17 +153,19 @@ Focus on:
 Be specific, concise, data-driven. Use real player names. 4 sections, maximum 350 words.`
 
   try {
-    const groq = createOpenAI({
-      apiKey,
-      baseURL: 'https://api.groq.com/openai/v1',
-    })
-
-    const { text } = await generateText({
-      model: groq('llama-3.3-70b-versatile'),
+    const { text, usage } = await generateText({
+      model: getAIModel(),
       system: systemPrompt,
       prompt: `Match data:\n${context}`,
       maxTokens: 800,
       temperature: 0.5,
+    })
+
+    await logAIUsage({
+      userId: user.id,
+      feature: 'demo_report',
+      promptTokens: usage?.promptTokens,
+      completionTokens: usage?.completionTokens,
     })
 
     await admin.from('demos').update({ ai_report: text }).eq('id', demoId)

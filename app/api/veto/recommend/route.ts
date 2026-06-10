@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
 import { z } from 'zod'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { aiConfigured, getAIModel, logAIUsage, sanitizePromptValue } from '@/lib/ai'
 
 const bodySchema = z.object({
   selfMapStats: z.record(z.object({ wins: z.number(), losses: z.number(), winRate: z.number() })),
@@ -15,7 +16,12 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!process.env.GROQ_API_KEY) {
+  // 10 veto recommendations per user per minute
+  if (!rateLimit(`ai:veto:${user.id}`, 10, 60_000)) {
+    return rateLimitResponse()
+  }
+
+  if (!aiConfigured()) {
     return NextResponse.json({ error: 'API key not configured' }, { status: 503 })
   }
 
@@ -27,7 +33,8 @@ export async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
-  const { selfMapStats, opponentMapPicks, opponentName } = parsed.data
+  const { selfMapStats, opponentMapPicks } = parsed.data
+  const opponentName = parsed.data.opponentName ? sanitizePromptValue(parsed.data.opponentName) : undefined
 
   const selfLines = Object.entries(selfMapStats)
     .sort(([, a], [, b]) => b.winRate - a.winRate)
@@ -70,16 +77,18 @@ Based on this data, recommend:
 
 Keep it concise (3-4 bullet points per section).`
 
-  const groq = createOpenAI({
-    apiKey: process.env.GROQ_API_KEY,
-    baseURL: 'https://api.groq.com/openai/v1',
-  })
-
-  const { text } = await generateText({
-    model: groq('llama-3.3-70b-versatile'),
+  const { text, usage } = await generateText({
+    model: getAIModel(),
     prompt,
     maxTokens: 600,
     temperature: 0.5,
+  })
+
+  await logAIUsage({
+    userId: user.id,
+    feature: 'veto',
+    promptTokens: usage?.promptTokens,
+    completionTokens: usage?.completionTokens,
   })
 
   return NextResponse.json({ recommendation: text })

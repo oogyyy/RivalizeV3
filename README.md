@@ -13,7 +13,7 @@ Upload your demo files, get automatic opponent scouting reports, run map veto si
 | **Demo Analysis** | Upload `.dem` files; the Go parser extracts kills, rounds, utility, economy |
 | **Opponent Scouting** | Per-opponent stat folders — win rate, map tendencies, best maps |
 | **Map Veto Helper** | Side-by-side map stats for you vs. opponent; AI veto recommendation |
-| **AI Coach** | GPT-4o chat grounded in your real match data and CS2 knowledge base |
+| **AI Coach** | LLM chat (Groq Llama 3.3 70B by default, provider-configurable) grounded in your real match data and CS2 knowledge base |
 | **Playbook** | Save and tag tactical setups per map with lineup images |
 | **Profile** | Link Steam + FACEIT accounts; track personal stats across teams |
 
@@ -26,7 +26,7 @@ Frontend         Next.js 15 (App Router) · React 19 · TypeScript 5 · Tailwind
 Database/Auth    Supabase (Postgres + Row Level Security + Auth)
 File Storage     Cloudflare R2 (demo uploads, lineup images)
 Demo Parser      Go 1.24 microservice (github.com/markus-wa/demoinfocs-golang)
-AI              Vercel AI SDK · OpenAI GPT-4o
+AI              Vercel AI SDK · Groq Llama 3.3 70B (swap any OpenAI-compatible provider via AI_API_KEY / AI_BASE_URL / AI_MODEL)
 Deployment       Railway (Next.js + Go parser as separate services)
 ```
 
