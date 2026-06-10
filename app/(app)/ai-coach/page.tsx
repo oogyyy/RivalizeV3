@@ -432,6 +432,28 @@ export default function AIScoutPage() {
   const followUpChips  = FOLLOW_UP_PROMPTS[followUpKey] ?? []
   const showFollowUps  = !isLoading && !error && lastMsg?.role === 'assistant' && followUpChips.length > 0
 
+  // Insights recorded by the AI via the recordInsight tool — newest first,
+  // deduped by title across the conversation
+  const seenInsightTitles = new Set<string>()
+  const liveInsights = messages
+    .flatMap(m =>
+      (m.toolInvocations ?? []).flatMap(inv => {
+        if (inv.toolName !== 'recordInsight' || inv.state !== 'result') return []
+        const r = inv.result as { title?: string; detail?: string; category?: string; confidence?: string } | null
+        if (!r?.title) return []
+        return [{
+          id:         inv.toolCallId,
+          title:      r.title,
+          detail:     r.detail ?? '',
+          category:   r.category ?? 'pattern',
+          confidence: (r.confidence === 'high' || r.confidence === 'low' ? r.confidence : 'medium') as 'low' | 'medium' | 'high',
+        }]
+      })
+    )
+    .reverse()
+    .filter(i => (seenInsightTitles.has(i.title.toLowerCase()) ? false : (seenInsightTitles.add(i.title.toLowerCase()), true)))
+    .slice(0, 12)
+
   const sidebarStyle: React.CSSProperties = {
     background: 'var(--panel)',
     borderRight: '1px solid var(--border)',
@@ -881,7 +903,7 @@ export default function AIScoutPage() {
                     inv => inv.toolName === 'showRoundReplay'
                   )
                   const pendingDataLookups = (msg.toolInvocations ?? []).filter(
-                    inv => inv.toolName !== 'showRoundReplay' && inv.state !== 'result'
+                    inv => inv.toolName !== 'showRoundReplay' && inv.toolName !== 'recordInsight' && inv.state !== 'result'
                   )
 
                   return (
@@ -1086,19 +1108,28 @@ export default function AIScoutPage() {
             </div>
             <p style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Insights</p>
             <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--signal)', background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 22%, transparent)', borderRadius: 5, padding: '2px 6px', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
-              {messages.filter(m => m.role === 'assistant').length || 3} LIVE
+              {liveInsights.length} LIVE
             </span>
           </div>
 
           {/* Insight cards */}
           <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
-            {[
-              { title: 'Mid-control weakness', text: 'The opponent consistently fails to hold mid on Mirage CT-side, often over-rotating. Exploit with quick mid-pushes or splits.', confidence: 94 },
-              { title: 'Eco round force pattern', text: 'Expect aggressive force buys with MP9s and Deagles on eco rounds. They stack A-site or push Underpass to disrupt B executes.', confidence: 87 },
-              { title: 'AWP positioning tendency', text: 'Primary AWPer favors Connector and Ticket Booth on Mirage CT-side. Flashing these angles early can neutralize their impact.', confidence: 81 },
-            ].map((insight, i) => (
+            {liveInsights.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '40px 18px' }}>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: 'color-mix(in srgb, var(--signal) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 18%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                  <Sparkles size={16} style={{ color: 'var(--signal)', opacity: 0.7 }} />
+                </div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 5 }}>No insights yet</p>
+                <p style={{ fontSize: 11, color: 'var(--faint)', lineHeight: 1.6, maxWidth: 240 }}>
+                  Ask the coach a question — key data-backed findings from the analysis will appear here as insight cards.
+                </p>
+              </div>
+            ) : liveInsights.map(insight => {
+              const confColor = insight.confidence === 'high' ? 'var(--win)' : insight.confidence === 'medium' ? 'var(--signal)' : 'var(--muted)'
+              const confValue = insight.confidence === 'high' ? 92 : insight.confidence === 'medium' ? 70 : 45
+              return (
               <div
-                key={i}
+                key={insight.id}
                 style={{
                   padding: '14px', borderRadius: 12, position: 'relative', overflow: 'hidden',
                   border: '1px solid color-mix(in srgb, var(--signal) 20%, transparent)',
@@ -1117,23 +1148,23 @@ export default function AIScoutPage() {
               >
                 {/* Badge row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 28%, transparent)', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.07em' }}>
-                    ✦ AI INSIGHT
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--signal) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--signal) 28%, transparent)', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: 'var(--signal)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                    ✦ {insight.category}
                   </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: 5, background: 'color-mix(in srgb, var(--win) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 20%, transparent)', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: 'var(--win)', letterSpacing: '0.07em' }}>
-                    HIGH
+                  <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: 5, background: `color-mix(in srgb, ${confColor} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${confColor} 20%, transparent)`, fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: confColor, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                    {insight.confidence}
                   </span>
                 </div>
 
                 <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 7, lineHeight: 1.3 }}>{insight.title}</p>
-                <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 12 }}>{insight.text}</p>
+                <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 12 }}>{insight.detail}</p>
 
                 {/* Confidence bar */}
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
                     <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Confidence</span>
                   </div>
-                  <ConfidenceBar value={insight.confidence} />
+                  <ConfidenceBar value={confValue} />
                 </div>
 
                 <button
@@ -1142,10 +1173,11 @@ export default function AIScoutPage() {
                   onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.opacity = '0.7'}
                   onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}
                 >
-                  View full analysis <ChevronRight size={11} />
+                  Ask about this <ChevronRight size={11} />
                 </button>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 

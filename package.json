@@ -10,7 +10,8 @@
     "lint:fix": "next lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval:coach": "tsx scripts/eval-coach.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.3.22",
