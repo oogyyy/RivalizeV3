@@ -302,7 +302,7 @@ export default function LineupsPage() {
             <button
               key={t.value}
               onClick={() => setTypeFilter(v => v === t.value ? '' : t.value)}
-              style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600, background: typeFilter === t.value ? 'rgba(129,140,248,0.15)' : 'transparent', color: typeFilter === t.value ? '#818cf8' : 'var(--muted)', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s, color 0.12s' }}
+              style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600, background: typeFilter === t.value ? `color-mix(in srgb, ${t.color} 18%, transparent)` : 'transparent', color: typeFilter === t.value ? t.color : 'var(--muted)', border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s, color 0.12s' }}
             >
               {t.label}
             </button>

@@ -42,12 +42,12 @@ interface Props {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub, accentColor, accentAlpha, icon: Icon, trendDot, trendText }: {
+function StatCard({ label, value, sub, accentColor, icon: Icon, trendDot, trendText }: {
   label: string
   value: string | number
   sub: string
   accentColor: string
-  accentAlpha: string
+  accentAlpha?: string
   icon: React.ElementType
   trendDot: 'green' | 'red' | 'amber'
   trendText: string
@@ -56,14 +56,19 @@ function StatCard({ label, value, sub, accentColor, accentAlpha, icon: Icon, tre
   return (
     <div style={{
       background: 'var(--card)',
-      border: `1px solid ${accentAlpha}`,
+      border: '1px solid var(--border)',
       borderRadius: 14,
       padding: 20,
       display: 'flex',
       flexDirection: 'column',
       gap: 0,
       flex: 1,
+      position: 'relative',
+      overflow: 'hidden',
     }}>
+      {/* Colored top strip */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: accentColor }} />
+
       {/* Label + Icon */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--faint)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -71,7 +76,7 @@ function StatCard({ label, value, sub, accentColor, accentAlpha, icon: Icon, tre
         </span>
         <div style={{
           width: 32, height: 32, borderRadius: 8,
-          background: `color-mix(in srgb, ${accentColor} 12%, transparent)`,
+          background: `color-mix(in srgb, ${accentColor} 15%, transparent)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
           <Icon size={18} color={accentColor} />
@@ -81,7 +86,7 @@ function StatCard({ label, value, sub, accentColor, accentAlpha, icon: Icon, tre
       {/* Big number */}
       <p style={{
         fontFamily: 'var(--font-mono)', fontSize: 38, fontWeight: 700,
-        color: accentColor, lineHeight: 1, letterSpacing: '-0.02em', marginBottom: 6,
+        color: 'var(--text)', lineHeight: 1, letterSpacing: '-0.02em', marginBottom: 6,
       }}>
         {value}
       </p>
@@ -348,7 +353,7 @@ export default function DashboardPageClient({
                   <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 700, padding: '3px 7px', borderRadius: 5,
-                      background: demo.wl === 'W' ? 'rgba(16,185,129,0.12)' : demo.wl === 'L' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+                      background: demo.wl === 'W' ? 'rgba(16,185,129,0.22)' : demo.wl === 'L' ? 'rgba(239,68,68,0.22)' : 'rgba(245,158,11,0.22)',
                       color: demo.wl === 'W' ? '#10b981' : demo.wl === 'L' ? '#ef4444' : '#f59e0b',
                     }}>
                       {demo.wl ?? '—'}
