@@ -128,6 +128,7 @@ export default function ProDemosClient({
   defaultTeamId: string | null
 }) {
   const [selectedTeamId, setSelectedTeamId] = useState(defaultTeamId ?? '')
+  const [view, setView] = useState<'results' | 'upcoming'>('results')
   const [matches, setMatches] = useState<ProMatch[]>([])
   const [total, setTotal] = useState<number | null>(null)
   const [page, setPage] = useState(1)
@@ -144,12 +145,11 @@ export default function ProDemosClient({
   const [hoveredRow, setHoveredRow] = useState<string | null>(null)
   const [imported, setImported] = useState<Record<string, string>>({})
   const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([])
-  const [upcomingMatches, setUpcomingMatches] = useState<LiveMatch[]>([])
   const PAGE_SIZE = 20
 
   const dayTabs = useMemo(buildDayTabs, [])
 
-  // Poll live/upcoming matches every 60s
+  // Poll live matches every 60s
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -159,7 +159,6 @@ export default function ProDemosClient({
         const data = await res.json()
         if (cancelled) return
         setLiveMatches(data.live ?? [])
-        setUpcomingMatches(data.upcoming ?? [])
       } catch { /* keep last known state */ }
     }
     load()
@@ -167,7 +166,7 @@ export default function ProDemosClient({
     return () => { cancelled = true; clearInterval(t) }
   }, [])
 
-  const fetchMatches = useCallback(async (pg: number, map: string, q: string, day: string, tier: string) => {
+  const fetchMatches = useCallback(async (pg: number, map: string, q: string, day: string, tier: string, vw: string) => {
     setLoading(true)
     try {
       const p = new URLSearchParams({ page: pg.toString(), limit: PAGE_SIZE.toString() })
@@ -175,6 +174,7 @@ export default function ProDemosClient({
       if (q) p.set('q', q)
       if (day) p.set('date', day)
       if (tier) p.set('tier', tier)
+      if (vw === 'upcoming') p.set('view', 'upcoming')
       const res = await fetch(`/api/pro-demos?${p}`)
       const data = await res.json()
       setMatches(data.matches ?? [])
@@ -195,12 +195,12 @@ export default function ProDemosClient({
 
   useEffect(() => {
     setPage(1)
-    fetchMatches(1, mapFilter, query, dayFilter, tierFilter)
-  }, [fetchMatches, mapFilter, query, dayFilter, tierFilter])
+    fetchMatches(1, view === 'upcoming' ? '' : mapFilter, query, view === 'upcoming' ? '' : dayFilter, tierFilter, view)
+  }, [fetchMatches, mapFilter, query, dayFilter, tierFilter, view])
 
   const goToPage = (pg: number) => {
     setPage(pg)
-    fetchMatches(pg, mapFilter, query, dayFilter, tierFilter)
+    fetchMatches(pg, view === 'upcoming' ? '' : mapFilter, query, view === 'upcoming' ? '' : dayFilter, tierFilter, view)
   }
 
   // Fallback (curated) data isn't searchable server-side — filter locally
@@ -389,45 +389,37 @@ export default function ProDemosClient({
         </div>
       )}
 
-      {/* ── Upcoming ── */}
-      {upcomingMatches.length > 0 && (
-        <div style={{ marginBottom: 22 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <CalendarClock size={13} style={{ color: 'var(--muted)' }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Upcoming
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-            {upcomingMatches.map(um => (
-              <div key={um.id} style={{
-                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
-                borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)',
-                padding: '8px 12px',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <TeamLogo src={um.team1_logo} name={um.team1} size={14} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{um.team1}</span>
-                  <span style={{ fontSize: 10, color: 'var(--faint)' }}>vs</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{um.team2}</span>
-                  <TeamLogo src={um.team2_logo} name={um.team2} size={14} />
-                </div>
-                <span style={{
-                  fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
-                  color: 'var(--accent)', whiteSpace: 'nowrap',
-                  padding: '2px 7px', borderRadius: 6,
-                  background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
-                }}>
-                  {startsIn(um.begin_at)}
-                </span>
-              </div>
-            ))}
-          </div>
+      {/* ── View tabs ── */}
+      {!fallback && (
+        <div style={{ display: 'flex', gap: 2, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
+          {([
+            ['results', 'Results', Trophy],
+            ['upcoming', 'Upcoming', CalendarClock],
+          ] as const).map(([value, label, Icon]) => {
+            const active = view === value
+            return (
+              <button
+                key={value}
+                onClick={() => setView(value)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '10px 16px', fontSize: 13, fontWeight: 600,
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: active ? 'var(--text)' : 'var(--muted)',
+                  borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+                  marginBottom: -1, transition: 'color 0.12s, border-color 0.12s',
+                }}
+              >
+                <Icon size={14} style={{ color: active ? 'var(--accent)' : 'var(--faint)' }} />
+                {label}
+              </button>
+            )
+          })}
         </div>
       )}
 
       {/* ── Day selector ── */}
-      {!fallback && (
+      {!fallback && view === 'results' && (
         <div style={{ display: 'flex', gap: 4, marginBottom: 14, overflowX: 'auto', paddingBottom: 2 }}>
           {dayTabs.map(d => {
             const active = dayFilter === d.value
@@ -474,6 +466,7 @@ export default function ProDemosClient({
       {/* ── Map filter + tier toggle ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22, flexWrap: 'wrap' }}>
         <Filter size={13} style={{ color: 'var(--faint)', flexShrink: 0 }} />
+        {view === 'results' && (
         <div style={{ display: 'flex', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0 }}>
           {CS2_MAPS.map((m, i) => (
             <button
@@ -491,6 +484,7 @@ export default function ProDemosClient({
             </button>
           ))}
         </div>
+        )}
         {!fallback && (
           <div style={{ display: 'flex', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, marginLeft: 'auto' }}>
             {([['top', 'Top tier'], ['', 'All matches']] as const).map(([value, label], i) => (
@@ -522,9 +516,13 @@ export default function ProDemosClient({
           <div style={{ width: 56, height: 56, borderRadius: 14, background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
             <Search size={22} style={{ color: 'var(--accent)' }} />
           </div>
-          <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>No matches found</p>
+          <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
+            {view === 'upcoming' ? 'No upcoming matches' : 'No matches found'}
+          </p>
           <p style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 280 }}>
-            Try a different search term, day, or map filter
+            {view === 'upcoming'
+              ? 'Try the All matches toggle or a different search term'
+              : 'Try a different search term, day, or map filter'}
           </p>
         </div>
       ) : (
@@ -578,7 +576,7 @@ export default function ProDemosClient({
                     onMouseLeave={() => setHoveredRow(null)}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '52px minmax(180px,340px) minmax(0,1fr) auto',
+                      gridTemplateColumns: `${view === 'upcoming' ? '80px' : '52px'} minmax(180px,340px) minmax(0,1fr) auto`,
                       gap: 16, alignItems: 'center', padding: '9px 14px',
                       borderBottom: idx < group.matches.length - 1 ? '1px solid var(--hairline)' : 'none',
                       background: hoveredRow === match.id ? 'color-mix(in srgb, var(--accent) 4%, transparent)' : 'transparent',
@@ -587,12 +585,21 @@ export default function ProDemosClient({
                   >
                     {/* Status + time */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
-                      <span style={{
-                        fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-                        color: 'var(--faint)',
-                      }}>
-                        {finished ? 'Ended' : 'TBD'}
-                      </span>
+                      {view === 'upcoming' ? (
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
+                          color: 'var(--accent)', whiteSpace: 'nowrap',
+                        }}>
+                          {startsIn(match.date)}
+                        </span>
+                      ) : (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                          color: 'var(--faint)',
+                        }}>
+                          {finished ? 'Ended' : 'TBD'}
+                        </span>
+                      )}
                       {match.date && (
                         <span style={{ fontSize: 10, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
                           {new Date(match.date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
@@ -630,7 +637,7 @@ export default function ProDemosClient({
 
                     {/* Actions */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-                      {demoId ? (
+                      {view === 'upcoming' ? null : demoId ? (
                         <Link
                           href={`/demos/${demoId}`}
                           style={{

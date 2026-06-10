@@ -26,12 +26,14 @@ type PSMatch = {
   number_of_games?: number
   league?: { name?: string }
   serie?: { full_name?: string }
-  tournament?: { name?: string }
+  tournament?: { name?: string; tier?: string | null }
   opponents?: Array<{ opponent?: PSTeam }>
   results?: Array<{ team_id?: number; score?: number }>
   games?: PSGame[]
   streams_list?: Array<{ raw_url?: string; main?: boolean; official?: boolean; language?: string }>
 }
+
+const TIER_RANK: Record<string, number> = { s: 0, a: 1, b: 2, c: 3, d: 4 }
 
 function normalizeMap(name: string): string {
   const n = name.toLowerCase().replace(/\s+/g, '')
@@ -71,6 +73,7 @@ function shapeMatch(m: PSMatch) {
     begin_at: m.begin_at ?? null,
     event: eventParts.join(' — ') || 'Pro Match',
     status: m.status ?? 'unknown',
+    tier: m.tournament?.tier ?? null,
     stream_url: stream?.raw_url ?? null,
   }
 }
@@ -82,43 +85,35 @@ export async function GET() {
 
   const apiKey = process.env.PANDASCORE_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ live: [], upcoming: [], fallback: true }, {
+    return NextResponse.json({ live: [], fallback: true }, {
       headers: { 'Cache-Control': 'no-store' },
     })
   }
 
-  const headers = { Accept: 'application/json', Authorization: `Bearer ${apiKey}` }
-  // Keep the live/upcoming rails to notable tournaments — low-tier qualifiers
-  // drown out the matches worth watching.
-  const tierFilter = '&filter[tournament_tier]=s,a,b'
-
   try {
-    const fetchList = async (path: string, init: RequestInit & { next?: { revalidate: number } }) => {
-      // /csgo/matches/running returns plain match objects (the top-level
-      // /lives endpoint wraps them differently and mixes all videogames).
-      let res = await fetch(`${PS_BASE}${path}${tierFilter}`, init)
-      if (!res.ok) res = await fetch(`${PS_BASE}${path}`, init) // plan may not allow tier filter
-      return res
-    }
+    // Over-fetch all running matches and rank by tournament tier ourselves —
+    // server-side tier filters aren't available on every plan, and a fixed
+    // page cap sorted by start time can push Major games off the rail.
+    const res = await fetch(`${PS_BASE}/matches/running?page[size]=50`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}` },
+      cache: 'no-store',
+    })
 
-    const [liveRes, upcomingRes] = await Promise.all([
-      fetchList('/matches/running?sort=begin_at&page[size]=10', { headers, cache: 'no-store' }),
-      fetchList('/matches/upcoming?sort=begin_at&page[size]=8', { headers, next: { revalidate: 120 } }),
-    ])
-
-    const live: ReturnType<typeof shapeMatch>[] = liveRes.ok
-      ? (await liveRes.json() as PSMatch[]).map(shapeMatch)
+    const live = res.ok
+      ? (await res.json() as PSMatch[])
+          .map(shapeMatch)
+          .sort((a, b) =>
+            (TIER_RANK[a.tier ?? ''] ?? 5) - (TIER_RANK[b.tier ?? ''] ?? 5) ||
+            (a.begin_at ?? '').localeCompare(b.begin_at ?? '')
+          )
+          .slice(0, 12)
       : []
 
-    const upcoming: ReturnType<typeof shapeMatch>[] = upcomingRes.ok
-      ? (await upcomingRes.json() as PSMatch[]).map(shapeMatch)
-      : []
-
-    return NextResponse.json({ live, upcoming }, {
+    return NextResponse.json({ live }, {
       headers: { 'Cache-Control': 'no-store' },
     })
   } catch {
-    return NextResponse.json({ live: [], upcoming: [], error: 'fetch_failed' }, {
+    return NextResponse.json({ live: [], error: 'fetch_failed' }, {
       headers: { 'Cache-Control': 'no-store' },
     })
   }

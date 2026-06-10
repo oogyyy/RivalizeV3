@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server'
 // results and match context (teams, scores, maps, events) for pro CS2.
 // CS2 data lives under the legacy /csgo prefix.
 // https://developers.pandascore.co
-const PANDASCORE_API = 'https://api.pandascore.co/csgo/matches/past'
+const PANDASCORE_BASE = 'https://api.pandascore.co/csgo/matches'
 
 type PSTeam = {
   id?: number
@@ -58,6 +58,7 @@ export async function GET(request: Request) {
   const query = searchParams.get('q')?.trim() ?? ''
   const date = searchParams.get('date') ?? '' // YYYY-MM-DD — limit results to one day
   const tier = searchParams.get('tier') ?? '' // "top" → only S/A/B tier tournaments
+  const view = searchParams.get('view') === 'upcoming' ? 'upcoming' : 'past'
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
   const limit = Math.min(50, parseInt(searchParams.get('limit') ?? '20', 10) || 20)
 
@@ -76,10 +77,11 @@ export async function GET(request: Request) {
   // PandaScore has no per-map filter, so over-fetch when one is active and
   // filter server-side. Pagination stays page-based in both modes.
   const pageSize = mapFilter ? 100 : date ? 50 : limit
+  const endpoint = `${PANDASCORE_BASE}/${view}`
 
   try {
     const params = new URLSearchParams({
-      sort: '-end_at',
+      sort: view === 'upcoming' ? 'begin_at' : '-end_at',
       'page[size]': pageSize.toString(),
       'page[number]': page.toString(),
     })
@@ -91,26 +93,34 @@ export async function GET(request: Request) {
     }
     if (tier === 'top') params.set('filter[tournament_tier]', 's,a,b')
 
-    let res = await fetch(`${PANDASCORE_API}?${params}`, {
+    const doFetch = (p: URLSearchParams) => fetch(`${endpoint}?${p}`, {
       headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}` },
-      next: { revalidate: 300 },
+      next: { revalidate: view === 'upcoming' ? 120 : 300 },
     })
 
-    // Older PandaScore plans may not accept the tier filter — degrade to all tiers.
+    let res = await doFetch(params)
+    let postFilterTier = false
+
+    // Some PandaScore plans reject the tournament_tier filter — over-fetch
+    // unfiltered and apply the tier cut ourselves so top-tier matches (e.g.
+    // Major games) never get drowned out by qualifier noise.
     if (!res.ok && tier === 'top') {
       params.delete('filter[tournament_tier]')
-      res = await fetch(`${PANDASCORE_API}?${params}`, {
-        headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}` },
-        next: { revalidate: 300 },
-      })
+      params.set('page[size]', '100')
+      postFilterTier = true
+      res = await doFetch(params)
     }
 
     if (!res.ok) {
       throw new Error(`PandaScore API returned ${res.status}`)
     }
 
-    const rows = await res.json() as PSMatch[]
+    let rows = await res.json() as PSMatch[]
     const totalHeader = parseInt(res.headers.get('x-total') ?? '', 10)
+    const rawCount = rows.length
+    if (postFilterTier) {
+      rows = rows.filter(r => ['s', 'a', 'b'].includes(r.tournament?.tier ?? '')).slice(0, limit)
+    }
 
     let matches = rows.map(m => {
       const opp = (m.opponents ?? []).map(o => o.opponent).filter((t): t is PSTeam => !!t)
@@ -139,16 +149,16 @@ export async function GET(request: Request) {
         map: maps[0] ?? null,
         maps,
         best_of: m.number_of_games ?? null,
-        date: m.end_at ?? m.begin_at ?? null,
+        date: view === 'upcoming' ? m.begin_at ?? null : m.end_at ?? m.begin_at ?? null,
         event: eventParts.join(' — ') || 'Pro Match',
         league_logo: m.league?.image_url ?? null,
         prizepool: formatPrizepool(m.tournament?.prizepool),
         tier: m.tournament?.tier ?? null,
-        score: s1 !== undefined && s2 !== undefined ? `${s1}–${s2}` : null,
+        score: view === 'past' && s1 !== undefined && s2 !== undefined ? `${s1}–${s2}` : null,
       }
     })
 
-    const hasMore = rows.length === pageSize
+    const hasMore = rawCount === (postFilterTier ? 100 : pageSize)
 
     if (mapFilter) {
       const wanted = mapFilter.replace(/^de_/, '')
@@ -161,7 +171,7 @@ export async function GET(request: Request) {
       matches,
       page,
       hasMore,
-      total: Number.isFinite(totalHeader) && !mapFilter ? totalHeader : null,
+      total: Number.isFinite(totalHeader) && !mapFilter && !postFilterTier ? totalHeader : null,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Failed to fetch pro matches'
