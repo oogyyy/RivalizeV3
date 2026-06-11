@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useVideoCapture } from '@/hooks/useVideoCapture'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
+import { roundStartOffset } from '@/lib/replay-trim'
 import type { Round, PlayerStats, PositionFrame } from '@/types/database'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -248,6 +249,12 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     if (kills.length  > 0) return kills[kills.length - 1].time + 2
     return currentRound?.duration ?? 90
   }, [frames, kills, currentRound])
+
+  // Skip the dead freeze/buy phase at the start of the round.
+  const startOffset = useMemo(
+    () => roundStartOffset({ freeze_end_time: currentRound?.freeze_end_time, frames, grenades, kills }),
+    [currentRound, frames, grenades, kills],
+  )
 
   const deadAt = useMemo(() => {
     const m = new Map<string, number>()
@@ -597,11 +604,11 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   }, [isPlaying, speed, maxTime])
 
   useEffect(() => { draw(time) }, [time, draw])
-  useEffect(() => { setTime(0); setIsPlaying(false); setFocusPlayer(null) }, [roundIdx]) // eslint-disable-line
+  useEffect(() => { setTime(startOffset); setIsPlaying(false); setFocusPlayer(null) }, [roundIdx]) // eslint-disable-line
   useEffect(() => { onPlaybackChange?.(time, isPlaying) }, [time, isPlaying, onPlaybackChange])
 
-  const toggle  = useCallback(() => { if (time >= maxTime) setTime(0); setIsPlaying(p => !p) }, [time, maxTime])
-  const restart = () => { setTime(0); setIsPlaying(false) }
+  const toggle  = useCallback(() => { if (time >= maxTime) setTime(startOffset); setIsPlaying(p => !p) }, [time, maxTime, startOffset])
+  const restart = () => { setTime(startOffset); setIsPlaying(false) }
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -609,7 +616,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (e.code === 'Space')      { e.preventDefault(); toggle() }
-      if (e.code === 'ArrowLeft')  { e.preventDefault(); setIsPlaying(false); setTime(t => Math.max(0, t - 2)) }
+      if (e.code === 'ArrowLeft')  { e.preventDefault(); setIsPlaying(false); setTime(t => Math.max(startOffset, t - 2)) }
       if (e.code === 'ArrowRight') { e.preventDefault(); setIsPlaying(false); setTime(t => Math.min(maxTime, t + 2)) }
       if (e.code === 'ArrowUp')    { e.preventDefault(); setRoundIdx(i => Math.min(rounds.length - 1, i + 1)) }
       if (e.code === 'ArrowDown')  { e.preventDefault(); setRoundIdx(i => Math.max(0, i - 1)) }
@@ -617,7 +624,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [toggle, maxTime, rounds.length])
+  }, [toggle, maxTime, rounds.length, startOffset])
 
   // ── Canvas mouse handlers ────────────────────────────────────────────────
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1236,7 +1243,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         {/* Scrubber */}
         <input
           type="range"
-          min={0}
+          min={startOffset}
           max={maxTime}
           step={0.05}
           value={time}

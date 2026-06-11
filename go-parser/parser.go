@@ -86,6 +86,9 @@ type Round struct {
 	Team2Economy int            `json:"team2_economy"`
 	BombPlanted  bool           `json:"bomb_planted"`
 	BombDefused  bool           `json:"bomb_defused"`
+	// Seconds from round start to freeze-time end — when the round goes live and
+	// players can move/throw. Lets the replay trim the dead buy phase.
+	FreezeEndTime float64        `json:"freeze_end_time"`
 	Kills        []Kill          `json:"kills"`
 	Grenades     []GrenadeEvent  `json:"grenades"`
 	Frames       []PositionFrame `json:"frames"`
@@ -190,6 +193,7 @@ type roundContrib struct {
 
 type roundState struct {
 	startTick    int
+	freezeEndTick int
 	endTick      int
 	winnerTeam   common.Team
 	winReason    events.RoundEndReason
@@ -334,6 +338,7 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 			return
 		}
 		gs := p.GameState()
+		cur.freezeEndTick = gs.IngameTick()
 		if t := gs.TeamTerrorists(); t != nil {
 			cur.team1Eco = t.MoneySpentThisRound()
 		}
@@ -1029,18 +1034,23 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 			if rnd.endTick > rnd.startTick {
 				dur = (rnd.endTick - rnd.startTick) / 64
 			}
+			freezeEnd := 0.0
+			if rnd.freezeEndTick > rnd.startTick {
+				freezeEnd = float64(rnd.freezeEndTick-rnd.startTick) / 64.0
+			}
 			outRounds = append(outRounds, Round{
-				Number:       realIdx, // 1-based, knife rounds excluded
-				Winner:       winner,
-				WinReason:    roundReasonString(rnd.winReason),
-				Duration:     dur,
-				Team1Economy: rnd.team1Eco,
-				Team2Economy: rnd.team2Eco,
-				BombPlanted:  rnd.bombPlanted,
-				BombDefused:  rnd.bombDefused,
-				Kills:        rnd.kills,
-				Grenades:     rnd.grenades,
-				Frames:       rnd.frames,
+				Number:        realIdx, // 1-based, knife rounds excluded
+				Winner:        winner,
+				WinReason:     roundReasonString(rnd.winReason),
+				Duration:      dur,
+				FreezeEndTime: freezeEnd,
+				Team1Economy:  rnd.team1Eco,
+				Team2Economy:  rnd.team2Eco,
+				BombPlanted:   rnd.bombPlanted,
+				BombDefused:   rnd.bombDefused,
+				Kills:         rnd.kills,
+				Grenades:      rnd.grenades,
+				Frames:        rnd.frames,
 			})
 		}
 	}

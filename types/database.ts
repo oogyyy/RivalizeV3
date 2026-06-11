@@ -123,6 +123,7 @@ export interface Round {
   winner: string
   win_reason: string
   duration: number
+  freeze_end_time?: number  // seconds from round start to freeze-time end (round goes live)
   team1_economy: number
   team2_economy: number
   kills: Kill[]

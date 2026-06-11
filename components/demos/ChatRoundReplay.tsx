@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
+import { roundStartOffset } from '@/lib/replay-trim'
 import type { Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 
 const CANVAS_SIZE = 420
@@ -25,6 +26,7 @@ export type ChatRoundData = {
   number: number
   winner: string
   duration: number
+  freeze_end_time?: number
   kills: Kill[]
   grenades?: GrenadeEvent[]
   bomb_planted?: boolean
@@ -45,18 +47,24 @@ interface Props {
 export default function ChatRoundReplay({
   round, players, team1Name, team2Name, mapName, roundNumber, description,
 }: Props) {
+  const duration = Math.max(round.duration || 120, 10)
+  // Skip the dead freeze/buy phase so the replay opens on the action.
+  const startOffset = roundStartOffset({
+    freeze_end_time: round.freeze_end_time,
+    grenades: round.grenades,
+    kills: round.kills,
+  })
+
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const rafRef     = useRef<number>(0)
   const mapImgRef  = useRef<HTMLImageElement | null>(null)
   const startRef   = useRef<number>(0)       // real-time start for animation
-  const pauseAtRef = useRef<number>(0)       // time paused at
+  const pauseAtRef = useRef<number>(startOffset) // time paused at
 
   const [playing,    setPlaying]    = useState(false)
   const [speed,      setSpeed]      = useState(1)
-  const [currentT,   setCurrentT]   = useState(0)
+  const [currentT,   setCurrentT]   = useState(startOffset)
   const [mapLoaded,  setMapLoaded]  = useState(false)
-
-  const duration = Math.max(round.duration || 120, 10)
 
   // Build player→team map
   const teamOf = new Map<string, 1 | 2>()
@@ -257,10 +265,10 @@ export default function ChatRoundReplay({
 
   const restart = () => {
     cancelAnimationFrame(rafRef.current)
-    pauseAtRef.current = 0
-    setCurrentT(0)
+    pauseAtRef.current = startOffset
+    setCurrentT(startOffset)
     setPlaying(false)
-    draw(0)
+    draw(startOffset)
   }
 
   const togglePlay = () => {
@@ -269,8 +277,8 @@ export default function ChatRoundReplay({
       setPlaying(false)
     } else {
       if (currentT >= duration) {
-        pauseAtRef.current = 0
-        setCurrentT(0)
+        pauseAtRef.current = startOffset
+        setCurrentT(startOffset)
       }
       startRef.current = performance.now()
       setPlaying(true)
