@@ -8,6 +8,7 @@ import { drawSmoke, smokeCanvasRadius } from '@/lib/replay-smoke'
 import { drawFire, fireCanvasRadius, throwerOnCT } from '@/lib/replay-fire'
 import { drawExplosion, drawFlashbang, heCanvasRadius, flashCanvasRadius } from '@/lib/replay-explosives'
 import { drawGrenadeArc } from '@/lib/replay-arc'
+import { drawBomb, bombStateFromRound } from '@/lib/replay-bomb'
 import type { Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 
 const CANVAS_SIZE = 420
@@ -29,11 +30,16 @@ const GREN_COLORS: Record<string, string> = {
 export type ChatRoundData = {
   number: number
   winner: string
+  win_reason?: string
   duration: number
   freeze_end_time?: number
   kills: Kill[]
   grenades?: GrenadeEvent[]
   bomb_planted?: boolean
+  plant_time?: number
+  plant_x?: number
+  plant_y?: number
+  defuse_time?: number
 }
 
 interface Props {
@@ -158,6 +164,10 @@ export default function ChatRoundReplay({
         ctx.setLineDash([])
       }
     })
+
+    // ── Bomb plant / timer / defuse / detonation ──
+    const bomb = bombStateFromRound(round, toXY)
+    if (bomb) drawBomb(ctx, bomb, t, heRadius * 2.1)
 
     // ── Kills ──
     const pastKills = round.kills.filter((k: Kill) => k.time <= t)

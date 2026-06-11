@@ -18,6 +18,8 @@ import { drawFire, fireCanvasRadius, throwerOnCT } from '@/lib/replay-fire'
 import { drawExplosion, drawFlashbang, heCanvasRadius, flashCanvasRadius } from '@/lib/replay-explosives'
 import { drawGrenadeArc } from '@/lib/replay-arc'
 import { drawKillFeed } from '@/lib/replay-killfeed'
+import { drawBomb, bombStateFromRound } from '@/lib/replay-bomb'
+import { drawViewCone } from '@/lib/replay-viewcone'
 import type { Round, PlayerStats, PositionFrame } from '@/types/database'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -259,6 +261,11 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   }, [frames, kills, currentRound])
 
   // Skip the dead freeze/buy phase at the start of the round.
+  const bombState = useMemo(
+    () => (currentRound ? bombStateFromRound(currentRound, toXY) : null),
+    [currentRound, toXY],
+  )
+
   const startOffset = useMemo(
     () => roundStartOffset({ freeze_end_time: currentRound?.freeze_end_time, frames, grenades, kills }),
     [currentRound, frames, grenades, kills],
@@ -398,6 +405,9 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       }
     })
 
+    // ── Bomb plant / timer / defuse / detonation ───────────────────────────
+    if (bombState) drawBomb(ctx, bombState, t, heRadius * 2.1)
+
     // ── Kill flash line ───────────────────────────────────────────────────
     const active = kills.find(k => k.time <= t && k.time > t - KILL_FLASH)
     if (active) {
@@ -450,22 +460,10 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       glow.addColorStop(0, col + '4a'); glow.addColorStop(1, 'transparent')
       ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2); ctx.fill()
 
-      // Direction arrow (uses yaw from frame data)
+      // View cone (uses yaw from frame data) — translucent FOV wedge
       if (showDirections && p.yaw !== undefined) {
         const rad = -(p.yaw * Math.PI / 180) // negate: canvas Y is flipped vs world Y
-        const len = 11
-        const dx = Math.cos(rad) * len, dy = Math.sin(rad) * len
-        const ax = p.x + dx, ay = p.y + dy
-        const hl = 5, ha = 0.48
-        const ang = Math.atan2(dy, dx)
-        ctx.strokeStyle = col + 'bb'; ctx.lineWidth = 1.4; ctx.globalAlpha = 0.80
-        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(ax, ay); ctx.stroke()
-        ctx.beginPath()
-        ctx.moveTo(ax, ay)
-        ctx.lineTo(ax - hl * Math.cos(ang - ha), ay - hl * Math.sin(ang - ha))
-        ctx.lineTo(ax - hl * Math.cos(ang + ha), ay - hl * Math.sin(ang + ha))
-        ctx.closePath(); ctx.fillStyle = col + 'bb'; ctx.fill()
-        ctx.globalAlpha = 1
+        drawViewCone(ctx, p.x, p.y, rad, col, isFocused)
       }
 
       // Focused: extra outer ring
@@ -568,7 +566,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   }, [
     annotations, annotColor, bgImage, deadAt, focusPlayer, frames, kills, roundIdx,
     showDeaths, showDirections, showHeatmap, showNames, showTrails,
-    team1Name, teamOf, toXY, visibleGrenades, smokeRadius, heRadius, flashRadius, currentRound, mapCfg,
+    team1Name, teamOf, toXY, visibleGrenades, smokeRadius, heRadius, flashRadius, currentRound, mapCfg, bombState,
   ])
 
   // ── Animation loop ─────────────────────────────────────────────────────

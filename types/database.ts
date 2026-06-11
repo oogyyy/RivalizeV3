@@ -131,6 +131,12 @@ export interface Round {
   frames?: PositionFrame[]
   bomb_planted?: boolean
   bomb_defused?: boolean
+  // Bomb event details (parser v3+; seconds from round start, world coords)
+  plant_time?: number
+  plant_x?: number
+  plant_y?: number
+  plant_site?: string
+  defuse_time?: number
 }
 
 export interface GrenadeEvent {
