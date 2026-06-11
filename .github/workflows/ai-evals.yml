@@ -1,0 +1,45 @@
+name: AI Evals
+
+# Runs the coach grounding/hallucination eval suite whenever AI-related code
+# changes. Requires the GROQ_API_KEY repository secret (Settings -> Secrets
+# and variables -> Actions); skips gracefully when it isn't configured.
+
+on:
+  pull_request:
+    paths:
+      - 'app/api/ai/**'
+      - 'app/api/playbooks/**'
+      - 'app/api/veto/**'
+      - 'app/api/opponents/**'
+      - 'app/api/demos/**'
+      - 'lib/ai.ts'
+      - 'lib/knowledge/**'
+      - 'scripts/eval-coach.ts'
+      - '.github/workflows/ai-evals.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app/api/ai/**'
+      - 'lib/ai.ts'
+      - 'lib/knowledge/**'
+      - 'scripts/eval-coach.ts'
+
+jobs:
+  eval-coach:
+    runs-on: ubuntu-latest
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run coach evals
+        run: |
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "::warning::GROQ_API_KEY secret not configured — skipping AI evals."
+            exit 0
+          fi
+          EVAL_VERBOSE=1 npm run eval:coach
