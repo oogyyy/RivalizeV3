@@ -174,8 +174,10 @@ function SetupModal({ onClose, onDone }: { onClose: () => void; onDone: () => vo
 
 // ── Import / grab demo modal ───────────────────────────────────────────────────
 
-function GrabDemoModal({ match, onClose }: { match: CS2Match; onClose: () => void }) {
+function GrabDemoModal({ match, onClose, onImported }: { match: CS2Match; onClose: () => void; onImported: () => void }) {
   const [copied, setCopied] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importErr, setImportErr] = useState<string | null>(null)
   const hasRealSharecode = !match.sharecode.startsWith('gc-')
   const hasDemoUrl = Boolean(match.demo_url)
 
@@ -183,6 +185,25 @@ function GrabDemoModal({ match, onClose }: { match: CS2Match; onClose: () => voi
     navigator.clipboard.writeText(match.sharecode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function importDemo() {
+    setImporting(true); setImportErr(null)
+    try {
+      const res = await fetch('/api/cs2/import-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchId: match.id }),
+      })
+      const data = await res.json() as { status?: string; error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Import failed')
+      onImported()
+      onClose()
+    } catch (e) {
+      setImportErr(e instanceof Error ? e.message : 'Import failed')
+    } finally {
+      setImporting(false)
+    }
   }
 
   return (
@@ -209,11 +230,14 @@ function GrabDemoModal({ match, onClose }: { match: CS2Match; onClose: () => voi
                 Demo URL found
               </p>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Valve CDN URL located. Click below to queue the demo for automatic download and parsing.
+                Valve CDN URL located. Queue it and we&apos;ll download, parse, and add it to your stats automatically.
               </p>
-              <Button variant="neon" size="sm" className="gap-1.5 w-full" onClick={onClose}>
-                <Download size={12} /> Download &amp; Parse Demo
+              <Button variant="neon" size="sm" className="gap-1.5 w-full" onClick={importDemo} disabled={importing}>
+                {importing
+                  ? <><Loader2 size={12} className="animate-spin" /> Queueing…</>
+                  : <><Download size={12} /> Download &amp; Parse Demo</>}
               </Button>
+              {importErr && <p className="text-[11px] text-red-400">{importErr}</p>}
             </div>
           ) : (
             /* Manual download via CS2 client */
@@ -586,7 +610,7 @@ export default function CS2MatchPanel({ personalTeamId }: Props) {
         <SetupModal onClose={() => setShowSetup(false)} onDone={() => { setShowSetup(false); load() }} />
       )}
       {grabMatch && (
-        <GrabDemoModal match={grabMatch} onClose={() => setGrabMatch(null)} />
+        <GrabDemoModal match={grabMatch} onClose={() => setGrabMatch(null)} onImported={load} />
       )}
     </>
   )
