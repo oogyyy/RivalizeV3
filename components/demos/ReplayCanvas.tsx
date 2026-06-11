@@ -14,6 +14,8 @@ import { useVideoCapture } from '@/hooks/useVideoCapture'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
 import { roundStartOffset } from '@/lib/replay-trim'
 import { drawSmoke, smokeCanvasRadius } from '@/lib/replay-smoke'
+import { drawFire, fireCanvasRadius, throwerOnCT } from '@/lib/replay-fire'
+import { drawExplosion, drawFlashbang, heCanvasRadius, flashCanvasRadius } from '@/lib/replay-explosives'
 import type { Round, PlayerStats, PositionFrame } from '@/types/database'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -226,6 +228,8 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
 
   const mapCfg = MAP_CONFIGS[mapName] ?? null
   const smokeRadius = mapCfg ? smokeCanvasRadius(mapCfg.scale, CANVAS_SIZE) : 28
+  const heRadius    = mapCfg ? heCanvasRadius(mapCfg.scale, CANVAS_SIZE) : 40
+  const flashRadius = mapCfg ? flashCanvasRadius(mapCfg.scale, CANVAS_SIZE) : 22
   const toXY = useCallback((wx: number, wy: number): [number, number] => {
     if (mapCfg) return worldToCanvas(wx, wy, mapCfg, CANVAS_SIZE)
     const s = CANVAS_SIZE
@@ -386,28 +390,13 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
         if (g.type === 'smoke' && age < SMOKE_DUR) {
           drawSmoke(ctx, lx, ly, smokeRadius, age, SMOKE_DUR)
         } else if (g.type === 'flash' && age < FLASH_DUR) {
-          const a = 1 - age / FLASH_DUR
-          ctx.globalAlpha = a * 0.90
-          const fg = ctx.createRadialGradient(lx, ly, 0, lx, ly, 22)
-          fg.addColorStop(0, '#ffffcc'); fg.addColorStop(1, 'transparent')
-          ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(lx, ly, 22, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = 1
+          drawFlashbang(ctx, lx, ly, flashRadius, age, FLASH_DUR)
         } else if (g.type === 'he' && age < HE_DUR) {
-          const a = Math.pow(Math.max(0, 1 - age / HE_DUR), 0.55)
-          const r = 8 + age * 22
-          ctx.globalAlpha = a * 0.85; ctx.strokeStyle = '#ff8800'; ctx.lineWidth = 2.5
-          ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.stroke()
-          const ig = ctx.createRadialGradient(lx, ly, 0, lx, ly, r)
-          ig.addColorStop(0, '#ff880044'); ig.addColorStop(1, 'transparent')
-          ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = 1
+          drawExplosion(ctx, lx, ly, heRadius, age, HE_DUR)
         } else if (g.type === 'molotov' && age < MOLOTOV_DUR) {
-          const a = Math.min(1, age * 2) * Math.max(0, 1 - Math.max(0, age - (MOLOTOV_DUR - 2)) / 2)
-          ctx.globalAlpha = a * 0.60; ctx.fillStyle = '#ff3300'
-          ctx.beginPath(); ctx.arc(lx, ly, 22, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = a * (Math.sin(t * 8) * 0.35 + 0.65) * 0.75; ctx.fillStyle = '#ff9900'
-          ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = 1
+          const isCT = throwerOnCT(teamOf.get(g.thrower) === team1Name, currentRound?.number ?? roundIdx + 1)
+          const fr   = mapCfg ? fireCanvasRadius(mapCfg.scale, CANVAS_SIZE, isCT) : (isCT ? 26 : 22)
+          drawFire(ctx, lx, ly, fr, age, MOLOTOV_DUR, isCT)
         }
       }
     })
@@ -577,7 +566,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   }, [
     annotations, annotColor, bgImage, deadAt, focusPlayer, frames, kills, roundIdx,
     showDeaths, showDirections, showHeatmap, showNames, showTrails,
-    team1Name, teamOf, toXY, visibleGrenades, smokeRadius,
+    team1Name, teamOf, toXY, visibleGrenades, smokeRadius, heRadius, flashRadius, currentRound, mapCfg,
   ])
 
   // ── Animation loop ─────────────────────────────────────────────────────

@@ -5,6 +5,8 @@ import { Play, Pause, RotateCcw } from 'lucide-react'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
 import { roundStartOffset } from '@/lib/replay-trim'
 import { drawSmoke, smokeCanvasRadius } from '@/lib/replay-smoke'
+import { drawFire, fireCanvasRadius, throwerOnCT } from '@/lib/replay-fire'
+import { drawExplosion, drawFlashbang, heCanvasRadius, flashCanvasRadius } from '@/lib/replay-explosives'
 import type { Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 
 const CANVAS_SIZE = 420
@@ -77,6 +79,8 @@ export default function ChatRoundReplay({
 
   const cfg = MAP_CONFIGS[mapName]
   const smokeRadius = cfg ? smokeCanvasRadius(cfg.scale, CANVAS_SIZE) : 18
+  const heRadius    = cfg ? heCanvasRadius(cfg.scale, CANVAS_SIZE) : 30
+  const flashRadius = cfg ? flashCanvasRadius(cfg.scale, CANVAS_SIZE) : 16
 
   // ── Canvas draw ──────────────────────────────────────────────────────────────
   const draw = useCallback((t: number) => {
@@ -123,27 +127,13 @@ export default function ChatRoundReplay({
       if (g.type === 'smoke') {
         drawSmoke(ctx, lx, ly, smokeRadius, age, SMOKE_DUR)
       } else if (g.type === 'flash') {
-        const radius = 12 + age * 30
-        const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, radius)
-        grad.addColorStop(0, `rgba(255,255,150,${fade})`)
-        grad.addColorStop(1, `rgba(255,255,150,0)`)
-        ctx.fillStyle = grad
-        ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.fill()
+        drawFlashbang(ctx, lx, ly, flashRadius, age, FLASH_DUR)
       } else if (g.type === 'he') {
-        const radius = 6 + age * 15
-        const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, radius)
-        grad.addColorStop(0, `rgba(255,153,0,${fade})`)
-        grad.addColorStop(1, `rgba(255,80,0,0)`)
-        ctx.fillStyle = grad
-        ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.fill()
+        drawExplosion(ctx, lx, ly, heRadius, age, HE_DUR)
       } else if (g.type === 'molotov') {
-        const pulse = 0.5 + 0.5 * Math.sin(age * 8)
-        const radius = 14 + pulse * 5
-        ctx.fillStyle = `rgba(255,68,0,${fade * 0.6})`
-        ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.fill()
-        ctx.strokeStyle = `rgba(255,180,0,${fade})`
-        ctx.lineWidth = 1
-        ctx.stroke()
+        const isCT = throwerOnCT(teamOf.get(g.thrower) === 1, round.number)
+        const fr   = cfg ? fireCanvasRadius(cfg.scale, CANVAS_SIZE, isCT) : (isCT ? 16 : 14)
+        drawFire(ctx, lx, ly, fr, age, MOLOTOV_DUR, isCT)
       } else {
         ctx.fillStyle = `rgba(${color},${fade})`
         ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill()
@@ -217,7 +207,7 @@ export default function ChatRoundReplay({
       ctx.fillStyle = 'rgba(255,215,0,0.7)'
       ctx.fillRect(tx - 0.5, barY, 1, 4)
     })
-  }, [round, cfg, duration, teamOf, smokeRadius]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [round, cfg, duration, teamOf, smokeRadius, heRadius, flashRadius]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Animation loop ───────────────────────────────────────────────────────────
   const tick = useCallback(() => {
@@ -354,7 +344,8 @@ export default function ChatRoundReplay({
           { color: '#ffd700',   label: 'Kill' },
           { color: '#c0c0d0',   label: 'Smoke' },
           { color: '#ff9900',   label: 'HE' },
-          { color: '#ff4400',   label: 'Molotov' },
+          { color: '#ff7733',   label: 'Molotov (T)' },
+          { color: '#4488ff',   label: 'Incendiary (CT)' },
         ].map(({ color, label }) => (
           <span key={label} className="flex items-center gap-1 text-[9px] text-muted-foreground">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
