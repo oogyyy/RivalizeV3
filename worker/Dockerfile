@@ -1,7 +1,7 @@
 FROM node:22-alpine
 
-# zstd for decompressing .dem.zst CS2 demos
-RUN apk add --no-cache zstd
+# zstd for .dem.zst demos; bzip2 for Valve CDN .dem.bz2 match demos
+RUN apk add --no-cache zstd bzip2
 
 WORKDIR /app
 
