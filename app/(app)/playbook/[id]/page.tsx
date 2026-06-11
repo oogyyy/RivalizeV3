@@ -25,11 +25,11 @@ const SECTIONS: { id: SectionId; label: string; antiLabel: string; icon: React.R
 type PlayerRole = 'AWPer' | 'Entry' | 'Support' | 'Lurker' | 'IGL' | 'Rifler'
 
 const ROLE_OPTIONS: { value: PlayerRole; label: string; color: string }[] = [
-  { value: 'Entry',   label: 'Entry',   color: 'text-orange-400' },
-  { value: 'AWPer',   label: 'AWPer',   color: 'text-purple-400' },
-  { value: 'Support', label: 'Support', color: 'text-blue-400' },
-  { value: 'Lurker',  label: 'Lurker',  color: 'text-yellow-400' },
-  { value: 'IGL',     label: 'IGL',     color: 'text-pink-400' },
+  { value: 'Entry',   label: 'Entry',   color: 'text-[color:var(--tside)]' },
+  { value: 'AWPer',   label: 'AWPer',   color: 'text-[color:var(--accent)]' },
+  { value: 'Support', label: 'Support', color: 'text-[color:var(--ct)]' },
+  { value: 'Lurker',  label: 'Lurker',  color: 'text-[color:var(--win)]' },
+  { value: 'IGL',     label: 'IGL',     color: 'text-brand' },
   { value: 'Rifler',  label: 'Rifler',  color: 'text-muted-foreground' },
 ]
 
@@ -51,12 +51,12 @@ type Playbook = {
 function MarkdownContent({ content }: { content: string }) {
   const rendered = content.split('\n').map((line, i) => {
     if (line.startsWith('### ')) return <h3 key={i} className="text-sm font-bold text-foreground mt-3 mb-1">{line.slice(4)}</h3>
-    if (line.startsWith('## '))  return <h2 key={i} className="text-sm font-bold text-[#00ffc8] mt-4 mb-1.5">{line.slice(3)}</h2>
+    if (line.startsWith('## '))  return <h2 key={i} className="text-sm font-bold text-[color:var(--signal)] mt-4 mb-1.5">{line.slice(3)}</h2>
     if (line.startsWith('# '))   return <h1 key={i} className="text-base font-bold text-foreground mt-4 mb-2">{line.slice(2)}</h1>
     if (line.startsWith('- ') || line.startsWith('* ')) {
       return (
         <div key={i} className="flex gap-2 my-0.5">
-          <span className="text-[#00ffc8] mt-1.5 shrink-0 text-xs">▸</span>
+          <span className="text-[color:var(--signal)] mt-1.5 shrink-0 text-xs">▸</span>
           <span className="text-sm">{renderInline(line.slice(2))}</span>
         </div>
       )
@@ -65,7 +65,7 @@ function MarkdownContent({ content }: { content: string }) {
     if (numbered) {
       return (
         <div key={i} className="flex gap-2 my-0.5">
-          <span className="text-[#00ffc8] shrink-0 font-mono text-xs min-w-[1.2rem]">{numbered[1]}.</span>
+          <span className="text-[color:var(--signal)] shrink-0 font-mono text-xs min-w-[1.2rem]">{numbered[1]}.</span>
           <span className="text-sm">{renderInline(numbered[2])}</span>
         </div>
       )
@@ -82,9 +82,9 @@ function renderInline(text: string): React.ReactNode {
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
     if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i} className="italic text-muted-foreground">{part.slice(1, -1)}</em>
-    if (part.startsWith('`') && part.endsWith('`')) return <code key={i} className="px-1 py-0.5 bg-muted rounded text-xs font-mono text-[#00ffc8]">{part.slice(1, -1)}</code>
+    if (part.startsWith('`') && part.endsWith('`')) return <code key={i} className="px-1 py-0.5 bg-muted rounded text-xs font-mono text-[color:var(--signal)]">{part.slice(1, -1)}</code>
     const linkMatch = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/)
-    if (linkMatch) return <a key={i} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-[#00ffc8] underline underline-offset-2 hover:text-[#00ffc8]/80 text-xs">{linkMatch[1]}</a>
+    if (linkMatch) return <a key={i} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-[color:var(--signal)] underline underline-offset-2 hover:opacity-80 text-xs">{linkMatch[1]}</a>
     return part
   })
 }
@@ -247,7 +247,7 @@ export default function PlaybookBuilderPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="animate-spin text-[#00ffc8]" size={28} />
+        <Loader2 className="animate-spin text-[color:var(--signal)]" size={28} />
       </div>
     )
   }
@@ -266,20 +266,20 @@ export default function PlaybookBuilderPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Top bar */}
-      <div className="flex items-center gap-3 px-4 md:px-5 py-3 border-b border-border bg-[hsl(229,23%,9%)] shrink-0">
+      <div className="flex items-center gap-3 px-4 md:px-5 py-3 border-b border-border bg-[color:var(--panel)] shrink-0">
         <Button variant="ghost" size="sm" onClick={() => router.push('/playbook')} className="gap-1.5 text-muted-foreground -ml-2">
           <ArrowLeft size={14} />
           <span className="hidden sm:inline">Playbooks</span>
         </Button>
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[rgba(0,255,200,0.08)] border border-[rgba(0,255,200,0.2)]">
-            <Map size={11} className="text-[#00ffc8]" />
-            <span className="text-xs font-mono text-[#00ffc8]">{playbook?.map}</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[color:color-mix(in_srgb,var(--signal)_8%,transparent)] border border-[color:color-mix(in_srgb,var(--signal)_20%,transparent)]">
+            <Map size={11} className="text-[color:var(--signal)]" />
+            <span className="text-xs font-mono text-[color:var(--signal)]">{playbook?.map}</span>
           </div>
           {isAntistrat && playbook?.opponent_name && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-orange-500/10 border border-orange-500/25">
-              <Target size={11} className="text-orange-400" />
-              <span className="text-xs font-medium text-orange-400">vs {playbook.opponent_name}</span>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[color:color-mix(in_srgb,var(--tside)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--tside)_25%,transparent)]">
+              <Target size={11} className="text-[color:var(--tside)]" />
+              <span className="text-xs font-medium text-[color:var(--tside)]">vs {playbook.opponent_name}</span>
             </div>
           )}
           {editing ? (
@@ -289,12 +289,12 @@ export default function PlaybookBuilderPage() {
               onBlur={() => setEditing(false)}
               onKeyDown={e => e.key === 'Enter' && setEditing(false)}
               autoFocus
-              className="bg-transparent border-b border-[rgba(0,255,200,0.4)] text-sm font-semibold text-foreground focus:outline-none min-w-0 max-w-[200px]"
+              className="bg-transparent border-b border-[color:color-mix(in_srgb,var(--signal)_40%,transparent)] text-sm font-semibold text-foreground focus:outline-none min-w-0 max-w-[200px]"
             />
           ) : (
             <button
               onClick={() => setEditing(true)}
-              className="text-sm font-semibold text-foreground hover:text-[#00ffc8] transition-colors truncate max-w-[200px]"
+              className="text-sm font-semibold text-foreground hover:text-[color:var(--signal)] transition-colors truncate max-w-[200px]"
             >
               {pbName}
             </button>
@@ -339,7 +339,7 @@ export default function PlaybookBuilderPage() {
         <div className="flex flex-1 overflow-hidden min-w-0">
 
           {/* Section nav */}
-          <div className="hidden sm:flex flex-col w-52 shrink-0 border-r border-border bg-[hsl(228,22%,8%)] overflow-y-auto">
+          <div className="hidden sm:flex flex-col w-52 shrink-0 border-r border-border bg-[color:var(--panel)] overflow-y-auto">
             <div className="p-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Sections</p>
               <div className="space-y-1">
@@ -353,20 +353,20 @@ export default function PlaybookBuilderPage() {
                       className={cn(
                         'w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-left transition-all',
                         activeSection === s.id
-                          ? 'bg-[rgba(0,255,200,0.08)] text-[#00ffc8] border border-[rgba(0,255,200,0.2)]'
+                          ? 'bg-[color:color-mix(in_srgb,var(--signal)_8%,transparent)] text-[color:var(--signal)] border border-[color:color-mix(in_srgb,var(--signal)_20%,transparent)]'
                           : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent'
                       )}
                     >
-                      <span className={activeSection === s.id ? 'text-[#00ffc8]' : 'text-muted-foreground shrink-0'}>
+                      <span className={activeSection === s.id ? 'text-[color:var(--signal)]' : 'text-muted-foreground shrink-0'}>
                         {s.icon}
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="truncate font-medium">{isAntistrat ? s.antiLabel : s.label}</p>
                       </div>
                       {isGenerating ? (
-                        <Loader2 size={10} className="animate-spin text-[#00ffc8] shrink-0" />
+                        <Loader2 size={10} className="animate-spin text-[color:var(--signal)] shrink-0" />
                       ) : hasContent ? (
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#00ffc8] shrink-0 opacity-70" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--signal)] shrink-0 opacity-70" />
                       ) : null}
                     </button>
                   )
@@ -393,7 +393,7 @@ export default function PlaybookBuilderPage() {
                             return { ...prev, [name]: val as PlayerRole }
                           })}
                           className={cn(
-                            'bg-background border border-border rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-neon-green/50 shrink-0',
+                            'bg-background border border-border rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)] shrink-0',
                             roleInfo ? roleInfo.color : 'text-muted-foreground'
                           )}
                         >
@@ -416,7 +416,7 @@ export default function PlaybookBuilderPage() {
             {/* Section header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2">
-                <span className={isAntistrat ? 'text-orange-400' : 'text-[#00ffc8]'}>{activeMeta.icon}</span>
+                <span className={isAntistrat ? 'text-[color:var(--tside)]' : 'text-[color:var(--signal)]'}>{activeMeta.icon}</span>
                 <div>
                   <h2 className="text-sm font-semibold text-foreground">{sectionLabel}</h2>
                   <p className="text-xs text-muted-foreground">{sectionDesc}</p>
@@ -447,14 +447,14 @@ export default function PlaybookBuilderPage() {
                     'flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs whitespace-nowrap border shrink-0',
                     activeSection === s.id
                       ? isAntistrat
-                        ? 'border-orange-500/30 text-orange-400 bg-orange-500/10'
-                        : 'border-[rgba(0,255,200,0.3)] text-[#00ffc8] bg-[rgba(0,255,200,0.08)]'
+                        ? 'border-[color:color-mix(in_srgb,var(--tside)_30%,transparent)] text-[color:var(--tside)] bg-[color:color-mix(in_srgb,var(--tside)_10%,transparent)]'
+                        : 'border-[color:color-mix(in_srgb,var(--signal)_30%,transparent)] text-[color:var(--signal)] bg-[color:color-mix(in_srgb,var(--signal)_8%,transparent)]'
                       : 'border-border text-muted-foreground bg-transparent'
                   )}
                 >
                   {s.icon}
                   {isAntistrat ? s.antiLabel : s.label}
-                  {sections[s.id] && <span className={cn('w-1 h-1 rounded-full ml-0.5', isAntistrat ? 'bg-orange-400' : 'bg-[#00ffc8]')} />}
+                  {sections[s.id] && <span className={cn('w-1 h-1 rounded-full ml-0.5', isAntistrat ? 'bg-[color:var(--tside)]' : 'bg-[color:var(--signal)]')} />}
                 </button>
               ))}
             </div>
@@ -463,20 +463,20 @@ export default function PlaybookBuilderPage() {
             <div className="flex-1 overflow-y-auto p-4">
               {generating === activeSection && !activeContent ? (
                 <div className="flex items-center gap-2 text-muted-foreground text-sm py-8">
-                  <Loader2 size={16} className="animate-spin text-[#00ffc8]" />
+                  <Loader2 size={16} className="animate-spin text-[color:var(--signal)]" />
                   Generating tactical content…
                 </div>
               ) : activeContent ? (
                 <div className="prose prose-invert max-w-none">
                   <MarkdownContent content={activeContent} />
                   {generating === activeSection && (
-                    <span className="inline-block w-2 h-4 bg-[#00ffc8] ml-0.5 animate-pulse rounded-sm" />
+                    <span className="inline-block w-2 h-4 bg-[color:var(--signal)] ml-0.5 animate-pulse rounded-sm" />
                   )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-[rgba(0,255,200,0.08)] border border-[rgba(0,255,200,0.15)] flex items-center justify-center mb-3">
-                    <span className="text-[#00ffc8]">{activeMeta.icon}</span>
+                  <div className="w-12 h-12 rounded-xl bg-[color:color-mix(in_srgb,var(--signal)_8%,transparent)] border border-[color:color-mix(in_srgb,var(--signal)_15%,transparent)] flex items-center justify-center mb-3">
+                    <span className="text-[color:var(--signal)]">{activeMeta.icon}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4 max-w-xs">
                     No content yet for <strong className="text-foreground">{sectionLabel}</strong>.
@@ -504,9 +504,9 @@ export default function PlaybookBuilderPage() {
         {/* Right: AI chat panel */}
         <div className="hidden lg:flex flex-col w-80 xl:w-96 shrink-0 border-l border-border overflow-hidden">
           {/* Chat header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-[hsl(228,22%,8%)] shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-[color:var(--panel)] shrink-0">
             <div className="flex items-center gap-2">
-              <MessageSquare size={14} className="text-[#00ffc8]" />
+              <MessageSquare size={14} className="text-[color:var(--signal)]" />
               <span className="text-sm font-semibold text-foreground">AI Assistant</span>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setMessages([])} className="text-xs text-muted-foreground gap-1">
@@ -518,8 +518,8 @@ export default function PlaybookBuilderPage() {
           <div className="flex-1 overflow-y-auto p-3 space-y-1">
             {messages.length === 0 && !chatLoading && (
               <div className="flex flex-col items-center text-center py-10 px-3">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(0,255,200,0.1)] border border-[rgba(0,255,200,0.2)] flex items-center justify-center mb-3">
-                  <Brain size={16} className="text-[#00ffc8]" />
+                <div className="w-10 h-10 rounded-xl bg-[color:color-mix(in_srgb,var(--signal)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--signal)_20%,transparent)] flex items-center justify-center mb-3">
+                  <Brain size={16} className="text-[color:var(--signal)]" />
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {isAntistrat
@@ -540,7 +540,7 @@ export default function PlaybookBuilderPage() {
                     <button
                       key={q}
                       onClick={() => sendChat(q)}
-                      className="w-full text-left text-xs px-3 py-2 rounded-lg border border-border hover:border-[rgba(0,255,200,0.3)] hover:bg-[rgba(0,255,200,0.04)] text-muted-foreground hover:text-foreground transition-all"
+                      className="w-full text-left text-xs px-3 py-2 rounded-lg border border-border hover:border-[color:color-mix(in_srgb,var(--signal)_30%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--signal)_4%,transparent)] text-muted-foreground hover:text-foreground transition-all"
                     >
                       {q}
                     </button>
@@ -555,8 +555,8 @@ export default function PlaybookBuilderPage() {
               return (
                 <div key={msg.id} className={cn('flex items-end gap-2 mb-3', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
                   {msg.role === 'assistant' ? (
-                    <div className="w-6 h-6 rounded-lg bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center shrink-0">
-                      <Brain size={11} className="text-[#00ffc8]" />
+                    <div className="w-6 h-6 rounded-lg bg-[color:color-mix(in_srgb,var(--signal)_12%,transparent)] border border-[color:color-mix(in_srgb,var(--signal)_25%,transparent)] flex items-center justify-center shrink-0">
+                      <Brain size={11} className="text-[color:var(--signal)]" />
                     </div>
                   ) : (
                     <div className="w-6 h-6 rounded-full bg-muted border border-border flex items-center justify-center shrink-0">
@@ -566,13 +566,13 @@ export default function PlaybookBuilderPage() {
                   <div className={cn(
                     'max-w-[85%] rounded-xl px-3 py-2',
                     msg.role === 'user'
-                      ? 'bg-[rgba(0,255,200,0.08)] border border-[rgba(0,255,200,0.18)] rounded-br-sm'
+                      ? 'bg-[color:color-mix(in_srgb,var(--signal)_8%,transparent)] border border-[color:color-mix(in_srgb,var(--signal)_18%,transparent)] rounded-br-sm'
                       : 'bg-card border border-border rounded-bl-sm'
                   )}>
                     {msg.role === 'assistant' ? (
                       <>
                         <MarkdownContent content={msg.content} />
-                        {streaming && <span className="inline-block w-1.5 h-3.5 bg-[#00ffc8] ml-0.5 animate-pulse rounded-sm" />}
+                        {streaming && <span className="inline-block w-1.5 h-3.5 bg-[color:var(--signal)] ml-0.5 animate-pulse rounded-sm" />}
                       </>
                     ) : (
                       <p className="text-xs text-foreground">{msg.content}</p>
@@ -584,13 +584,13 @@ export default function PlaybookBuilderPage() {
 
             {isThinking && (
               <div className="flex items-end gap-2 mb-3">
-                <div className="w-6 h-6 rounded-lg bg-[rgba(0,255,200,0.12)] border border-[rgba(0,255,200,0.25)] flex items-center justify-center shrink-0">
-                  <Brain size={11} className="text-[#00ffc8]" />
+                <div className="w-6 h-6 rounded-lg bg-[color:color-mix(in_srgb,var(--signal)_12%,transparent)] border border-[color:color-mix(in_srgb,var(--signal)_25%,transparent)] flex items-center justify-center shrink-0">
+                  <Brain size={11} className="text-[color:var(--signal)]" />
                 </div>
                 <div className="bg-card border border-border rounded-xl rounded-bl-sm px-3 py-2">
                   <div className="flex gap-1 items-center h-3">
                     {[0, 1, 2].map(i => (
-                      <div key={i} className="w-1 h-1 rounded-full bg-[#00ffc8] animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                      <div key={i} className="w-1 h-1 rounded-full bg-[color:var(--signal)] animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
                     ))}
                   </div>
                 </div>
@@ -599,12 +599,12 @@ export default function PlaybookBuilderPage() {
 
             {chatError && !chatLoading && (
               <div className="flex items-end gap-2 mb-3">
-                <div className="w-6 h-6 rounded-full bg-red-400/20 border border-red-400/30 flex items-center justify-center shrink-0">
-                  <AlertCircle size={11} className="text-red-400" />
+                <div className="w-6 h-6 rounded-full bg-[color:color-mix(in_srgb,var(--loss)_18%,transparent)] border border-[color:color-mix(in_srgb,var(--loss)_30%,transparent)] flex items-center justify-center shrink-0">
+                  <AlertCircle size={11} className="text-[color:var(--loss)]" />
                 </div>
-                <div className="bg-card border border-red-400/30 rounded-xl rounded-bl-sm px-3 py-2">
-                  <p className="text-xs text-red-400">Something went wrong.</p>
-                  <Button variant="outline" size="sm" onClick={retryChat} className="mt-1.5 gap-1 text-xs border-red-400/30 text-red-400 h-6 px-2">
+                <div className="bg-card border border-[color:color-mix(in_srgb,var(--loss)_30%,transparent)] rounded-xl rounded-bl-sm px-3 py-2">
+                  <p className="text-xs text-[color:var(--loss)]">Something went wrong.</p>
+                  <Button variant="outline" size="sm" onClick={retryChat} className="mt-1.5 gap-1 text-xs border-[color:color-mix(in_srgb,var(--loss)_30%,transparent)] text-[color:var(--loss)] h-6 px-2">
                     <RefreshCw size={9} /> Retry
                   </Button>
                 </div>
@@ -615,10 +615,10 @@ export default function PlaybookBuilderPage() {
           </div>
 
           {/* Chat input */}
-          <div className="border-t border-border p-2.5 shrink-0 bg-[hsl(228,22%,8%)]">
+          <div className="border-t border-border p-2.5 shrink-0 bg-[color:var(--panel)]">
             <div className={cn(
               'flex items-end gap-2 p-1.5 rounded-lg border transition-all',
-              'border-border focus-within:border-[rgba(0,255,200,0.4)]'
+              'border-border focus-within:border-[color:color-mix(in_srgb,var(--signal)_40%,transparent)]'
             )}>
               <textarea
                 ref={textareaRef}
