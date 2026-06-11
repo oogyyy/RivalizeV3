@@ -11,7 +11,7 @@ import {
   Target, Crosshair, Shield, Users,
   Sparkles, ChevronRight, ExternalLink, Database,
   SlidersHorizontal, X, ChevronDown, BarChart3, AlertCircle, RefreshCw,
-  BookOpen, Zap, History, Trash2,
+  BookOpen, Zap, History, Trash2, User,
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
 import { CS2_MAPS } from '@/types/database'
@@ -19,8 +19,10 @@ import dynamic from 'next/dynamic'
 
 const ChatRoundReplay = dynamic(() => import('@/components/demos/ChatRoundReplay'), { ssr: false })
 
-type Mode = 'opponent' | 'myteam'
-type FocusArea = 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player' | 'executes' | 'rounds' | 'drills'
+type Mode = 'opponent' | 'myteam' | 'individual'
+type FocusArea =
+  | 'general' | 'weakness' | 'antistrat' | 'strategy' | 'player' | 'executes' | 'rounds' | 'drills'
+  | 'aim' | 'positioning' | 'utility' | 'clutch'
 
 type CoachSession = {
   id: string
@@ -50,6 +52,15 @@ const MY_TEAM_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode
   { id: 'strategy', label: 'Playbook',        icon: <Shield size={13} />,    description: 'Build your team playbook' },
 ]
 
+const INDIVIDUAL_FOCUS_AREAS: { id: FocusArea; label: string; icon: React.ReactNode; description: string }[] = [
+  { id: 'general',     label: 'Performance Review', icon: <Brain size={13} />,     description: 'Strengths, weaknesses, trend' },
+  { id: 'aim',         label: 'Aim & Duels',        icon: <Crosshair size={13} />, description: 'HS%, entries, fight selection' },
+  { id: 'positioning', label: 'Positioning',        icon: <Target size={13} />,    description: 'Where you die and why' },
+  { id: 'utility',     label: 'Utility',            icon: <Zap size={13} />,       description: 'Flashes, smokes, habits' },
+  { id: 'clutch',      label: 'Clutch & Decisions', icon: <Shield size={13} />,    description: 'Late-round play, saves' },
+  { id: 'drills',      label: 'Practice Plan',      icon: <Sparkles size={13} />,  description: 'Personal training routine' },
+]
+
 const OPPONENT_QUESTIONS = [
   { label: 'Opponent weaknesses',  prompt: "What are this opponent's biggest weaknesses we can exploit?" },
   { label: 'Full anti-strat',      prompt: "Create a detailed anti-strat — their tendencies, executes, and how we counter them." },
@@ -62,6 +73,13 @@ const MY_TEAM_QUESTIONS = [
   { label: 'Improve our executes',   prompt: "How can we improve our site executes? Review our utility usage, timing, and coordination." },
   { label: 'Practice drill plan',    prompt: "Create a personalised practice plan with specific drills to improve based on our recent performance." },
   { label: 'Build our playbook',     prompt: "Help us build a structured T-side and CT-side playbook with clear roles and go-to strategies." },
+]
+
+const INDIVIDUAL_QUESTIONS = [
+  { label: 'My biggest weaknesses', prompt: "What are my biggest weaknesses based on my recent matches? Be specific and prioritised." },
+  { label: 'Why am I dying so much', prompt: "Where and why do I keep dying? Use my positional data and suggest position changes." },
+  { label: 'Am I improving',         prompt: "Look at my match trend — am I improving or declining, and what's driving it?" },
+  { label: 'Personal training plan', prompt: "Build me a personal practice routine targeting my weakest stats." },
 ]
 
 const FOLLOW_UP_PROMPTS: Record<string, { label: string; prompt: string }[]> = {
@@ -119,6 +137,36 @@ const FOLLOW_UP_PROMPTS: Record<string, { label: string; prompt: string }[]> = {
     { label: 'A site default',      prompt: "Help us build a solid A site CT default with clear responsibilities for each player." },
     { label: 'T-side default',      prompt: "Design a structured T-side default — what's everyone's role and where do we gather info?" },
     { label: 'Mid-round calling',   prompt: "What mid-round calling structure would help us adapt better to CT reads?" },
+  ],
+  'individual/general': [
+    { label: 'Fix my worst stat',   prompt: "What's my single worst stat and what's the fastest way to fix it?" },
+    { label: 'Best and worst map',  prompt: "Which map am I performing best and worst on, and why?" },
+    { label: 'One habit to change', prompt: "If I could only change one habit this week, what should it be?" },
+  ],
+  'individual/aim': [
+    { label: 'Why I lose duels',    prompt: "Am I losing duels to aim, timing, or fight selection? Break it down." },
+    { label: 'Entry discipline',    prompt: "Should I be entrying as much as I do? Look at my entry kills vs entry deaths." },
+    { label: 'Aim routine',         prompt: "Give me a 20-minute daily aim routine targeted at my numbers." },
+  ],
+  'individual/positioning': [
+    { label: 'My death spots',      prompt: "Where exactly do I keep dying, and what position should I take instead?" },
+    { label: 'Untraded deaths',     prompt: "Am I dying in spots where my teammates can't trade me? How do I fix that?" },
+    { label: 'Off-angle ideas',     prompt: "Suggest off-angles or alternative positions on my most-played map." },
+  ],
+  'individual/utility': [
+    { label: 'Flash effectiveness', prompt: "Are my flashes actually effective? What does the data say?" },
+    { label: 'Must-know lineups',   prompt: "What 3 utility lineups would help me most on my most-played maps?" },
+    { label: 'Utility before peeks', prompt: "How should I use utility to win more of the duels I currently lose?" },
+  ],
+  'individual/clutch': [
+    { label: 'Clutch win rate',     prompt: "How am I doing in clutches and what should I change in 1vX situations?" },
+    { label: 'Save or force',       prompt: "Am I making good save decisions late in rounds?" },
+    { label: '1v1 framework',       prompt: "Give me a simple decision framework for 1v1s based on my data." },
+  ],
+  'individual/drills': [
+    { label: 'Weekly schedule',     prompt: "Turn that into a realistic weekly schedule (45 min/day)." },
+    { label: 'Warm-up routine',     prompt: "What's the ideal pre-game warm-up for my weaknesses?" },
+    { label: 'Measure progress',    prompt: "Which 3 stats should I track to know the practice is working?" },
   ],
 }
 
@@ -216,6 +264,7 @@ export default function AIScoutPage() {
   const [includeProDataset, setIncludeProDataset] = useState(false)
   const [isContextOpen, setIsContextOpen] = useState(false)
   const [myTeamId, setMyTeamId] = useState<string | null>(null)
+  const [personalTeamId, setPersonalTeamId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<CoachSession[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
 
@@ -231,6 +280,7 @@ export default function AIScoutPage() {
   const selectedMapRef      = useRef(selectedMap)
   const includeProDatasetRef = useRef(includeProDataset)
   const myTeamIdRef         = useRef(myTeamId)
+  const personalTeamIdRef   = useRef(personalTeamId)
 
   useEffect(() => { modeRef.current = mode },             [mode])
   useEffect(() => { selectedFolderIdRef.current = selectedFolderId }, [selectedFolderId])
@@ -239,6 +289,7 @@ export default function AIScoutPage() {
   useEffect(() => { selectedMapRef.current = selectedMap }, [selectedMap])
   useEffect(() => { includeProDatasetRef.current = includeProDataset }, [includeProDataset])
   useEffect(() => { myTeamIdRef.current = myTeamId },     [myTeamId])
+  useEffect(() => { personalTeamIdRef.current = personalTeamId }, [personalTeamId])
   useEffect(() => { sessionIdRef.current = sessionId },   [sessionId])
 
   const selectedFolder = opponents.find(f => f.id === selectedFolderId)
@@ -259,8 +310,10 @@ export default function AIScoutPage() {
   useEffect(() => {
     fetch('/api/teams')
       .then(r => r.ok ? r.json() : [])
-      .then((teams: Array<{ id: string }>) => {
+      .then((teams: Array<{ id: string; is_personal?: boolean }>) => {
         if (teams.length > 0) setMyTeamId(teams[0].id)
+        const personal = teams.find(t => t.is_personal)
+        if (personal) setPersonalTeamId(personal.id)
       })
       .catch(() => {})
   }, [])
@@ -292,7 +345,7 @@ export default function AIScoutPage() {
     const fid = params.get('folder')
     if (fid) setSelectedFolderId(fid)
     const m = params.get('mode')
-    if (m === 'myteam' || m === 'opponent') setMode(m)
+    if (m === 'myteam' || m === 'opponent' || m === 'individual') setMode(m)
     const f = params.get('focus')
     if (f) setFocusArea(f as FocusArea)
   }, [])
@@ -306,7 +359,9 @@ export default function AIScoutPage() {
     return {
       teamId:           modeRef.current === 'myteam'
                           ? (myTeamIdRef.current ?? undefined)
-                          : (currentFolder?.user_team_id ?? undefined),
+                          : modeRef.current === 'individual'
+                            ? (personalTeamIdRef.current ?? undefined)
+                            : (currentFolder?.user_team_id ?? undefined),
       folderId:         modeRef.current === 'opponent' ? (selectedFolderIdRef.current || undefined) : undefined,
       focusArea:        focusAreaRef.current,
       mode:             modeRef.current,
@@ -332,7 +387,9 @@ export default function AIScoutPage() {
           mode:      modeRef.current,
           teamId:    modeRef.current === 'myteam'
                        ? (myTeamIdRef.current ?? undefined)
-                       : (currentFolder?.user_team_id ?? undefined),
+                       : modeRef.current === 'individual'
+                         ? (personalTeamIdRef.current ?? undefined)
+                         : (currentFolder?.user_team_id ?? undefined),
           folderId:  modeRef.current === 'opponent' ? (selectedFolderIdRef.current || undefined) : undefined,
           focusArea: focusAreaRef.current,
         }),
@@ -379,7 +436,7 @@ export default function AIScoutPage() {
         messages: { id: string; role: 'user' | 'assistant'; content: string; created_at: string }[]
       }
       const s = data.session
-      setMode(s.mode === 'myteam' ? 'myteam' : 'opponent')
+      setMode(s.mode === 'myteam' || s.mode === 'individual' ? s.mode : 'opponent')
       if (s.focus_area) setFocusArea(s.focus_area as FocusArea)
       setSelectedFolderId(s.folder_id ?? '')
       sessionIdRef.current = s.id
@@ -419,8 +476,8 @@ export default function AIScoutPage() {
     }
   }
 
-  const activeFocusAreas   = mode === 'myteam' ? MY_TEAM_FOCUS_AREAS : OPPONENT_FOCUS_AREAS
-  const suggestedQuestions  = mode === 'myteam' ? MY_TEAM_QUESTIONS   : OPPONENT_QUESTIONS
+  const activeFocusAreas   = mode === 'myteam' ? MY_TEAM_FOCUS_AREAS : mode === 'individual' ? INDIVIDUAL_FOCUS_AREAS : OPPONENT_FOCUS_AREAS
+  const suggestedQuestions  = mode === 'myteam' ? MY_TEAM_QUESTIONS   : mode === 'individual' ? INDIVIDUAL_QUESTIONS   : OPPONENT_QUESTIONS
   const availablePlayers: string[] = (selectedFolder?.aggregated_stats as { top_players?: { name: string }[] } | null)
     ?.top_players?.map(p => p.name) ?? []
 
@@ -471,9 +528,9 @@ export default function AIScoutPage() {
       {/* ── Mode tab bar ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--panel)', flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--card)', border: '1px solid var(--border)' }}>
-          {(['opponent', 'myteam'] as const).map(m => {
+          {(['opponent', 'myteam', 'individual'] as const).map(m => {
             const active = mode === m
-            const modeColor = m === 'opponent' ? 'var(--signal)' : 'var(--accent)'
+            const modeColor = m === 'opponent' ? 'var(--signal)' : m === 'myteam' ? 'var(--accent)' : 'var(--ct)'
             return (
               <button
                 key={m}
@@ -487,8 +544,8 @@ export default function AIScoutPage() {
                   outline: active ? `1px solid color-mix(in srgb, ${modeColor} 30%, transparent)` : 'none',
                 }}
               >
-                {m === 'opponent' ? <Target size={13} /> : <Shield size={13} />}
-                {m === 'opponent' ? 'Opponent Scout' : 'My Team'}
+                {m === 'opponent' ? <Target size={13} /> : m === 'myteam' ? <Shield size={13} /> : <User size={13} />}
+                {m === 'opponent' ? 'Opponent Scout' : m === 'myteam' ? 'My Team' : 'Individual'}
               </button>
             )
           })}
@@ -582,6 +639,20 @@ export default function AIScoutPage() {
               </p>
               <p style={{ color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>
                 AI will analyse your own demos to help you improve.
+              </p>
+            </div>
+          )}
+
+          {/* Individual banner */}
+          {mode === 'individual' && (
+            <div style={{ padding: '9px 11px', borderRadius: 9, background: 'color-mix(in srgb, var(--ct) 5%, var(--card))', border: '1px solid color-mix(in srgb, var(--ct) 22%, transparent)', fontSize: 12 }}>
+              <p style={{ fontWeight: 600, color: 'var(--ct)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <User size={11} /> Personal Coaching
+              </p>
+              <p style={{ color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>
+                AI analyses your own matchmaking demos from{' '}
+                <Link href="/improve" style={{ color: 'var(--ct)' }}>My Demos</Link>
+                {' '}— your stats, your positions, your improvement plan.
               </p>
             </div>
           )}
@@ -755,7 +826,7 @@ export default function AIScoutPage() {
                           {s.title || 'New conversation'}
                         </p>
                         <p style={{ fontSize: 9.5, color: 'var(--faint)', marginTop: 1 }}>
-                          {s.mode === 'myteam' ? 'My Team' : 'Opponent'} · {new Date(s.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          {s.mode === 'myteam' ? 'My Team' : s.mode === 'individual' ? 'Individual' : 'Opponent'} · {new Date(s.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </p>
                       </div>
                       <button
@@ -781,6 +852,8 @@ export default function AIScoutPage() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
             {mode === 'myteam' ? (
               <Badge variant="neon" className="text-xs">My Team</Badge>
+            ) : mode === 'individual' ? (
+              <Badge variant="neon" className="text-xs">My Demos</Badge>
             ) : selectedFolder ? (
               <Badge variant="neon" className="text-xs">{selectedFolder.opponent_display_name}</Badge>
             ) : (
@@ -813,9 +886,9 @@ export default function AIScoutPage() {
               </button>
               <span className="hidden md:block"><Scope size={14} /></span>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }} className="hidden md:block">
-                {mode === 'myteam' ? 'My Team' : selectedFolder ? selectedFolder.opponent_display_name : 'AI Coach'}
+                {mode === 'myteam' ? 'My Team' : mode === 'individual' ? 'Personal Coach' : selectedFolder ? selectedFolder.opponent_display_name : 'AI Coach'}
               </span>
-              {(selectedFolder || mode === 'myteam') && (
+              {(selectedFolder || mode !== 'opponent') && (
                 <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'capitalize' }} className="hidden md:block">· {focusArea}</span>
               )}
             </div>
@@ -842,14 +915,18 @@ export default function AIScoutPage() {
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)', marginBottom: 6 }}>
                   {mode === 'myteam'
                     ? 'My Team Coach Ready'
-                    : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Scout Ready'}
+                    : mode === 'individual'
+                      ? 'Personal Coach Ready'
+                      : selectedFolder ? `Studying ${selectedFolder.opponent_display_name}` : 'AI Scout Ready'}
                 </h2>
                 <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 340, marginBottom: 28, lineHeight: 1.6 }}>
                   {mode === 'myteam'
                     ? "Ask anything about your team's performance — weaknesses, executes, practice plans, and strategy."
-                    : selectedFolder
-                      ? `Ask anything about ${selectedFolder.opponent_display_name} — tendencies, anti-strats, key players, map reads.`
-                      : "Select an opponent you've uploaded demos for, then ask for scouting reports and anti-strats."}
+                    : mode === 'individual'
+                      ? 'Ask anything about your own game — your duels, positioning, utility, and what to practice. Built from your My Demos matches.'
+                      : selectedFolder
+                        ? `Ask anything about ${selectedFolder.opponent_display_name} — tendencies, anti-strats, key players, map reads.`
+                        : "Select an opponent you've uploaded demos for, then ask for scouting reports and anti-strats."}
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%', maxWidth: 480 }}>
@@ -1068,9 +1145,11 @@ export default function AIScoutPage() {
                 placeholder={
                   mode === 'myteam'
                     ? "Ask about your team's performance, weaknesses, or strategy…"
-                    : selectedFolder
-                      ? `Ask about ${selectedFolder.opponent_display_name}…`
-                      : 'Ask anything about CS2 tactics, or select an opponent for personalised scouting…'
+                    : mode === 'individual'
+                      ? 'Ask about your own performance, deaths, aim, or what to practice…'
+                      : selectedFolder
+                        ? `Ask about ${selectedFolder.opponent_display_name}…`
+                        : 'Ask anything about CS2 tactics, or select an opponent for personalised scouting…'
                 }
                 disabled={isLoading}
                 rows={1}
@@ -1092,9 +1171,11 @@ export default function AIScoutPage() {
             <p style={{ fontSize: 10, color: 'var(--faint)', textAlign: 'center', marginTop: 7 }}>
               {mode === 'myteam'
                 ? "Analysing your team's own demos for self-improvement coaching"
-                : selectedFolder
-                  ? `Analysing demos from your ${selectedFolder.opponent_display_name} folder`
-                  : 'Select an opponent folder for personalised anti-strats and scouting reports'}
+                : mode === 'individual'
+                  ? 'Analysing your personal matchmaking demos from My Demos'
+                  : selectedFolder
+                    ? `Analysing demos from your ${selectedFolder.opponent_display_name} folder`
+                    : 'Select an opponent folder for personalised anti-strats and scouting reports'}
             </p>
           </div>
         </div>
