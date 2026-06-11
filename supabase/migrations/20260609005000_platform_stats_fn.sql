@@ -1,6 +1,8 @@
 -- Public function to aggregate platform-wide stats for the landing page.
 -- SECURITY DEFINER lets it run as the function owner, bypassing RLS.
--- Grant execute to anon so the public API route can call it without service-role.
+-- Renamed off the duplicate version 20260609000000. Execute grants are managed
+-- by the later advisor_cleanup migration (service_role only, called via the
+-- admin client), so no GRANT here — that keeps a re-apply from re-opening it.
 CREATE OR REPLACE FUNCTION get_platform_stats()
 RETURNS json
 LANGUAGE plpgsql
@@ -39,5 +41,3 @@ BEGIN
   );
 END;
 $$;
-
-GRANT EXECUTE ON FUNCTION get_platform_stats() TO anon, authenticated;
