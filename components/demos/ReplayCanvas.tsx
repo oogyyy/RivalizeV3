@@ -16,6 +16,8 @@ import { roundStartOffset } from '@/lib/replay-trim'
 import { drawSmoke, smokeCanvasRadius } from '@/lib/replay-smoke'
 import { drawFire, fireCanvasRadius, throwerOnCT } from '@/lib/replay-fire'
 import { drawExplosion, drawFlashbang, heCanvasRadius, flashCanvasRadius } from '@/lib/replay-explosives'
+import { drawGrenadeArc } from '@/lib/replay-arc'
+import { drawKillFeed } from '@/lib/replay-killfeed'
 import type { Round, PlayerStats, PositionFrame } from '@/types/database'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -379,12 +381,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
 
       if (inFlight) {
         const prog = Math.min(1, (t - g.time) / Math.max(0.01, g.land_time - g.time))
-        const px = tx2 + (lx - tx2) * prog, py = ty2 + (ly - ty2) * prog
-        ctx.setLineDash([3, 5]); ctx.strokeStyle = col + '66'; ctx.lineWidth = 1.1
-        ctx.beginPath(); ctx.moveTo(tx2, ty2); ctx.lineTo(px, py); ctx.stroke()
-        ctx.setLineDash([])
-        ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2)
-        ctx.fillStyle = col; ctx.fill()
+        drawGrenadeArc(ctx, tx2, ty2, lx, ly, prog, col)
       } else {
         const age = t - g.land_time
         if (g.type === 'smoke' && age < SMOKE_DUR) {
@@ -559,6 +556,11 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       }
       ctx.globalAlpha = 1; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'
     })
+
+    // Kill feed overlay (screen space, top-right)
+    drawKillFeed(ctx, kills, t, W, name =>
+      teamOf.get(name) === team1Name ? T1_COLOR : T2_COLOR,
+    )
 
     // Canvas border
     ctx.strokeStyle = 'rgba(34,211,238,0.09)'; ctx.lineWidth = 1.5

@@ -7,6 +7,7 @@ import { roundStartOffset } from '@/lib/replay-trim'
 import { drawSmoke, smokeCanvasRadius } from '@/lib/replay-smoke'
 import { drawFire, fireCanvasRadius, throwerOnCT } from '@/lib/replay-fire'
 import { drawExplosion, drawFlashbang, heCanvasRadius, flashCanvasRadius } from '@/lib/replay-explosives'
+import { drawGrenadeArc } from '@/lib/replay-arc'
 import type { Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 
 const CANVAS_SIZE = 420
@@ -106,10 +107,20 @@ export default function ChatRoundReplay({
 
     // ── Grenades ──
     ;(round.grenades ?? []).forEach((g: GrenadeEvent) => {
-      if (g.land_time > t) return
+      if (g.time > t) return
 
-      const age  = t - g.land_time
       const color = GREN_COLORS[g.type] ?? '#fff'
+      const [lx, ly]   = toXY(g.land_x, g.land_y)
+      const [tx2, ty2] = toXY(g.throw_x, g.throw_y)
+
+      // In flight — animated arc from thrower to landing spot.
+      if (t < g.land_time) {
+        const prog = Math.min(1, (t - g.time) / Math.max(0.01, g.land_time - g.time))
+        drawGrenadeArc(ctx, tx2, ty2, lx, ly, prog, color)
+        return
+      }
+
+      const age = t - g.land_time
 
       let maxDur: number
       switch (g.type) {
@@ -121,8 +132,7 @@ export default function ChatRoundReplay({
       }
       if (age > maxDur) return
 
-      const fade   = Math.max(0, 1 - age / maxDur)
-      const [lx, ly] = toXY(g.land_x, g.land_y)
+      const fade = Math.max(0, 1 - age / maxDur)
 
       if (g.type === 'smoke') {
         drawSmoke(ctx, lx, ly, smokeRadius, age, SMOKE_DUR)
@@ -139,13 +149,14 @@ export default function ChatRoundReplay({
         ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill()
       }
 
-      // Throw origin dot
-      const [tx2, ty2] = toXY(g.throw_x, g.throw_y)
-      ctx.strokeStyle = `rgba(255,255,255,0.25)`
-      ctx.lineWidth = 0.5
-      ctx.setLineDash([2, 3])
-      ctx.beginPath(); ctx.moveTo(tx2, ty2); ctx.lineTo(lx, ly); ctx.stroke()
-      ctx.setLineDash([])
+      // Throw-origin line lingers briefly after landing, then clears.
+      if (age < 1.5) {
+        ctx.strokeStyle = `rgba(255,255,255,${0.25 * (1 - age / 1.5)})`
+        ctx.lineWidth = 0.5
+        ctx.setLineDash([2, 3])
+        ctx.beginPath(); ctx.moveTo(tx2, ty2); ctx.lineTo(lx, ly); ctx.stroke()
+        ctx.setLineDash([])
+      }
     })
 
     // ── Kills ──
