@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
+import { roundStartOffset } from '@/lib/replay-trim'
+import { drawSmoke, smokeCanvasRadius } from '@/lib/replay-smoke'
+import { drawFire, fireCanvasRadius, throwerOnCT } from '@/lib/replay-fire'
+import { drawExplosion, drawFlashbang, heCanvasRadius, flashCanvasRadius } from '@/lib/replay-explosives'
 import type { Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 
 const CANVAS_SIZE = 420
@@ -25,6 +29,7 @@ export type ChatRoundData = {
   number: number
   winner: string
   duration: number
+  freeze_end_time?: number
   kills: Kill[]
   grenades?: GrenadeEvent[]
   bomb_planted?: boolean
@@ -45,18 +50,24 @@ interface Props {
 export default function ChatRoundReplay({
   round, players, team1Name, team2Name, mapName, roundNumber, description,
 }: Props) {
+  const duration = Math.max(round.duration || 120, 10)
+  // Skip the dead freeze/buy phase so the replay opens on the action.
+  const startOffset = roundStartOffset({
+    freeze_end_time: round.freeze_end_time,
+    grenades: round.grenades,
+    kills: round.kills,
+  })
+
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const rafRef     = useRef<number>(0)
   const mapImgRef  = useRef<HTMLImageElement | null>(null)
   const startRef   = useRef<number>(0)       // real-time start for animation
-  const pauseAtRef = useRef<number>(0)       // time paused at
+  const pauseAtRef = useRef<number>(startOffset) // time paused at
 
   const [playing,    setPlaying]    = useState(false)
   const [speed,      setSpeed]      = useState(1)
-  const [currentT,   setCurrentT]   = useState(0)
+  const [currentT,   setCurrentT]   = useState(startOffset)
   const [mapLoaded,  setMapLoaded]  = useState(false)
-
-  const duration = Math.max(round.duration || 120, 10)
 
   // Build player→team map
   const teamOf = new Map<string, 1 | 2>()
@@ -67,6 +78,9 @@ export default function ChatRoundReplay({
   const colorOf = (name: string) => teamOf.get(name) === 1 ? T1_COLOR : T2_COLOR
 
   const cfg = MAP_CONFIGS[mapName]
+  const smokeRadius = cfg ? smokeCanvasRadius(cfg.scale, CANVAS_SIZE) : 18
+  const heRadius    = cfg ? heCanvasRadius(cfg.scale, CANVAS_SIZE) : 30
+  const flashRadius = cfg ? flashCanvasRadius(cfg.scale, CANVAS_SIZE) : 16
 
   // ── Canvas draw ──────────────────────────────────────────────────────────────
   const draw = useCallback((t: number) => {
@@ -111,39 +125,15 @@ export default function ChatRoundReplay({
       const [lx, ly] = toXY(g.land_x, g.land_y)
 
       if (g.type === 'smoke') {
-        const radius = 20 + age * 1.2
-        const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, radius)
-        grad.addColorStop(0, `rgba(192,192,208,${fade * 0.7})`)
-        grad.addColorStop(1, `rgba(192,192,208,0)`)
-        ctx.fillStyle = grad
-        ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.fill()
-        // label
-        ctx.fillStyle = `rgba(255,255,255,${fade * 0.8})`
-        ctx.font = `bold 9px monospace`
-        ctx.textAlign = 'center'
-        ctx.fillText('SMOKE', lx, ly + 4)
+        drawSmoke(ctx, lx, ly, smokeRadius, age, SMOKE_DUR)
       } else if (g.type === 'flash') {
-        const radius = 12 + age * 30
-        const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, radius)
-        grad.addColorStop(0, `rgba(255,255,150,${fade})`)
-        grad.addColorStop(1, `rgba(255,255,150,0)`)
-        ctx.fillStyle = grad
-        ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.fill()
+        drawFlashbang(ctx, lx, ly, flashRadius, age, FLASH_DUR)
       } else if (g.type === 'he') {
-        const radius = 6 + age * 15
-        const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, radius)
-        grad.addColorStop(0, `rgba(255,153,0,${fade})`)
-        grad.addColorStop(1, `rgba(255,80,0,0)`)
-        ctx.fillStyle = grad
-        ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.fill()
+        drawExplosion(ctx, lx, ly, heRadius, age, HE_DUR)
       } else if (g.type === 'molotov') {
-        const pulse = 0.5 + 0.5 * Math.sin(age * 8)
-        const radius = 14 + pulse * 5
-        ctx.fillStyle = `rgba(255,68,0,${fade * 0.6})`
-        ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.fill()
-        ctx.strokeStyle = `rgba(255,180,0,${fade})`
-        ctx.lineWidth = 1
-        ctx.stroke()
+        const isCT = throwerOnCT(teamOf.get(g.thrower) === 1, round.number)
+        const fr   = cfg ? fireCanvasRadius(cfg.scale, CANVAS_SIZE, isCT) : (isCT ? 16 : 14)
+        drawFire(ctx, lx, ly, fr, age, MOLOTOV_DUR, isCT)
       } else {
         ctx.fillStyle = `rgba(${color},${fade})`
         ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill()
@@ -217,7 +207,7 @@ export default function ChatRoundReplay({
       ctx.fillStyle = 'rgba(255,215,0,0.7)'
       ctx.fillRect(tx - 0.5, barY, 1, 4)
     })
-  }, [round, cfg, duration, teamOf]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [round, cfg, duration, teamOf, smokeRadius, heRadius, flashRadius]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Animation loop ───────────────────────────────────────────────────────────
   const tick = useCallback(() => {
@@ -257,10 +247,10 @@ export default function ChatRoundReplay({
 
   const restart = () => {
     cancelAnimationFrame(rafRef.current)
-    pauseAtRef.current = 0
-    setCurrentT(0)
+    pauseAtRef.current = startOffset
+    setCurrentT(startOffset)
     setPlaying(false)
-    draw(0)
+    draw(startOffset)
   }
 
   const togglePlay = () => {
@@ -269,8 +259,8 @@ export default function ChatRoundReplay({
       setPlaying(false)
     } else {
       if (currentT >= duration) {
-        pauseAtRef.current = 0
-        setCurrentT(0)
+        pauseAtRef.current = startOffset
+        setCurrentT(startOffset)
       }
       startRef.current = performance.now()
       setPlaying(true)
@@ -354,7 +344,8 @@ export default function ChatRoundReplay({
           { color: '#ffd700',   label: 'Kill' },
           { color: '#c0c0d0',   label: 'Smoke' },
           { color: '#ff9900',   label: 'HE' },
-          { color: '#ff4400',   label: 'Molotov' },
+          { color: '#ff7733',   label: 'Molotov (T)' },
+          { color: '#4488ff',   label: 'Incendiary (CT)' },
         ].map(({ color, label }) => (
           <span key={label} className="flex items-center gap-1 text-[9px] text-muted-foreground">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
