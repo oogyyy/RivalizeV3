@@ -4,11 +4,13 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, BookOpen, Crosshair } from 'lucide-react'
 import type { AggregatedStats, PlayerStats, Round, Kill, GrenadeEvent } from '@/types/database'
 import PrepPrintButton from './PrepPrintButton'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
+import { summarizeZoneTendencies, focusRoster } from '@/lib/zone-analytics'
 import AiBriefSection from '@/components/prep/AiBriefSection'
+import VetoPlanSection from '@/components/prep/VetoPlanSection'
 
 const MAP_LABELS: Record<string, string> = {
   de_dust2: 'Dust2', de_mirage: 'Mirage', de_inferno: 'Inferno', de_nuke: 'Nuke',
@@ -52,15 +54,30 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
 
   const stats = folder.aggregated_stats as AggregatedStats | null
 
-  const { data: demos } = await admin
-    .from('demos')
-    .select('parsed_data, map')
-    .eq('team_id', teamId)
-    .eq('opponent_slug', folder.opponent_slug)
-    .eq('demo_type', 'opponent')
-    .eq('status', 'completed')
-    .order('created_at', { ascending: false })
-    .limit(10)
+  const [{ data: demos }, { data: selfDemos }, { data: linkedPlaybooks }] = await Promise.all([
+    admin
+      .from('demos')
+      .select('parsed_data, map')
+      .eq('team_id', teamId)
+      .eq('opponent_slug', folder.opponent_slug)
+      .eq('demo_type', 'opponent')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(10),
+    admin
+      .from('demos')
+      .select('parsed_data, map')
+      .eq('team_id', teamId)
+      .eq('demo_type', 'self')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(50),
+    admin
+      .from('playbooks')
+      .select('id, name, map, updated_at')
+      .eq('folder_id', folderId)
+      .order('updated_at', { ascending: false }),
+  ])
 
   const parsedDemos = (demos ?? [])
     .map(d => d.parsed_data as ParsedDemo | null)
@@ -114,6 +131,40 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
     if (roundSets.length < 2) continue
     const result = detectTacticalPatterns(roundSets, map)
     if (result.hasData) patterns.push({ map, text: result.text })
+  }
+
+  // Positional read — opponent kill/death/utility coordinates mapped to callouts
+  const oppRosterByMap: Record<string, Set<string>> = {}
+  for (const pd of parsedDemos) {
+    const m = pd.header?.map
+    if (!m) continue
+    if (!oppRosterByMap[m]) oppRosterByMap[m] = new Set()
+    focusRoster(pd.players, pd.header, pd.opponentSide, 'opponent').forEach(n => oppRosterByMap[m].add(n))
+  }
+  const positionalReads: Array<{ map: string; text: string[] }> = []
+  for (const [map, roundSets] of Object.entries(roundsByMap)) {
+    const result = summarizeZoneTendencies(roundSets, map, oppRosterByMap[map])
+    if (result.hasData) positionalReads.push({ map, text: result.text })
+  }
+
+  // Our own map win rates — feeds the AI veto plan
+  const selfMapStats: Record<string, { wins: number; losses: number; winRate: number }> = {}
+  for (const d of selfDemos ?? []) {
+    const pd = d.parsed_data as ParsedDemo | null
+    const h = pd?.header
+    const m = (h?.map ?? d.map ?? '').toLowerCase()
+    if (!h || !m || m === 'unknown') continue
+    const os = pd?.opponentSide ?? 'team2'
+    const ours   = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
+    const theirs = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
+    if (ours === 0 && theirs === 0) continue
+    if (!selfMapStats[m]) selfMapStats[m] = { wins: 0, losses: 0, winRate: 0 }
+    if (ours > theirs) selfMapStats[m].wins++
+    else if (theirs > ours) selfMapStats[m].losses++
+  }
+  for (const s of Object.values(selfMapStats)) {
+    const total = s.wins + s.losses
+    s.winRate = total > 0 ? s.wins / total : 0
   }
 
   // Economy profile
@@ -183,6 +234,13 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
             folderId={folderId}
             cachedBrief={(folder.ai_brief as string | null) ?? null}
             updatedAt={(folder.ai_brief_updated_at as string | null) ?? null}
+          />
+
+          {/* AI Veto Plan */}
+          <VetoPlanSection
+            opponentName={folder.opponent_display_name}
+            selfMapStats={selfMapStats}
+            opponentMapPicks={Object.fromEntries(sortedMaps)}
           />
 
           {/* Overview stats */}
@@ -286,6 +344,36 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
             </section>
           )}
 
+          {/* Positional read */}
+          {positionalReads.length > 0 && (
+            <section className="prep-section rounded-xl border border-border bg-card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-7 h-7 rounded-md bg-blue-500/10 flex items-center justify-center">
+                  <Crosshair size={14} className="text-blue-400" />
+                </div>
+                <h2 className="text-base font-semibold text-foreground">Positional Read</h2>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">
+                Where this opponent fights, dies, and times their utility — derived from kill and grenade coordinates mapped to map callouts.
+              </p>
+              <div className="space-y-5">
+                {positionalReads.map(({ map, text }) => (
+                  <div key={map}>
+                    <h3 className="text-sm font-semibold text-blue-400 mb-2">{fmtLabel(map)}</h3>
+                    <ul className="space-y-1">
+                      {text.map((line, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-foreground/80">
+                          <span className="text-blue-400/60 mt-0.5 shrink-0">›</span>
+                          <span>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Economy & stats */}
           <section className="prep-section rounded-xl border border-border bg-card p-5">
             <h2 className="text-base font-semibold text-foreground mb-4">Combat Profile</h2>
@@ -347,6 +435,52 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
                 </div>
               )}
             </div>
+          </section>
+
+          {/* Linked anti-strat playbooks */}
+          <section className="prep-section rounded-xl border border-border bg-card p-5 no-print">
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-md bg-neon-green/10 flex items-center justify-center">
+                  <BookOpen size={14} className="text-neon-green" />
+                </div>
+                <h2 className="text-base font-semibold text-foreground">Anti-Strat Playbooks</h2>
+              </div>
+              <Link
+                href={`/playbook?folder=${folderId}`}
+                className="text-xs text-neon-green hover:underline shrink-0"
+              >
+                + New playbook
+              </Link>
+            </div>
+            {(linkedPlaybooks ?? []).length > 0 ? (
+              <div className="space-y-2">
+                {(linkedPlaybooks ?? []).map(pb => (
+                  <Link
+                    key={pb.id}
+                    href={`/playbook/${pb.id}`}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-md bg-neon-green/10 flex items-center justify-center shrink-0">
+                      <BookOpen size={14} className="text-neon-green" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{pb.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{fmtLabel(pb.map)}</p>
+                    </div>
+                    <span className="text-xs text-neon-green shrink-0">Open ›</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No anti-strat playbooks yet for {folder.opponent_display_name}.{' '}
+                <Link href={`/playbook?folder=${folderId}`} className="text-neon-green hover:underline">
+                  Create one
+                </Link>{' '}
+                to build a per-map counter-strategy with the AI.
+              </p>
+            )}
           </section>
 
           {/* Footer */}

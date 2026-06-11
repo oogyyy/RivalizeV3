@@ -11,6 +11,30 @@ import TopBar from '@/components/layout/TopBar'
 import SocialPanel from '@/components/layout/SocialPanel'
 import { NavigationRefresh } from '@/components/layout/NavigationRefresh'
 import ExtensionModal from '@/components/extension/ExtensionModal'
+import OnboardingWizard, { type OnboardingState } from '@/components/onboarding/OnboardingWizard'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+async function getOnboardingState(userId: string): Promise<OnboardingState> {
+  const admin = createAdminClient()
+  const { data: memberships } = await admin
+    .from('team_members')
+    .select('team_id')
+    .eq('user_id', userId)
+  const teamIds = (memberships ?? []).map(m => m.team_id).filter(Boolean)
+
+  const [demoCount, coachCount] = await Promise.all([
+    teamIds.length
+      ? admin.from('demos').select('id', { count: 'exact', head: true }).in('team_id', teamIds)
+      : Promise.resolve({ count: 0 }),
+    admin.from('coach_sessions').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+  ])
+
+  return {
+    teamCreated:  teamIds.length > 0,
+    demoUploaded: (demoCount.count ?? 0) > 0,
+    coachUsed:    (coachCount.count ?? 0) > 0,
+  }
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
@@ -18,11 +42,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const supabase = await createClient()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [{ data: profile }, onboarding] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    getOnboardingState(user.id),
+  ])
 
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', position: 'relative', background: 'var(--bg)' }}>
@@ -63,6 +86,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Extension install prompt (first-time only, auto-hides if installed) */}
       <ExtensionModal />
+
+      {/* Onboarding checklist — auto-hides once all steps complete or dismissed */}
+      <OnboardingWizard state={onboarding} />
 
       {/* Refresh server data on every navigation to prevent stale RSC cache */}
       <NavigationRefresh />
