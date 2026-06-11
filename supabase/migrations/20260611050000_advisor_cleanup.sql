@@ -32,7 +32,18 @@ grant  execute on function public.get_platform_stats() to service_role;
 revoke execute on function public.refresh_team_stats(uuid) from public, anon, authenticated;
 grant  execute on function public.refresh_team_stats(uuid) to service_role;
 
-revoke execute on function public.match_cs2_knowledge(public.vector, text, uuid, integer, double precision)
-  from public, anon, authenticated;
-grant  execute on function public.match_cs2_knowledge(public.vector, text, uuid, integer, double precision)
-  to service_role;
+-- match_cs2_knowledge takes a `vector` arg whose schema differs between
+-- environments (public here, extensions on a fresh Supabase build), so resolve
+-- the function by name and apply the grants to its actual signature.
+do $$
+declare fn regprocedure;
+begin
+  select p.oid::regprocedure into fn
+  from pg_proc p join pg_namespace n on p.pronamespace = n.oid
+  where n.nspname = 'public' and p.proname = 'match_cs2_knowledge'
+  limit 1;
+  if fn is not null then
+    execute format('revoke execute on function %s from public, anon, authenticated', fn);
+    execute format('grant execute on function %s to service_role', fn);
+  end if;
+end $$;

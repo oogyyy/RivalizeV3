@@ -1,17 +1,33 @@
 -- Move the pgvector extension out of the public schema (advisor 0014).
 --
--- Only three objects depend on it — cs2_knowledge.embedding, the HNSW index,
--- and match_cs2_knowledge(). The type, operators and operator class are
--- referenced by OID, so the column and index follow the extension automatically.
--- The one thing that would break is operator resolution (<=>) inside
--- match_cs2_knowledge, whose search_path was 'public'. We add 'extensions' so
--- the cosine operator still resolves. No function body change.
+-- Idempotent and schema-agnostic: production had vector in `public`, but a
+-- fresh Supabase build pre-installs it in `extensions`. We only move it if it
+-- is currently in public, and we widen match_cs2_knowledge's search_path so the
+-- <=> cosine operator resolves wherever the extension lives. The type, index
+-- and operator class are referenced by OID and follow the extension.
 
 create schema if not exists extensions;
 grant usage on schema extensions to anon, authenticated, service_role;
 
-alter extension vector set schema extensions;
+do $$
+declare
+  cur_schema text;
+  fn         regprocedure;
+begin
+  select n.nspname into cur_schema
+  from pg_extension e join pg_namespace n on e.extnamespace = n.oid
+  where e.extname = 'vector';
 
--- The arg type is now extensions.vector after the move.
-alter function public.match_cs2_knowledge(extensions.vector, text, uuid, integer, double precision)
-  set search_path = public, extensions;
+  if cur_schema = 'public' then
+    alter extension vector set schema extensions;
+  end if;
+
+  select p.oid::regprocedure into fn
+  from pg_proc p join pg_namespace n on p.pronamespace = n.oid
+  where n.nspname = 'public' and p.proname = 'match_cs2_knowledge'
+  limit 1;
+
+  if fn is not null then
+    execute format('alter function %s set search_path = public, extensions', fn);
+  end if;
+end $$;
