@@ -86,6 +86,13 @@ type Round struct {
 	Team2Economy int            `json:"team2_economy"`
 	BombPlanted  bool           `json:"bomb_planted"`
 	BombDefused  bool           `json:"bomb_defused"`
+	// Bomb event details (seconds from round start; world coords). Zero/empty
+	// when no plant happened.
+	PlantTime  float64 `json:"plant_time,omitempty"`
+	PlantX     float64 `json:"plant_x,omitempty"`
+	PlantY     float64 `json:"plant_y,omitempty"`
+	PlantSite  string  `json:"plant_site,omitempty"`
+	DefuseTime float64 `json:"defuse_time,omitempty"`
 	// Seconds from round start to freeze-time end — when the round goes live and
 	// players can move/throw. Lets the replay trim the dead buy phase.
 	FreezeEndTime float64        `json:"freeze_end_time"`
@@ -201,6 +208,11 @@ type roundState struct {
 	team2Eco     int
 	bombPlanted  bool
 	bombDefused  bool
+	bombPlantTick  int
+	bombDefuseTick int
+	bombPlantX     float64
+	bombPlantY     float64
+	bombSite       string
 	isKnifeRound bool
 	kills        []Kill
 	grenades     []GrenadeEvent
@@ -409,12 +421,20 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 	p.RegisterEventHandler(func(e events.BombPlanted) {
 		if cur != nil {
 			cur.bombPlanted = true
+			cur.bombPlantTick = p.GameState().IngameTick()
+			cur.bombSite = string(e.Site)
+			if e.Player != nil {
+				pos := e.Player.Position()
+				cur.bombPlantX = pos.X
+				cur.bombPlantY = pos.Y
+			}
 		}
 	})
 
 	p.RegisterEventHandler(func(e events.BombDefused) {
 		if cur != nil {
 			cur.bombDefused = true
+			cur.bombDefuseTick = p.GameState().IngameTick()
 		}
 	})
 
@@ -1038,6 +1058,14 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 			if rnd.freezeEndTick > rnd.startTick {
 				freezeEnd = float64(rnd.freezeEndTick-rnd.startTick) / 64.0
 			}
+			plantTime := 0.0
+			if rnd.bombPlantTick > rnd.startTick {
+				plantTime = float64(rnd.bombPlantTick-rnd.startTick) / 64.0
+			}
+			defuseTime := 0.0
+			if rnd.bombDefuseTick > rnd.startTick {
+				defuseTime = float64(rnd.bombDefuseTick-rnd.startTick) / 64.0
+			}
 			outRounds = append(outRounds, Round{
 				Number:        realIdx, // 1-based, knife rounds excluded
 				Winner:        winner,
@@ -1048,6 +1076,11 @@ func parseDemoInternal(r io.Reader) (result *ParseResult, err error) {
 				Team2Economy:  rnd.team2Eco,
 				BombPlanted:   rnd.bombPlanted,
 				BombDefused:   rnd.bombDefused,
+				PlantTime:     plantTime,
+				PlantX:        rnd.bombPlantX,
+				PlantY:        rnd.bombPlantY,
+				PlantSite:     rnd.bombSite,
+				DefuseTime:    defuseTime,
 				Kills:         rnd.kills,
 				Grenades:      rnd.grenades,
 				Frames:        rnd.frames,
