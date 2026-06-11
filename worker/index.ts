@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { parseAndSaveDemo, applyParsedDemo } from '../lib/demo-parser/parse-and-save'
 import { startParserHealthMonitor } from './parser-health'
 import { startAutoSync } from './auto-sync'
+import { backfillEmbeddings } from './embed-backfill'
 
 /**
  * Rivalize Demo Processing Worker v3
@@ -313,8 +314,10 @@ async function run(): Promise<void> {
   console.log('[worker] Demo processing worker v3 started')
   // Background watchdog: alerts if the Go parser goes down while demos wait.
   startParserHealthMonitor(supabase)
-  // Background CS2 match discovery for opted-in users.
+  // Background CS2 match discovery + import for opted-in users.
   startAutoSync(supabase)
+  // One-time backfill of missing knowledge-base embeddings (non-blocking).
+  setTimeout(() => { backfillEmbeddings(supabase).catch(() => {}) }, 15_000)
   while (true) {
     try {
       await tick()
