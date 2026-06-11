@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
 import { roundStartOffset } from '@/lib/replay-trim'
+import { drawSmoke, smokeCanvasRadius } from '@/lib/replay-smoke'
 import type { Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 
 const CANVAS_SIZE = 420
@@ -75,6 +76,7 @@ export default function ChatRoundReplay({
   const colorOf = (name: string) => teamOf.get(name) === 1 ? T1_COLOR : T2_COLOR
 
   const cfg = MAP_CONFIGS[mapName]
+  const smokeRadius = cfg ? smokeCanvasRadius(cfg.scale, CANVAS_SIZE) : 18
 
   // ── Canvas draw ──────────────────────────────────────────────────────────────
   const draw = useCallback((t: number) => {
@@ -119,17 +121,7 @@ export default function ChatRoundReplay({
       const [lx, ly] = toXY(g.land_x, g.land_y)
 
       if (g.type === 'smoke') {
-        const radius = 20 + age * 1.2
-        const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, radius)
-        grad.addColorStop(0, `rgba(192,192,208,${fade * 0.7})`)
-        grad.addColorStop(1, `rgba(192,192,208,0)`)
-        ctx.fillStyle = grad
-        ctx.beginPath(); ctx.arc(lx, ly, radius, 0, Math.PI * 2); ctx.fill()
-        // label
-        ctx.fillStyle = `rgba(255,255,255,${fade * 0.8})`
-        ctx.font = `bold 9px monospace`
-        ctx.textAlign = 'center'
-        ctx.fillText('SMOKE', lx, ly + 4)
+        drawSmoke(ctx, lx, ly, smokeRadius, age, SMOKE_DUR)
       } else if (g.type === 'flash') {
         const radius = 12 + age * 30
         const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, radius)
@@ -225,7 +217,7 @@ export default function ChatRoundReplay({
       ctx.fillStyle = 'rgba(255,215,0,0.7)'
       ctx.fillRect(tx - 0.5, barY, 1, 4)
     })
-  }, [round, cfg, duration, teamOf]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [round, cfg, duration, teamOf, smokeRadius]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Animation loop ───────────────────────────────────────────────────────────
   const tick = useCallback(() => {

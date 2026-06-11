@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { useVideoCapture } from '@/hooks/useVideoCapture'
 import { MAP_CONFIGS, worldToCanvas, loadMapImage } from '@/lib/map-config'
 import { roundStartOffset } from '@/lib/replay-trim'
+import { drawSmoke, smokeCanvasRadius } from '@/lib/replay-smoke'
 import type { Round, PlayerStats, PositionFrame } from '@/types/database'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -224,6 +225,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   }, [players])
 
   const mapCfg = MAP_CONFIGS[mapName] ?? null
+  const smokeRadius = mapCfg ? smokeCanvasRadius(mapCfg.scale, CANVAS_SIZE) : 28
   const toXY = useCallback((wx: number, wy: number): [number, number] => {
     if (mapCfg) return worldToCanvas(wx, wy, mapCfg, CANVAS_SIZE)
     const s = CANVAS_SIZE
@@ -382,13 +384,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
       } else {
         const age = t - g.land_time
         if (g.type === 'smoke' && age < SMOKE_DUR) {
-          const a = Math.min(1, age * 1.5) * Math.max(0, 1 - Math.max(0, age - (SMOKE_DUR - 3)) / 3)
-          ctx.globalAlpha = a * 0.50; ctx.fillStyle = '#b0b0cc'
-          ctx.beginPath(); ctx.arc(lx, ly, 30, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = a * 0.80; ctx.strokeStyle = '#888898'; ctx.lineWidth = 1.5
-          ctx.beginPath(); ctx.arc(lx, ly, 30, 0, Math.PI * 2); ctx.stroke()
-          ctx.globalAlpha = a * 0.70; ctx.fillStyle = 'rgba(255,255,255,0.60)'; ctx.font = 'bold 7px monospace'
-          ctx.fillText('SMK', lx - 9, ly + 3); ctx.globalAlpha = 1
+          drawSmoke(ctx, lx, ly, smokeRadius, age, SMOKE_DUR)
         } else if (g.type === 'flash' && age < FLASH_DUR) {
           const a = 1 - age / FLASH_DUR
           ctx.globalAlpha = a * 0.90
@@ -581,7 +577,7 @@ export default function ReplayCanvas({ rounds, players, team1Name, team2Name, ma
   }, [
     annotations, annotColor, bgImage, deadAt, focusPlayer, frames, kills, roundIdx,
     showDeaths, showDirections, showHeatmap, showNames, showTrails,
-    team1Name, teamOf, toXY, visibleGrenades,
+    team1Name, teamOf, toXY, visibleGrenades, smokeRadius,
   ])
 
   // ── Animation loop ─────────────────────────────────────────────────────
