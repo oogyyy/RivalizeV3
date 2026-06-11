@@ -6,6 +6,7 @@ import { streamText, tool } from 'ai'
 import { z } from 'zod'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
+import { summarizeZoneTendencies, focusRoster } from '@/lib/zone-analytics'
 import { aiConfigured, getAIModel, logAIUsage, sanitizePromptValue } from '@/lib/ai'
 import { retrieve, formatContext } from '@/lib/knowledge/retrieval'
 
@@ -312,6 +313,7 @@ export async function POST(request: Request) {
     if (recentDemos && recentDemos.length > 0) {
       contextText += `\nTeam: ${teamName}\nMatches analysed: ${recentDemos.length}\n\nRecent match details:\n`
       const selfRoundsByMap: Record<string, Round[][]> = {}
+      const selfRosterByMap: Record<string, Set<string>> = {}
 
       recentDemos.forEach((demo, i) => {
         const pd = demo.parsed_data as DemoParsedData | null
@@ -336,6 +338,8 @@ export async function POST(request: Request) {
           if (h.map && pd?.rounds && pd.rounds.length > 0) {
             if (!selfRoundsByMap[h.map]) selfRoundsByMap[h.map] = []
             selfRoundsByMap[h.map].push(pd.rounds)
+            if (!selfRosterByMap[h.map]) selfRosterByMap[h.map] = new Set()
+            focusRoster(pd.players, h, pd.opponentSide, 'self').forEach(n => selfRosterByMap[h.map!].add(n))
           }
         }
       })
@@ -354,6 +358,21 @@ export async function POST(request: Request) {
       if (selfPatternLines.length > 0) {
         contextText += '\n--- Cross-demo execute patterns ---'
         contextText += selfPatternLines.join('\n')
+        contextText += '\n'
+      }
+
+      // Positional tendencies from kill/grenade coordinates mapped to callouts
+      const selfZoneLines: string[] = []
+      for (const [map, roundSets] of Object.entries(selfRoundsByMap)) {
+        const zones = summarizeZoneTendencies(roundSets, map, selfRosterByMap[map])
+        if (zones.hasData) {
+          selfZoneLines.push(`\nPositional tendencies on ${map} (our players):`)
+          selfZoneLines.push(...zones.text.map(l => `  ${l}`))
+        }
+      }
+      if (selfZoneLines.length > 0) {
+        contextText += '\n--- Positional read (from demo coordinates) ---'
+        contextText += selfZoneLines.join('\n')
         contextText += '\n'
       }
     }
@@ -408,6 +427,7 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
         if (recentDemos && recentDemos.length > 0) {
           contextText += '\nRecent match details:\n'
           const roundsByMap: Record<string, Round[][]> = {}
+          const oppRosterByMap: Record<string, Set<string>> = {}
 
           recentDemos.forEach((demo, i) => {
             const pd = demo.parsed_data as DemoParsedData | null
@@ -431,6 +451,8 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
               if (h.map && pd.rounds && pd.rounds.length > 0) {
                 if (!roundsByMap[h.map]) roundsByMap[h.map] = []
                 roundsByMap[h.map].push(pd.rounds)
+                if (!oppRosterByMap[h.map]) oppRosterByMap[h.map] = new Set()
+                focusRoster(pd.players, h, pd.opponentSide, 'opponent').forEach(n => oppRosterByMap[h.map!].add(n))
               }
             }
           })
@@ -449,6 +471,21 @@ Average rating: ${stats?.avg_rating?.toFixed(2) || 'N/A'}
           if (patternLines.length > 0) {
             contextText += '\n--- Cross-demo tactical tendencies ---'
             contextText += patternLines.join('\n')
+            contextText += '\n'
+          }
+
+          // Positional tendencies from kill/grenade coordinates mapped to callouts
+          const zoneLines: string[] = []
+          for (const [map, roundSets] of Object.entries(roundsByMap)) {
+            const zones = summarizeZoneTendencies(roundSets, map, oppRosterByMap[map])
+            if (zones.hasData) {
+              zoneLines.push(`\nOpponent positional tendencies on ${map}:`)
+              zoneLines.push(...zones.text.map(l => `  ${l}`))
+            }
+          }
+          if (zoneLines.length > 0) {
+            contextText += '\n--- Positional read (from demo coordinates) ---'
+            contextText += zoneLines.join('\n')
             contextText += '\n'
           }
         }
@@ -680,6 +717,11 @@ CRITICAL RULES for pro dataset references:
           matches: rows.map(d => {
             const pd = d.parsed_data as DemoParsedData | null
             const h  = pd?.header
+            const demoMap = d.map ?? h?.map
+            const roster = focusRoster(pd?.players, h, pd?.opponentSide, mode === 'myteam' ? 'self' : 'opponent')
+            const zones = demoMap && pd?.rounds
+              ? summarizeZoneTendencies([pd.rounds], demoMap, roster.size > 0 ? roster : undefined)
+              : { text: [], hasData: false }
             return {
               demoId:   d.id,
               map:      d.map ?? h?.map,
@@ -696,6 +738,7 @@ CRITICAL RULES for pro dataset references:
                   adr: Number(p.adr?.toFixed?.(1) ?? p.adr),
                 })),
               tacticalSummary: summarizeTactics(pd?.rounds ?? [], pd?.players ?? []),
+              positionalRead: zones.hasData ? zones.text : undefined,
             }
           }),
         }

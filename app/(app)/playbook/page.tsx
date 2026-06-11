@@ -41,7 +41,7 @@ function PlaybookListInner() {
   const [newMap, setNewMap]             = useState(searchParams.get('map') ?? '')
   const [newName, setNewName]           = useState('')
   const [selectedTeam, setSelectedTeam] = useState(searchParams.get('team') ?? '')
-  const [selectedFolder, setSelectedFolder] = useState('')
+  const [selectedFolder, setSelectedFolder] = useState(searchParams.get('folder') ?? '')
   const [deleting, setDeleting]         = useState<string | null>(null)
   const [hoveredCard, setHoveredCard]   = useState<string | null>(null)
   const [availablePlayers, setAvailablePlayers] = useState<string[]>([])
@@ -60,7 +60,7 @@ function PlaybookListInner() {
       if (!selectedTeam && ts.length > 0) setSelectedTeam(ts[0].id)
     }).finally(() => setLoading(false))
 
-    if (searchParams.get('map')) setShowNew(true)
+    if (searchParams.get('map') || searchParams.get('folder')) setShowNew(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedOpponent = opponents.find(o => o.id === selectedFolder)
