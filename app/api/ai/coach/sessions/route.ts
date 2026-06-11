@@ -20,7 +20,7 @@ export async function GET() {
 }
 
 const createSchema = z.object({
-  mode:      z.enum(['opponent', 'myteam']).default('opponent'),
+  mode:      z.enum(['opponent', 'myteam', 'individual']).default('opponent'),
   teamId:    z.string().uuid().optional(),
   folderId:  z.string().uuid().optional(),
   focusArea: z.string().max(32).optional(),
