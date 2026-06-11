@@ -136,17 +136,46 @@ export async function parseAndSaveDemo(demoId: string): Promise<ParseJobResult> 
  * Returns the side that belongs to our team, or null if detection fails
  * (no Steam IDs linked, no matches, or missing data).
  */
+function sideForSteamId(
+  steamId: string,
+  players: Array<{ steam_id?: string; team?: string }>,
+  header: { team1?: string; team2?: string },
+): 'team1' | 'team2' | null {
+  const p = players.find(pl => pl.steam_id === steamId)
+  if (!p) return null
+  if (p.team === header.team1) return 'team1'
+  if (p.team === header.team2) return 'team2'
+  return null
+}
+
 async function detectOurTeamSide(
   parsedData: Record<string, unknown>,
   teamId: string,
   admin: ReturnType<typeof createAdminClient>,
+  creatorUserId?: string | null,
 ): Promise<'team1' | 'team2' | null> {
   const header  = parsedData.header as { team1?: string; team2?: string } | undefined
   const players = parsedData.players as Array<{ steam_id?: string; team?: string }> | undefined
 
   if (!header || !players || players.length === 0) return null
 
-  // Fetch Steam IDs for all team members who have Steam linked
+  // Highest precision: the user who imported/uploaded this demo. Unambiguous for
+  // auto-imported matchmaking games where teammates may be randoms, and for
+  // shared rosters where members solo-queue into separate games.
+  if (creatorUserId) {
+    const { data: creator } = await admin
+      .from('profiles')
+      .select('steam_id')
+      .eq('id', creatorUserId)
+      .not('steam_id', 'is', null)
+      .maybeSingle()
+    if (creator?.steam_id) {
+      const side = sideForSteamId(creator.steam_id, players, header)
+      if (side) return side
+    }
+  }
+
+  // Fallback: count how many of the team's Steam-linked members appear per side.
   const { data: members } = await admin
     .from('team_members')
     .select('user_id')
@@ -162,7 +191,6 @@ async function detectOurTeamSide(
 
   const memberSteamIds = new Set(profiles.map(p => p.steam_id).filter(Boolean))
 
-  // Count how many team members appear on each side
   let team1Matches = 0
   let team2Matches = 0
   for (const p of players) {
@@ -207,7 +235,7 @@ export async function applyParsedDemo(
 
   const { data: demo } = await admin
     .from('demos')
-    .select('team_id, opponent_slug, demo_type')
+    .select('team_id, opponent_slug, demo_type, created_by')
     .eq('id', demoId)
     .single()
 
@@ -223,7 +251,7 @@ export async function applyParsedDemo(
   // For self demos, attempt to auto-detect which side is the user's team
   // using linked Steam IDs. opponentSide is stored as the OTHER team's side.
   if (demo.demo_type === 'self') {
-    const ourSide = await detectOurTeamSide(parsedData, demo.team_id, admin)
+    const ourSide = await detectOurTeamSide(parsedData, demo.team_id, admin, demo.created_by)
     if (ourSide !== null) {
       opponentSide = ourSide === 'team1' ? 'team2' : 'team1'
       console.log(`[apply] [${demoId}] Auto-detected our side: ${ourSide} → opponentSide=${opponentSide}`)
