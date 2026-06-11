@@ -339,7 +339,7 @@ function MatchRow({ match, onGrab }: { match: CS2Match; onGrab: (m: CS2Match) =>
 
 interface Props { personalTeamId: string }
 
-export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props) {
+export default function CS2MatchPanel({ personalTeamId }: Props) {
   const [data, setData]       = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -348,18 +348,44 @@ export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props
   const [grabMatch, setGrabMatch] = useState<CS2Match | null>(null)
   const [showAll, setShowAll] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [autoSync, setAutoSync] = useState(false)
+  const [autoSaving, setAutoSaving] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const res  = await fetch('/api/cs2/matches')
-      const json = await res.json() as ApiResponse
+      const [matchesRes, autoRes] = await Promise.all([
+        fetch('/api/cs2/matches'),
+        fetch('/api/cs2/autosync'),
+      ])
+      const json = await matchesRes.json() as ApiResponse
       setData(json)
+      if (autoRes.ok) {
+        const a = await autoRes.json() as { enabled: boolean }
+        setAutoSync(Boolean(a.enabled))
+      }
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  async function toggleAutoSync() {
+    const next = !autoSync
+    setAutoSync(next)
+    setAutoSaving(true)
+    try {
+      await fetch('/api/cs2/autosync', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next, teamId: next ? personalTeamId : null }),
+      })
+    } catch {
+      setAutoSync(!next) // revert on failure
+    } finally {
+      setAutoSaving(false)
+    }
+  }
 
   async function sync() {
     setSyncing(true); setNewCount(null); setSyncError(null)
@@ -468,6 +494,32 @@ export default function CS2MatchPanel({ personalTeamId: _personalTeamId }: Props
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          {isBotMode && (
+            <>
+              <button
+                onClick={toggleAutoSync}
+                disabled={autoSaving}
+                title="Automatically pull new matches in the background"
+                className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                <span>Auto-sync</span>
+                <span
+                  className={cn(
+                    'relative inline-block w-6 h-3.5 rounded-full transition-colors',
+                    autoSync ? 'bg-[#00ffc8]' : 'bg-border'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-all',
+                      autoSync ? 'left-3' : 'left-0.5'
+                    )}
+                  />
+                </span>
+              </button>
+              <span className="text-border">·</span>
+            </>
+          )}
           <button
             onClick={sync}
             disabled={syncing}

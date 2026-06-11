@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { parseAndSaveDemo, applyParsedDemo } from '../lib/demo-parser/parse-and-save'
 import { startParserHealthMonitor } from './parser-health'
+import { startAutoSync } from './auto-sync'
 
 /**
  * Rivalize Demo Processing Worker v3
@@ -312,6 +313,8 @@ async function run(): Promise<void> {
   console.log('[worker] Demo processing worker v3 started')
   // Background watchdog: alerts if the Go parser goes down while demos wait.
   startParserHealthMonitor(supabase)
+  // Background CS2 match discovery for opted-in users.
+  startAutoSync(supabase)
   while (true) {
     try {
       await tick()
