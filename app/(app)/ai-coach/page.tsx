@@ -1031,10 +1031,10 @@ export default function AIScoutPage() {
                         <div style={{ paddingLeft: 42, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                           {replayInvocations.map(inv => {
                             if (inv.state === 'result') {
-                              const r = inv.result as Record<string, unknown>
-                              if (r.error) return (
+                              const r = (inv.result ?? {}) as Record<string, unknown>
+                              if (r.error || !r.round) return (
                                 <p key={inv.toolCallId} style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>
-                                  Replay unavailable: {String(r.error)}
+                                  Replay unavailable{r.error ? `: ${String(r.error)}` : ''}
                                 </p>
                               )
                               return (

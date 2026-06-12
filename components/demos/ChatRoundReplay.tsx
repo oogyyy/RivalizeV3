@@ -55,14 +55,19 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ChatRoundReplay({
-  round, players, team1Name, team2Name, mapName, roundNumber, description,
+  round, players: playersProp, team1Name, team2Name, mapName, roundNumber, description,
 }: Props) {
-  const duration = Math.max(round.duration || 120, 10)
+  // Defensive defaults — tool results travel through the chat stream and may
+  // arrive with missing arrays; never let that crash the chat.
+  const kills    = round?.kills ?? []
+  const grenades = round?.grenades ?? []
+  const players  = playersProp ?? []
+  const duration = Math.max(round?.duration || 120, 10)
   // Skip the dead freeze/buy phase so the replay opens on the action.
   const startOffset = roundStartOffset({
     freeze_end_time: round.freeze_end_time,
-    grenades: round.grenades,
-    kills: round.kills,
+    grenades,
+    kills,
   })
 
   const canvasRef  = useRef<HTMLCanvasElement>(null)
@@ -112,7 +117,7 @@ export default function ChatRoundReplay({
       worldToCanvas(wx, wy, cfg, CANVAS_SIZE)
 
     // ── Grenades ──
-    ;(round.grenades ?? []).forEach((g: GrenadeEvent) => {
+    ;grenades.forEach((g: GrenadeEvent) => {
       if (g.time > t) return
 
       const color = GREN_COLORS[g.type] ?? '#fff'
@@ -170,7 +175,7 @@ export default function ChatRoundReplay({
     if (bomb) drawBomb(ctx, bomb, t, heRadius * 2.1)
 
     // ── Kills ──
-    const pastKills = round.kills.filter((k: Kill) => k.time <= t)
+    const pastKills = kills.filter((k: Kill) => k.time <= t)
     pastKills.forEach((k: Kill) => {
       const age = t - k.time
       const [kx, ky] = toXY(k.killer_x, k.killer_y)
@@ -223,7 +228,7 @@ export default function ChatRoundReplay({
     ctx.fillRect(0, barY, CANVAS_SIZE * (t / duration), 4)
 
     // Kill tick marks on timeline
-    round.kills.forEach((k: Kill) => {
+    kills.forEach((k: Kill) => {
       const tx = CANVAS_SIZE * (k.time / duration)
       ctx.fillStyle = 'rgba(255,215,0,0.7)'
       ctx.fillRect(tx - 0.5, barY, 1, 4)

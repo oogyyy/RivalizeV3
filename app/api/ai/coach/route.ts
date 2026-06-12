@@ -957,7 +957,7 @@ CRITICAL RULES for pro dataset references:
   const showRoundReplay = tool({
     description: 'Display an interactive 2D round replay to help the user visualise a tactical pattern, execute, or key event you are discussing. Use this proactively when explaining specific round sequences, smoke setups, execute patterns, or kill events that benefit from visual context. Do NOT use it for general statistical observations.',
     parameters: z.object({
-      mapName:     z.string().describe('CS2 map name e.g. de_mirage'),
+      mapName:     z.string().describe('Exact CS2 map id with prefix, e.g. de_mirage (never "Mirage")'),
       roundNumber: z.number().int().optional().describe('Specific round number (1-indexed). Omit to let the system pick a representative round.'),
       description: z.string().max(200).describe('Short caption shown below the replay explaining what to look for — e.g. "Notice the simultaneous Stairs + Jungle smokes at 0:23."'),
     }),
@@ -998,9 +998,17 @@ CRITICAL RULES for pro dataset references:
           demoParsedList = (demos ?? []).map(d => d.parsed_data as DemoParsedData).filter(Boolean)
         }
 
+        // Normalize the map name — the model sometimes passes "Mirage" instead
+        // of the exact id, and the client needs the de_-prefixed id to render.
+        const normalized = mapName.trim().toLowerCase().replace(/\s+/g, '')
+        const wantedMap = /^(de|cs|ar)_/.test(normalized) ? normalized : `de_${normalized}`
+
         // Find a demo that has rounds on the requested map
-        const pd = demoParsedList.find(d => d?.header?.map === mapName && (d.rounds?.length ?? 0) > 0)
-        if (!pd?.rounds) return { error: `No round data available for ${mapName}` }
+        const pd = demoParsedList.find(d => d?.header?.map === wantedMap && (d.rounds?.length ?? 0) > 0)
+        if (!pd?.rounds) {
+          const available = [...new Set(demoParsedList.map(d => d?.header?.map).filter(Boolean))]
+          return { error: `No round data available for ${wantedMap}${available.length ? ` — available maps: ${available.join(', ')}` : ''}` }
+        }
 
         const rounds = pd.rounds
         const round = roundNumber
@@ -1009,11 +1017,14 @@ CRITICAL RULES for pro dataset references:
 
         if (!round) return { error: 'Round not found' }
 
-        // Strip frames (too large to transmit) — kills + grenades are enough for kill-only replay
-        const { frames: _frames, ...roundWithoutFrames } = round
+        // Strip frames (too large to transmit) — kills + grenades are enough
+        // for kill-only replay. Default the event arrays so the client never
+        // receives a round it cannot render.
+        const { frames: _frames, ...rest } = round
+        const roundWithoutFrames = { ...rest, kills: rest.kills ?? [], grenades: rest.grenades ?? [] }
 
         return {
-          mapName,
+          mapName:      pd.header?.map ?? wantedMap,
           roundNumber:  round.number,
           team1Name:    pd.header?.team1 ?? 'Team 1',
           team2Name:    pd.header?.team2 ?? 'Team 2',
