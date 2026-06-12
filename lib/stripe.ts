@@ -29,7 +29,7 @@ export const PLANS = {
   },
   pro: {
     name: 'Pro',
-    price: 19,
+    price: 5,
     priceId: process.env.STRIPE_PRO_PRICE_ID ?? null,
     demosPerMonth: -1, // unlimited
     maxTeams: 3,
@@ -46,7 +46,7 @@ export const PLANS = {
   },
   team: {
     name: 'Team',
-    price: 49,
+    price: 20,
     priceId: process.env.STRIPE_TEAM_PRICE_ID ?? null,
     demosPerMonth: -1,
     maxTeams: -1,
