@@ -292,6 +292,9 @@ export default function LandingPage() {
             <a className="lp-navlink" href="#product">
               Product
             </a>
+            <Link className="lp-navlink" href="/pricing">
+              Pricing
+            </Link>
             <Link className="lp-navlink" href="/login">
               Sign in
             </Link>
@@ -600,7 +603,7 @@ export default function LandingPage() {
                 { text: 'Features', href: '#features' },
                 { text: 'Product', href: '#product' },
                 { text: 'How it works', href: '#how' },
-                { text: 'Pricing', href: '#start' },
+                { text: 'Pricing', href: '/pricing' },
               ]}
             />
             <FooterCol
