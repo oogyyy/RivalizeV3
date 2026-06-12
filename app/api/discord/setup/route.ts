@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { testWebhook } from '@/lib/discord/notify'
 import { z } from 'zod'
+import { checkTeamFeature } from '@/lib/billing'
 
 const connectSchema = z.object({
   teamId:     z.string().uuid(),
@@ -70,6 +71,14 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
   if (!member || !['owner', 'admin'].includes(member.role)) {
     return NextResponse.json({ error: 'Only team owner or admin can manage Discord integration' }, { status: 403 })
+  }
+
+  const discordFeature = await checkTeamFeature(teamId, 'discordBot')
+  if (!discordFeature.allowed) {
+    return NextResponse.json(
+      { error: 'plan_required', message: 'Discord integration requires a Team plan.', upgradeRequired: discordFeature.upgradeRequired },
+      { status: 402 },
+    )
   }
 
   // Resolve webhook metadata from Discord API to get guild_id

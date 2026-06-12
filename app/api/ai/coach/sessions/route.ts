@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { checkUserFeature } from '@/lib/billing'
 
 // Lists the user's recent coach sessions (RLS scopes rows to the user).
 export async function GET() {
@@ -30,6 +31,14 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const feature = await checkUserFeature(user.id, 'aiCoaching')
+  if (!feature.allowed) {
+    return NextResponse.json(
+      { error: 'plan_required', message: 'AI coaching requires a Pro plan or higher.', upgradeRequired: feature.upgradeRequired },
+      { status: 402 },
+    )
+  }
 
   let raw: unknown
   try { raw = await request.json() } catch {

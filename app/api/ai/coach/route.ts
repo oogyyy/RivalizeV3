@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { checkUserFeature } from '@/lib/billing'
 import { streamText, tool } from 'ai'
 import { z } from 'zod'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
@@ -217,6 +218,14 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const feature = await checkUserFeature(user.id, 'aiCoaching')
+  if (!feature.allowed) {
+    return NextResponse.json(
+      { error: 'plan_required', message: 'AI coaching requires a Pro plan or higher.', upgradeRequired: feature.upgradeRequired },
+      { status: 402 },
+    )
   }
 
   // 20 AI coach messages per user per 60 s

@@ -40,16 +40,20 @@ export async function POST(
   }
 
   // Check if a user with this email already exists and is a team member.
-  // Email lives in auth.users — use the admin auth API to look it up.
-  const { data: authUserData } = await admin.auth.admin.getUserByEmail(email)
-  const existingAuthUser = authUserData?.user ?? null
+  // Query auth.users directly using the service-role client.
+  const { data: authUserRow } = await (admin as ReturnType<typeof createAdminClient>)
+    .schema('auth' as 'public')
+    .from('users' as never)
+    .select('id')
+    .eq('email' as never, email)
+    .maybeSingle() as { data: { id: string } | null; error: unknown }
 
-  if (existingAuthUser) {
+  if (authUserRow?.id) {
     const { data: existingMember } = await admin
       .from('team_members')
       .select('user_id')
       .eq('team_id', teamId)
-      .eq('user_id', existingAuthUser.id)
+      .eq('user_id', authUserRow.id)
       .maybeSingle()
 
     if (existingMember) {

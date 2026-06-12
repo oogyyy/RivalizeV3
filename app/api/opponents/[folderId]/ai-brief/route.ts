@@ -6,6 +6,7 @@ import type { PlayerStats, Round, Kill, GrenadeEvent } from '@/types/database'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { aiConfigured, getAIModel, logAIUsage } from '@/lib/ai'
+import { checkUserFeature } from '@/lib/billing'
 
 type ParsedDemo = {
   header?: { map?: string; team1?: string; team2?: string; score_team1?: number; score_team2?: number; total_rounds?: number }
@@ -126,6 +127,14 @@ export async function POST(
     .eq('user_id', user.id)
     .single()
   if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const feature = await checkUserFeature(user.id, 'aiCoaching')
+  if (!feature.allowed) {
+    return NextResponse.json(
+      { error: 'plan_required', message: 'AI scouting briefs require a Pro plan or higher.', upgradeRequired: feature.upgradeRequired },
+      { status: 402 },
+    )
+  }
 
   const body = await req.json().catch(() => ({})) as { regenerate?: boolean }
 

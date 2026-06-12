@@ -5,6 +5,7 @@ import { generateText } from 'ai'
 import type { PlayerStats, Round, Kill, GrenadeEvent } from '@/types/database'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { aiConfigured, getAIModel, logAIUsage } from '@/lib/ai'
+import { checkUserFeature } from '@/lib/billing'
 
 type ParsedData = {
   header?: {
@@ -118,6 +119,14 @@ export async function POST(
     .eq('user_id', user.id)
     .single()
   if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const feature = await checkUserFeature(user.id, 'aiCoaching')
+  if (!feature.allowed) {
+    return NextResponse.json(
+      { error: 'plan_required', message: 'AI reports require a Pro plan or higher.', upgradeRequired: feature.upgradeRequired },
+      { status: 402 },
+    )
+  }
 
   // 5 report generations per user per minute (cache hits above are unaffected)
   if (!rateLimit(`ai:report:${user.id}`, 5, 60_000)) {

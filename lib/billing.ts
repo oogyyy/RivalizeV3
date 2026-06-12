@@ -80,3 +80,49 @@ export async function getUserPlan(userId: string): Promise<'pro' | 'team' | null
   if (subs.some(s => s.plan === 'pro')) return 'pro'
   return null
 }
+
+type BooleanFeature = 'aiCoaching' | 'discordBot' | 'pdfExports'
+
+// Check if a user's plan allows a feature (across all their team subscriptions).
+export async function checkUserFeature(
+  userId: string,
+  feature: BooleanFeature,
+): Promise<{ allowed: boolean; upgradeRequired?: 'pro' | 'team' }> {
+  const plan = await getUserPlan(userId)
+  const limits = PLANS[plan ?? 'free']
+  if (limits[feature]) return { allowed: true }
+  if (PLANS.pro[feature]) return { allowed: false, upgradeRequired: 'pro' }
+  return { allowed: false, upgradeRequired: 'team' }
+}
+
+// Check if a specific team's active plan allows a feature.
+export async function checkTeamFeature(
+  teamId: string,
+  feature: BooleanFeature,
+): Promise<{ allowed: boolean; upgradeRequired?: 'pro' | 'team' }> {
+  const sub = await getTeamSubscription(teamId)
+  const effectivePlan = (sub.status === 'active' || sub.status === 'trialing') ? sub.plan : 'free'
+  const limits = PLANS[effectivePlan]
+  if (limits[feature]) return { allowed: true }
+  if (PLANS.pro[feature]) return { allowed: false, upgradeRequired: 'pro' }
+  return { allowed: false, upgradeRequired: 'team' }
+}
+
+// Check if a user can create another team (counts teams they own, not just belong to).
+export async function checkTeamLimit(
+  userId: string,
+): Promise<{ allowed: boolean; limit: number; current: number }> {
+  const plan = await getUserPlan(userId)
+  const limits = PLANS[plan ?? 'free']
+  if (limits.maxTeams === -1) return { allowed: true, limit: -1, current: 0 }
+
+  const admin = createAdminClient()
+  const { count } = await admin
+    .from('team_members')
+    .select('team_id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('role', 'owner')
+
+  const current = count ?? 0
+  return { allowed: current < limits.maxTeams, limit: limits.maxTeams, current }
+}

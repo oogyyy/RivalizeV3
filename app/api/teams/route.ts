@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { checkTeamLimit } from '@/lib/billing'
 
 const createTeamSchema = z.object({
   name: z.string().min(2).max(50),
@@ -26,6 +27,20 @@ export async function POST(request: Request) {
   }
 
   const { name, slug } = parsed.data
+
+  // Enforce per-plan team limit (counts teams the user owns)
+  const teamLimit = await checkTeamLimit(user.id)
+  if (!teamLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: 'team_limit_reached',
+        message: `Your plan allows up to ${teamLimit.limit} team${teamLimit.limit === 1 ? '' : 's'}. Upgrade to create more.`,
+        limit: teamLimit.limit,
+        current: teamLimit.current,
+      },
+      { status: 402 },
+    )
+  }
 
   // Admin client bypasses RLS entirely (service role key required in SUPABASE_SERVICE_ROLE_KEY).
   // Do NOT use the user's client here — the team_members INSERT policies call is_team_admin()

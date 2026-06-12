@@ -11,6 +11,7 @@ import { detectTacticalPatterns } from '@/lib/cs2-zones'
 import { summarizeZoneTendencies, focusRoster } from '@/lib/zone-analytics'
 import AiBriefSection from '@/components/prep/AiBriefSection'
 import VetoPlanSection from '@/components/prep/VetoPlanSection'
+import { getUserPlan } from '@/lib/billing'
 
 const MAP_LABELS: Record<string, string> = {
   de_dust2: 'Dust2', de_mirage: 'Mirage', de_inferno: 'Inferno', de_nuke: 'Nuke',
@@ -53,6 +54,8 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
   if (!membership) redirect('/opponents')
 
   const stats = folder.aggregated_stats as AggregatedStats | null
+
+  const userPlan = await getUserPlan(user.id)
 
   const [{ data: demos }, { data: selfDemos }, { data: linkedPlaybooks }] = await Promise.all([
     admin
@@ -204,7 +207,7 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
               <ArrowLeft size={15} />
               Back to {folder.opponent_display_name}
             </Link>
-            <PrepPrintButton />
+            <PrepPrintButton plan={userPlan} />
           </div>
         </div>
 
@@ -224,7 +227,7 @@ export default async function PrepPage({ params }: { params: Promise<{ folderId:
                 </p>
               </div>
               <div className="no-print">
-                <PrepPrintButton />
+                <PrepPrintButton plan={userPlan} />
               </div>
             </div>
           </div>
