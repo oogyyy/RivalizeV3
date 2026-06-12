@@ -7,7 +7,7 @@ import {
   Save, ArrowLeft, Sparkles, Loader2, CheckCircle2,
   Swords, Shield, Crosshair, Users, Coins,
   Brain, Send, RotateCcw, AlertCircle, RefreshCw, Map, MessageSquare, Target,
-  Pencil, Check,
+  Pencil, Check, ClipboardList, Trash2, Wand2, Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -34,12 +34,22 @@ const ROLE_OPTIONS: { value: PlayerRole; label: string; color: string }[] = [
   { value: 'Rifler',  label: 'Rifler',  color: 'text-muted-foreground' },
 ]
 
+type StratAssignment = { player: string; instruction: string }
+
+type Strat = {
+  id: string
+  name: string
+  side: 't' | 'ct'
+  assignments: StratAssignment[]   // always 5 rows
+}
+
 type Playbook = {
   id: string
   team_id: string
   map: string
   name: string
   sections: Record<string, string>
+  strats?: Strat[]
   notes?: string
   folder_id?: string | null
   opponent_name?: string | null
@@ -101,8 +111,11 @@ export default function PlaybookBuilderPage() {
   const [sections, setSections]   = useState<Record<string, string>>({})
   const [pbName, setPbName]       = useState('')
   const [playerRoles, setPlayerRoles] = useState<Record<string, PlayerRole>>({})
-  const [activeSection, setActiveSection] = useState<SectionId>('t_side')
+  const [activeSection, setActiveSection] = useState<SectionId | 'strats'>('t_side')
   const [editingSection, setEditingSection] = useState<SectionId | null>(null)
+  const [strats, setStrats]               = useState<Strat[]>([])
+  const [improvingStrat, setImprovingStrat] = useState<string | null>(null)
+  const [stratError, setStratError]       = useState<string | null>(null)
   const [generating, setGenerating]       = useState<SectionId | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
   const [saving, setSaving]               = useState(false)
@@ -124,6 +137,7 @@ export default function PlaybookBuilderPage() {
       setPlaybook(pb)
       setPbName(pb.name)
       setSections(pb.sections ?? {})
+      setStrats(Array.isArray(pb.strats) ? pb.strats : [])
       setPlayerRoles(pb.player_roles ?? {})
       if (teams.length > 0) setMyTeamId(teams[0].id)
       else setMyTeamId(pb.team_id)
@@ -224,13 +238,54 @@ export default function PlaybookBuilderPage() {
     }
   }
 
+  const addStrat = () => {
+    const roster = playbook?.players ?? []
+    const strat: Strat = {
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: `Strat ${strats.length + 1}`,
+      side: 't',
+      assignments: Array.from({ length: 5 }, (_, i) => ({ player: roster[i] ?? '', instruction: '' })),
+    }
+    setStrats(prev => [...prev, strat])
+    setActiveSection('strats')
+  }
+
+  const updateStrat = (stratId: string, patch: Partial<Strat>) =>
+    setStrats(prev => prev.map(st => st.id === stratId ? { ...st, ...patch } : st))
+
+  const updateAssignment = (stratId: string, idx: number, patch: Partial<StratAssignment>) =>
+    setStrats(prev => prev.map(st => st.id === stratId
+      ? { ...st, assignments: st.assignments.map((a, i) => i === idx ? { ...a, ...patch } : a) }
+      : st))
+
+  const improveStrat = async (strat: Strat) => {
+    setImprovingStrat(strat.id)
+    setStratError(null)
+    try {
+      const res = await fetch(`/api/playbooks/${id}/improve-strat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ strat }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.strat) throw new Error(data.error ?? 'Improve failed')
+      setStrats(prev => prev.map(st => st.id === strat.id ? data.strat as Strat : st))
+    } catch (e) {
+      setStratError(e instanceof Error ? e.message : 'Improve failed')
+    } finally {
+      setImprovingStrat(null)
+    }
+  }
+
   const handleSave = async () => {
     if (!playbook) return
     setSaving(true)
     const res = await fetch(`/api/playbooks/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: pbName, sections, playerRoles }),
+      body: JSON.stringify({ name: pbName, sections, playerRoles, strats }),
     })
     setSaving(false)
     if (res.ok) {
@@ -240,10 +295,11 @@ export default function PlaybookBuilderPage() {
   }
 
   const isAntistrat   = !!playbook?.opponent_name
-  const activeContent = sections[activeSection] ?? ''
-  const activeMeta    = SECTIONS.find(s => s.id === activeSection)!
-  const sectionLabel  = isAntistrat ? activeMeta.antiLabel : activeMeta.label
-  const sectionDesc   = isAntistrat ? activeMeta.antiDesc  : activeMeta.desc
+  const isStratsTab   = activeSection === 'strats'
+  const activeContent = isStratsTab ? '' : (sections[activeSection] ?? '')
+  const activeMeta    = SECTIONS.find(s => s.id === activeSection) ?? SECTIONS[0]
+  const sectionLabel  = isStratsTab ? 'Team Strats' : (isAntistrat ? activeMeta.antiLabel : activeMeta.label)
+  const sectionDesc   = isStratsTab ? 'Named set plays with per-player jobs' : (isAntistrat ? activeMeta.antiDesc : activeMeta.desc)
   const lastChatMsg   = messages[messages.length - 1]
   const isThinking    = chatLoading && (!lastChatMsg || lastChatMsg.role === 'user')
 
@@ -375,6 +431,26 @@ export default function PlaybookBuilderPage() {
                   )
                 })}
               </div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-4 mb-2 px-1">Strats</p>
+              <button
+                onClick={() => setActiveSection('strats')}
+                className={cn(
+                  'w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-left transition-all',
+                  isStratsTab
+                    ? 'bg-[color:color-mix(in_srgb,var(--signal)_8%,transparent)] text-[color:var(--signal)] border border-[color:color-mix(in_srgb,var(--signal)_20%,transparent)]'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent'
+                )}
+              >
+                <span className={isStratsTab ? 'text-[color:var(--signal)]' : 'text-muted-foreground shrink-0'}>
+                  <ClipboardList size={14} />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate font-medium">Team Strats</p>
+                </div>
+                {strats.length > 0 && (
+                  <span className="text-[10px] font-mono text-muted-foreground shrink-0">{strats.length}</span>
+                )}
+              </button>
             </div>
 
             {/* Roster role assignments */}
@@ -425,11 +501,16 @@ export default function PlaybookBuilderPage() {
                   <p className="text-xs text-muted-foreground">{sectionDesc}</p>
                 </div>
               </div>
+              {isStratsTab ? (
+                <Button variant="neon" size="sm" onClick={addStrat} className="gap-1.5 shrink-0">
+                  <Plus size={12} /> Add Strat
+                </Button>
+              ) : (
               <div className="flex items-center gap-2 shrink-0">
                 <Button
                   variant={editingSection === activeSection ? 'neon' : 'outline'}
                   size="sm"
-                  onClick={() => setEditingSection(prev => prev === activeSection ? null : activeSection)}
+                  onClick={() => setEditingSection(prev => prev === activeSection ? null : (activeSection as SectionId))}
                   disabled={generating === activeSection || generatingAll}
                   className="gap-1.5"
                   title={editingSection === activeSection ? 'Finish editing (hit Save to persist)' : 'Write or edit this section manually'}
@@ -443,7 +524,7 @@ export default function PlaybookBuilderPage() {
                 <Button
                   variant={activeContent ? 'outline' : 'neon'}
                   size="sm"
-                  onClick={() => generateSection(activeSection)}
+                  onClick={() => generateSection(activeSection as SectionId)}
                   disabled={!!generating || generatingAll || editingSection === activeSection}
                   className="gap-1.5"
                 >
@@ -454,6 +535,7 @@ export default function PlaybookBuilderPage() {
                   )}
                 </Button>
               </div>
+              )}
             </div>
 
             {/* Mobile section tabs */}
@@ -476,11 +558,149 @@ export default function PlaybookBuilderPage() {
                   {sections[s.id] && <span className={cn('w-1 h-1 rounded-full ml-0.5', isAntistrat ? 'bg-[color:var(--tside)]' : 'bg-[color:var(--signal)]')} />}
                 </button>
               ))}
+              <button
+                onClick={() => setActiveSection('strats')}
+                className={cn(
+                  'flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs whitespace-nowrap border shrink-0',
+                  isStratsTab
+                    ? 'border-[color:color-mix(in_srgb,var(--signal)_30%,transparent)] text-[color:var(--signal)] bg-[color:color-mix(in_srgb,var(--signal)_8%,transparent)]'
+                    : 'border-border text-muted-foreground bg-transparent'
+                )}
+              >
+                <ClipboardList size={14} />
+                Team Strats
+                {strats.length > 0 && <span className="ml-0.5 font-mono text-[10px]">{strats.length}</span>}
+              </button>
             </div>
 
             {/* Content area */}
             <div className="flex-1 overflow-y-auto p-4">
-              {editingSection === activeSection ? (
+              {isStratsTab ? (
+                <div className="space-y-4 max-w-3xl">
+                  {stratError && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[color:color-mix(in_srgb,var(--loss)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--loss)_6%,transparent)]">
+                      <AlertCircle size={13} className="text-[color:var(--loss)] shrink-0" />
+                      <p className="text-xs text-[color:var(--loss)]">{stratError}</p>
+                    </div>
+                  )}
+
+                  {strats.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="w-12 h-12 rounded-xl bg-[color:color-mix(in_srgb,var(--signal)_8%,transparent)] border border-[color:color-mix(in_srgb,var(--signal)_15%,transparent)] flex items-center justify-center mb-3">
+                        <ClipboardList size={18} className="text-[color:var(--signal)]" />
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4 max-w-xs">
+                        No strats yet. Add a play, assign all five players their job, and optionally let AI sharpen the wording.
+                      </p>
+                      <Button variant="neon" size="sm" onClick={addStrat} className="gap-1.5">
+                        <Plus size={13} /> Add your first strat
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {strats.map((strat, si) => {
+                        const improving = improvingStrat === strat.id
+                        return (
+                          <div key={strat.id} className="rounded-xl border border-border bg-card overflow-hidden">
+                            {/* Strat header */}
+                            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border bg-[color:var(--panel)]">
+                              <input
+                                value={strat.name}
+                                onChange={e => updateStrat(strat.id, { name: e.target.value })}
+                                placeholder={`Strat ${si + 1}`}
+                                className="flex-1 min-w-0 bg-transparent text-sm font-semibold text-foreground focus:outline-none border-b border-transparent focus:border-[color:color-mix(in_srgb,var(--signal)_40%,transparent)]"
+                              />
+                              <div className="flex rounded-md border border-border overflow-hidden shrink-0">
+                                {(['t', 'ct'] as const).map(side => (
+                                  <button
+                                    key={side}
+                                    onClick={() => updateStrat(strat.id, { side })}
+                                    className={cn(
+                                      'px-2 py-1 text-[10px] font-bold uppercase transition-colors',
+                                      strat.side === side
+                                        ? side === 't'
+                                          ? 'bg-[color:color-mix(in_srgb,var(--tside)_18%,transparent)] text-[color:var(--tside)]'
+                                          : 'bg-[color:color-mix(in_srgb,var(--ct)_18%,transparent)] text-[color:var(--ct)]'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                    )}
+                                  >
+                                    {side === 't' ? 'T' : 'CT'}
+                                  </button>
+                                ))}
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => improveStrat(strat)}
+                                disabled={!!improvingStrat || strat.assignments.every(a => !a.instruction.trim())}
+                                className="gap-1.5 shrink-0"
+                                title="AI rewrites the instructions with proper callouts and timings — your players and the play's intent stay yours"
+                              >
+                                {improving ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                                <span className="hidden md:inline">{improving ? 'Improving…' : 'Improve with AI'}</span>
+                              </Button>
+                              <button
+                                onClick={() => setStrats(prev => prev.filter(st => st.id !== strat.id))}
+                                className="p-1.5 rounded text-muted-foreground hover:text-[color:var(--loss)] transition-colors shrink-0"
+                                title="Delete strat"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                            {/* Five player rows */}
+                            <div className="divide-y divide-border">
+                              {strat.assignments.map((a, i) => (
+                                <div key={i} className="flex items-start gap-2 px-3 py-2">
+                                  <div className="w-32 shrink-0 pt-1">
+                                    {(playbook?.players?.length ?? 0) > 0 ? (
+                                      <select
+                                        value={a.player}
+                                        onChange={e => updateAssignment(strat.id, i, { player: e.target.value })}
+                                        className="w-full bg-background border border-border rounded px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)]"
+                                      >
+                                        <option value="">Player…</option>
+                                        {playbook!.players!.map(pl => <option key={pl} value={pl}>{pl}</option>)}
+                                        {a.player && !playbook!.players!.includes(a.player) && (
+                                          <option value={a.player}>{a.player}</option>
+                                        )}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        value={a.player}
+                                        onChange={e => updateAssignment(strat.id, i, { player: e.target.value })}
+                                        placeholder={`Player ${i + 1}`}
+                                        className="w-full bg-background border border-border rounded px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)]"
+                                      />
+                                    )}
+                                    {a.player && playerRoles[a.player] && (
+                                      <p className="text-[9px] text-muted-foreground mt-0.5 px-0.5">{playerRoles[a.player]}</p>
+                                    )}
+                                  </div>
+                                  <textarea
+                                    value={a.instruction}
+                                    onChange={e => updateAssignment(strat.id, i, { instruction: e.target.value })}
+                                    placeholder="e.g. Smoke CT from Top Mid at 1:35, then hold Connector"
+                                    rows={2}
+                                    className="flex-1 bg-transparent border border-transparent hover:border-border focus:border-[color:color-mix(in_srgb,var(--signal)_40%,transparent)] rounded px-2 py-1 text-xs text-foreground leading-relaxed resize-none focus:outline-none min-h-[44px]"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      <div className="flex items-center justify-between">
+                        <Button variant="outline" size="sm" onClick={addStrat} className="gap-1.5">
+                          <Plus size={13} /> Add Strat
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground">
+                          Strats are saved with the playbook — hit <strong className="text-foreground">Save</strong>
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : editingSection === activeSection ? (
                 <div className="flex flex-col h-full gap-2">
                   <textarea
                     value={activeContent}
@@ -521,7 +741,7 @@ export default function PlaybookBuilderPage() {
                     <Button
                       variant="neon"
                       size="sm"
-                      onClick={() => generateSection(activeSection)}
+                      onClick={() => generateSection(activeSection as SectionId)}
                       disabled={!!generating || generatingAll}
                       className="gap-1.5"
                     >
@@ -531,7 +751,7 @@ export default function PlaybookBuilderPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setEditingSection(activeSection)}
+                      onClick={() => setEditingSection(activeSection as SectionId)}
                       disabled={!!generating || generatingAll}
                       className="gap-1.5"
                     >

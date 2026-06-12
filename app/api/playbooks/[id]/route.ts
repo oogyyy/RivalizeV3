@@ -4,11 +4,22 @@ import { z } from 'zod'
 
 const VALID_ROLES = ['AWPer', 'Entry', 'Support', 'Lurker', 'IGL', 'Rifler'] as const
 
+const stratSchema = z.object({
+  id:   z.string().max(64),
+  name: z.string().max(120),
+  side: z.enum(['t', 'ct']),
+  assignments: z.array(z.object({
+    player:      z.string().max(64),
+    instruction: z.string().max(1000),
+  })).length(5),
+})
+
 const updateSchema = z.object({
   name:        z.string().min(1).max(128).optional(),
   sections:    z.record(z.string()).optional(),
   notes:       z.string().max(4000).optional(),
   playerRoles: z.record(z.string().max(64), z.enum(VALID_ROLES)).optional(),
+  strats:      z.array(stratSchema).max(50).optional(),
 })
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
