@@ -10,6 +10,7 @@ const stratSchema = z.object({
   side: z.enum(['t', 'ct']),
   assignments: z.array(z.object({
     player:      z.string().max(64),
+    role:        z.string().max(24).optional().default(''),
     instruction: z.string().max(1000),
   })).length(5),
 })

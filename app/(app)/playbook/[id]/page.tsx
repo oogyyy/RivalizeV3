@@ -34,7 +34,7 @@ const ROLE_OPTIONS: { value: PlayerRole; label: string; color: string }[] = [
   { value: 'Rifler',  label: 'Rifler',  color: 'text-muted-foreground' },
 ]
 
-type StratAssignment = { player: string; instruction: string }
+type StratAssignment = { player: string; role: string; instruction: string }
 
 type Strat = {
   id: string
@@ -137,7 +137,11 @@ export default function PlaybookBuilderPage() {
       setPlaybook(pb)
       setPbName(pb.name)
       setSections(pb.sections ?? {})
-      setStrats(Array.isArray(pb.strats) ? pb.strats : [])
+      // Normalize older strats saved before the role column existed
+      setStrats(Array.isArray(pb.strats) ? (pb.strats as Strat[]).map(st => ({
+        ...st,
+        assignments: (st.assignments ?? []).map(a => ({ player: a.player ?? '', role: a.role ?? '', instruction: a.instruction ?? '' })),
+      })) : [])
       setPlayerRoles(pb.player_roles ?? {})
       if (teams.length > 0) setMyTeamId(teams[0].id)
       else setMyTeamId(pb.team_id)
@@ -246,7 +250,7 @@ export default function PlaybookBuilderPage() {
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       name: `Strat ${strats.length + 1}`,
       side: 't',
-      assignments: Array.from({ length: 5 }, (_, i) => ({ player: roster[i] ?? '', instruction: '' })),
+      assignments: Array.from({ length: 5 }, (_, i) => ({ player: roster[i] ?? '', role: roster[i] ? (playerRoles[roster[i]] ?? '') : '', instruction: '' })),
     }
     setStrats(prev => [...prev, strat])
     setActiveSection('strats')
@@ -647,6 +651,12 @@ export default function PlaybookBuilderPage() {
                                 <Trash2 size={13} />
                               </button>
                             </div>
+                            {/* Column headers */}
+                            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-[color:color-mix(in_srgb,var(--signal)_3%,transparent)]">
+                              <p className="w-32 shrink-0 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Player</p>
+                              <p className="w-24 shrink-0 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Role</p>
+                              <p className="flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">What you do</p>
+                            </div>
                             {/* Five player rows */}
                             <div className="divide-y divide-border">
                               {strat.assignments.map((a, i) => (
@@ -655,7 +665,14 @@ export default function PlaybookBuilderPage() {
                                     {(playbook?.players?.length ?? 0) > 0 ? (
                                       <select
                                         value={a.player}
-                                        onChange={e => updateAssignment(strat.id, i, { player: e.target.value })}
+                                        onChange={e => {
+                                          const player = e.target.value
+                                          updateAssignment(strat.id, i, {
+                                            player,
+                                            // Auto-fill role from roster assignment unless the row already has one
+                                            ...(player && !a.role && playerRoles[player] ? { role: playerRoles[player] } : {}),
+                                          })
+                                        }}
                                         className="w-full bg-background border border-border rounded px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)]"
                                       >
                                         <option value="">Player…</option>
@@ -672,9 +689,16 @@ export default function PlaybookBuilderPage() {
                                         className="w-full bg-background border border-border rounded px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)]"
                                       />
                                     )}
-                                    {a.player && playerRoles[a.player] && (
-                                      <p className="text-[9px] text-muted-foreground mt-0.5 px-0.5">{playerRoles[a.player]}</p>
-                                    )}
+                                  </div>
+                                  <div className="w-24 shrink-0 pt-1">
+                                    <select
+                                      value={a.role}
+                                      onChange={e => updateAssignment(strat.id, i, { role: e.target.value })}
+                                      className="w-full bg-background border border-border rounded px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)]"
+                                    >
+                                      <option value="">Role…</option>
+                                      {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                    </select>
                                   </div>
                                   <textarea
                                     value={a.instruction}
