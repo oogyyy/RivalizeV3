@@ -11,7 +11,7 @@ import {
   Target, Crosshair, Shield, Users,
   Sparkles, ChevronRight, ExternalLink, Database,
   SlidersHorizontal, X, ChevronDown, BarChart3, AlertCircle, RefreshCw,
-  BookOpen, Zap, History, Trash2, User,
+  BookOpen, Zap, History, Trash2, User, ThumbsUp, ThumbsDown,
 } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
 import { CS2_MAPS } from '@/types/database'
@@ -267,6 +267,7 @@ export default function AIScoutPage() {
   const [personalTeamId, setPersonalTeamId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<CoachSession[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [feedbackSent, setFeedbackSent] = useState<Record<string, 1 | -1>>({})
 
   const messagesEndRef    = useRef<HTMLDivElement>(null)
   const textareaRef       = useRef<HTMLTextAreaElement>(null)
@@ -353,6 +354,22 @@ export default function AIScoutPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
+
+  // Rates an AI answer — stored server-side as fine-tuning raw material.
+  const sendFeedback = useCallback((msgId: string, content: string, rating: 1 | -1, promptText?: string) => {
+    setFeedbackSent(prev => ({ ...prev, [msgId]: rating }))
+    fetch('/api/ai/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        feature: 'coach',
+        rating,
+        content: content.slice(0, 20_000),
+        prompt:  promptText?.slice(0, 4_000),
+        context: { mode: modeRef.current, focusArea: focusAreaRef.current },
+      }),
+    }).catch(() => {})
+  }, [])
 
   const buildBody = useCallback(() => {
     const currentFolder = opponents.find(f => f.id === selectedFolderIdRef.current)
@@ -982,6 +999,7 @@ export default function AIScoutPage() {
                   const pendingDataLookups = (msg.toolInvocations ?? []).filter(
                     inv => inv.toolName !== 'showRoundReplay' && inv.toolName !== 'recordInsight' && inv.state !== 'result'
                   )
+                  const precedingUserMsg = [...messages.slice(0, i)].reverse().find(m => m.role === 'user')?.content
 
                   return (
                     <div key={msg.id} style={{ marginBottom: 16 }}>
@@ -1016,6 +1034,36 @@ export default function AIScoutPage() {
                             <p style={{ fontSize: 10, color: 'var(--faint)', marginTop: 6 }}>
                               {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>
+                          )}
+                          {msg.role === 'assistant' && !streaming && msg.content && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                              {feedbackSent[msg.id] ? (
+                                <span style={{ fontSize: 10, color: 'var(--faint)' }}>
+                                  {feedbackSent[msg.id] === 1 ? 'Marked helpful' : 'Marked unhelpful'} — thanks!
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => sendFeedback(msg.id, msg.content, 1, precedingUserMsg)}
+                                    title="Good answer — helps train the CS2 model"
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--faint)', cursor: 'pointer', transition: 'color 0.12s' }}
+                                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--win)')}
+                                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--faint)')}
+                                  >
+                                    <ThumbsUp size={10} />
+                                  </button>
+                                  <button
+                                    onClick={() => sendFeedback(msg.id, msg.content, -1, precedingUserMsg)}
+                                    title="Bad answer"
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--faint)', cursor: 'pointer', transition: 'color 0.12s' }}
+                                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--loss)')}
+                                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--faint)')}
+                                  >
+                                    <ThumbsDown size={10} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
