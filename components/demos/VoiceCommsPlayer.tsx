@@ -161,7 +161,7 @@ export default function VoiceCommsPlayer({ demoId, roundTime, isPlaying }: Props
               value={volume}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setVolume(parseFloat(e.target.value))}
               className="flex-1 h-1 accent-neon-green cursor-pointer"
-              style={{ accentColor: '#00ffc8' }}
+              style={{ accentColor: '#2DE3CE' }}
             />
           </div>
 

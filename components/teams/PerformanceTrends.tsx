@@ -94,8 +94,8 @@ export default function PerformanceTrends({ demos }: Props) {
           <AreaChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
             <defs>
               <linearGradient id="wrGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#00ffc8" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#00ffc8" stopOpacity={0} />
+                <stop offset="5%"  stopColor="#2DE3CE" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#2DE3CE" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
@@ -106,7 +106,7 @@ export default function PerformanceTrends({ demos }: Props) {
               labelFormatter={(v: number) => `Match #${v}`}
               formatter={(v: number) => [`${v}%`, 'Win Rate']}
             />
-            <Area type="monotone" dataKey="winRate" stroke="#00ffc8" strokeWidth={2} fill="url(#wrGrad)" dot={false} connectNulls />
+            <Area type="monotone" dataKey="winRate" stroke="#2DE3CE" strokeWidth={2} fill="url(#wrGrad)" dot={false} connectNulls />
           </AreaChart>
         </ResponsiveContainer>
         {/* Result dots */}
@@ -117,7 +117,7 @@ export default function PerformanceTrends({ demos }: Props) {
               title={`Match ${d.idx}: ${d.result ?? '?'} on ${d.map}`}
               className="w-2 h-2 rounded-full flex-shrink-0"
               style={{
-                background: d.result === 'Win' ? '#00ffc8'
+                background: d.result === 'Win' ? '#2DE3CE'
                   : d.result === 'Loss' ? '#ff4466'
                   : d.result === 'Draw' ? '#facc15'
                   : '#555',
@@ -144,7 +144,7 @@ export default function PerformanceTrends({ demos }: Props) {
                 {mapData.map((entry: { map: string; winRate: number; games: number }, i: number) => (
                   <Cell
                     key={i}
-                    fill={entry.winRate >= 55 ? '#00ffc8' : entry.winRate >= 45 ? '#facc15' : '#ff4466'}
+                    fill={entry.winRate >= 55 ? '#2DE3CE' : entry.winRate >= 45 ? '#facc15' : '#ff4466'}
                     fillOpacity={0.75}
                   />
                 ))}

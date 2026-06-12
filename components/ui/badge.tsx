@@ -18,7 +18,7 @@ const badgeVariants = cva(
 
         /* Success / analyzed */
         neon:
-          'border border-[rgba(0,255,200,0.28)] bg-[rgba(0,255,200,0.1)] text-[#00ffc8]',
+          'border border-[rgba(45,227,206,0.28)] bg-[rgba(45,227,206,0.1)] text-[#2DE3CE]',
         success:
           'border border-[rgba(0,200,100,0.28)] bg-[rgba(0,200,100,0.12)] text-[#00c864]',
 

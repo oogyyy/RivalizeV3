@@ -24,7 +24,7 @@ interface DrawAction {
 }
 
 const COLORS = [
-  { label: 'Green',  value: '#00ffc8' },
+  { label: 'Green',  value: '#2DE3CE' },
   { label: 'Red',    value: '#ff4466' },
   { label: 'Yellow', value: '#facc15' },
   { label: 'Blue',   value: '#38bdf8' },
@@ -137,7 +137,7 @@ export default function StrategyBoard({ mapName }: StrategyBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
   const [tool, setTool] = useState<Tool>('pen')
-  const [color, setColor] = useState('#00ffc8')
+  const [color, setColor] = useState('#2DE3CE')
   const [lineWidth, setLineWidth] = useState(3)
   const [actions, setActions] = useState<DrawAction[]>([])
   const [drawing, setDrawing] = useState(false)

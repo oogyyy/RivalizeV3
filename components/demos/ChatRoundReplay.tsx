@@ -219,7 +219,7 @@ export default function ChatRoundReplay({
     const barY = CANVAS_SIZE - 4
     ctx.fillStyle = 'rgba(255,255,255,0.1)'
     ctx.fillRect(0, barY, CANVAS_SIZE, 4)
-    ctx.fillStyle = '#00ffc8'
+    ctx.fillStyle = '#2DE3CE'
     ctx.fillRect(0, barY, CANVAS_SIZE * (t / duration), 4)
 
     // Kill tick marks on timeline
@@ -303,14 +303,14 @@ export default function ChatRoundReplay({
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden" style={{ maxWidth: CANVAS_SIZE }}>
       {/* Header */}
-      <div className="px-3 py-2 bg-[rgba(0,255,200,0.06)] border-b border-border flex items-center justify-between">
+      <div className="px-3 py-2 bg-[rgba(45,227,206,0.06)] border-b border-border flex items-center justify-between">
         <div>
-          <span className="text-[10px] font-mono text-[#00ffc8]">{mapName}</span>
+          <span className="text-[10px] font-mono text-[#2DE3CE]">{mapName}</span>
           <span className="text-[10px] text-muted-foreground mx-1.5">·</span>
           <span className="text-[10px] text-muted-foreground">Round {roundNumber}</span>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span className="text-[#00ffc8]">{team1Name}</span>
+          <span className="text-[#2DE3CE]">{team1Name}</span>
           <span>vs</span>
           <span className="text-[#ff4466]">{team2Name}</span>
         </div>
@@ -335,7 +335,7 @@ export default function ChatRoundReplay({
         </button>
         <button
           onClick={togglePlay}
-          className="p-1.5 rounded-full bg-[rgba(0,255,200,0.15)] border border-[rgba(0,255,200,0.3)] text-[#00ffc8] hover:bg-[rgba(0,255,200,0.25)] transition-colors"
+          className="p-1.5 rounded-full bg-[rgba(45,227,206,0.15)] border border-[rgba(45,227,206,0.3)] text-[#2DE3CE] hover:bg-[rgba(45,227,206,0.25)] transition-colors"
         >
           {playing ? <Pause size={12} /> : <Play size={12} />}
         </button>

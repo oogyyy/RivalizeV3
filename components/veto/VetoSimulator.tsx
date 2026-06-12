@@ -319,7 +319,7 @@ export default function VetoSimulator({ selfMapStats, opponents, activeDutyMaps 
               const isSuggested = map === aiSuggestion
 
               const pct = Math.round((score?.score ?? 0.5) * 100)
-              const barColor = pct >= 60 ? '#00ffc8' : pct >= 40 ? '#facc15' : '#ff4466'
+              const barColor = pct >= 60 ? '#2DE3CE' : pct >= 40 ? '#facc15' : '#ff4466'
 
               return (
                 <button

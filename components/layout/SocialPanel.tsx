@@ -27,9 +27,9 @@ function Avatar({ profile }: { profile: FriendProfile }) {
   return (
     <div style={{
       width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-      background: 'rgba(0,255,200,0.12)', border: '1.5px solid rgba(0,255,200,0.25)',
+      background: 'rgba(45,227,206,0.12)', border: '1.5px solid rgba(45,227,206,0.25)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 11, fontWeight: 700, color: '#00ffc8',
+      fontSize: 11, fontWeight: 700, color: '#2DE3CE',
     }}>
       {name.slice(0, 2).toUpperCase()}
     </div>
@@ -136,7 +136,7 @@ export default function SocialPanel() {
           {pendingCount > 0 && (
             <div style={{
               width: 16, height: 16, borderRadius: '50%',
-              background: '#00ffc8', color: '#060512',
+              background: '#2DE3CE', color: '#060512',
               fontSize: 9, fontWeight: 800,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
@@ -197,7 +197,7 @@ export default function SocialPanel() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
-              <Loader2 size={18} style={{ color: '#00ffc8', animation: 'spin 1s linear infinite' }} />
+              <Loader2 size={18} style={{ color: '#2DE3CE', animation: 'spin 1s linear infinite' }} />
             </div>
           ) : (
             <>
@@ -233,7 +233,7 @@ export default function SocialPanel() {
                           disabled={actioning === entry.id}
                           style={{
                             width: 22, height: 22, borderRadius: 5, border: 'none',
-                            background: 'rgba(0,255,200,0.15)', color: '#00ffc8',
+                            background: 'rgba(45,227,206,0.15)', color: '#2DE3CE',
                             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}
                         >
@@ -281,7 +281,7 @@ export default function SocialPanel() {
                   <Link
                     href="/friends"
                     style={{
-                      fontSize: 11, color: '#00ffc8', textDecoration: 'none',
+                      fontSize: 11, color: '#2DE3CE', textDecoration: 'none',
                       fontFamily: 'var(--font-inter, Inter), sans-serif',
                     }}
                   >

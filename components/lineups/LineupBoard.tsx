@@ -24,7 +24,7 @@ export interface DrawAction {
 }
 
 const COLORS = [
-  { label: 'Green',  value: '#00ffc8' },
+  { label: 'Green',  value: '#2DE3CE' },
   { label: 'Red',    value: '#ff4466' },
   { label: 'Yellow', value: '#facc15' },
   { label: 'Blue',   value: '#38bdf8' },

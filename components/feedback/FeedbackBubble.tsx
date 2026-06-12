@@ -344,7 +344,7 @@ export default function FeedbackBubble() {
               </form>
             ) : (
               <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-                <CheckCircle size={48} color="#00ffc8" style={{ marginBottom: 16 }} />
+                <CheckCircle size={48} color="#2DE3CE" style={{ marginBottom: 16 }} />
                 <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
                   Thank you!
                 </h3>

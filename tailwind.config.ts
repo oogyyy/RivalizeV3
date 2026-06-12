@@ -54,6 +54,10 @@ const config: Config = {
         pink:   '#f43f5e',
         purple: '#7047eb',
         teal:   '#14b8a6',
+        /* Signal teal (mirrors --signal in globals.css). Widely used as
+           text-neon-green / bg-neon-green/10 etc. but was never defined,
+           so those classes silently produced no CSS. */
+        'neon-green': '#2DE3CE',
         'brand-bg':           '#07080e',
         'brand-card':         '#0f111e',
         'brand-purple':       '#7047eb',

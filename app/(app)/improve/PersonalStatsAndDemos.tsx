@@ -82,7 +82,7 @@ function StatCard({
       </div>
       <p className={cn(
         'text-[26px] font-bold tracking-tight tabular-nums font-mono leading-none',
-        highlight ? 'text-[#00ffc8]' : 'text-foreground',
+        highlight ? 'text-[#2DE3CE]' : 'text-foreground',
       )}>{value}</p>
       <p className="text-[11px] text-muted-foreground/50 mt-1">{sub}</p>
     </div>
@@ -130,8 +130,8 @@ export default function PersonalStatsAndDemos({
     <>
       {/* Steam link nudge */}
       {!steamId && demos.filter(d => d.status === 'completed').length > 0 && (
-        <div className="flex items-start gap-3 bg-[rgba(0,255,200,0.04)] border border-[rgba(0,255,200,0.12)] rounded-xl px-4 py-3 animate-fade-in-up">
-          <Info size={15} className="text-[#00ffc8] mt-0.5 shrink-0" />
+        <div className="flex items-start gap-3 bg-[rgba(45,227,206,0.04)] border border-[rgba(45,227,206,0.12)] rounded-xl px-4 py-3 animate-fade-in-up">
+          <Info size={15} className="text-[#2DE3CE] mt-0.5 shrink-0" />
           <p className="text-[12px] text-muted-foreground leading-relaxed">
             <span className="text-foreground font-medium">Link your Steam account</span> in Settings to see your own per-match stats (K/D, ADR, Rating) rather than team averages.
           </p>
@@ -152,8 +152,8 @@ export default function PersonalStatsAndDemos({
           label="Win Rate"
           value={stats.totalMatches > 0 ? `${Math.round(stats.winRate * 100)}%` : '—'}
           sub={stats.totalMatches > 0 ? `${stats.wins} wins from ${stats.totalMatches}` : 'Upload demos to track'}
-          icon={<TrendingUp size={15} className="text-[#00ffc8]" />}
-          iconBg="bg-[rgba(0,255,200,0.1)]"
+          icon={<TrendingUp size={15} className="text-[#2DE3CE]" />}
+          iconBg="bg-[rgba(45,227,206,0.1)]"
           accent="stat-card-green"
           highlight={stats.winRate >= 0.5}
         />
@@ -179,7 +179,7 @@ export default function PersonalStatsAndDemos({
       <div className="animate-fade-in-up animate-fade-in-up-delay-2">
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
-            <FileVideo size={15} className="text-[#00ffc8]" />
+            <FileVideo size={15} className="text-[#2DE3CE]" />
             <h2 className="text-[13px] font-semibold text-foreground">My Demos</h2>
             {demos.length > 0 && (
               <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded font-mono">
@@ -210,7 +210,7 @@ export default function PersonalStatsAndDemos({
                     className={cn(
                       'px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors',
                       mapFilter === null
-                        ? 'bg-[#00ffc8]/15 text-[#00ffc8] border border-[#00ffc8]/30'
+                        ? 'bg-[#2DE3CE]/15 text-[#2DE3CE] border border-[#2DE3CE]/30'
                         : 'bg-accent/40 text-muted-foreground hover:text-foreground border border-transparent',
                     )}
                   >
@@ -223,7 +223,7 @@ export default function PersonalStatsAndDemos({
                       className={cn(
                         'px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors flex items-center gap-1',
                         mapFilter === m
-                          ? 'bg-[#00ffc8]/15 text-[#00ffc8] border border-[#00ffc8]/30'
+                          ? 'bg-[#2DE3CE]/15 text-[#2DE3CE] border border-[#2DE3CE]/30'
                           : 'bg-accent/40 text-muted-foreground hover:text-foreground border border-transparent',
                       )}
                     >
