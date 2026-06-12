@@ -7,6 +7,7 @@ import {
   Save, ArrowLeft, Sparkles, Loader2, CheckCircle2,
   Swords, Shield, Crosshair, Users, Coins,
   Brain, Send, RotateCcw, AlertCircle, RefreshCw, Map, MessageSquare, Target,
+  Pencil, Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -101,6 +102,7 @@ export default function PlaybookBuilderPage() {
   const [pbName, setPbName]       = useState('')
   const [playerRoles, setPlayerRoles] = useState<Record<string, PlayerRole>>({})
   const [activeSection, setActiveSection] = useState<SectionId>('t_side')
+  const [editingSection, setEditingSection] = useState<SectionId | null>(null)
   const [generating, setGenerating]       = useState<SectionId | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
   const [saving, setSaving]               = useState(false)
@@ -180,6 +182,7 @@ export default function PlaybookBuilderPage() {
   const generateSection = async (sectionId: SectionId) => {
     setGenerating(sectionId)
     setActiveSection(sectionId)
+    setEditingSection(null)
     setSections(prev => ({ ...prev, [sectionId]: '' }))
     try {
       const res = await fetch(`/api/playbooks/${id}/generate`, {
@@ -422,19 +425,35 @@ export default function PlaybookBuilderPage() {
                   <p className="text-xs text-muted-foreground">{sectionDesc}</p>
                 </div>
               </div>
-              <Button
-                variant={activeContent ? 'outline' : 'neon'}
-                size="sm"
-                onClick={() => generateSection(activeSection)}
-                disabled={!!generating || generatingAll}
-                className="gap-1.5 shrink-0"
-              >
-                {generating === activeSection ? (
-                  <><Loader2 size={12} className="animate-spin" /> Generating…</>
-                ) : (
-                  <><Sparkles size={12} /> {activeContent ? 'Regenerate' : 'Generate with AI'}</>
-                )}
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  variant={editingSection === activeSection ? 'neon' : 'outline'}
+                  size="sm"
+                  onClick={() => setEditingSection(prev => prev === activeSection ? null : activeSection)}
+                  disabled={generating === activeSection || generatingAll}
+                  className="gap-1.5"
+                  title={editingSection === activeSection ? 'Finish editing (hit Save to persist)' : 'Write or edit this section manually'}
+                >
+                  {editingSection === activeSection ? (
+                    <><Check size={12} /> Done</>
+                  ) : (
+                    <><Pencil size={12} /> {activeContent ? 'Edit' : 'Write'}</>
+                  )}
+                </Button>
+                <Button
+                  variant={activeContent ? 'outline' : 'neon'}
+                  size="sm"
+                  onClick={() => generateSection(activeSection)}
+                  disabled={!!generating || generatingAll || editingSection === activeSection}
+                  className="gap-1.5"
+                >
+                  {generating === activeSection ? (
+                    <><Loader2 size={12} className="animate-spin" /> Generating…</>
+                  ) : (
+                    <><Sparkles size={12} /> {activeContent ? 'Regenerate' : 'Generate with AI'}</>
+                  )}
+                </Button>
+              </div>
             </div>
 
             {/* Mobile section tabs */}
@@ -461,7 +480,20 @@ export default function PlaybookBuilderPage() {
 
             {/* Content area */}
             <div className="flex-1 overflow-y-auto p-4">
-              {generating === activeSection && !activeContent ? (
+              {editingSection === activeSection ? (
+                <div className="flex flex-col h-full gap-2">
+                  <textarea
+                    value={activeContent}
+                    onChange={e => setSections(prev => ({ ...prev, [activeSection]: e.target.value }))}
+                    placeholder={`Write your ${sectionLabel} here…\n\nMarkdown supported:\n## Heading\n- bullet point\n1. numbered step\n**bold** for player names or callouts`}
+                    autoFocus
+                    className="flex-1 w-full min-h-[360px] bg-card border border-border rounded-lg p-4 text-sm text-foreground leading-relaxed resize-none focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_40%,transparent)]"
+                  />
+                  <p className="text-[11px] text-muted-foreground shrink-0">
+                    Markdown supported · hit <strong className="text-foreground">Done</strong> to preview, then <strong className="text-foreground">Save</strong> to persist
+                  </p>
+                </div>
+              ) : generating === activeSection && !activeContent ? (
                 <div className="flex items-center gap-2 text-muted-foreground text-sm py-8">
                   <Loader2 size={16} className="animate-spin text-[color:var(--signal)]" />
                   Generating tactical content…
@@ -481,20 +513,32 @@ export default function PlaybookBuilderPage() {
                   <p className="text-sm text-muted-foreground mb-4 max-w-xs">
                     No content yet for <strong className="text-foreground">{sectionLabel}</strong>.
                     {isAntistrat
-                      ? ` Click generate to have AI build counter-play against ${playbook?.opponent_name} on ${playbook?.map}.`
-                      : ` Click generate to have AI build this section for ${playbook?.map}.`
+                      ? ` Have AI build counter-play against ${playbook?.opponent_name} on ${playbook?.map}, or write your own.`
+                      : ` Have AI build this section for ${playbook?.map}, or write your own strats.`
                     }
                   </p>
-                  <Button
-                    variant="neon"
-                    size="sm"
-                    onClick={() => generateSection(activeSection)}
-                    disabled={!!generating || generatingAll}
-                    className="gap-1.5"
-                  >
-                    <Sparkles size={13} />
-                    Generate with AI
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="neon"
+                      size="sm"
+                      onClick={() => generateSection(activeSection)}
+                      disabled={!!generating || generatingAll}
+                      className="gap-1.5"
+                    >
+                      <Sparkles size={13} />
+                      Generate with AI
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingSection(activeSection)}
+                      disabled={!!generating || generatingAll}
+                      className="gap-1.5"
+                    >
+                      <Pencil size={13} />
+                      Write manually
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
