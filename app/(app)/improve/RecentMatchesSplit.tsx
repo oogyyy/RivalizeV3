@@ -82,7 +82,7 @@ function FaceitRow({ match }: { match: FaceitRecentMatch }) {
         )}
         <div className={cn(
           'absolute bottom-0 left-0 right-0 flex items-center justify-center text-[9px] font-bold leading-none py-[3px]',
-          result === 'W' ? 'bg-[rgba(0,255,200,0.75)] text-black' :
+          result === 'W' ? 'bg-[rgba(45,227,206,0.75)] text-black' :
           result === 'L' ? 'bg-red-500/75 text-white' :
           result === 'D' ? 'bg-yellow-500/75 text-black' :
           'bg-black/50 text-muted-foreground'
@@ -99,7 +99,7 @@ function FaceitRow({ match }: { match: FaceitRecentMatch }) {
           {scoreStr && (
             <span className={cn(
               'text-[10px] font-mono font-bold shrink-0',
-              result === 'W' ? 'text-[#00ffc8]' : result === 'L' ? 'text-red-400' : 'text-yellow-400'
+              result === 'W' ? 'text-[#2DE3CE]' : result === 'L' ? 'text-red-400' : 'text-yellow-400'
             )}>
               {scoreStr}
             </span>

@@ -204,7 +204,7 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
             </p>
             {demoEntries.some(e => e.result) && (
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#00ffc8]" />W</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#2DE3CE]" />W</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#ff4466]" />L</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#818cf8]" />—</span>
               </div>
@@ -230,7 +230,7 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
                 fill="url(#ratingGrad)"
                 dot={(props: { cx: number; cy: number; payload: { result?: string | null } }) => {
                   const { cx, cy, payload } = props
-                  const fill = payload.result === 'Win' ? '#00ffc8' : payload.result === 'Loss' ? '#ff4466' : '#818cf8'
+                  const fill = payload.result === 'Win' ? '#2DE3CE' : payload.result === 'Loss' ? '#ff4466' : '#818cf8'
                   return <circle key={`dot-${cx}-${cy}`} cx={cx} cy={cy} r={4} fill={fill} stroke="none" />
                 }}
               />
@@ -252,7 +252,7 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
               <XAxis dataKey="map" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.35)' }} tickLine={false} />
               <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.35)' }} tickLine={false} />
               <Tooltip contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }} />
-              <Bar dataKey="kills"  name="Kills"  fill="#00ffc8" fillOpacity={0.75} radius={[2, 2, 0, 0]} maxBarSize={20} />
+              <Bar dataKey="kills"  name="Kills"  fill="#2DE3CE" fillOpacity={0.75} radius={[2, 2, 0, 0]} maxBarSize={20} />
               <Bar dataKey="deaths" name="Deaths" fill="#ff4466" fillOpacity={0.75} radius={[2, 2, 0, 0]} maxBarSize={20} />
             </BarChart>
           </ResponsiveContainer>
@@ -282,7 +282,7 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
                         className="h-full rounded-full"
                         style={{
                           width: `${pct}%`,
-                          background: i === 0 ? '#00ffc8' : i === 1 ? '#818cf8' : '#facc15',
+                          background: i === 0 ? '#2DE3CE' : i === 1 ? '#818cf8' : '#facc15',
                           opacity: 0.75,
                         }}
                       />
@@ -303,7 +303,7 @@ export default function PlayerDeepDive({ playerName, demoEntries }: Props) {
             </p>
             <div className="space-y-2">
               {mapStats.map(({ map, avgKills, avgRating, games }: { map: string; avgKills: number; avgRating: number; games: number }) => {
-                const rColor = avgRating >= 1.2 ? '#00ffc8' : avgRating >= 1.0 ? '#4ade80' : avgRating >= 0.8 ? '#facc15' : '#ff4466'
+                const rColor = avgRating >= 1.2 ? '#2DE3CE' : avgRating >= 1.0 ? '#4ade80' : avgRating >= 0.8 ? '#facc15' : '#ff4466'
                 return (
                   <div key={map} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/20">
                     <span className="text-xs font-medium text-foreground w-16 flex-shrink-0">{map}</span>

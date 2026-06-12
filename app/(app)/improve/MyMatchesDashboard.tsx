@@ -143,7 +143,7 @@ type PerfPoint = {
 function PerfTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: PerfPoint }> }) {
   if (!active || !payload?.length) return null
   const p = payload[0].payload
-  const resultColor = p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : '#facc15'
+  const resultColor = p.result === 'w' ? '#2DE3CE' : p.result === 'l' ? '#ff4466' : '#facc15'
   const resultLabel = p.result === 'w' ? 'Win' : p.result === 'l' ? 'Loss' : p.result === 'd' ? 'Draw' : '?'
   return (
     <div style={{ background: 'var(--card-2)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '8px 10px', fontSize: 11, lineHeight: 1.6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
@@ -170,7 +170,7 @@ function FaceitMatchRow({ match }: { match: FaceitRecentMatch }) {
   if (myScore !== null && oppScore !== null) scoreStr = `${myScore}–${oppScore}`
 
   const thumbUrl = match.map ? MAP_THUMBS[match.map.toLowerCase()] : undefined
-  const badgeBg = result === 'W' ? 'rgba(0,255,200,0.75)' : result === 'L' ? 'rgba(239,68,68,0.75)' : result === 'D' ? 'rgba(245,158,11,0.75)' : 'rgba(0,0,0,0.5)'
+  const badgeBg = result === 'W' ? 'rgba(45,227,206,0.75)' : result === 'L' ? 'rgba(239,68,68,0.75)' : result === 'D' ? 'rgba(245,158,11,0.75)' : 'rgba(0,0,0,0.5)'
   const badgeColor = result === 'L' ? 'white' : result === null ? 'var(--muted)' : 'black'
   const scoreColor = result === 'W' ? 'var(--signal)' : result === 'L' ? 'var(--loss)' : 'var(--tside)'
 
@@ -338,7 +338,7 @@ export default function MyMatchesDashboard({
 
       {/* Steam link nudge */}
       {!steamId && demos.filter(d => d.status === 'completed').length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(0,255,200,0.04)', border: '1px solid rgba(0,255,200,0.12)', borderRadius: 12, padding: '10px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(45,227,206,0.04)', border: '1px solid rgba(45,227,206,0.12)', borderRadius: 12, padding: '10px 14px' }}>
           <Info size={14} style={{ color: 'var(--signal)', marginTop: 1, flexShrink: 0 }} />
           <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
             <span style={{ color: 'var(--text)', fontWeight: 500 }}>Link your Steam account</span> in Settings to see your own per-match stats (K/D, ADR) rather than team averages.
@@ -441,7 +441,7 @@ export default function MyMatchesDashboard({
                 <TrendingUp size={16} style={{ color: 'var(--accent)' }} /> Performance Trends
               </p>
               <div style={{ display: 'flex', gap: 10, fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                <span style={{ color: '#00ffc8' }}>{perfTrends.totalW}W</span>
+                <span style={{ color: '#2DE3CE' }}>{perfTrends.totalW}W</span>
                 <span style={{ color: '#ff4466' }}>{perfTrends.totalL}L</span>
                 {perfTrends.totalD > 0 && <span style={{ color: '#facc15' }}>{perfTrends.totalD}D</span>}
               </div>
@@ -478,7 +478,7 @@ export default function MyMatchesDashboard({
                   {perfTrends.points.map((p, i) => (
                     <Cell
                       key={i}
-                      fill={p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.15)'}
+                      fill={p.result === 'w' ? '#2DE3CE' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.15)'}
                       fillOpacity={0.75}
                     />
                   ))}
@@ -493,14 +493,14 @@ export default function MyMatchesDashboard({
                     title={`Match ${p.idx}: ${p.result === 'w' ? 'Win' : p.result === 'l' ? 'Loss' : p.result === 'd' ? 'Draw' : '?'} on ${p.map}${(p.ourScore > 0 || p.theirScore > 0) ? ` · ${p.ourScore}–${p.theirScore}` : ''}`}
                     style={{
                       width: 10, height: 10, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
-                      background: p.result === 'w' ? '#00ffc8' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.2)',
-                      boxShadow: p.result === 'w' ? '0 0 5px rgba(0,255,200,0.5)' : p.result === 'l' ? '0 0 5px rgba(255,68,102,0.4)' : 'none',
+                      background: p.result === 'w' ? '#2DE3CE' : p.result === 'l' ? '#ff4466' : p.result === 'd' ? '#facc15' : 'rgba(255,255,255,0.2)',
+                      boxShadow: p.result === 'w' ? '0 0 5px rgba(45,227,206,0.5)' : p.result === 'l' ? '0 0 5px rgba(255,68,102,0.4)' : 'none',
                     }}
                   />
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, fontSize: 9, color: 'var(--muted)', alignItems: 'center' }}>
-                {[['#00ffc8', 'W'], ['#ff4466', 'L'], ['#facc15', 'D']].map(([color, label]) => (
+                {[['#2DE3CE', 'W'], ['#ff4466', 'L'], ['#facc15', 'D']].map(([color, label]) => (
                   <span key={label as string} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: color as string, display: 'inline-block' }} />
                     {label}

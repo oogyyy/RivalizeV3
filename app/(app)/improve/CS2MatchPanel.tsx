@@ -119,13 +119,13 @@ function SetupModal({ onClose, onDone }: { onClose: () => void; onDone: () => vo
           {/* Step 1 */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0', step >= 1 ? 'bg-[#00ffc8] text-black' : 'bg-border text-muted-foreground')}>1</div>
+              <div className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0', step >= 1 ? 'bg-[#2DE3CE] text-black' : 'bg-border text-muted-foreground')}>1</div>
               <p className="text-[12px] font-semibold text-foreground">Get your Steam Game Auth Code</p>
             </div>
             <div className="ml-7 space-y-2">
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 Go to{' '}
-                <a href="https://help.steampowered.com/en/wizard/HelpWithGameIssue/?appid=730&issueid=128" target="_blank" rel="noopener noreferrer" className="text-[#00ffc8] underline-offset-2 hover:underline">
+                <a href="https://help.steampowered.com/en/wizard/HelpWithGameIssue/?appid=730&issueid=128" target="_blank" rel="noopener noreferrer" className="text-[#2DE3CE] underline-offset-2 hover:underline">
                   Steam Help → CS2 → I want to see my match history
                 </a>
                 {' '}and sign in. Copy the auth code shown.
@@ -142,7 +142,7 @@ function SetupModal({ onClose, onDone }: { onClose: () => void; onDone: () => vo
           {/* Step 2 */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0', step >= 2 ? 'bg-[#00ffc8] text-black' : 'bg-border text-muted-foreground')}>2</div>
+              <div className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0', step >= 2 ? 'bg-[#2DE3CE] text-black' : 'bg-border text-muted-foreground')}>2</div>
               <p className="text-[12px] font-semibold text-foreground">Paste your latest match sharecode</p>
             </div>
             <div className="ml-7 space-y-2">
@@ -224,7 +224,7 @@ function GrabDemoModal({ match, onClose, onImported }: { match: CS2Match; onClos
             /* Auto-download URL found */
             <div className="space-y-2">
               <p className="text-[12px] font-semibold text-foreground flex items-center gap-1.5">
-                <span className="w-4 h-4 rounded-full bg-[#00ffc8] flex items-center justify-center shrink-0">
+                <span className="w-4 h-4 rounded-full bg-[#2DE3CE] flex items-center justify-center shrink-0">
                   <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 2.5" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </span>
                 Demo URL found
@@ -253,7 +253,7 @@ function GrabDemoModal({ match, onClose, onImported }: { match: CS2Match; onClos
                   <div className="flex gap-2 flex-wrap">
                     <a
                       href={sharecode_toSteamUrl(match.sharecode)}
-                      className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-[rgba(0,255,200,0.1)] border border-[rgba(0,255,200,0.3)] text-[#00ffc8] text-[11px] font-medium hover:bg-[rgba(0,255,200,0.15)] transition-colors"
+                      className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-[rgba(45,227,206,0.1)] border border-[rgba(45,227,206,0.3)] text-[#2DE3CE] text-[11px] font-medium hover:bg-[rgba(45,227,206,0.15)] transition-colors"
                     >
                       Open in CS2
                     </a>
@@ -261,7 +261,7 @@ function GrabDemoModal({ match, onClose, onImported }: { match: CS2Match; onClos
                       onClick={copySharecode}
                       className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-muted-foreground text-[11px] hover:text-foreground transition-colors"
                     >
-                      {copied ? <Check size={11} className="text-[#00ffc8]" /> : <Copy size={11} />}
+                      {copied ? <Check size={11} className="text-[#2DE3CE]" /> : <Copy size={11} />}
                       {copied ? 'Copied!' : 'Copy sharecode'}
                     </button>
                   </div>
@@ -312,7 +312,7 @@ function MatchRow({ match, onGrab }: { match: CS2Match; onGrab: (m: CS2Match) =>
       {/* Badge */}
       <div className={cn(
         'w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0',
-        badge === 'W' ? 'bg-[rgba(0,255,200,0.12)] text-[#00ffc8]' :
+        badge === 'W' ? 'bg-[rgba(45,227,206,0.12)] text-[#2DE3CE]' :
         badge === 'L' ? 'bg-red-500/10 text-red-400' :
         badge === 'D' ? 'bg-yellow-500/10 text-yellow-400' :
         demo?.status === 'processing' || demo?.status === 'queued' ? 'bg-muted/50 text-muted-foreground' :
@@ -330,7 +330,7 @@ function MatchRow({ match, onGrab }: { match: CS2Match; onGrab: (m: CS2Match) =>
           {score && (
             <span className={cn(
               'ml-1.5 text-[10px] font-mono',
-              badge === 'W' ? 'text-[#00ffc8]' :
+              badge === 'W' ? 'text-[#2DE3CE]' :
               badge === 'L' ? 'text-red-400' :
               badge === 'D' ? 'text-yellow-400' :
               'text-muted-foreground'
@@ -344,7 +344,7 @@ function MatchRow({ match, onGrab }: { match: CS2Match; onGrab: (m: CS2Match) =>
 
       {/* Action */}
       {isParsed ? (
-        <a href={`/demos/${demo!.id}`} className="shrink-0 text-[10px] text-[#00ffc8] hover:underline">View</a>
+        <a href={`/demos/${demo!.id}`} className="shrink-0 text-[10px] text-[#2DE3CE] hover:underline">View</a>
       ) : demo?.status === 'queued' || demo?.status === 'processing' ? (
         <span className="shrink-0 text-[10px] text-muted-foreground">Parsing…</span>
       ) : (
@@ -452,7 +452,7 @@ export default function CS2MatchPanel({ personalTeamId }: Props) {
       <div className="flex flex-col items-center justify-center py-8 text-center gap-2 px-4">
         <p className="text-[13px] font-semibold text-foreground">Link your Steam account</p>
         <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[220px]">
-          Go to <a href="/settings" className="text-[#00ffc8] underline-offset-2 hover:underline">Settings</a> and link your Steam profile so we can pull your match history.
+          Go to <a href="/settings" className="text-[#2DE3CE] underline-offset-2 hover:underline">Settings</a> and link your Steam profile so we can pull your match history.
         </p>
       </div>
     )
@@ -503,12 +503,12 @@ export default function CS2MatchPanel({ personalTeamId }: Props) {
             {data?.matches.length ?? 0} matches
           </span>
           {isBotMode && (
-            <span className="text-[9px] bg-[rgba(0,255,200,0.1)] text-[#00ffc8] border border-[rgba(0,255,200,0.2)] rounded px-1 py-0.5 font-medium">
+            <span className="text-[9px] bg-[rgba(45,227,206,0.1)] text-[#2DE3CE] border border-[rgba(45,227,206,0.2)] rounded px-1 py-0.5 font-medium">
               Auto
             </span>
           )}
           {newCount !== null && newCount > 0 && (
-            <span className="text-[10px] text-[#00ffc8]">+{newCount} new</span>
+            <span className="text-[10px] text-[#2DE3CE]">+{newCount} new</span>
           )}
           {newCount === 0 && !syncError && (
             <span className="text-[10px] text-muted-foreground/50">· up to date</span>
@@ -530,7 +530,7 @@ export default function CS2MatchPanel({ personalTeamId }: Props) {
                 <span
                   className={cn(
                     'relative inline-block w-6 h-3.5 rounded-full transition-colors',
-                    autoSync ? 'bg-[#00ffc8]' : 'bg-border'
+                    autoSync ? 'bg-[#2DE3CE]' : 'bg-border'
                   )}
                 >
                   <span
@@ -560,7 +560,7 @@ export default function CS2MatchPanel({ personalTeamId }: Props) {
                   Disconnect
                 </button>
               ) : (
-                <button onClick={() => setShowSetup(true)} className="text-[10px] text-[#00ffc8] hover:underline transition-colors">
+                <button onClick={() => setShowSetup(true)} className="text-[10px] text-[#2DE3CE] hover:underline transition-colors">
                   Set up sharecode
                 </button>
               )}

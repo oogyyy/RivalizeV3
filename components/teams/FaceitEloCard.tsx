@@ -88,7 +88,7 @@ export default function FaceitEloCard({ faceitNickname, teamId }: Props) {
   const firstElo = history[0]?.elo ?? elo
   const delta    = elo - firstElo
   const Trend    = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus
-  const trendColor = delta > 0 ? 'text-[#00ffc8]' : delta < 0 ? 'text-red-400' : 'text-muted-foreground'
+  const trendColor = delta > 0 ? 'text-[#2DE3CE]' : delta < 0 ? 'text-red-400' : 'text-muted-foreground'
   const levelColor = LEVEL_COLORS[level ?? 1] ?? '#eee'
 
   return (

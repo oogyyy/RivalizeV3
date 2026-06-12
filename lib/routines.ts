@@ -86,7 +86,7 @@ function kmeans(features: RoundFeature[], k = 4, iters = 30): number[] {
 
 const ROUTINE_DEFS = [
   { name: 'Aggressive Rush',  description: 'Fast pace, early first blood, high kill tempo',            color: '#ff4466' },
-  { name: 'Default Setup',    description: 'Utility-heavy, mid-round reads, full buy',                 color: '#00ffc8' },
+  { name: 'Default Setup',    description: 'Utility-heavy, mid-round reads, full buy',                 color: '#2DE3CE' },
   { name: 'Eco / Force Buy',  description: 'Low equipment value — pistol rounds or force buys',        color: '#facc15' },
   { name: 'Slow Grind',       description: 'Late first contact, passive map control, bomb plants',     color: '#818cf8' },
 ]

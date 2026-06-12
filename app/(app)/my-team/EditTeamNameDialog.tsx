@@ -68,8 +68,8 @@ export default function EditTeamNameDialog({ teamId, currentName }: Props) {
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-border">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded bg-[rgba(0,255,200,0.1)] flex items-center justify-center">
-                  <Users size={16} className="text-[#00ffc8]" />
+                <div className="w-8 h-8 rounded bg-[rgba(45,227,206,0.1)] flex items-center justify-center">
+                  <Users size={16} className="text-[#2DE3CE]" />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-foreground">Edit Team Name</h2>
