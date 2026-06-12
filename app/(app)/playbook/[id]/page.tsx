@@ -7,8 +7,9 @@ import {
   Save, ArrowLeft, Sparkles, Loader2, CheckCircle2,
   Swords, Shield, Crosshair, Users, Coins,
   Brain, Send, RotateCcw, AlertCircle, RefreshCw, Map, MessageSquare, Target,
-  Pencil, Check, ClipboardList, Trash2, Wand2, Plus,
+  Pencil, Check, ClipboardList, Trash2, Wand2, Plus, X,
 } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -34,7 +35,12 @@ const ROLE_OPTIONS: { value: PlayerRole; label: string; color: string }[] = [
   { value: 'Rifler',  label: 'Rifler',  color: 'text-muted-foreground' },
 ]
 
-type StratAssignment = { player: string; role: string; instruction: string }
+type StratUtility = { id: string; name: string; type: string }
+type StratAssignment = { player: string; role: string; instruction: string; utility: StratUtility[] }
+
+const LINEUP_TYPE_COLORS: Record<string, string> = {
+  smoke: '#c0c0d0', flash: '#ffff88', molotov: '#ff4400', he: '#ff9900', custom: '#818cf8',
+}
 
 type Strat = {
   id: string
@@ -115,6 +121,7 @@ export default function PlaybookBuilderPage() {
   const [editingSection, setEditingSection] = useState<SectionId | null>(null)
   const [strats, setStrats]               = useState<Strat[]>([])
   const [improvingStrat, setImprovingStrat] = useState<string | null>(null)
+  const [hubLineups, setHubLineups]       = useState<StratUtility[]>([])
   const [stratError, setStratError]       = useState<string | null>(null)
   const [generating, setGenerating]       = useState<SectionId | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
@@ -140,13 +147,22 @@ export default function PlaybookBuilderPage() {
       // Normalize older strats saved before the role column existed
       setStrats(Array.isArray(pb.strats) ? (pb.strats as Strat[]).map(st => ({
         ...st,
-        assignments: (st.assignments ?? []).map(a => ({ player: a.player ?? '', role: a.role ?? '', instruction: a.instruction ?? '' })),
+        assignments: (st.assignments ?? []).map(a => ({ player: a.player ?? '', role: a.role ?? '', instruction: a.instruction ?? '', utility: a.utility ?? [] })),
       })) : [])
       setPlayerRoles(pb.player_roles ?? {})
       if (teams.length > 0) setMyTeamId(teams[0].id)
       else setMyTeamId(pb.team_id)
     }).finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    if (!playbook?.map) return
+    fetch(`/api/lineups?map=${encodeURIComponent(playbook.map)}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((ls: Array<{ id: string; name: string; type: string }>) =>
+        setHubLineups(ls.map(l => ({ id: l.id, name: l.name, type: l.type }))))
+      .catch(() => {})
+  }, [playbook?.map])
 
   const { messages, input, setInput, isLoading: chatLoading, error: chatError, append, setMessages } = useChat({
     api: '/api/ai/coach',
@@ -250,7 +266,7 @@ export default function PlaybookBuilderPage() {
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       name: `Strat ${strats.length + 1}`,
       side: 't',
-      assignments: Array.from({ length: 5 }, (_, i) => ({ player: roster[i] ?? '', role: roster[i] ? (playerRoles[roster[i]] ?? '') : '', instruction: '' })),
+      assignments: Array.from({ length: 5 }, (_, i) => ({ player: roster[i] ?? '', role: roster[i] ? (playerRoles[roster[i]] ?? '') : '', instruction: '', utility: [] })),
     }
     setStrats(prev => [...prev, strat])
     setActiveSection('strats')
@@ -656,6 +672,7 @@ export default function PlaybookBuilderPage() {
                               <p className="w-32 shrink-0 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Player</p>
                               <p className="w-24 shrink-0 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Role</p>
                               <p className="flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">What you do</p>
+                              <p className="w-44 shrink-0 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Utility you need</p>
                             </div>
                             {/* Five player rows */}
                             <div className="divide-y divide-border">
@@ -707,6 +724,51 @@ export default function PlaybookBuilderPage() {
                                     rows={2}
                                     className="flex-1 bg-transparent border border-transparent hover:border-border focus:border-[color:color-mix(in_srgb,var(--signal)_40%,transparent)] rounded px-2 py-1 text-xs text-foreground leading-relaxed resize-none focus:outline-none min-h-[44px]"
                                   />
+                                  <div className="w-44 shrink-0 pt-1 space-y-1">
+                                    {a.utility.map(u => {
+                                      const c = LINEUP_TYPE_COLORS[u.type] ?? LINEUP_TYPE_COLORS.custom
+                                      return (
+                                        <div key={u.id} className="flex items-center gap-1">
+                                          <Link
+                                            href={`/lineups?map=${encodeURIComponent(playbook?.map ?? '')}&open=${u.id}`}
+                                            title={`Open "${u.name}" in Utility Hub`}
+                                            className="flex-1 min-w-0 flex items-center gap-1.5 px-1.5 py-0.5 rounded border text-[10px] truncate hover:opacity-80 transition-opacity"
+                                            style={{ color: c, borderColor: `color-mix(in srgb, ${c} 35%, transparent)`, background: `color-mix(in srgb, ${c} 8%, transparent)` }}
+                                          >
+                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c }} />
+                                            <span className="truncate">{u.name}</span>
+                                          </Link>
+                                          <button
+                                            onClick={() => updateAssignment(strat.id, i, { utility: a.utility.filter(x => x.id !== u.id) })}
+                                            className="p-0.5 text-muted-foreground hover:text-foreground shrink-0"
+                                            title="Remove"
+                                          >
+                                            <X size={10} />
+                                          </button>
+                                        </div>
+                                      )
+                                    })}
+                                    {a.utility.length < 4 && hubLineups.filter(l => !a.utility.some(u => u.id === l.id)).length > 0 && (
+                                      <select
+                                        value=""
+                                        onChange={e => {
+                                          const l = hubLineups.find(x => x.id === e.target.value)
+                                          if (l) updateAssignment(strat.id, i, { utility: [...a.utility, l] })
+                                        }}
+                                        className="w-full bg-background border border-border rounded px-1.5 py-1 text-[10px] text-muted-foreground focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)]"
+                                      >
+                                        <option value="">+ Utility…</option>
+                                        {hubLineups.filter(l => !a.utility.some(u => u.id === l.id)).map(l => (
+                                          <option key={l.id} value={l.id}>{l.name}</option>
+                                        ))}
+                                      </select>
+                                    )}
+                                    {hubLineups.length === 0 && a.utility.length === 0 && (
+                                      <Link href="/lineups" className="block text-[9px] text-muted-foreground hover:text-foreground">
+                                        No lineups for this map yet → Utility Hub
+                                      </Link>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                             </div>

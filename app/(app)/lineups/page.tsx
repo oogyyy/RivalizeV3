@@ -139,6 +139,14 @@ export default function LineupsPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  // Deep link support: /lineups?map=de_mirage&open=<lineupId>
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    const m = sp.get('map')
+    const o = sp.get('open')
+    if (m) { setActiveMap(m); setNewMap(m) }
+    if (o) setOpenId(o)
+  }, [])
   useEffect(() => { if (teams.length > 0 && !selectedTeam) setSelectedTeam(teams[0].id) }, [teams, selectedTeam])
   useEffect(() => () => { if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current) }, [])
 

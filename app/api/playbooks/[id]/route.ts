@@ -12,6 +12,11 @@ const stratSchema = z.object({
     player:      z.string().max(64),
     role:        z.string().max(24).optional().default(''),
     instruction: z.string().max(1000),
+    utility:     z.array(z.object({
+      id:   z.string().max(64),
+      name: z.string().max(120),
+      type: z.string().max(16).optional().default(''),
+    })).max(4).optional().default([]),
   })).length(5),
 })
 

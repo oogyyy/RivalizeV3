@@ -15,6 +15,11 @@ const stratSchema = z.object({
     player:      z.string().max(64),
     role:        z.string().max(24).optional().default(''),
     instruction: z.string().max(1000),
+    utility:     z.array(z.object({
+      id:   z.string().max(64),
+      name: z.string().max(120),
+      type: z.string().max(16).optional().default(''),
+    })).max(4).optional().default([]),
   })).length(5),
 })
 
@@ -37,8 +42,8 @@ function parseImproved(text: string, original: Strat): Strat | null {
       assignments: original.assignments.map((a, i) => {
         const out = assignments[i] as { instruction?: unknown } | undefined
         const instruction = typeof out?.instruction === 'string' ? out.instruction.trim().slice(0, 1000) : a.instruction
-        // Player and role assignments belong to the user — the AI only rewrites instructions
-        return { player: a.player, role: a.role, instruction }
+        // Player, role and linked utility belong to the user — the AI only rewrites instructions
+        return { player: a.player, role: a.role, utility: a.utility, instruction }
       }),
     }
   } catch {
@@ -78,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const sideLabel = strat.side === 't' ? 'T-side (attacking)' : 'CT-side (defending)'
   const rows = strat.assignments
-    .map((a, i) => `${i + 1}. ${a.player || `Player ${i + 1}`}${a.role ? ` (${a.role})` : ''}: ${a.instruction || '(empty)'}`)
+    .map((a, i) => `${i + 1}. ${a.player || `Player ${i + 1}`}${a.role ? ` (${a.role})` : ''}: ${a.instruction || '(empty)'}${a.utility.length ? ` [linked lineups: ${a.utility.map(u => u.name).join(', ')}]` : ''}`)
     .join('\n')
 
   const systemPrompt = `You are an expert CS2 coach refining a team's set play on ${playbook.map}.
@@ -91,6 +96,7 @@ The coach wrote a ${sideLabel} strat as five per-player instructions. Rewrite ea
 - Each instruction: 1-2 sentences, readable aloud in a team meeting
 - All five instructions must be side-consistent (${sideLabel}) and physically possible together as ONE coordinated play
 - If an instruction is empty, infer a sensible job that supports the other four
+- Rows may list [linked lineups] from the team's utility library — treat those as the exact throws that player performs and reference them by name
 
 Respond with ONLY this JSON, no other text:
 {"name": "improved strat name (keep it if already good)", "assignments": [{"instruction": "..."}, {"instruction": "..."}, {"instruction": "..."}, {"instruction": "..."}, {"instruction": "..."}]}
