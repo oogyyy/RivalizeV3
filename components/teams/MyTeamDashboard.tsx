@@ -582,32 +582,85 @@ export default function MyTeamDashboard({
               const completed = [...effectiveDemos.filter(d => d.status === 'completed')]
                 .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''))
               if (completed.length < 2) return null
-              const results = completed.map(d => {
+              const matches = completed.map(d => {
                 const h = d.parsed_data?.header
                 if (!h) return null
                 const os = d.parsed_data?.opponentSide ?? 'team2'
                 const ours = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
                 const theirs = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
-                return ours > theirs ? 'w' : ours < theirs ? 'l' : 'd'
-              }).filter(Boolean) as ('w' | 'l' | 'd')[]
-              const runningRates = results.map((_, idx) => {
-                const slice = results.slice(0, idx + 1)
-                return Math.round(slice.filter(r => r === 'w').length / slice.length * 100)
+                const result: 'w' | 'l' | 'd' = ours > theirs ? 'w' : ours < theirs ? 'l' : 'd'
+                const mapName = (h.map ?? '').replace(/^(de_|cs_|ar_)/, '').replace(/\b\w/g, c => c.toUpperCase()) || 'Unknown map'
+                return { result, ours, theirs, mapName }
+              }).filter(Boolean) as { result: 'w' | 'l' | 'd'; ours: number; theirs: number; mapName: string }[]
+              if (matches.length < 2) return null
+
+              // Rolling win rate over the last WINDOW matches at each point
+              const WINDOW = 5
+              const rolling = matches.map((_, idx) => {
+                const slice = matches.slice(Math.max(0, idx - WINDOW + 1), idx + 1)
+                return Math.round(slice.filter(m => m.result === 'w').length / slice.length * 100)
               })
+              const current = rolling[rolling.length - 1]
+              const RESULT_LABEL = { w: 'Won', l: 'Lost', d: 'Draw' } as const
+              const RESULT_COLOR = { w: 'var(--win)', l: 'var(--loss)', d: 'var(--muted)' } as const
+              const CHART_H = 120
+
               return (
                 <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <TrendingUp size={16} style={{ color: 'var(--accent)' }} /> Performance Trends
-                  </p>
-                  <div style={{ height: 140, display: 'flex', alignItems: 'flex-end', gap: 3, paddingBottom: 8 }}>
-                    {runningRates.map((rate, i) => (
-                      <div key={i} style={{ flex: 1, height: `${(rate / 100) * 120}px`, background: 'linear-gradient(180deg,var(--signal),var(--accent))', borderRadius: '2px 2px 0 0', opacity: 0.8 }} title={`Match ${i + 1}: ${rate}%`} />
-                    ))}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 2 }}>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                      <TrendingUp size={16} style={{ color: 'var(--accent)' }} /> Performance Trends
+                    </p>
+                    <p style={{ fontSize: 12, fontWeight: 700, margin: 0, color: current >= 50 ? 'var(--win)' : 'var(--loss)' }}>
+                      Last {Math.min(WINDOW, matches.length)}: {current}%
+                    </p>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, paddingTop: 8, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
-                    {results.map((r, i) => (
-                      <span key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: r === 'w' ? 'var(--win)' : r === 'l' ? 'var(--loss)' : 'var(--muted)', flexShrink: 0 }} />
-                    ))}
+                  <p style={{ fontSize: 11, color: 'var(--muted)', margin: '0 0 12px' }}>
+                    Each bar is your win rate over the {WINDOW} matches up to that point — dots show each match result. Hover a bar for details.
+                  </p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {/* Y axis */}
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: CHART_H, flexShrink: 0 }}>
+                      {['100%', '50%', '0%'].map(l => (
+                        <span key={l} style={{ fontSize: 9, color: 'var(--faint)', lineHeight: 1 }}>{l}</span>
+                      ))}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Bars + gridlines */}
+                      <div style={{ position: 'relative', height: CHART_H }}>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, borderTop: '1px dashed var(--border)' }} />
+                        <div style={{ position: 'absolute', top: CHART_H / 2, left: 0, right: 0, borderTop: '1px dashed var(--border)' }} />
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderTop: '1px solid var(--border)' }} />
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', gap: 3 }}>
+                          {matches.map((m, i) => (
+                            <div
+                              key={i}
+                              title={`${m.mapName} — ${RESULT_LABEL[m.result]} ${m.ours}-${m.theirs}\nWin rate over last ${Math.min(i + 1, WINDOW)} matches: ${rolling[i]}%`}
+                              style={{ flex: 1, height: `${Math.max((rolling[i] / 100) * CHART_H, 3)}px`, background: 'linear-gradient(180deg,var(--signal),var(--accent))', borderRadius: '2px 2px 0 0', opacity: 0.85, cursor: 'default' }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {/* Result dots aligned under their bars */}
+                      <div style={{ display: 'flex', gap: 3, marginTop: 6 }}>
+                        {matches.map((m, i) => (
+                          <div key={i} style={{ flex: 1, display: 'flex', justifyContent: 'center' }} title={`${m.mapName} — ${RESULT_LABEL[m.result]} ${m.ours}-${m.theirs}`}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: RESULT_COLOR[m.result], flexShrink: 0 }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Legend */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {([['w', 'Win'], ['l', 'Loss'], ['d', 'Draw']] as const).map(([r, label]) => (
+                        <span key={r} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--muted)' }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: RESULT_COLOR[r] }} /> {label}
+                        </span>
+                      ))}
+                    </div>
+                    <span style={{ fontSize: 10, color: 'var(--faint)' }}>oldest → newest</span>
                   </div>
                 </div>
               )
