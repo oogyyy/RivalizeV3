@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { generateText } from 'ai'
 import type { PlayerStats, Round, Kill, GrenadeEvent } from '@/types/database'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { cs2Doctrine } from '@/lib/cs2-doctrine'
 import { aiConfigured, getAIModel, logAIUsage } from '@/lib/ai'
 import { checkUserFeature } from '@/lib/billing'
 
@@ -150,16 +151,18 @@ Focus on:
 3. **Weaknesses** — identify 2-3 specific areas where the team struggled (low KAST players, poor economy rounds, weak maps)
 4. **Key Takeaways** — 3 actionable bullet points the team should work on
 
-Be specific, data-driven, and concise. Use real player names and real numbers. 4 sections, maximum 350 words.`
+Be specific, data-driven, and concise. Use real player names and real numbers. 4 sections, maximum 350 words.
+${cs2Doctrine()}`
     : `You are a CS2 analyst. Given match data for an OPPONENT's demo, write a structured opponent scouting report in markdown.
 
 Focus on:
 1. **Scoreline & Context** — brief summary of the match
 2. **Dangerous Players** — their top performers with stats to watch
 3. **Tactical Tendencies** — patterns in utility, aggression, site preferences
-4. **Exploit Opportunities** — 3 specific weaknesses or habits we can exploit
+4. **Exploit Opportunities** — 3 specific weaknesses or habits we can exploit. For each repeated tendency, give a trigger→response counter (who does what, where, with which utility) — never report a habit without saying how to punish it.
 
-Be specific, concise, data-driven. Use real player names. 4 sections, maximum 350 words.`
+Be specific, concise, data-driven. Use real player names. Only state tendencies present in the data. 4 sections, maximum 350 words.
+${cs2Doctrine({ counterStrat: true })}`
 
   try {
     const { text, usage } = await generateText({

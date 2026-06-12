@@ -10,6 +10,7 @@ import fs from 'fs'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
 import { calloutGuide } from '@/lib/map-callouts'
+import { cs2Doctrine } from '@/lib/cs2-doctrine'
 import { retrieve, formatContext } from '@/lib/knowledge/retrieval'
 
 const bodySchema = z.object({
@@ -516,8 +517,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Deterministic grounding: curated map playbook docs + verified callout list
+  // + distilled professional doctrine (counter-strat included for anti-strats)
   const referenceContext = loadReferenceDocs(playbook.map, sectionType)
   const calloutContext   = calloutGuide(playbook.map)
+  const doctrineContext  = cs2Doctrine({ counterStrat: isAntistrat })
 
   const prompts    = isAntistrat ? ANTISTRAT_PROMPTS : SELF_PROMPTS
   const promptTmpl = prompts[sectionType] ?? prompts.t_side
@@ -558,6 +561,7 @@ Playbook: ${playbook.name}
 ${demoContext}
 ${rosterInstruction}
 ${sharedRules}
+${doctrineContext}
 ${calloutContext}
 ${utilityInstruction}
 ${referenceContext ? `\n${referenceContext}\nThe map reference above is verified ground truth for ${playbook.map} positions, timings, and smoke lineups. Adapt it against the opponent rather than writing from scratch.` : ''}
@@ -569,6 +573,7 @@ Playbook: ${playbook.name}
 ${demoContext}
 ${rosterInstruction}
 ${sharedRules}
+${doctrineContext}
 ${calloutContext}
 ${utilityInstruction}
 ${referenceContext ? `\n${referenceContext}\nThe map reference above is verified ground truth for ${playbook.map} positions, timings, and smoke lineups. Build your answer on it — reuse its named lineups and structures, adapting them to the requested section.` : ''}

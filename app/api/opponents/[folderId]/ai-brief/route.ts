@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { generateText } from 'ai'
 import type { PlayerStats, Round, Kill, GrenadeEvent } from '@/types/database'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
+import { cs2Doctrine } from '@/lib/cs2-doctrine'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { aiConfigured, getAIModel, logAIUsage } from '@/lib/ai'
 import { checkUserFeature } from '@/lib/billing'
@@ -188,17 +189,18 @@ Their T-side patterns: site preferences, utility habits, timing tendencies.
 Their CT-side tendencies: anchor positions, aggression level, rotation speed.
 
 ## 🔑 Key Exploit Points
-3 specific, actionable weaknesses we can attack.
+3 specific, actionable weaknesses we can attack. For every repeated tendency in the data (cite its frequency), give a trigger→response counter the team can run: who does what, where, with which utility.
+${cs2Doctrine({ counterStrat: true })}
 
-Be specific and data-driven. Use real player names. Keep the brief printable and scannable — 400 words max.`
+Be specific and data-driven. Use real player names. Only state tendencies present in the data — never invent rounds or plays. Keep the brief printable and scannable — 450 words max.`
 
   try {
     const { text, usage } = await generateText({
       model: getAIModel(),
       system: systemPrompt,
       prompt: `Intelligence data:\n${context}`,
-      maxTokens: 900,
-      temperature: 0.5,
+      maxTokens: 1100,
+      temperature: 0.4,
     })
 
     await logAIUsage({
