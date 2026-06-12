@@ -16,7 +16,7 @@ export const PLANS = {
     name: 'Free',
     price: 0,
     priceId: null,
-    demosPerMonth: 2,
+    demosPerMonth: 5,
     maxTeams: 1,
     aiCoaching: false,
     discordBot: false,
