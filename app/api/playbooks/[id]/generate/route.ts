@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { streamText } from 'ai'
+import { generateText } from 'ai'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { aiConfigured, getAIModel, logAIUsage } from '@/lib/ai'
 import { z } from 'zod'
@@ -9,7 +9,7 @@ import path from 'path'
 import fs from 'fs'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
-import { calloutGuide } from '@/lib/map-callouts'
+import { calloutGuide, MAP_CALLOUTS } from '@/lib/map-callouts'
 import { cs2Doctrine } from '@/lib/cs2-doctrine'
 import { retrieve, formatContext } from '@/lib/knowledge/retrieval'
 
@@ -341,6 +341,57 @@ function loadReferenceDocs(map: string, sectionType: string): string {
   return `--- VERIFIED MAP REFERENCE (ground truth for ${map}) ---\n${docs.join('\n\n')}\n--- END MAP REFERENCE ---`
 }
 
+// ── Output validation ────────────────────────────────────────────────────────
+// Deterministic sanity checks on generated sections. Catches the failure
+// modes that prompt rules alone don't fully prevent with smaller models.
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+const BANNED_PATTERNS: Array<{ re: RegExp; issue: string }> = [
+  {
+    re: /\bre-?throws?\b|\bthrows? (the |their |that )?(same |)smoke again\b/i,
+    issue: 'Suggested re-throwing a grenade — a thrown grenade is consumed for the round (rule 9). A second smoke from the same player is only valid if a teammate explicitly drops them an unthrown one.',
+  },
+  {
+    re: /\bnext tick\b/i,
+    issue: 'Used "next tick" — not a real CS2 mechanic (rule 9).',
+  },
+]
+
+function validateSection(text: string, map: string, sectionType: string): string[] {
+  const issues = BANNED_PATTERNS.filter(p => p.re.test(text)).map(p => p.issue)
+
+  // Team-wide smoke budget: 5 players buy at most 5 smokes
+  const smokeThrows = (text.match(/throws?\s+(a\s+|the\s+)?smoke/gi) ?? []).length
+  if (smokeThrows > 5) {
+    issues.push(`Described ${smokeThrows} smoke throws — a 5-player team carries at most 5 smokes total.`)
+  }
+
+  // Cross-site callouts inside the main utility sequence of an execute (rule 8)
+  if (sectionType === 'a_execute' || sectionType === 'b_execute') {
+    const c = MAP_CALLOUTS[map]
+    const block = text.match(/##\s*(our\s+)?utility sequence[\s\S]*?(?=\n##\s|$)/i)?.[0]
+    if (c && block) {
+      const wrongSite = sectionType === 'a_execute' ? c.bSite : c.aSite
+      const sameSite  = sectionType === 'a_execute' ? c.aSite : c.bSite
+      const found = wrongSite.filter(name =>
+        // Skip names that are substrings of a legitimate same-site callout
+        // (e.g. "Generator" vs "Generator Room" on Vertigo)
+        !sameSite.some(s => s.toLowerCase().includes(name.toLowerCase())) &&
+        new RegExp(`\\b${escapeRegExp(name)}\\b`, 'i').test(block)
+      )
+      if (found.length > 0) {
+        const wrong = sectionType === 'a_execute' ? 'B' : 'A'
+        issues.push(`The utility sequence references ${found.join(', ')} — ${wrong}-site callout(s) in a ${wrong === 'B' ? 'A' : 'B'} execute (rule 8). Replace with callouts for the correct site.`)
+      }
+    }
+  }
+
+  return issues
+}
+
 // ── Demo context helpers ─────────────────────────────────────────────────────
 
 type DemoParsedData = {
@@ -552,7 +603,9 @@ CRITICAL RULES — violating any of these invalidates the entire response:
 4. ROUND TIMING: CS2 rounds are 1:55. Default phase runs 1:40→1:00. Execute window is 1:00→0:40. Post-plant is 0:40 and below.
 5. REALISM: Strategies must be physically executable. A player cannot be in two places at once. Splits require time to travel.
 6. STRUCTURE: Follow the section headers in the prompt exactly. Do not add extra sections or skip required ones.
-7. LINEUPS: When describing a specific smoke/flash lineup, prefer the exact lineups named in the map reference. If the reference has no lineup for a throw you need, name the throw position and landing callout but do NOT invent precise aim instructions.`
+7. LINEUPS: When describing a specific smoke/flash lineup, prefer the exact lineups named in the map reference. If the reference has no lineup for a throw you need, name the throw position and landing callout but do NOT invent precise aim instructions.
+8. SITE CONSISTENCY: An A execute uses only A-site and contested callouts; a B execute uses only B-site and contested callouts. The opposite site's callouts may appear ONLY inside an explicitly labelled fake/redirect option — never as part of the main utility sequence or adaptations to it.
+9. UTILITY IS SINGLE-USE: A thrown grenade is gone for the round — NEVER suggest re-throwing a smoke, throwing it "again", or "on the next tick"; no such mechanic exists. A player carries at most ONE smoke at a time, but teammates CAN drop grenades to each other — so the same player throwing a second smoke is valid ONLY if the plan explicitly names who drops it to them and when. Team-wide, 5 players still have at most 5 smokes per round.`
 
   const systemPrompt = isAntistrat
     ? `You are an expert CS2 anti-strat analyst building a structured pre-match counter-strategy playbook.
@@ -581,24 +634,40 @@ ${knowledgeContext ? `\n${knowledgeContext}` : ''}
 ${demoContext ? 'Where relevant, incorporate the team demo data above to tailor recommendations.' : ''}
 Keep it practical and specific — every position, throw, and timing must be named with real ${playbook.map} callouts.`
 
-  const result = streamText({
-    model: getAIModel(),
-    system: systemPrompt,
-    prompt,
-    maxTokens: 3000,
-    temperature: 0.25,
-    onFinish: async ({ usage }) => {
-      await logAIUsage({
-        userId: user.id,
-        feature: 'playbook',
-        promptTokens: usage?.promptTokens,
-        completionTokens: usage?.completionTokens,
-      })
-    },
-  })
+  // Generate, validate against the hard rules, and retry once with the
+  // specific violations called out. Catches the nonsense class of output
+  // (cross-site utility, re-thrown smokes, impossible grenade counts) that
+  // prompt rules alone don't fully prevent.
+  let text = ''
+  let issues: string[] = []
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const retrySuffix = attempt === 0 ? '' : `
 
-  return new Response(
-    result.textStream.pipeThrough(new TextEncoderStream()),
-    { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Accel-Buffering': 'no' } }
-  )
+Your previous attempt was REJECTED for violating the critical rules:
+${issues.map(i => `- ${i}`).join('\n')}
+Rewrite the entire section from scratch, fixing every violation. Re-read the critical rules before answering.`
+
+    const result = await generateText({
+      model: getAIModel(),
+      system: systemPrompt,
+      prompt: prompt + retrySuffix,
+      maxTokens: 3000,
+      temperature: 0.25,
+    })
+    text = result.text
+    await logAIUsage({
+      userId: user.id,
+      feature: 'playbook',
+      promptTokens: result.usage?.promptTokens,
+      completionTokens: result.usage?.completionTokens,
+    })
+
+    issues = validateSection(text, playbook.map, sectionType)
+    if (issues.length === 0) break
+    console.warn(`[generate] section ${sectionType} attempt ${attempt + 1} rejected:`, issues.join(' | '))
+  }
+
+  return new Response(text, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Accel-Buffering': 'no' },
+  })
 }

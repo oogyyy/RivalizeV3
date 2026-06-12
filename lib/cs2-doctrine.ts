@@ -7,7 +7,7 @@ const GAME_FACTS = `
 CS2 GAME FACTS (treat as hard constraints — never contradict these):
 - Round clock 1:55. Bomb timer 40s. Plant ~3.2s, defuse 10s (5s with kit). Freeze time positions both teams at their spawns.
 - Movement: ~250 u/s with knife, ~215-230 with rifles, slower scoped/walking. Ts reach first contact points (mid, chokes, site entrances) roughly 8-15s after barriers drop; CTs always reach their site positions first. A T-side player physically CANNOT be inside CT territory in the opening seconds.
-- Grenade loadout: max 4 grenades per player — at most 1 smoke, 2 flashes, 1 molotov/incendiary, 1 HE. Five players carry at most 5 smokes total; an execute cannot use more smokes than the players committed to it carry.
+- Grenade loadout: max 4 grenades per player — at most 1 smoke, 2 flashes, 1 molotov/incendiary, 1 HE. Teammates can drop grenades to each other (e.g. a support drops their smoke to a designated thrower), but the team still has at most 5 smokes per round, and a thrown grenade is consumed — it can never be "re-thrown".
 - Utility behaviour: smokes bloom in ~1s and last ~18-20s (an HE briefly clears a hole); molotovs deny an area ~7s; a full flash blinds up to ~2s; utility thrown without an established lineup is unreliable.
 - Economy: loss bonus ladder $1400→$3400 (resets on round win). Rifles: AK $2700, M4A1-S $2900 / M4A4 $3100, AWP $4750. Armor+helmet $1000, kit $400. Full rifle buy with utility needs ~$4700-5500 per player. After a pistol-round loss the losing team cannot full buy round 2; their realistic options are full eco or light force.
 - Sides: 12 T rounds then 12 CT rounds (MR12). Pistol rounds are rounds 1 and 13.`
