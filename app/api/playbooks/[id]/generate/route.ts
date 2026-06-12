@@ -5,8 +5,11 @@ import { streamText } from 'ai'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { aiConfigured, getAIModel, logAIUsage } from '@/lib/ai'
 import { z } from 'zod'
+import path from 'path'
+import fs from 'fs'
 import type { Round, Kill, GrenadeEvent, PlayerStats } from '@/types/database'
 import { detectTacticalPatterns } from '@/lib/cs2-zones'
+import { calloutGuide } from '@/lib/map-callouts'
 import { retrieve, formatContext } from '@/lib/knowledge/retrieval'
 
 const bodySchema = z.object({
@@ -302,6 +305,41 @@ Given their weapon preferences, which of our roles most needs a rifle drop to su
 The $ amount below which individuals save. Does anything about their playstyle change this calculus?`,
 }
 
+// ── Curated map reference docs ───────────────────────────────────────────────
+// Always loaded directly from disk so the model is grounded in the verified
+// map playbooks even when vector retrieval is unavailable or returns weak hits.
+
+const KB_DIR = path.join(process.cwd(), 'knowledge_base/cs2')
+
+function loadReferenceDocs(map: string, sectionType: string): string {
+  const short = map.replace(/^de_/, '')
+  const files: string[] = []
+
+  if (['t_side', 'a_execute', 'b_execute'].includes(sectionType)) {
+    files.push(`${short}_t_default.md`)
+  } else if (sectionType === 'ct_side') {
+    files.push(`${short}_ct_default.md`)
+  } else if (sectionType === 'roles') {
+    files.push(`${short}_t_default.md`, `${short}_ct_default.md`, 'team_roles_template.md')
+  } else if (sectionType === 'economy') {
+    files.push('pro_default_principles.md')
+  }
+
+  const docs = files
+    .map(f => {
+      const fp = path.join(KB_DIR, f)
+      try {
+        return fs.existsSync(fp) ? fs.readFileSync(fp, 'utf-8').slice(0, 6000) : null
+      } catch {
+        return null
+      }
+    })
+    .filter((d): d is string => d !== null)
+
+  if (docs.length === 0) return ''
+  return `--- VERIFIED MAP REFERENCE (ground truth for ${map}) ---\n${docs.join('\n\n')}\n--- END MAP REFERENCE ---`
+}
+
 // ── Demo context helpers ─────────────────────────────────────────────────────
 
 type DemoParsedData = {
@@ -471,10 +509,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       retrieve({ query: KB_QUERIES[sectionType] ?? sectionType, map: playbook.map, topK: 6 }),
       new Promise<null>((_, rej) => setTimeout(() => rej(new Error('kb timeout')), 8000)),
     ])
-    if (kbResult) knowledgeContext = formatContext(kbResult)
+    // The 'file' fallback returns the same docs we already load deterministically below
+    if (kbResult && kbResult.source !== 'file') knowledgeContext = formatContext(kbResult)
   } catch (err) {
     console.warn('[generate] knowledge retrieval skipped:', (err as Error).message)
   }
+
+  // Deterministic grounding: curated map playbook docs + verified callout list
+  const referenceContext = loadReferenceDocs(playbook.map, sectionType)
+  const calloutContext   = calloutGuide(playbook.map)
 
   const prompts    = isAntistrat ? ANTISTRAT_PROMPTS : SELF_PROMPTS
   const promptTmpl = prompts[sectionType] ?? prompts.t_side
@@ -505,7 +548,8 @@ CRITICAL RULES — violating any of these invalidates the entire response:
 3. CALLOUTS: Use ONLY real, established callouts for ${playbook.map}. Never invent position names.
 4. ROUND TIMING: CS2 rounds are 1:55. Default phase runs 1:40→1:00. Execute window is 1:00→0:40. Post-plant is 0:40 and below.
 5. REALISM: Strategies must be physically executable. A player cannot be in two places at once. Splits require time to travel.
-6. STRUCTURE: Follow the section headers in the prompt exactly. Do not add extra sections or skip required ones.`
+6. STRUCTURE: Follow the section headers in the prompt exactly. Do not add extra sections or skip required ones.
+7. LINEUPS: When describing a specific smoke/flash lineup, prefer the exact lineups named in the map reference. If the reference has no lineup for a throw you need, name the throw position and landing callout but do NOT invent precise aim instructions.`
 
   const systemPrompt = isAntistrat
     ? `You are an expert CS2 anti-strat analyst building a structured pre-match counter-strategy playbook.
@@ -514,8 +558,10 @@ Playbook: ${playbook.name}
 ${demoContext}
 ${rosterInstruction}
 ${sharedRules}
+${calloutContext}
 ${utilityInstruction}
-${knowledgeContext ? `\n${knowledgeContext}\nUse the knowledge base above as your ground truth for ${playbook.map} callouts, timings, and utility positions. Combine it with the opponent demo data to produce a targeted counter-strategy.` : ''}
+${referenceContext ? `\n${referenceContext}\nThe map reference above is verified ground truth for ${playbook.map} positions, timings, and smoke lineups. Adapt it against the opponent rather than writing from scratch.` : ''}
+${knowledgeContext ? `\n${knowledgeContext}` : ''}
 Base every recommendation directly on the opponent demo data provided. Reference their specific tendencies and positions. Keep it practical — coaches should be able to read this to players in a team meeting.`
     : `You are an expert CS2 tactical coach writing a structured competitive playbook.
 Map: ${playbook.map}
@@ -523,8 +569,10 @@ Playbook: ${playbook.name}
 ${demoContext}
 ${rosterInstruction}
 ${sharedRules}
+${calloutContext}
 ${utilityInstruction}
-${knowledgeContext ? `\n${knowledgeContext}\nUse the knowledge base above as your ground truth for ${playbook.map} callouts, timings, and utility positions. Do not invent positions not present in the knowledge base.` : ''}
+${referenceContext ? `\n${referenceContext}\nThe map reference above is verified ground truth for ${playbook.map} positions, timings, and smoke lineups. Build your answer on it — reuse its named lineups and structures, adapting them to the requested section.` : ''}
+${knowledgeContext ? `\n${knowledgeContext}` : ''}
 ${demoContext ? 'Where relevant, incorporate the team demo data above to tailor recommendations.' : ''}
 Keep it practical and specific — every position, throw, and timing must be named with real ${playbook.map} callouts.`
 
@@ -532,8 +580,8 @@ Keep it practical and specific — every position, throw, and timing must be nam
     model: getAIModel(),
     system: systemPrompt,
     prompt,
-    maxTokens: 2000,
-    temperature: 0.35,
+    maxTokens: 3000,
+    temperature: 0.25,
     onFinish: async ({ usage }) => {
       await logAIUsage({
         userId: user.id,
