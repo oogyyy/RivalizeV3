@@ -4,14 +4,16 @@ import { createAdminClient } from '@/lib/supabase/admin'
 /**
  * Central AI provider configuration.
  *
- * Defaults to Groq Llama 3.3 70B (the original hardcoded setup), but any
- * OpenAI-compatible provider can be swapped in via env without code changes:
+ * Defaults to OpenAI gpt-oss-120b on Groq (open-weight reasoning model on the
+ * free tier — substantially better tactical reasoning and tool use than the
+ * previous Llama 3.3 70B default), but any OpenAI-compatible provider can be
+ * swapped in via env without code changes:
  *   AI_API_KEY   — provider API key  (falls back to GROQ_API_KEY)
  *   AI_BASE_URL  — OpenAI-compatible base URL (falls back to Groq)
- *   AI_MODEL     — model id (falls back to llama-3.3-70b-versatile)
+ *   AI_MODEL     — model id (falls back to openai/gpt-oss-120b)
  */
 const DEFAULT_BASE_URL = 'https://api.groq.com/openai/v1'
-const DEFAULT_MODEL    = 'llama-3.3-70b-versatile'
+const DEFAULT_MODEL    = 'openai/gpt-oss-120b'
 
 export function aiConfigured(): boolean {
   return Boolean(process.env.AI_API_KEY ?? process.env.GROQ_API_KEY)
