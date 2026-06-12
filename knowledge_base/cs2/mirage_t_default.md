@@ -11,7 +11,7 @@ Our T-side default on Mirage is built around denying the CT AWP in Window (Snipe
 
 #### Info-Gathering Positions
 ▸ [Entry]: Push T Ramp toward A Short — apply A-side pressure and report CT numbers at Ticket Booth and Short.
-▸ [AWPer]: Take Top Mid / Underpass behind Window smoke — duel CT exiting Window after smoke lands or wait for cross-map pick opportunity; do NOT sit in open mid.
+▸ [AWPer]: Hold Top Mid behind the Window smoke — duel the CT exiting Window after the smoke lands, or wait for a cross-map pick. Underpass is only the safe rotation route up to Top Mid: from INSIDE Underpass there is NO line of sight to Window, so the hold must happen at the Top Mid / Underpass-exit level. Do NOT sit in open mid.
 ▸ [Support]: Rotate to B Apartments (Upper or Lower Apps) — monitor B site through Market Window and report CT B numbers before IGL commits.
 ▸ [IGL]: Hold B Apartments (Lower Apps or Bench) — reads CT positioning from Apartments approach; primary decision-maker for B vs. A call.
 ▸ [Lurker]: Take Palace toward A Ramp / Balcony — watches for CT rotating off B toward A Short; holds as late-round A split threat.
