@@ -74,7 +74,10 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/dashboard')
+      // If there's a pending invite token, redirect to the invite page to auto-accept
+      const inviteToken = searchParams.get('invite')
+      const nextPath = inviteToken ? `/invite/${inviteToken}` : '/dashboard'
+      router.push(nextPath)
       router.refresh()
     } catch {
       setError('An unexpected error occurred. Please try again.')
@@ -94,10 +97,12 @@ export default function LoginPage() {
     setOauthLoading(provider)
 
     try {
+      const inviteToken = searchParams.get('invite')
+      const nextPath = inviteToken ? `/invite/${inviteToken}` : '/dashboard'
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       })
 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import {
@@ -49,6 +50,10 @@ function validateUsername(username: string): string | null {
 }
 
 export default function SignupPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const inviteToken = searchParams.get('invite')
+
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -64,6 +69,17 @@ export default function SignupPage() {
 
   const supabase = createClient()
   const passwordStrength = getPasswordStrength(password)
+
+  // Pre-fill email from invite token if available
+  useEffect(() => {
+    if (!inviteToken) return
+    fetch(`/api/invite/${inviteToken}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.email && !email) setEmail(data.email)
+      })
+      .catch(() => {/* ignore */})
+  }, [inviteToken]) // email intentionally excluded — only prefill once
 
   function handleUsernameChange(value: string) {
     const lower = value.toLowerCase()
@@ -103,6 +119,8 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
+      // If there's an invite token, redirect back to the invite page after email verification
+      const nextPath = inviteToken ? `/invite/${inviteToken}` : '/dashboard'
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -111,7 +129,7 @@ export default function SignupPage() {
             username,
             display_name: username,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       })
 
@@ -137,10 +155,11 @@ export default function SignupPage() {
     setOauthLoading(provider)
 
     try {
+      const nextPath = inviteToken ? `/invite/${inviteToken}` : '/dashboard'
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       })
 
@@ -167,8 +186,9 @@ export default function SignupPage() {
         </p>
         <p className="text-white font-semibold mb-6">{email}</p>
         <p className="text-white/40 text-sm leading-relaxed mb-8">
-          Click the link in the email to verify your account and get started.
-          If you don&apos;t see it, check your spam folder.
+          {inviteToken
+            ? "Click the link in the email to verify your account. You'll be taken back to accept the team invite automatically."
+            : "Click the link in the email to verify your account and get started. If you don't see it, check your spam folder."}
         </p>
         <Link
           href="/login"
