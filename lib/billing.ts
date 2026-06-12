@@ -61,3 +61,22 @@ export async function incrementDemoCount(teamId: string): Promise<void> {
   const admin = createAdminClient()
   await admin.rpc('increment_team_demo_count', { p_team_id: teamId })
 }
+
+// Returns the best active plan for a user across all their teams (team > pro > null).
+export async function getUserPlan(userId: string): Promise<'pro' | 'team' | null> {
+  const admin = createAdminClient()
+  const { data: memberships } = await admin
+    .from('team_members').select('team_id').eq('user_id', userId)
+  if (!memberships?.length) return null
+
+  const teamIds = memberships.map(m => m.team_id)
+  const { data: subs } = await admin
+    .from('subscriptions').select('plan, status')
+    .in('team_id', teamIds)
+    .in('status', ['active', 'trialing'])
+  if (!subs?.length) return null
+
+  if (subs.some(s => s.plan === 'team')) return 'team'
+  if (subs.some(s => s.plan === 'pro')) return 'pro'
+  return null
+}

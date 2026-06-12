@@ -39,7 +39,12 @@ function formatRelativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export default function TopBar({ profile }: { profile: Profile | null }) {
+const PLAN_BADGE: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  pro:  { label: 'Pro',  color: 'var(--accent)',  bg: 'color-mix(in srgb, var(--accent) 14%, transparent)',  border: 'color-mix(in srgb, var(--accent) 30%, transparent)' },
+  team: { label: 'Team', color: 'var(--signal)',  bg: 'color-mix(in srgb, var(--signal) 14%, transparent)',  border: 'color-mix(in srgb, var(--signal) 30%, transparent)' },
+}
+
+export default function TopBar({ profile, plan }: { profile: Profile | null; plan?: 'pro' | 'team' | null }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -680,11 +685,25 @@ export default function TopBar({ profile }: { profile: Profile | null }) {
               <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-ui)' }}>
                 {displayName}
               </div>
-              {profile?.username && (
-                <div style={{ fontSize: 10.5, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
-                  @{profile.username}
-                </div>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                {profile?.username && (
+                  <span style={{ fontSize: 10.5, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
+                    @{profile.username}
+                  </span>
+                )}
+                {plan && PLAN_BADGE[plan] && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, letterSpacing: '0.07em',
+                    fontFamily: 'var(--font-mono)', textTransform: 'uppercase',
+                    color: PLAN_BADGE[plan].color,
+                    background: PLAN_BADGE[plan].bg,
+                    border: `1px solid ${PLAN_BADGE[plan].border}`,
+                    padding: '1px 5px', borderRadius: 4,
+                  }}>
+                    {PLAN_BADGE[plan].label}
+                  </span>
+                )}
+              </div>
             </div>
 
             <ChevronDown

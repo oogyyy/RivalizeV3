@@ -13,6 +13,7 @@ import { NavigationRefresh } from '@/components/layout/NavigationRefresh'
 import ExtensionModal from '@/components/extension/ExtensionModal'
 import OnboardingWizard, { type OnboardingState } from '@/components/onboarding/OnboardingWizard'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserPlan } from '@/lib/billing'
 
 async function getOnboardingState(userId: string): Promise<OnboardingState> {
   const admin = createAdminClient()
@@ -42,9 +43,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const supabase = await createClient()
 
-  const [{ data: profile }, onboarding] = await Promise.all([
+  const [{ data: profile }, onboarding, userPlan] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     getOnboardingState(user.id),
+    getUserPlan(user.id),
   ])
 
   return (
@@ -68,7 +70,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <MobileTopBar />
 
         {/* Desktop top bar — hidden on mobile */}
-        <TopBar profile={profile} />
+        <TopBar profile={profile} plan={userPlan} />
 
         <main className="flex-1 overflow-auto rv-main-scroll md:pt-0">
           {children}

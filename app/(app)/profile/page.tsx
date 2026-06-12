@@ -178,6 +178,7 @@ export default function ProfilePage() {
   const [teamsData, setTeamsData] = useState<TeamInfo[]>([])
   const [mapStats, setMapStats] = useState<MapStat[]>([])
   const [primaryTeamId, setPrimaryTeamId] = useState<string | null>(null)
+  const [userPlan, setUserPlan] = useState<'pro' | 'team' | null>(null)
 
   const [linkBanner, setLinkBanner] = useState<string | null>(null)
   const [unlinking, setUnlinking] = useState<'steam' | 'faceit' | null>(null)
@@ -227,6 +228,14 @@ export default function ProfilePage() {
       const teamIds = (memberships || []).map(m => m.team_id)
 
       if (teamIds.length > 0) {
+        // Fetch best active plan across all teams
+        const { data: subs } = await supabase
+          .from('subscriptions').select('plan, status')
+          .in('team_id', teamIds)
+          .in('status', ['active', 'trialing'])
+        if (subs?.some(s => s.plan === 'team')) setUserPlan('team')
+        else if (subs?.some(s => s.plan === 'pro')) setUserPlan('pro')
+
         setPrimaryTeamId(teamIds[0])
         const { data: teams } = await supabase.from('teams').select('id, name, logo_url').in('id', teamIds)
         setTeamsData((teams || []) as TeamInfo[])
@@ -413,6 +422,16 @@ export default function ProfilePage() {
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Calendar size={11} />Joined {joinDate}
                   </span>
+                  {userPlan === 'team' && (
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold" style={{ background: 'color-mix(in srgb, var(--signal) 14%, transparent)', color: 'var(--signal)', border: '1px solid color-mix(in srgb, var(--signal) 30%, transparent)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      ✦ Team
+                    </span>
+                  )}
+                  {userPlan === 'pro' && (
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold" style={{ background: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      ✦ Pro
+                    </span>
+                  )}
                   {steamId && (
                     <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium" style={{ background: 'rgba(27,40,56,0.8)', color: '#c7d5e0', border: '1px solid rgba(199,213,224,0.2)' }}>
                       <Shield size={9} /> Steam
