@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       const subId = session.subscription as string
       const stripeSub = await getStripe().subscriptions.retrieve(subId) as unknown as Stripe.Subscription
 
+      const item = stripeSub.items?.data?.[0] as any
       await admin.from('subscriptions').upsert({
         team_id:                teamId,
         stripe_customer_id:     session.customer as string,
@@ -37,8 +38,8 @@ export async function POST(req: NextRequest) {
         plan,
         status:                 stripeSub.status,
         cancel_at_period_end:   stripeSub.cancel_at_period_end,
-        current_period_start:   new Date((stripeSub as any).billing_cycle_anchor * 1000).toISOString(),
-        current_period_end:     stripeSub.cancel_at ? new Date(stripeSub.cancel_at * 1000).toISOString() : null,
+        current_period_start:   item?.period?.start ? new Date(item.period.start * 1000).toISOString() : null,
+        current_period_end:     item?.period?.end ? new Date(item.period.end * 1000).toISOString() : null,
         updated_at:             new Date().toISOString(),
       }, { onConflict: 'team_id' })
       break
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
 
       const plan = (sub.metadata?.plan ?? sub.items.data[0]?.price?.metadata?.plan ?? 'pro') as string
 
+      const item = (sub as any).items?.data?.[0]
       await admin.from('subscriptions').upsert({
         team_id:                teamId,
         stripe_customer_id:     sub.customer as string,
@@ -58,8 +60,8 @@ export async function POST(req: NextRequest) {
         plan,
         status:                 sub.status,
         cancel_at_period_end:   sub.cancel_at_period_end,
-        current_period_start:   new Date((sub as any).billing_cycle_anchor * 1000).toISOString(),
-        current_period_end:     sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
+        current_period_start:   item?.period?.start ? new Date(item.period.start * 1000).toISOString() : null,
+        current_period_end:     item?.period?.end ? new Date(item.period.end * 1000).toISOString() : null,
         updated_at:             new Date().toISOString(),
       }, { onConflict: 'team_id' })
       break
