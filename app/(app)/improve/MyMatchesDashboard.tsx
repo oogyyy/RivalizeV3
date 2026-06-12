@@ -152,7 +152,7 @@ function PerfTooltip({ active, payload }: { active?: boolean; payload?: Array<{ 
       <p style={{ color: resultColor, fontWeight: 600, margin: '0 0 2px' }}>
         {resultLabel}{(p.ourScore > 0 || p.theirScore > 0) ? ` · ${p.ourScore}–${p.theirScore}` : ''}
       </p>
-      <p style={{ color: 'var(--muted)', margin: 0 }}>Win rate: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{p.runningRate ?? '—'}%</span></p>
+      <p style={{ color: 'var(--muted)', margin: 0 }}>Last-5 win rate: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{p.runningRate ?? '—'}%</span></p>
     </div>
   )
 }
@@ -252,7 +252,9 @@ export default function MyMatchesDashboard({
       .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''))
     if (completed.length < 2) return null
 
-    let wins = 0, total = 0
+    // Rolling win rate over the last WINDOW matches with a known result
+    const WINDOW = 5
+    const resultsSoFar: ('w' | 'l' | 'd')[] = []
     const points: PerfPoint[] = completed.map((d, idx) => {
       const h = d.parsed_data?.header
       const os = d.parsed_data?.opponentSide ?? 'team2'
@@ -262,15 +264,16 @@ export default function MyMatchesDashboard({
       if (h) {
         ourScore = os === 'team1' ? (h.score_team2 ?? 0) : (h.score_team1 ?? 0)
         theirScore = os === 'team1' ? (h.score_team1 ?? 0) : (h.score_team2 ?? 0)
-        total++
-        if (ourScore > theirScore) { wins++; result = 'w' }
+        if (ourScore > theirScore) result = 'w'
         else if (ourScore < theirScore) result = 'l'
         else result = 'd'
+        resultsSoFar.push(result)
       }
 
       const mapRaw = d.parsed_data?.header?.map
       const mapName = mapRaw ? (MAP_LABELS[mapRaw] ?? mapRaw.replace(/^de_/, '').replace(/\b\w/g, (c: string) => c.toUpperCase())) : '—'
-      const runningRate = total > 0 ? Math.round((wins / total) * 100) : null
+      const window = resultsSoFar.slice(-WINDOW)
+      const runningRate = window.length > 0 ? Math.round((window.filter(r => r === 'w').length / window.length) * 100) : null
       const dateStr = d.match_date || d.created_at
 
       return {
@@ -447,7 +450,7 @@ export default function MyMatchesDashboard({
               </div>
             </div>
             <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 0, marginBottom: 12 }}>
-              Running win rate · hover bars for match details
+              Each bar is your win rate over the 5 matches up to that point · bar color shows that match&apos;s result · hover for details
             </p>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={perfTrends.points} margin={{ top: 6, right: 4, bottom: 0, left: -16 }} barCategoryGap="18%">

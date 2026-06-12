@@ -36,16 +36,15 @@ export default function PerformanceTrends({ demos }: Props) {
     [demos],
   )
 
-  // Rolling win-rate series
+  // Rolling win-rate series: win rate over the last WINDOW results at each point
   const trendData = useMemo(() => {
-    let wins = 0, played = 0
+    const WINDOW = 5
+    const resultsSoFar: ('Win' | 'Loss' | 'Draw')[] = []
     return completed.map((d: DemoRowData, i: number) => {
       const result = getResult(d)
-      if (result) {
-        played++
-        if (result === 'Win') wins++
-      }
-      const wr = played > 0 ? Math.round((wins / played) * 100) : null
+      if (result) resultsSoFar.push(result)
+      const window = resultsSoFar.slice(-WINDOW)
+      const wr = window.length > 0 ? Math.round((window.filter(r => r === 'Win').length / window.length) * 100) : null
       const map = d.parsed_data?.header?.map
       return {
         idx: i + 1,
@@ -89,7 +88,19 @@ export default function PerformanceTrends({ demos }: Props) {
 
       {/* Win-rate over time */}
       <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs text-muted-foreground mb-3">Win rate over time (cumulative)</p>
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <p className="text-xs text-muted-foreground">
+            Form — win rate over the 5 matches up to each point · dots show each match result
+          </p>
+          {(() => {
+            const last = [...trendData].reverse().find(d => d.winRate !== null)
+            return last?.winRate != null ? (
+              <p className={`text-xs font-bold shrink-0 ${last.winRate >= 50 ? 'text-[#2DE3CE]' : 'text-[#ff4466]'}`}>
+                Last 5: {last.winRate}%
+              </p>
+            ) : null
+          })()}
+        </div>
         <ResponsiveContainer width="100%" height={140}>
           <AreaChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
             <defs>
@@ -104,7 +115,7 @@ export default function PerformanceTrends({ demos }: Props) {
             <Tooltip
               contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
               labelFormatter={(v: number) => `Match #${v}`}
-              formatter={(v: number) => [`${v}%`, 'Win Rate']}
+              formatter={(v: number) => [`${v}%`, 'Last-5 win rate']}
             />
             <Area type="monotone" dataKey="winRate" stroke="#2DE3CE" strokeWidth={2} fill="url(#wrGrad)" dot={false} connectNulls />
           </AreaChart>
@@ -123,6 +134,12 @@ export default function PerformanceTrends({ demos }: Props) {
                   : '#555',
               }}
             />
+          ))}
+          <span className="flex-1" />
+          {([['#2DE3CE', 'Win'], ['#ff4466', 'Loss'], ['#facc15', 'Draw']] as const).map(([color, label]) => (
+            <span key={label} className="flex items-center gap-1 text-[9px] text-muted-foreground shrink-0">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} /> {label}
+            </span>
           ))}
         </div>
       </div>
