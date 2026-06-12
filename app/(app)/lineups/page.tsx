@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, type ElementType, type ChangeEvent, type KeyboardEvent } from 'react'
 import {
   BookMarked, Plus, Trash2, Filter, Loader2, ChevronDown, ChevronUp,
-  Globe, Youtube, Video, Image, Upload, X,
+  Globe, Youtube, Video, Image, Upload, X, Search, Pencil, PencilLine, Check,
 } from 'lucide-react'
 import Link from 'next/link'
 import LineupBoard, { type DrawAction } from '@/components/lineups/LineupBoard'
@@ -78,6 +78,7 @@ function YoutubeEmbed({ url }: { url: string }) {
 }
 
 const MEDIA_TABS: { value: MediaType; label: string; Icon: ElementType }[] = [
+  { value: 'draw',    label: 'Draw',    Icon: PencilLine },
   { value: 'youtube', label: 'YouTube', Icon: Youtube },
   { value: 'video',   label: 'Video',   Icon: Video   },
   { value: 'images',  label: 'Images',  Icon: Image   },
@@ -105,8 +106,17 @@ export default function LineupsPage() {
   const [showForm, setShowForm]   = useState(false)
   const [deleting, setDeleting]   = useState<string | null>(null)
   const [publishing, setPublishing] = useState<string | null>(null)
+  const [search, setSearch]       = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [newMediaType, setNewMediaType] = useState<MediaType>('youtube')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName]   = useState('')
+  const [editType, setEditType]   = useState('smoke')
+  const [editNotes, setEditNotes] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  const [newMediaType, setNewMediaType] = useState<MediaType>('draw')
   const [newYoutubeUrl, setNewYoutubeUrl] = useState('')
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [uploadingMedia, setUploadingMedia] = useState(false)
@@ -131,6 +141,7 @@ export default function LineupsPage() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => { if (teams.length > 0 && !selectedTeam) setSelectedTeam(teams[0].id) }, [teams, selectedTeam])
+  useEffect(() => () => { if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current) }, [])
 
   function resetForm() {
     setNewName(''); setNewNotes(''); setNewYoutubeUrl('')
@@ -218,6 +229,18 @@ export default function LineupsPage() {
     }
   }
 
+  function requestDelete(id: string) {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id)
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current)
+      confirmTimerRef.current = setTimeout(() => setConfirmDeleteId(null), 3000)
+      return
+    }
+    if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current)
+    setConfirmDeleteId(null)
+    handleDelete(id)
+  }
+
   async function handleDelete(id: string) {
     setDeleting(id)
     try {
@@ -229,7 +252,44 @@ export default function LineupsPage() {
     }
   }
 
-  const displayed = mapFilter ? lineups.filter((l: Lineup) => l.map === mapFilter) : lineups
+  function startEdit(lineup: Lineup) {
+    setEditingId(lineup.id)
+    setEditName(lineup.name)
+    setEditType(lineup.type)
+    setEditNotes(lineup.notes ?? '')
+  }
+
+  async function handleEditSave() {
+    if (!editingId || !editName.trim()) return
+    setSavingEdit(true)
+    try {
+      const res = await fetch(`/api/lineups/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName.trim(), type: editType, notes: editNotes }),
+      })
+      if (res.ok) {
+        setLineups((prev: Lineup[]) => prev.map((l: Lineup) =>
+          l.id === editingId ? { ...l, name: editName.trim(), type: editType, notes: editNotes } : l))
+        setEditingId(null)
+      }
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const searchLower = search.trim().toLowerCase()
+  const displayed = lineups.filter((l: Lineup) =>
+    (!mapFilter || l.map === mapFilter) &&
+    (!searchLower || l.name.toLowerCase().includes(searchLower) || (l.notes ?? '').toLowerCase().includes(searchLower))
+  )
+  const hasFilters = Boolean(mapFilter || typeFilter || searchLower)
+  // Group by map (CS2_MAPS order) when no single map is selected
+  const groups: { map: string; items: Lineup[] }[] = mapFilter
+    ? [{ map: mapFilter, items: displayed }]
+    : [...CS2_MAPS.map(m => m.value), ...Array.from(new Set(displayed.map((l: Lineup) => l.map))).filter(m => !CS2_MAPS.some(c => c.value === m))]
+        .map(map => ({ map, items: displayed.filter((l: Lineup) => l.map === map) }))
+        .filter(g => g.items.length > 0)
   const isBusy = creating || uploadingMedia
 
   const inputStyle: React.CSSProperties = {
@@ -272,6 +332,21 @@ export default function LineupsPage() {
       {/* Filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <Filter size={13} style={{ color: 'var(--faint)', flexShrink: 0 }} />
+        {/* Search */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <Search size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--faint)', pointerEvents: 'none' }} />
+          <input
+            value={search}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+            placeholder="Search lineups…"
+            style={{ width: 170, padding: '6px 26px 6px 26px', fontSize: 11, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', outline: 'none' }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 0, display: 'flex' }}>
+              <X size={11} />
+            </button>
+          )}
+        </div>
         {/* Map filter */}
         <div style={{ display: 'flex', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0 }}>
           <button
@@ -440,20 +515,37 @@ export default function LineupsPage() {
       ) : displayed.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 16px', textAlign: 'center', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--card)' }}>
           <BookMarked size={32} style={{ color: 'var(--faint)', marginBottom: 12 }} />
-          <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>No lineups yet</p>
+          <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>{hasFilters ? 'No matching lineups' : 'No lineups yet'}</p>
           <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
-            {mapFilter ? `No ${LINEUP_TYPES.find(t => t.value === typeFilter)?.label ?? ''} lineups for ${MAP_LABELS[mapFilter] ?? mapFilter} yet.` : 'Create your first lineup to get started.'}
+            {hasFilters ? 'Try adjusting the search or filters.' : 'Create your first lineup to get started.'}
           </p>
-          <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: 'var(--accent)', color: 'white', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-            <Plus size={13} /> Create lineup
-          </button>
+          {hasFilters ? (
+            <button onClick={() => { setSearch(''); setMapFilter(''); setTypeFilter('') }} style={{ padding: '7px 14px', borderRadius: 8, background: 'transparent', color: 'var(--muted)', fontSize: 12, fontWeight: 500, border: '1px solid var(--border)', cursor: 'pointer' }}>
+              Clear filters
+            </button>
+          ) : (
+            <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: 'var(--accent)', color: 'white', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+              <Plus size={13} /> Create lineup
+            </button>
+          )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {displayed.map((lineup: Lineup) => {
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {groups.map(group => (
+          <div key={group.map}>
+          {!mapFilter && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>{MAP_LABELS[group.map] ?? group.map}</p>
+              <span style={{ fontSize: 11, color: 'var(--faint)' }}>{group.items.length} lineup{group.items.length === 1 ? '' : 's'}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {group.items.map((lineup: Lineup) => {
             const typeInfo = LINEUP_TYPES.find(t => t.value === lineup.type) ?? LINEUP_TYPES[4]
             const mapLabelStr = MAP_LABELS[lineup.map] ?? lineup.map
             const isOpen = openId === lineup.id
+            const isEditing = editingId === lineup.id
+            const isConfirmingDelete = confirmDeleteId === lineup.id
             const effectiveMediaType = lineup.media_type ?? 'draw'
 
             return (
@@ -461,11 +553,65 @@ export default function LineupsPage() {
                 {/* Row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px' }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: typeInfo.color, flexShrink: 0 }} />
+                  {isEditing ? (
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <input
+                        value={editName}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setEditName(e.target.value)}
+                        onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleEditSave(); if (e.key === 'Escape') setEditingId(null) }}
+                        autoFocus
+                        style={{ flex: '2 1 160px', minWidth: 0, padding: '6px 10px', fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', outline: 'none' }}
+                      />
+                      <select
+                        value={editType}
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) => setEditType(e.target.value)}
+                        style={{ flexShrink: 0, padding: '6px 8px', fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', outline: 'none' }}
+                      >
+                        {LINEUP_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                      <input
+                        value={editNotes}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setEditNotes(e.target.value)}
+                        onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleEditSave(); if (e.key === 'Escape') setEditingId(null) }}
+                        placeholder="Notes (optional)"
+                        style={{ flex: '3 1 180px', minWidth: 0, padding: '6px 10px', fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', outline: 'none' }}
+                      />
+                    </div>
+                  ) : (
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{lineup.name}</p>
                     <p style={{ fontSize: 11, color: 'var(--muted)', margin: '1px 0 0' }}>{mapLabelStr} · {typeInfo.label}</p>
                   </div>
+                  )}
+                  {isEditing ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button
+                      onClick={handleEditSave}
+                      disabled={savingEdit || !editName.trim()}
+                      title="Save changes"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, border: '1px solid rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', cursor: savingEdit || !editName.trim() ? 'not-allowed' : 'pointer', opacity: savingEdit || !editName.trim() ? 0.5 : 1 }}
+                    >
+                      {savingEdit ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      title="Cancel"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button
+                      onClick={() => startEdit(lineup)}
+                      title="Edit name, type and notes"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', transition: 'color 0.14s' }}
+                      onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
+                      onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
+                    >
+                      <Pencil size={12} />
+                    </button>
                     <button
                       onClick={() => handlePublish(lineup.id, !lineup.is_public)}
                       disabled={publishing === lineup.id}
@@ -487,15 +633,25 @@ export default function LineupsPage() {
                       {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                     </button>
                     <button
-                      onClick={() => handleDelete(lineup.id)}
+                      onClick={() => requestDelete(lineup.id)}
                       disabled={deleting === lineup.id}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: deleting === lineup.id ? 'var(--muted)' : 'var(--muted)', cursor: 'pointer' }}
+                      title={isConfirmingDelete ? 'Click again to delete permanently' : 'Delete lineup'}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, height: 28, minWidth: 28,
+                        padding: isConfirmingDelete ? '0 8px' : 0, borderRadius: 6, cursor: 'pointer', transition: 'all 0.14s',
+                        border: isConfirmingDelete ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--border)',
+                        background: isConfirmingDelete ? 'rgba(239,68,68,0.12)' : 'transparent',
+                        color: isConfirmingDelete ? 'var(--loss)' : 'var(--muted)',
+                        fontSize: 11, fontWeight: 600,
+                      }}
                       onMouseEnter={e => { e.currentTarget.style.color = 'var(--loss)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)' }}
-                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+                      onMouseLeave={e => { if (confirmDeleteId !== lineup.id) { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'var(--border)' } }}
                     >
                       {deleting === lineup.id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={12} />}
+                      {isConfirmingDelete && 'Sure?'}
                     </button>
                   </div>
+                  )}
                 </div>
 
                 {/* Expanded content */}
@@ -545,6 +701,9 @@ export default function LineupsPage() {
               </div>
             )
           })}
+          </div>
+          </div>
+          ))}
         </div>
       )}
     </div>
