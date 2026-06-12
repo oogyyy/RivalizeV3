@@ -45,6 +45,13 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Knowledge base markdown is read from disk at runtime (AI prompt grounding +
+# boot-time embedding sync) — Next file tracing can't see the dynamic fs
+# reads, so it must be copied explicitly.
+COPY --from=builder --chown=nextjs:nodejs /app/knowledge_base ./knowledge_base
+
+# Embedding model cache must live somewhere the nextjs user can write
+ENV TRANSFORMERS_CACHE=/tmp/transformers
 
 USER nextjs
 
