@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { Search, ArrowRight, Sparkles, Trophy } from 'lucide-react'
 import type { AggregatedStats } from '@/types/database'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
-import AddFromEseaButton from '@/components/opponents/AddFromEseaButton'
 
 interface OpponentFolder {
   id: string
@@ -109,14 +108,11 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
           </p>
         </div>
         {primaryTeamId && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <AddFromEseaButton teamId={primaryTeamId} />
-            <DemoUploadButton
-              teamId={primaryTeamId}
-              demoType="opponent"
-              label="Add Opponent"
-            />
-          </div>
+          <DemoUploadButton
+            teamId={primaryTeamId}
+            demoType="opponent"
+            label="Add Opponent"
+          />
         )}
       </div>
 
