@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import {
-  Upload, Plus, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info, RefreshCw,
+  Upload, Plus, X, FileVideo, Loader2, CheckCircle2, AlertCircle, Info, RefreshCw, Trophy,
 } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
@@ -162,6 +162,33 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', label,
   const [mounted, setMounted]         = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
+  // ── Link an ESEA/FACEIT team directly from the Add Opponent modal ──
+  const [eseaInput, setEseaInput]     = useState('')
+  const [eseaLoading, setEseaLoading] = useState(false)
+  const [eseaError, setEseaError]     = useState<string | null>(null)
+
+  const createFromEsea = async () => {
+    if (!eseaInput.trim()) return
+    setEseaLoading(true)
+    setEseaError(null)
+    try {
+      const res = await fetch('/api/opponents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, faceitInput: eseaInput }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setEseaError(data.error ?? 'Failed to link team'); return }
+      setOpen(false)
+      router.push(`/opponents/${data.folderId}`)
+      router.refresh()
+    } catch {
+      setEseaError('Network error')
+    } finally {
+      setEseaLoading(false)
+    }
+  }
+
   // Hash computations start immediately when files are dropped.
   // By the time the user clicks Upload the hash is usually already ready.
   const hashPromises = useRef<Map<File, Promise<string>>>(new Map())
@@ -263,6 +290,8 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', label,
     setUploads([])
     setOpponentName('')
     setHasStarted(false)
+    setEseaInput('')
+    setEseaError(null)
   }
 
   // ── Derived values ────────────────────────────────────────────────────────────
@@ -350,6 +379,54 @@ export default function DemoUploadButton({ teamId, demoType = 'opponent', label,
         </div>
 
         <div className="px-5 pb-5 space-y-4">
+
+          {/* ── Option A: link an ESEA / FACEIT team (auto-pulls matches & demos) ── */}
+          {demoType === 'opponent' && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Trophy size={13} style={{ color: 'var(--accent)' }} />
+                <span className="text-xs font-semibold text-foreground">Scouting an ESEA team?</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={eseaInput}
+                  onChange={e => setEseaInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') createFromEsea() }}
+                  placeholder="Paste FACEIT team URL or id…"
+                  disabled={eseaLoading || isProcessing}
+                  className="flex-1 min-w-0 rounded-lg border bg-white/[0.03] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 transition-colors"
+                  style={{ borderColor: eseaInput ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'var(--border)' }}
+                />
+                <Button
+                  size="sm"
+                  onClick={createFromEsea}
+                  disabled={eseaLoading || !eseaInput.trim() || isProcessing}
+                  className="gap-1.5 shrink-0 h-auto px-3"
+                  style={{ background: 'var(--accent)', color: '#fff', boxShadow: 'none' }}
+                >
+                  {eseaLoading ? <Loader2 size={13} className="animate-spin" /> : <Trophy size={13} />}
+                  Link
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                <Info size={10} className="shrink-0" />
+                Creates the opponent and pulls their ESEA match history automatically.
+              </p>
+              {eseaError && (
+                <p className="text-[10px] flex items-center gap-1.5" style={{ color: 'var(--loss)' }}>
+                  <AlertCircle size={10} className="shrink-0" />{eseaError}
+                </p>
+              )}
+
+              {/* divider */}
+              <div className="flex items-center gap-3 pt-1">
+                <span className="h-px flex-1 bg-border/60" />
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">or upload demos manually</span>
+                <span className="h-px flex-1 bg-border/60" />
+              </div>
+            </div>
+          )}
 
           {/* Step 1 — Opponent name */}
           {demoType === 'opponent' && (
