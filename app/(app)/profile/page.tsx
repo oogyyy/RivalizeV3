@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 import { useDropzone } from 'react-dropzone'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -244,14 +245,14 @@ export default function ProfilePage() {
 
         const { data: demosData } = await supabase
           .from('demos')
-          .select('id, map, match_date, created_at, demo_type, opponent_name, parsed_data')
+          .select(`id, map, match_date, created_at, demo_type, opponent_name, ${PARSED_SUMMARY_SELECT}`)
           .in('team_id', teamIds)
           .eq('status', 'completed')
           .order('created_at', { ascending: false })
           .limit(5)
 
         const matches: RecentMatch[] = (demosData || []).map(d => {
-          const pd = d.parsed_data as { header?: { score_team1?: number; score_team2?: number }; opponentSide?: string } | null
+          const pd = summaryToParsedData(d as ParsedSummaryRow)
           const s1 = pd?.header?.score_team1 ?? 0
           const s2 = pd?.header?.score_team2 ?? 0
           const opSide = pd?.opponentSide ?? 'team2'

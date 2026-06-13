@@ -8,6 +8,7 @@ import { ArrowLeft, MapPin } from 'lucide-react'
 import { MAP_THUMBS } from '@/lib/map-config'
 import DemoListMultiSelect, { type DemoRowData } from '@/components/teams/DemoListMultiSelect'
 import DemoUploadButton from '@/components/teams/DemoUploadButton'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 
 interface Props {
   params: Promise<{ mapName: string }>
@@ -49,14 +50,15 @@ export default async function MyTeamMapPage({ params }: Props) {
 
   const { data: demosRaw } = await admin
     .from('demos')
-    .select('id, status, map, match_date, created_at, opponent_slug, parsed_data, error_message, processing_started_at')
+    .select(`id, status, map, match_date, created_at, opponent_slug, error_message, processing_started_at, ${PARSED_SUMMARY_SELECT}`)
     .eq('team_id', team.id)
     .eq('demo_type', 'self')
     .eq('map', mapName)
     .order('created_at', { ascending: false })
     .limit(100)
 
-  const demos = (demosRaw ?? []) as DemoRowData[]
+  const demos = ((demosRaw ?? []) as Array<Record<string, unknown> & ParsedSummaryRow>)
+    .map(r => ({ ...r, parsed_data: summaryToParsedData(r) })) as unknown as DemoRowData[]
 
   const name  = mapDisplayName(mapName)
   const thumb = MAP_THUMBS[mapName]

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import VetoClient from './VetoClient'
 import type { AggregatedStats } from '@/types/database'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData } from '@/lib/demo-parser/parsed-summary'
 
 const ACTIVE_DUTY = [
   'de_dust2', 'de_mirage', 'de_inferno', 'de_nuke',
@@ -50,7 +51,7 @@ export default async function VetoPage() {
 
     const { data: selfDemos } = await admin
       .from('demos')
-      .select('parsed_data, map')
+      .select(`map, ${PARSED_SUMMARY_SELECT}`)
       .eq('team_id', team.id)
       .eq('status', 'completed')
       .eq('demo_type', 'self')
@@ -59,10 +60,7 @@ export default async function VetoPage() {
 
     for (const demo of selfDemos ?? []) {
       if (!demo.map || !ACTIVE_DUTY.includes(demo.map)) continue
-      const pd = demo.parsed_data as {
-        header?: { score_team1?: number; score_team2?: number; team1?: string; team2?: string }
-        opponentSide?: string
-      } | null
+      const pd = summaryToParsedData(demo)
       if (!pd?.header) continue
 
       const { score_team1 = 0, score_team2 = 0 } = pd.header

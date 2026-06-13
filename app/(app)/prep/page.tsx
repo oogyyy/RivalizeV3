@@ -8,6 +8,7 @@ import { ArrowRight, Brain, Sparkles, BookOpen, Swords } from 'lucide-react'
 import type { TeamFolder } from '@/types/database'
 import PrepHeroSection from '@/components/prep/PrepHeroSection'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 
 const ACTIVE_DUTY_MAPS = [
   { key: 'de_mirage',   name: 'Mirage' },
@@ -43,7 +44,7 @@ export default async function PrepPage() {
     teamIds.length
       ? admin
           .from('demos')
-          .select('id, status, map, parsed_data')
+          .select(`id, status, map, ${PARSED_SUMMARY_SELECT}`)
           .in('team_id', teamIds)
           .eq('demo_type', 'self')
           .eq('status', 'completed')
@@ -55,7 +56,8 @@ export default async function PrepPage() {
 
   // Compute per-map win rates from user's own demos
   const mapStats: Record<string, { wins: number; total: number }> = {}
-  for (const demo of (demosRes.data ?? []) as DemoRowData[]) {
+  for (const r of (demosRes.data ?? []) as Array<{ map: string | null } & ParsedSummaryRow>) {
+    const demo = { map: r.map, parsed_data: summaryToParsedData(r) } as DemoRowData
     const rawMap = (demo.parsed_data?.header?.map ?? demo.map ?? '').toLowerCase()
     if (!rawMap || rawMap === 'unknown') continue
     const h = demo.parsed_data?.header

@@ -19,10 +19,15 @@ interface TeamOption {
   role: 'owner' | 'admin' | 'member'
 }
 
+/** Per-map T/CT win split, computed in-DB (see team_self_map_side_splits). */
+export type MapSideWins = Record<string, { tWins: number; ctWins: number; tTotal: number; ctTotal: number }>
+
 interface MyTeamDashboardProps {
   selectedTeamId: string
   allTeams: TeamOption[]
   demos: DemoRowData[]
+  /** Per-map T/CT split aggregated server-side (rounds[] never leaves the DB). */
+  mapSideWins: MapSideWins
   teamName: string
   canEdit: boolean
   canInvite: boolean
@@ -75,13 +80,13 @@ function buildMapGroups(demos: DemoRowData[]): MapGroup[] {
     })
 }
 
-function computeStats(demos: DemoRowData[]) {
+function computeStats(demos: DemoRowData[], mapSideWins: MapSideWins) {
   const completedDemos = demos.filter(d => d.status === 'completed')
   let totalMatches = 0, totalWins = 0, totalDraws = 0
   let totalKills = 0, totalDeaths = 0, totalAdr = 0, playerCount = 0
   const mapCounts: Record<string, number> = {}
-  // Per-map T/CT round win tracking for own team
-  const mapSideWins: Record<string, { tWins: number; ctWins: number; tTotal: number; ctTotal: number }> = {}
+  // Per-map T/CT split is computed server-side (rounds[] no longer egressed) and
+  // passed in; see team_self_map_side_splits and the My Team page.
   type PlayerAccum = { kills: number; deaths: number; assists: number; adr: number; rating: number; games: number; entryKills: number; clutchWins: number; clutchAttempts: number }
   const myPlayerStats: Record<string, PlayerAccum> = {}
 
@@ -97,38 +102,6 @@ function computeStats(demos: DemoRowData[]) {
       if (ourScore > theirScore) totalWins++
       else if (ourScore === theirScore) totalDraws++
       if (h.map && h.map !== 'unknown') mapCounts[h.map] = (mapCounts[h.map] ?? 0) + 1
-
-      // Compute per-map T/CT win split for our team.
-      // The parsed round.winner is the team label (matches header.team1 or header.team2).
-      // Our team label is the opposite of the opponentSide label.
-      const ourLabel = opponentSide === 'team1' ? (h.team2 ?? 'CT-Side') : (h.team1 ?? 'T-Side')
-      const mapKey = h.map ?? 'unknown'
-      if (!mapSideWins[mapKey]) mapSideWins[mapKey] = { tWins: 0, ctWins: 0, tTotal: 0, ctTotal: 0 }
-      const sw = mapSideWins[mapKey]
-      const totalRounds = (h.score_team1 ?? 0) + (h.score_team2 ?? 0)
-      // CS2 standard: first 12 rounds team keeps their starting side.
-      // Determine our starting side: if opponentSide='team2', opponent is team2,
-      // we are team1. team1 label is usually the T-starting team (not guaranteed,
-      // but we use win_reason to discriminate instead).
-      for (const round of (pd?.rounds ?? [])) {
-        if (!round.winner) continue
-        const ourWon = round.winner === ourLabel
-        // Classify round side from win_reason:
-        //   T wins: TargetBombed, Elimination (when T side wins)
-        //   CT wins: BombDefused, TargetSaved, Elimination (when CT side wins)
-        // Simpler: use round number — rounds 1-12 team1 is T (CS2 default).
-        // round ≤12 → team1=T, team2=CT; round 13-24 → sides flip.
-        const isFirstHalf = round.number <= 12
-        // If opponentSide='team2', our team is team1 → T in first half
-        const ourSideIsT = opponentSide === 'team2' ? isFirstHalf : !isFirstHalf
-        if (ourSideIsT) { sw.tTotal++; if (ourWon) sw.tWins++ }
-        else             { sw.ctTotal++; if (ourWon) sw.ctWins++ }
-      }
-      // Fallback if no round data but we know total rounds
-      if ((pd?.rounds ?? []).length === 0 && totalRounds > 0) {
-        sw.tTotal  += Math.floor(totalRounds / 2)
-        sw.ctTotal += Math.ceil(totalRounds / 2)
-      }
     }
 
     if (pd?.players) {
@@ -190,6 +163,7 @@ export default function MyTeamDashboard({
   selectedTeamId,
   allTeams,
   demos,
+  mapSideWins,
   teamName,
   canEdit,
   canInvite,
@@ -368,7 +342,7 @@ export default function MyTeamDashboard({
     setSideOverrides(prev => ({ ...prev, [demoId]: opponentSide }))
   }
 
-  const stats = useMemo(() => computeStats(effectiveDemos), [effectiveDemos])
+  const stats = useMemo(() => computeStats(effectiveDemos, mapSideWins), [effectiveDemos, mapSideWins])
   const mapGroups = useMemo(() => buildMapGroups(effectiveDemos), [effectiveDemos])
 
   const hasNoDemos = effectiveDemos.length === 0

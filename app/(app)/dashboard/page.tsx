@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import DashboardPageClient, { type RecentDemoItem, type MapPerfItem, type CommunityFeedItem } from '@/components/dashboard/DashboardPageClient'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -88,7 +89,7 @@ export default async function DashboardPage() {
     teamIds.length
       ? admin
           .from('demos')
-          .select('id, team_id, opponent_name, opponent_slug, map, match_date, status, created_at, parsed_data')
+          .select(`id, team_id, opponent_name, opponent_slug, map, match_date, status, created_at, ${PARSED_SUMMARY_SELECT}`)
           .in('team_id', teamIds)
           .eq('demo_type', 'self')
           .order('created_at', { ascending: false })
@@ -100,7 +101,8 @@ export default async function DashboardPage() {
     teamIds.length
       ? admin
           .from('demos')
-          .select('parsed_data')
+          // Slim projection: header/players/opponentSide only (no heavy rounds[]).
+          .select(PARSED_SUMMARY_SELECT)
           .in('team_id', teamIds)
           .eq('demo_type', 'self')
           .eq('status', 'completed')
@@ -117,9 +119,13 @@ export default async function DashboardPage() {
 
   const primaryTeam    = teamResult.data   as { name?: string } | null
   const topFolder      = folderResult.data as { id: string; opponent_display_name: string; opponent_slug: string } | null
-  const recentSelfDemos = recentResult.data as unknown[]
+  // Fold the projected header/players/opponentSide aliases back into parsed_data
+  // so the aggregation logic below reads `d.parsed_data.*` unchanged.
+  const recentSelfDemos = ((recentResult.data ?? []) as Array<Record<string, unknown> & ParsedSummaryRow>)
+    .map(r => ({ ...r, parsed_data: summaryToParsedData(r) }))
   const allDemosMeta   = metaResult.data   as unknown[]
-  const allSelfDemosData = statsResult.data as unknown[]
+  const allSelfDemosData = ((statsResult.data ?? []) as ParsedSummaryRow[])
+    .map(r => ({ parsed_data: summaryToParsedData(r) }))
   const publicFolders  = publicResult.data as Array<{ id: string; opponent_display_name: string; published_at: string | null; aggregated_stats: unknown }> | null
 
   const myTeamName   = primaryTeam?.name ?? 'My Team'

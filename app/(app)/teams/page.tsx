@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { Users, Shield, FileVideo } from 'lucide-react'
 import TeamCard from '@/components/teams/TeamCard'
 import CreateTeamDialog from './CreateTeamDialog'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 
 export default async function TeamsPage() {
   const user = await getCurrentUser()
@@ -36,13 +37,14 @@ export default async function TeamsPage() {
   }
 
   const { data: allDemos } = teamIds.length
-    ? await admin.from('demos').select('team_id, parsed_data').in('team_id', teamIds)
+    ? await admin.from('demos').select(`team_id, ${PARSED_SUMMARY_SELECT}`).in('team_id', teamIds)
     : { data: [] }
 
   const demoCountMap: Record<string, number> = {}
   const winMap: Record<string, { wins: number; total: number }> = {}
 
-  for (const d of allDemos ?? []) {
+  for (const r of (allDemos ?? []) as Array<{ team_id: string } & ParsedSummaryRow>) {
+    const d = { team_id: r.team_id, parsed_data: summaryToParsedData(r) }
     demoCountMap[d.team_id] = (demoCountMap[d.team_id] ?? 0) + 1
     if (d.parsed_data) {
       const pd = d.parsed_data as { header?: { score_team1?: number; score_team2?: number } }

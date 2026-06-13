@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import ScoutDetailClient from './ScoutDetailClient'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 
 export const revalidate = 3600 // ISR — rebuild every hour
 
@@ -66,15 +67,17 @@ export default async function ScoutDetailPage({ params }: Props) {
 
   if (!folder) notFound()
 
-  // Recent demos — only summary info (no full parsed_data for perf)
-  const { data: demos } = await admin
+  // Recent demos — slim parsed_data projection (header/players/opponentSide only)
+  const { data: demosRaw } = await admin
     .from('demos')
-    .select('id, map, match_date, created_at, parsed_data')
+    .select(`id, map, match_date, created_at, ${PARSED_SUMMARY_SELECT}`)
     .eq('opponent_slug', folder.opponent_slug)
     .eq('demo_type', 'opponent')
     .eq('status', 'completed')
     .order('created_at', { ascending: false })
     .limit(10)
+  const demos = ((demosRaw ?? []) as Array<{ id: string; map: string; match_date: string | null; created_at: string } & ParsedSummaryRow>)
+    .map(r => ({ id: r.id, map: r.map, match_date: r.match_date, created_at: r.created_at, parsed_data: summaryToParsedData(r) }))
 
   // Rating counts
   const { data: ratings } = await admin

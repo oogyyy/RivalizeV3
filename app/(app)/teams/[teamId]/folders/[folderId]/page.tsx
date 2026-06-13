@@ -13,6 +13,7 @@ import {
   Crosshair, Calendar, MapPin, TrendingUp, Upload, ExternalLink,
 } from 'lucide-react'
 import type { AggregatedStats, DemoHeader, PlayerStats } from '@/types/database'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 
 export default async function FolderPage({
   params,
@@ -54,13 +55,16 @@ export default async function FolderPage({
 
   // Fetch demos for this folder's opponent with limit to reduce bandwidth
   // Limit to 500 recent demos; aggregated_stats handles full history
-  const { data: demos } = await supabase
+  const { data: demosRaw } = await supabase
     .from('demos')
-    .select('id, status, map, match_date, created_at, opponent_slug, parsed_data')
+    .select(`id, status, map, match_date, created_at, opponent_slug, ${PARSED_SUMMARY_SELECT}`)
     .eq('team_id', teamId)
     .eq('opponent_slug', folder.opponent_slug)
     .order('match_date', { ascending: false, nullsFirst: false })
     .limit(500)
+  type FolderDemoRow = { id: string; status: string; map: string | null; match_date: string | null; created_at: string; opponent_slug: string | null }
+  const demos = ((demosRaw ?? []) as Array<FolderDemoRow & ParsedSummaryRow>)
+    .map(({ header, players, opponentSide, ...rest }) => ({ ...rest, parsed_data: summaryToParsedData({ header, players, opponentSide }) }))
 
   const totalDemos = (demos ?? []).length
   const wins = stats?.wins ?? 0

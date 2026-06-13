@@ -23,6 +23,7 @@ import RoutinesPanel from '@/components/demos/RoutinesPanel'
 import type { AggregatedStats, PlayerStats } from '@/types/database'
 import { getPlayerRoleInfo } from '@/lib/roles'
 import { MAP_THUMBS } from '@/lib/map-config'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 
 /* ── helpers ─────────────────────────────────────────────────────── */
 
@@ -93,7 +94,9 @@ export default async function OpponentPage({
       .limit(200),
     admin
       .from('demos')
-      .select('id, map, parsed_data')
+      // Slim projection — only header/players/opponentSide leave the DB, not the
+      // heavy rounds[] array. See lib/demo-parser/parsed-summary.ts.
+      .select(`id, map, ${PARSED_SUMMARY_SELECT}`)
       .eq('team_id', teamId)
       .eq('opponent_slug', folder.opponent_slug)
       .eq('demo_type', 'opponent')
@@ -102,7 +105,8 @@ export default async function OpponentPage({
       .limit(100),
   ])
   const demos     = listResult.data as DemoListRow[] | null
-  const statDemos = statResult.data as DemoStatRow[] | null
+  const statDemos = ((statResult.data ?? []) as Array<{ id: string; map: string } & ParsedSummaryRow>)
+    .map(r => ({ id: r.id, map: r.map, parsed_data: summaryToParsedData(r) })) as DemoStatRow[]
 
   // Build a header lookup so OpponentDemoList can show real team names
   const parsedByDemoId = new Map(

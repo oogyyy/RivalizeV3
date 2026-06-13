@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
 import MyMatchesDashboard from '@/app/(app)/improve/MyMatchesDashboard'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 
 async function getOrCreatePersonalTeam(
   userId: string,
@@ -52,13 +53,14 @@ export default async function ImprovePage() {
 
   const { data: demosData } = await admin
     .from('demos')
-    .select('id, status, map, match_date, created_at, opponent_slug, league, faceit_match_id, parsed_data, error_message, processing_started_at')
+    .select(`id, status, map, match_date, created_at, opponent_slug, league, faceit_match_id, error_message, processing_started_at, ${PARSED_SUMMARY_SELECT}`)
     .eq('team_id', personalTeamId)
     .eq('demo_type', 'self')
     .order('created_at', { ascending: false })
     .limit(100)
 
-  const demos = (demosData ?? []) as DemoRowData[]
+  const demos = ((demosData ?? []) as Array<Record<string, unknown> & ParsedSummaryRow>)
+    .map(r => ({ ...r, parsed_data: summaryToParsedData(r) })) as unknown as DemoRowData[]
 
   return (
     <MyMatchesDashboard

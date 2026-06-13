@@ -3,8 +3,9 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/get-user'
 import { redirect } from 'next/navigation'
-import MyTeamDashboard from '@/components/teams/MyTeamDashboard'
+import MyTeamDashboard, { type MapSideWins } from '@/components/teams/MyTeamDashboard'
 import type { DemoRowData } from '@/components/teams/DemoListMultiSelect'
+import { PARSED_SUMMARY_SELECT, summaryToParsedData, type ParsedSummaryRow } from '@/lib/demo-parser/parsed-summary'
 
 interface TeamOption {
   id: string
@@ -70,27 +71,38 @@ export default async function MyTeamPage({
 
   const teamName = teamMap.get(selectedTeamId) ?? 'My Team'
 
-  const [membersRes, profileRes, demosRes] = await Promise.all([
+  const [membersRes, profileRes, demosRes, splitsRes] = await Promise.all([
     admin.from('team_members').select('user_id').eq('team_id', selectedTeamId),
     admin.from('profiles').select('faceit_id').eq('id', user.id).single(),
     admin
       .from('demos')
-      .select('id, status, map, match_date, created_at, opponent_slug, parsed_data, error_message, processing_started_at')
+      // Slim projection — the heavy rounds[] array stays in Postgres. The per-map
+      // T/CT split that used to need rounds is computed in-DB via the RPC below.
+      .select(`id, status, map, match_date, created_at, opponent_slug, error_message, processing_started_at, ${PARSED_SUMMARY_SELECT}`)
       .eq('team_id', selectedTeamId)
       .eq('demo_type', 'self')
       .order('created_at', { ascending: false })
       .limit(50),
+    admin.rpc('team_self_map_side_splits', { p_team_id: selectedTeamId }),
   ])
 
   const _memberIds = (membersRes.data ?? []).map((m: { user_id: string }) => m.user_id).filter(Boolean)
   const myFaceitId = profileRes.data?.faceit_id ?? null
-  const demos = (demosRes.data ?? []) as DemoRowData[]
+  const demos = ((demosRes.data ?? []) as Array<Record<string, unknown> & ParsedSummaryRow>)
+    .map(r => ({ ...r, parsed_data: summaryToParsedData(r) })) as unknown as DemoRowData[]
+
+  // Per-map T/CT win split, aggregated inside Postgres (keyed by map).
+  const mapSideWins: MapSideWins = {}
+  for (const s of (splitsRes.data ?? []) as Array<{ map: string; t_wins: number; t_total: number; ct_wins: number; ct_total: number }>) {
+    mapSideWins[s.map] = { tWins: s.t_wins, tTotal: s.t_total, ctWins: s.ct_wins, ctTotal: s.ct_total }
+  }
 
   return (
     <MyTeamDashboard
       selectedTeamId={selectedTeamId}
       allTeams={allTeams}
       demos={demos}
+      mapSideWins={mapSideWins}
       teamName={teamName}
       canEdit={canEdit}
       canInvite={canInvite}
