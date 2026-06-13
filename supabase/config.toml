@@ -1,0 +1,3 @@
+# Supabase CLI project config.
+# Used by `supabase link` / `supabase db push` in CI to target the hosted project.
+project_id = "tfehusarmrbburyzbxxi"
