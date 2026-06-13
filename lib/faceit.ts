@@ -110,6 +110,10 @@ export interface FaceitTeamMatch {
   matchUrl: string
   /** Which faction the scouted team was in this match. */
   ourFaction: 'faction1' | 'faction2'
+  /** Picked map(s) for the match — 1 for a BO1, up to 3 for a BO3. */
+  maps: string[]
+  /** Series format (1 = BO1, 3 = BO3…), or null when unknown. */
+  bestOf: number | null
 }
 
 /** One stat segment (e.g. a map) from the team stats endpoint. */
@@ -190,13 +194,37 @@ export async function getTeamStats(teamId: string): Promise<FaceitTeamStats> {
   }
 }
 
+/** Run an async mapper over items with a bounded number of concurrent calls. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let cursor = 0
+  async function worker() {
+    while (cursor < items.length) {
+      const i = cursor++
+      results[i] = await fn(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker))
+  return results
+}
+
 /**
  * Recent ESEA/league match history for a team.
  *
  * The FACEIT Data API has no team-match-history endpoint, so we anchor on a
  * roster player (the captain when known) and pull their CS2 history, keeping
- * only `championship` matches (ESEA league play) where that player's faction
- * is the linked team. The opponent is read from the other faction.
+ * only `championship` matches (ESEA league play). We decide which faction is
+ * the scouted team by roster overlap against the full team roster — robust to
+ * stand-ins and to the captain sitting a match out (a single-player check would
+ * flip the W/L and opponent whenever the anchor wasn't on the server).
+ *
+ * Each kept match is then enriched via the match-details endpoint, the only
+ * place that reliably carries the ESEA team names, the picked map(s) and the
+ * best-of format (the history endpoint leaves faction names null for leagues).
  */
 export async function getTeamMatchHistory(
   teamId: string,
@@ -206,26 +234,60 @@ export async function getTeamMatchHistory(
   const anchorId = team.leader || team.members[0]?.user_id
   if (!anchorId) return { team, matches: [] }
 
-  const history = await getPlayerMatchHistory(anchorId, Math.min(100, limit * 3))
-  const matches: FaceitTeamMatch[] = []
+  const memberIds = new Set(team.members.map(m => m.user_id))
+
+  const history = await getPlayerMatchHistory(anchorId, Math.min(100, limit * 4))
+
+  // Keep championship matches that actually belong to this team, deciding the
+  // faction by which side has more of our roster on it.
+  const candidates: Array<{ m: FaceitMatchItem; inF1: boolean }> = []
   for (const m of history.items) {
     if (m.competition_type !== 'championship') continue
-    const inF1 = m.teams.faction1.roster?.some(p => p.player_id === anchorId) ?? false
-    const opp  = inF1 ? m.teams.faction2 : m.teams.faction1
+    const f1 = (m.teams.faction1.roster ?? []).filter(p => memberIds.has(p.player_id)).length
+    const f2 = (m.teams.faction2.roster ?? []).filter(p => memberIds.has(p.player_id)).length
+    if (f1 === 0 && f2 === 0) continue           // not this team's match (mix/pug)
+    candidates.push({ m, inF1: f1 >= f2 })
+    if (candidates.length >= limit) break
+  }
+
+  const matches = await mapWithConcurrency(candidates, 6, async ({ m, inF1 }) => {
+    const opp = inF1 ? m.teams.faction2 : m.teams.faction1
     const score = m.results?.score
-    matches.push({
+
+    // Enrich with match details — names / maps / best-of (best-effort).
+    let opponentName = opp.name || ''
+    let maps: string[] = []
+    let bestOf: number | null = null
+    try {
+      const detail = await getMatchDetail(m.match_id)
+      bestOf = typeof detail.best_of === 'number' ? detail.best_of : null
+      maps = (detail.voting?.map?.pick ?? []).filter(Boolean)
+      const detailOpp = inF1 ? detail.teams.faction2 : detail.teams.faction1
+      opponentName = opponentName || detailOpp?.name || ''
+    } catch {
+      /* keep history-derived fallbacks */
+    }
+    // Last-resort opponent label from their roster, so we never show "Unknown".
+    if (!opponentName) {
+      const oppRoster = opp.roster ?? []
+      opponentName = oppRoster[0]?.nickname ? `${oppRoster[0].nickname}'s team` : 'Unknown'
+    }
+
+    return {
       matchId: m.match_id,
       competitionName: m.competition_name,
       date: m.started_at * 1000,
-      opponentName: opp.name || 'Unknown',
+      opponentName,
       ourScore: score ? (inF1 ? score.faction1 : score.faction2) : null,
       oppScore: score ? (inF1 ? score.faction2 : score.faction1) : null,
       won: m.results ? m.results.winner === (inF1 ? 'faction1' : 'faction2') : null,
       matchUrl: m.match_url,
-      ourFaction: inF1 ? 'faction1' : 'faction2',
-    })
-    if (matches.length >= limit) break
-  }
+      ourFaction: (inF1 ? 'faction1' : 'faction2') as 'faction1' | 'faction2',
+      maps,
+      bestOf,
+    }
+  })
+
   return { team, matches }
 }
 

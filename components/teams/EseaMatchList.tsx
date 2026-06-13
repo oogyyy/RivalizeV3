@@ -16,6 +16,13 @@ interface FaceitTeamMatch {
   oppScore: number | null
   won: boolean | null
   matchUrl: string
+  maps: string[]
+  bestOf: number | null
+}
+
+/** "de_mirage" → "Mirage"; passes through already-clean labels. */
+function prettyMap(map: string): string {
+  return map.replace(/^de_/, '').replace(/^(.)/, c => c.toUpperCase())
 }
 
 type UploadStatus = 'idle' | 'uploading' | 'done' | 'error'
@@ -125,6 +132,22 @@ export default function EseaMatchList({ folderId, teamId, opponentName, isOwnerO
                   <p className="text-[10px] text-muted-foreground truncate">
                     {new Date(m.date).toLocaleDateString()} · {m.competitionName}
                   </p>
+                  {(m.bestOf || m.maps.length > 0) && (
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      {m.bestOf ? (
+                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                          style={{ background: 'color-mix(in srgb, var(--signal) 14%, transparent)', color: 'var(--signal)' }}>
+                          BO{m.bestOf}
+                        </span>
+                      ) : null}
+                      {m.maps.map(map => (
+                        <span key={map} className="text-[9px] font-semibold px-1.5 py-0.5 rounded text-muted-foreground"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>
+                          {prettyMap(map)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {m.ourScore != null && (
                   <span className="text-xs font-mono text-muted-foreground shrink-0">{m.ourScore}–{m.oppScore}</span>

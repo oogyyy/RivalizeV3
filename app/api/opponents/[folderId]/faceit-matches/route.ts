@@ -37,7 +37,11 @@ export async function GET(
 
   try {
     const { matches } = await getTeamMatchHistory(faceitTeamId, 30)
-    return NextResponse.json({ matches })
+    const res = NextResponse.json({ matches })
+    // Match history changes slowly; cache per-client to avoid re-hitting FACEIT
+    // (each load fans out to one match-details call per match).
+    res.headers.set('Cache-Control', 'private, max-age=300')
+    return res
   } catch {
     return NextResponse.json({ error: 'Failed to load FACEIT matches', matches: [] }, { status: 502 })
   }
