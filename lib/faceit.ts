@@ -108,6 +108,8 @@ export interface FaceitTeamMatch {
   oppScore: number | null
   won: boolean | null
   matchUrl: string
+  /** Which faction the scouted team was in this match. */
+  ourFaction: 'faction1' | 'faction2'
 }
 
 /** One stat segment (e.g. a map) from the team stats endpoint. */
@@ -220,10 +222,68 @@ export async function getTeamMatchHistory(
       oppScore: score ? (inF1 ? score.faction2 : score.faction1) : null,
       won: m.results ? m.results.winner === (inF1 ? 'faction1' : 'faction2') : null,
       matchUrl: m.match_url,
+      ourFaction: inF1 ? 'faction1' : 'faction2',
     })
     if (matches.length >= limit) break
   }
   return { team, matches }
+}
+
+/** A single map drop/pick from a match veto, in veto order. */
+export interface FaceitVetoStep {
+  map: string
+  status: 'drop' | 'pick'
+  faction: 'faction1' | 'faction2' | null
+}
+
+interface RawDemocracy {
+  payload?: {
+    tickets?: Array<{
+      entity_type?: string
+      entities?: Array<{
+        guid?: string
+        status?: string
+        selected_by?: string
+        round?: number
+        random?: boolean
+      }>
+    }>
+  }
+}
+
+/**
+ * Map veto (ban/pick sequence) for a match, via FACEIT's internal democracy
+ * endpoint — the only public source for ordered ban data (the Data API exposes
+ * only the picked map). Best-effort: returns null on any failure or shape change
+ * so callers can degrade gracefully.
+ */
+export async function getMatchVeto(matchId: string): Promise<FaceitVetoStep[] | null> {
+  try {
+    const res = await fetch(`${FACEIT_DOWNLOADS_BASE}/democracy/v1/match/${matchId}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return null
+    const json = await res.json() as RawDemocracy
+    const mapTicket = (json.payload?.tickets ?? []).find(t => t.entity_type === 'map')
+      ?? (json.payload?.tickets ?? [])[0]
+    const entities = mapTicket?.entities ?? []
+    if (entities.length === 0) return null
+
+    const steps: FaceitVetoStep[] = entities
+      .filter(e => e.guid && (e.status === 'drop' || e.status === 'pick'))
+      .sort((a, b) => (a.round ?? 0) - (b.round ?? 0))
+      .map(e => ({
+        map: e.guid as string,
+        status: e.status as 'drop' | 'pick',
+        faction: e.selected_by === 'faction1' ? 'faction1'
+          : e.selected_by === 'faction2' ? 'faction2'
+          : null,
+      }))
+    return steps.length > 0 ? steps : null
+  } catch {
+    return null
+  }
 }
 
 /** Lookup a player by FaceIt nickname. */

@@ -16,6 +16,7 @@ import TeamNotes from '@/components/teams/TeamNotes'
 import PublishToggle from '@/components/teams/PublishToggle'
 import EseaTeamLink from '@/components/teams/EseaTeamLink'
 import EseaMatchList from '@/components/teams/EseaMatchList'
+import VetoTendencies from '@/components/teams/VetoTendencies'
 import { getTeamStats, type FaceitTeamStats } from '@/lib/faceit'
 import RoundSearchPanel from '@/components/demos/RoundSearchPanel'
 import RoutinesPanel from '@/components/demos/RoutinesPanel'
@@ -525,6 +526,9 @@ export default async function OpponentPage({
                 </div>
               </div>
             )}
+
+            {/* Ban tendencies (veto donuts, live from FACEIT) */}
+            {faceitTeamId && <VetoTendencies folderId={folderId} />}
 
             {/* Publish to Library */}
             {isOwnerOrAdmin && (
