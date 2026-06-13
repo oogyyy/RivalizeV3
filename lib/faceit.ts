@@ -70,6 +70,11 @@ export interface FaceitMatchDetail {
   best_of: number
   round: number
   results: FaceitMatchItem['results']
+  /** Per-map results for a series (BO3/BO5); one entry per map played. */
+  detailed_results?: Array<{
+    winner: string
+    factions: { faction1: { score: number }; faction2: { score: number } }
+  }>
   teams: FaceitMatchItem['teams']
   started_at: number
   finished_at: number
@@ -263,10 +268,8 @@ export async function getTeamMatchHistory(
     .slice(0, limit)
 
   const matches = await mapWithConcurrency(candidates, 6, async (m) => {
-    const score = m.results?.score
-
     // Match details carry the only reliable ESEA team names, rosters (for faction
-    // detection), picked map(s) and best-of. Best-effort — fall back to history.
+    // detection), per-map series results, picked map(s) and best-of. Best-effort.
     let detail: FaceitMatchDetail | null = null
     try { detail = await getMatchDetail(m.match_id) } catch { /* keep fallbacks */ }
 
@@ -285,14 +288,35 @@ export async function getTeamMatchHistory(
       opponentName = oppRoster[0]?.nickname ? `${oppRoster[0].nickname}'s team` : 'Unknown'
     }
 
+    // Score: for a multi-map series show maps won (e.g. 2–1); for a single map
+    // show the round score. The history endpoint only ever carries one map's
+    // round score, so series results must come from detailed_results.
+    const dr = detail?.detailed_results ?? []
+    let ourScore: number | null
+    let oppScore: number | null
+    let won: boolean | null
+    if (dr.length > 1) {
+      const w1 = dr.filter(r => r.winner === 'faction1').length
+      const w2 = dr.filter(r => r.winner === 'faction2').length
+      ourScore = inF1 ? w1 : w2
+      oppScore = inF1 ? w2 : w1
+      won = ourScore === oppScore ? null : ourScore > oppScore
+    } else {
+      const result = detail?.results ?? m.results
+      const score  = result?.score
+      ourScore = score ? (inF1 ? score.faction1 : score.faction2) : null
+      oppScore = score ? (inF1 ? score.faction2 : score.faction1) : null
+      won = result ? result.winner === (inF1 ? 'faction1' : 'faction2') : null
+    }
+
     return {
       matchId: m.match_id,
       competitionName: m.competition_name,
       date: m.started_at * 1000,
       opponentName,
-      ourScore: score ? (inF1 ? score.faction1 : score.faction2) : null,
-      oppScore: score ? (inF1 ? score.faction2 : score.faction1) : null,
-      won: m.results ? m.results.winner === (inF1 ? 'faction1' : 'faction2') : null,
+      ourScore,
+      oppScore,
+      won,
       matchUrl: m.match_url,
       ourFaction: (inF1 ? 'faction1' : 'faction2') as 'faction1' | 'faction2',
       maps: (detail?.voting?.map?.pick ?? []).filter(Boolean),
