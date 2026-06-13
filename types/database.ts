@@ -80,6 +80,10 @@ export interface TeamFolder {
   opponent_slug: string
   opponent_display_name: string
   aggregated_stats: AggregatedStats
+  /** FACEIT team UUID (from the team URL); links the folder to its ESEA team page. */
+  faceit_team_id?: string | null
+  /** Cached FACEIT team display name, set when the id is linked. */
+  faceit_team_name?: string | null
 }
 
 export interface ParsedDemoData {

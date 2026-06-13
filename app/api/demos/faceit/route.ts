@@ -11,6 +11,8 @@ import {
   getPlayerMatchHistory,
   getMatchDetail,
   getSignedDemoUrl,
+  getTeamMatchHistory,
+  parseFaceitTeamId,
 } from '@/lib/faceit'
 import { uploadStream, getPublicUrl } from '@/lib/r2'
 import { slugify } from '@/lib/utils'
@@ -33,7 +35,15 @@ const importSchema = z.object({
   playerFaction: z.enum(['faction1', 'faction2']).default('faction2'),
 })
 
-const bodySchema = z.discriminatedUnion('action', [lookupSchema, eloCheckSchema, importSchema])
+const teamLookupSchema = z.object({
+  action: z.literal('team-lookup'),
+  // Accepts a FACEIT team URL or a bare team UUID.
+  input: z.string().min(1).max(200),
+})
+
+const bodySchema = z.discriminatedUnion('action', [
+  lookupSchema, eloCheckSchema, importSchema, teamLookupSchema,
+])
 
 /** GET — check if FaceIt is configured */
 export async function GET() {
@@ -102,6 +112,34 @@ export async function POST(request: Request) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'FaceIt lookup failed'
       return NextResponse.json({ error: msg }, { status: 500 })
+    }
+  }
+
+  // ── Team lookup: resolve a FACEIT team + its recent ESEA matches ──
+  if (parsed.data.action === 'team-lookup') {
+    const teamId = parseFaceitTeamId(parsed.data.input)
+    if (!teamId) {
+      return NextResponse.json(
+        { error: 'Could not find a FACEIT team id. Paste the team URL or its id.' },
+        { status: 400 },
+      )
+    }
+    try {
+      const { team, matches } = await getTeamMatchHistory(teamId, 30)
+      return NextResponse.json({
+        team: {
+          id: team.team_id,
+          name: team.name || team.nickname,
+          avatar: team.avatar,
+          members: team.members.map(m => ({ nickname: m.nickname, avatar: m.avatar })),
+        },
+        matches,
+      })
+    } catch {
+      return NextResponse.json(
+        { error: 'No FACEIT team found for that id. Double-check the link.' },
+        { status: 404 },
+      )
     }
   }
 
