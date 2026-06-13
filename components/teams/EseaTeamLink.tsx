@@ -13,9 +13,6 @@ interface Props {
 function faceitTeamUrl(id: string) {
   return `https://www.faceit.com/en/teams/${id}/leagues`
 }
-function eseaTeamUrl(id: string) {
-  return `https://esea.team/team/${id}`
-}
 
 export default function EseaTeamLink({ folderId, initialTeamId, initialTeamName, isOwnerOrAdmin }: Props) {
   const [teamId, setTeamId]     = useState<string | null>(initialTeamId)
@@ -99,28 +96,16 @@ export default function EseaTeamLink({ folderId, initialTeamId, initialTeamName,
       </div>
 
       {teamId ? (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <a
-            href={eseaTeamUrl(teamId)} target="_blank" rel="noopener noreferrer"
-            style={{
-              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '7px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none',
-              background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)',
-            }}
-          >
-            <ExternalLink size={11} /> View on ESEA
-          </a>
-          <a
-            href={faceitTeamUrl(teamId)} target="_blank" rel="noopener noreferrer"
-            style={{
-              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '7px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none',
-              background: 'rgba(255,255,255,0.04)', color: 'var(--muted)', border: '1px solid var(--border)',
-            }}
-          >
-            <ExternalLink size={11} /> FACEIT
-          </a>
-        </div>
+        <a
+          href={faceitTeamUrl(teamId)} target="_blank" rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '7px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none',
+            background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)',
+          }}
+        >
+          <ExternalLink size={11} /> View team on FACEIT
+        </a>
       ) : (
         <>
           <div style={{ display: 'flex', gap: 8 }}>

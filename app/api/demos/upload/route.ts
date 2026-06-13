@@ -87,9 +87,25 @@ async function handleInit(
     return NextResponse.json({ error: 'quota_exceeded', message: quota.reason }, { status: 402 })
   }
 
-  const fileHash     = q.get('fileHash')
-  const opponentName = q.get('opponentName') ?? 'Unknown'
-  const demoType     = (q.get('demoType') ?? 'opponent') as 'opponent' | 'self'
+  const fileHash      = q.get('fileHash')
+  const opponentName  = q.get('opponentName') ?? 'Unknown'
+  const demoType      = (q.get('demoType') ?? 'opponent') as 'opponent' | 'self'
+  const faceitMatchId = q.get('faceitMatchId')
+
+  // Guard against uploading a demo for a match that's already attached.
+  if (faceitMatchId) {
+    const { data: existing } = await admin
+      .from('demos')
+      .select('id, created_at, map, opponent_name, status')
+      .eq('team_id', teamId)
+      .eq('faceit_match_id', faceitMatchId)
+      .neq('status', 'failed')
+      .limit(1)
+      .maybeSingle()
+    if (existing) {
+      return NextResponse.json({ error: 'duplicate', existingDemo: existing }, { status: 409 })
+    }
+  }
 
   if (fileHash) {
     // ── Same-team duplicate: reject ───────────────────────────────────────────
@@ -220,6 +236,7 @@ async function handleComplete(
   const demoType   = (q.get('demoType') ?? 'opponent') as 'opponent' | 'self'
   const fileSize   = parseInt(q.get('fileSize') ?? '0', 10)
   const fileHash   = q.get('fileHash') || null
+  const faceitMatchId = q.get('faceitMatchId') || null
 
   if (!uploadId || !key || !teamId) {
     return NextResponse.json({ error: 'Missing uploadId, key, or teamId' }, { status: 400 })
@@ -271,6 +288,7 @@ async function handleComplete(
       demo_type:      demoType,
       parsed_data:    { opponentSide: demoType === 'self' ? 'team1' : 'team2' },
       file_hash:      fileHash,
+      faceit_match_id: faceitMatchId,
     })
     .select()
     .single()
