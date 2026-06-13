@@ -24,7 +24,10 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { invitee_id } = await req.json() as { invitee_id?: string }
+  // Accept both invitee_id (snake_case) and inviteeId (camelCase) so a client
+  // field-name mismatch can never silently break invites again.
+  const body = await req.json() as { invitee_id?: string; inviteeId?: string }
+  const invitee_id = body.invitee_id ?? body.inviteeId
   if (!invitee_id) return NextResponse.json({ error: 'invitee_id required' }, { status: 400 })
 
   // Must be friends

@@ -337,7 +337,7 @@ export default function MyTeamDashboard({
       const res = await fetch(`/api/teams/${selectedTeamId}/invitations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inviteeId: friendUserId }),
+        body: JSON.stringify({ invitee_id: friendUserId }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
