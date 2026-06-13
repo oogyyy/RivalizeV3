@@ -93,7 +93,21 @@ export interface FaceitTeam {
   avatar: string
   cover_image: string
   game: string
+  /** user_id of the team captain, when present. */
+  leader?: string
   members: FaceitTeamMember[]
+}
+
+/** A single ESEA/league match for a team, derived from a roster player's history. */
+export interface FaceitTeamMatch {
+  matchId: string
+  competitionName: string
+  date: number             // ms epoch
+  opponentName: string     // the team they played against
+  ourScore: number | null
+  oppScore: number | null
+  won: boolean | null
+  matchUrl: string
 }
 
 /** One stat segment (e.g. a map) from the team stats endpoint. */
@@ -172,6 +186,44 @@ export async function getTeamStats(teamId: string): Promise<FaceitTeamStats> {
     winRate: num(raw.lifetime?.['Win Rate %']),
     maps,
   }
+}
+
+/**
+ * Recent ESEA/league match history for a team.
+ *
+ * The FACEIT Data API has no team-match-history endpoint, so we anchor on a
+ * roster player (the captain when known) and pull their CS2 history, keeping
+ * only `championship` matches (ESEA league play) where that player's faction
+ * is the linked team. The opponent is read from the other faction.
+ */
+export async function getTeamMatchHistory(
+  teamId: string,
+  limit = 30,
+): Promise<{ team: FaceitTeam; matches: FaceitTeamMatch[] }> {
+  const team = await getTeam(teamId)
+  const anchorId = team.leader || team.members[0]?.user_id
+  if (!anchorId) return { team, matches: [] }
+
+  const history = await getPlayerMatchHistory(anchorId, Math.min(100, limit * 3))
+  const matches: FaceitTeamMatch[] = []
+  for (const m of history.items) {
+    if (m.competition_type !== 'championship') continue
+    const inF1 = m.teams.faction1.roster?.some(p => p.player_id === anchorId) ?? false
+    const opp  = inF1 ? m.teams.faction2 : m.teams.faction1
+    const score = m.results?.score
+    matches.push({
+      matchId: m.match_id,
+      competitionName: m.competition_name,
+      date: m.started_at * 1000,
+      opponentName: opp.name || 'Unknown',
+      ourScore: score ? (inF1 ? score.faction1 : score.faction2) : null,
+      oppScore: score ? (inF1 ? score.faction2 : score.faction1) : null,
+      won: m.results ? m.results.winner === (inF1 ? 'faction1' : 'faction2') : null,
+      matchUrl: m.match_url,
+    })
+    if (matches.length >= limit) break
+  }
+  return { team, matches }
 }
 
 /** Lookup a player by FaceIt nickname. */

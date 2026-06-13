@@ -15,6 +15,7 @@ import OpponentDemoList from '@/components/teams/OpponentDemoList'
 import TeamNotes from '@/components/teams/TeamNotes'
 import PublishToggle from '@/components/teams/PublishToggle'
 import EseaTeamLink from '@/components/teams/EseaTeamLink'
+import EseaMatchList from '@/components/teams/EseaMatchList'
 import { getTeamStats, type FaceitTeamStats } from '@/lib/faceit'
 import RoundSearchPanel from '@/components/demos/RoundSearchPanel'
 import RoutinesPanel from '@/components/demos/RoutinesPanel'
@@ -339,6 +340,14 @@ export default async function OpponentPage({
 
           {/* Left: Demo list + panels */}
           <div className="lg:col-span-2 space-y-5">
+            {faceitTeamId && (
+              <EseaMatchList
+                folderId={folderId}
+                teamId={teamId}
+                opponentName={folder.opponent_display_name}
+                isOwnerOrAdmin={isOwnerOrAdmin}
+              />
+            )}
             <div className="rv-panel overflow-hidden">
               <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-border/50">
                 <Crosshair size={14} style={{ color: 'var(--signal)' }} />
