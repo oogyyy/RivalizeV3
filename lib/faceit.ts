@@ -79,6 +79,101 @@ export interface FaceitMatchDetail {
   }
 }
 
+export interface FaceitTeamMember {
+  user_id: string
+  nickname: string
+  avatar: string
+  country: string
+}
+
+export interface FaceitTeam {
+  team_id: string
+  nickname: string
+  name: string
+  avatar: string
+  cover_image: string
+  game: string
+  members: FaceitTeamMember[]
+}
+
+/** One stat segment (e.g. a map) from the team stats endpoint. */
+export interface FaceitTeamMapStat {
+  label: string          // e.g. "de_mirage"
+  img_small?: string
+  matches: number
+  wins: number
+  winRate: number        // 0–100
+}
+
+export interface FaceitTeamStats {
+  matches: number
+  wins: number
+  winRate: number        // 0–100
+  maps: FaceitTeamMapStat[]
+}
+
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+
+/**
+ * Extract a FACEIT team UUID from raw input — accepts either a bare id or a
+ * full team URL (…/teams/<id>/leagues, /stats, etc.) or an esea.team link.
+ * Returns the lowercased id, or null if no valid UUID is present.
+ */
+export function parseFaceitTeamId(input: string): string | null {
+  const m = input.trim().match(UUID_RE)
+  return m ? m[0].toLowerCase() : null
+}
+
+/** Canonical FACEIT team page (ESEA league view). */
+export function faceitTeamUrl(teamId: string): string {
+  return `https://www.faceit.com/en/teams/${teamId}/leagues`
+}
+
+/** Third-party esea.team stats view for a FACEIT team id. */
+export function eseaTeamUrl(teamId: string): string {
+  return `https://esea.team/team/${teamId}`
+}
+
+/** Fetch a FACEIT team profile (name, avatar, roster). */
+export async function getTeam(teamId: string): Promise<FaceitTeam> {
+  return fetchFaceit<FaceitTeam>(`/teams/${teamId}`)
+}
+
+interface RawTeamStats {
+  lifetime?: Record<string, string>
+  segments?: Array<{
+    type: string
+    mode?: string
+    label: string
+    img_small?: string
+    stats: Record<string, string>
+  }>
+}
+
+/** Fetch aggregate CS2 team stats with per-map breakdown. */
+export async function getTeamStats(teamId: string): Promise<FaceitTeamStats> {
+  const raw = await fetchFaceit<RawTeamStats>(`/teams/${teamId}/stats/cs2`)
+  const num = (v: string | undefined) => (v ? Number(v) : 0)
+
+  const maps: FaceitTeamMapStat[] = (raw.segments ?? [])
+    .filter(s => s.type === 'Map')
+    .map(s => ({
+      label: s.label,
+      img_small: s.img_small,
+      matches: num(s.stats['Matches']),
+      wins: num(s.stats['Wins']),
+      winRate: num(s.stats['Win Rate %']),
+    }))
+    .sort((a, b) => b.matches - a.matches)
+
+  return {
+    matches: num(raw.lifetime?.['Matches']),
+    wins: num(raw.lifetime?.['Wins']),
+    winRate: num(raw.lifetime?.['Win Rate %']),
+    maps,
+  }
+}
+
 /** Lookup a player by FaceIt nickname. */
 export async function getPlayerByNickname(nickname: string): Promise<FaceitPlayer> {
   return fetchFaceit<FaceitPlayer>(`/players?nickname=${encodeURIComponent(nickname)}`)

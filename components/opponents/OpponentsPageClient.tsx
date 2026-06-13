@@ -11,6 +11,7 @@ interface OpponentFolder {
   opponent_display_name: string
   opponent_slug: string
   aggregated_stats: AggregatedStats | null
+  faceit_team_id?: string | null
 }
 
 interface Props {
@@ -195,6 +196,23 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
                       <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 5, lineHeight: 1 }}>
                         {opponent.opponent_display_name}
                       </p>
+                      {opponent.faceit_team_id && (
+                        <a
+                          href={`https://esea.team/team/${opponent.faceit_team_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                            color: 'var(--accent)', textDecoration: 'none',
+                            padding: '2px 6px', borderRadius: 5,
+                            background: 'var(--accent-soft)', border: '1px solid var(--accent-line)',
+                          }}
+                        >
+                          <Trophy size={9} /> ESEA
+                        </a>
+                      )}
                     </div>
                   </div>
                   <Trophy size={15} style={{ color: 'var(--faint)', flexShrink: 0, marginTop: 2 }} />

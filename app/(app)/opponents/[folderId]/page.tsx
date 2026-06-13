@@ -14,6 +14,8 @@ import DeleteFolderButton from '@/components/teams/DeleteFolderButton'
 import OpponentDemoList from '@/components/teams/OpponentDemoList'
 import TeamNotes from '@/components/teams/TeamNotes'
 import PublishToggle from '@/components/teams/PublishToggle'
+import EseaTeamLink from '@/components/teams/EseaTeamLink'
+import { getTeamStats, type FaceitTeamStats } from '@/lib/faceit'
 import RoundSearchPanel from '@/components/demos/RoundSearchPanel'
 import RoutinesPanel from '@/components/demos/RoutinesPanel'
 import type { AggregatedStats, PlayerStats } from '@/types/database'
@@ -192,6 +194,18 @@ export default async function OpponentPage({
   const proRefUrl  = primaryMap
     ? `https://huggingface.co/datasets/blanchon/opencs2_dataset/viewer/default/train?q=${encodeURIComponent(primaryMap)}`
     : 'https://huggingface.co/datasets/blanchon/opencs2_dataset/viewer'
+
+  /* ── ESEA / FACEIT team link + live map stats ── */
+  const faceitTeamId   = (folder as { faceit_team_id?: string | null }).faceit_team_id ?? null
+  const faceitTeamName = (folder as { faceit_team_name?: string | null }).faceit_team_name ?? null
+  let faceitStats: FaceitTeamStats | null = null
+  if (faceitTeamId) {
+    try {
+      faceitStats = await getTeamStats(faceitTeamId)
+    } catch {
+      faceitStats = null  // FACEIT unreachable / no stats — fall back to demo-derived data
+    }
+  }
 
   const color    = teamColor(folder.opponent_display_name)
   const initials = getInitials(folder.opponent_display_name)
@@ -458,6 +472,50 @@ export default async function OpponentPage({
                 </div>
               )}
             </div>
+
+            {/* ESEA / FACEIT team link */}
+            <EseaTeamLink
+              folderId={folderId}
+              initialTeamId={faceitTeamId}
+              initialTeamName={faceitTeamName}
+              isOwnerOrAdmin={isOwnerOrAdmin}
+            />
+
+            {/* FACEIT / ESEA map win rates (live from FACEIT) */}
+            {faceitStats && faceitStats.maps.length > 0 && (
+              <div className="rv-panel p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Trophy size={13} style={{ color: 'var(--signal)' }} />
+                  <h2 className="text-sm font-semibold text-foreground">ESEA Map Form</h2>
+                  <span className="text-[10px] text-muted-foreground ml-auto">
+                    {faceitStats.matches} matches · {Math.round(faceitStats.winRate)}% WR
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  {faceitStats.maps.slice(0, 7).map(m => {
+                    const wr = Math.round(m.winRate)
+                    const c  = wr >= 60 ? 'var(--loss)' : wr >= 40 ? '#facc15' : 'var(--win)'
+                    return (
+                      <div key={m.label}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-foreground">{mapDisplayName(m.label)}</span>
+                            <span className="text-[10px] text-muted-foreground">{m.matches}x</span>
+                          </div>
+                          <span className="text-xs font-bold font-mono" style={{ color: c }}>{wr}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${wr}%`, background: `linear-gradient(90deg, ${c}, color-mix(in srgb, ${c} 70%, transparent))` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Publish to Library */}
             {isOwnerOrAdmin && (
