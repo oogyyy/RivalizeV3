@@ -22,11 +22,6 @@ const Replay3DCanvas = dynamic(
   () => import('@/components/demos/Replay3DCanvas'),
   { ssr: false, loading: () => <div className="h-[460px] flex items-center justify-center bg-[#070a16] rounded-lg"><Loader2 size={24} className="text-neon-green animate-spin" /></div> }
 )
-// de_mirage uses the procedural 3D blockout viewer; other maps use the radar-plane 3D canvas.
-const MirageReplay = dynamic(
-  () => import('@/components/replay/MirageReplay'),
-  { ssr: false, loading: () => <div className="h-[460px] flex items-center justify-center bg-[#070a16] rounded-lg"><Loader2 size={24} className="text-neon-green animate-spin" /></div> }
-)
 import { MAP_THUMBS } from '@/lib/map-config'
 import {
   Trophy, Crosshair, Target, Shield, Zap, TrendingUp,
@@ -783,20 +778,12 @@ export default function MyTeamDemoPageClient({ demo: initialDemo }: Props) {
                 {activeTab === '3d' && replayParsed && (
                   <div className="flex flex-col lg:flex-row gap-4 items-start">
                     <div className="w-full lg:flex-1 min-w-0">
-                      {replayParsed.header.map === 'de_mirage' ? (
-                        <MirageReplay
-                          parsed={replayParsed}
-                          team1={replayParsed.header.team1}
-                          team2={replayParsed.header.team2}
-                        />
-                      ) : (
-                        <Replay3DCanvas
-                          mapName={replayParsed.header.map}
-                          parsed={replayParsed}
-                          team1={replayParsed.header.team1}
-                          team2={replayParsed.header.team2}
-                        />
-                      )}
+                      <Replay3DCanvas
+                        mapName={replayParsed.header.map}
+                        parsed={replayParsed}
+                        team1={replayParsed.header.team1}
+                        team2={replayParsed.header.team2}
+                      />
                     </div>
                     <div className="w-full lg:w-[340px] lg:shrink-0 h-[548px]">
                       <DemoInlineChat

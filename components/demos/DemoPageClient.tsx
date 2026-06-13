@@ -31,18 +31,6 @@ const Replay3DCanvas = dynamic(
   }
 )
 
-// de_mirage gets the procedural 3D blockout viewer; other maps use the radar-plane 3D canvas.
-const MirageReplay = dynamic(
-  () => import('@/components/replay/MirageReplay'),
-  {
-    ssr: false,
-    loading: () => (
-      <div style={{ height: 560, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 12 }}>
-        <Loader2 size={24} style={{ color: 'var(--win)', animation: 'spin 1s linear infinite' }} />
-      </div>
-    ),
-  }
-)
 import {
   Trophy, Crosshair, Target, Shield, Zap, TrendingUp,
   BarChart3, Map, Clock, Brain, ArrowLeft, RefreshCw,
@@ -804,22 +792,13 @@ export default function DemoPageClient({ demo: initialDemo, folderId }: Props) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {replayParsed.header.map === 'de_mirage' ? (
-                      <MirageReplay
-                        parsed={replayParsed}
-                        team1={replayParsed.header.team1}
-                        team2={replayParsed.header.team2}
-                        onStateChange={setReplayState}
-                      />
-                    ) : (
-                      <Replay3DCanvas
-                        mapName={replayParsed.header.map}
-                        parsed={replayParsed}
-                        team1={replayParsed.header.team1}
-                        team2={replayParsed.header.team2}
-                        onStateChange={setReplayState}
-                      />
-                    )}
+                    <Replay3DCanvas
+                      mapName={replayParsed.header.map}
+                      parsed={replayParsed}
+                      team1={replayParsed.header.team1}
+                      team2={replayParsed.header.team2}
+                      onStateChange={setReplayState}
+                    />
                   </div>
                   <div style={{ width: 340, flexShrink: 0, height: 548 }}>
                     <DemoInlineChat
