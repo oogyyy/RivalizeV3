@@ -32,7 +32,33 @@ export async function GET(request: Request) {
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+
+  // Reverse links: which playbook strats reference each lineup
+  const lineupRows = data ?? []
+  if (lineupRows.length > 0) {
+    const { data: playbooks } = await admin
+      .from('playbooks')
+      .select('id, name, strats')
+      .in('team_id', teamIds)
+    const usedIn: Record<string, Array<{ playbook_id: string; playbook_name: string; strat_name: string }>> = {}
+    for (const pb of playbooks ?? []) {
+      const strats = Array.isArray(pb.strats) ? pb.strats : []
+      for (const st of strats as Array<{ name?: string; assignments?: Array<{ utility?: Array<{ id?: string }> }> }>) {
+        const seen = new Set<string>()
+        for (const a of st.assignments ?? []) {
+          for (const u of a.utility ?? []) {
+            if (!u.id || seen.has(u.id)) continue
+            seen.add(u.id)
+            ;(usedIn[u.id] ??= []).push({ playbook_id: pb.id, playbook_name: pb.name, strat_name: st.name ?? 'Strat' })
+          }
+        }
+      }
+    }
+    for (const l of lineupRows as Array<{ id: string; used_in?: unknown }>) {
+      l.used_in = usedIn[l.id] ?? []
+    }
+  }
+  return NextResponse.json(lineupRows)
 }
 
 export async function POST(request: Request) {

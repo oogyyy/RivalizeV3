@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, type ElementType, type Change
 import {
   BookMarked, Plus, Trash2, Filter, Loader2, ChevronDown, ChevronUp,
   Globe, Youtube, Video, Image, Upload, X, Search, Pencil, PencilLine, Check, ArrowLeft, FolderOpen,
+  ClipboardList,
 } from 'lucide-react'
 import Link from 'next/link'
 import LineupBoard, { type DrawAction } from '@/components/lineups/LineupBoard'
@@ -45,6 +46,7 @@ interface Lineup {
   media_type: MediaType | null
   youtube_url: string | null
   media_urls: string[] | null
+  used_in?: Array<{ playbook_id: string; playbook_name: string; strat_name: string }>
 }
 
 function getYoutubeEmbedId(url: string): string | null {
@@ -804,6 +806,23 @@ export default function LineupsPage() {
                     {((effectiveMediaType === 'video' && !lineup.media_urls?.[0]) ||
                       (effectiveMediaType === 'images' && !lineup.media_urls?.length)) && (
                       <p style={{ fontSize: 11, color: 'var(--muted)', padding: '10px 14px' }}>No media uploaded yet.</p>
+                    )}
+                    {lineup.used_in && lineup.used_in.length > 0 && (
+                      <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <ClipboardList size={12} style={{ color: '#818cf8' }} /> Used in:
+                        </span>
+                        {lineup.used_in.map((u, i) => (
+                          <Link
+                            key={`${u.playbook_id}-${i}`}
+                            href={`/playbook/${u.playbook_id}`}
+                            style={{ fontSize: 11, fontWeight: 500, color: '#818cf8', textDecoration: 'none', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(129,140,248,0.3)', background: 'rgba(129,140,248,0.08)' }}
+                            title={`${u.playbook_name} → ${u.strat_name}`}
+                          >
+                            {u.playbook_name} · {u.strat_name}
+                          </Link>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}

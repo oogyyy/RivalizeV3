@@ -8,10 +8,15 @@ import {
   Swords, Shield, Crosshair, Users, Coins,
   Brain, Send, RotateCcw, AlertCircle, RefreshCw, Map, MessageSquare, Target,
   Pencil, Check, ClipboardList, Trash2, Wand2, Plus, X,
+  ChevronDown, ChevronRight, Clock, PenLine, Printer,
 } from 'lucide-react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import type { DrawAction } from '@/components/lineups/LineupBoard'
+
+const LineupBoard = dynamic(() => import('@/components/lineups/LineupBoard'), { ssr: false })
 
 type SectionId = 't_side' | 'ct_side' | 'a_execute' | 'b_execute' | 'roles' | 'economy'
 
@@ -37,6 +42,7 @@ const ROLE_OPTIONS: { value: PlayerRole; label: string; color: string }[] = [
 
 type StratUtility = { id: string; name: string; type: string }
 type StratAssignment = { player: string; role: string; instruction: string; utility: StratUtility[] }
+type StratPhase = { id: string; time: string; label: string; notes: string }
 
 const LINEUP_TYPE_COLORS: Record<string, string> = {
   smoke: '#c0c0d0', flash: '#ffff88', molotov: '#ff4400', he: '#ff9900', custom: '#818cf8',
@@ -47,6 +53,8 @@ type Strat = {
   name: string
   side: 't' | 'ct'
   assignments: StratAssignment[]   // always 5 rows
+  phases?: StratPhase[]
+  sketch?: DrawAction[]
 }
 
 type Playbook = {
@@ -123,6 +131,9 @@ export default function PlaybookBuilderPage() {
   const [improvingStrat, setImprovingStrat] = useState<string | null>(null)
   const [hubLineups, setHubLineups]       = useState<StratUtility[]>([])
   const [stratError, setStratError]       = useState<string | null>(null)
+  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({})
+  const [sketchingStrat, setSketchingStrat] = useState<string | null>(null)
+  const [showPrintView, setShowPrintView] = useState(false)
   const [generating, setGenerating]       = useState<SectionId | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
   const [saving, setSaving]               = useState(false)
@@ -144,9 +155,11 @@ export default function PlaybookBuilderPage() {
       setPlaybook(pb)
       setPbName(pb.name)
       setSections(pb.sections ?? {})
-      // Normalize older strats saved before the role column existed
+      // Normalize older strats saved before newer columns existed
       setStrats(Array.isArray(pb.strats) ? (pb.strats as Strat[]).map(st => ({
         ...st,
+        phases: st.phases ?? [],
+        sketch: st.sketch ?? [],
         assignments: (st.assignments ?? []).map(a => ({ player: a.player ?? '', role: a.role ?? '', instruction: a.instruction ?? '', utility: a.utility ?? [] })),
       })) : [])
       setPlayerRoles(pb.player_roles ?? {})
@@ -266,11 +279,34 @@ export default function PlaybookBuilderPage() {
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       name: `Strat ${strats.length + 1}`,
       side: 't',
+      phases: [],
+      sketch: [],
       assignments: Array.from({ length: 5 }, (_, i) => ({ player: roster[i] ?? '', role: roster[i] ? (playerRoles[roster[i]] ?? '') : '', instruction: '', utility: [] })),
     }
     setStrats(prev => [...prev, strat])
     setActiveSection('strats')
   }
+
+  const genId = () => typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+  const addPhase = (stratId: string) => {
+    setStrats(prev => prev.map(st => st.id === stratId
+      ? { ...st, phases: [...(st.phases ?? []), { id: genId(), time: '', label: '', notes: '' }] }
+      : st))
+    setExpandedPhases(p => ({ ...p, [stratId]: true }))
+  }
+
+  const updatePhase = (stratId: string, phaseId: string, patch: Partial<StratPhase>) =>
+    setStrats(prev => prev.map(st => st.id === stratId
+      ? { ...st, phases: (st.phases ?? []).map(ph => ph.id === phaseId ? { ...ph, ...patch } : ph) }
+      : st))
+
+  const removePhase = (stratId: string, phaseId: string) =>
+    setStrats(prev => prev.map(st => st.id === stratId
+      ? { ...st, phases: (st.phases ?? []).filter(ph => ph.id !== phaseId) }
+      : st))
 
   const updateStrat = (stratId: string, patch: Partial<Strat>) =>
     setStrats(prev => prev.map(st => st.id === stratId ? { ...st, ...patch } : st))
@@ -522,9 +558,16 @@ export default function PlaybookBuilderPage() {
                 </div>
               </div>
               {isStratsTab ? (
-                <Button variant="neon" size="sm" onClick={addStrat} className="gap-1.5 shrink-0">
-                  <Plus size={12} /> Add Strat
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {strats.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={() => setShowPrintView(true)} className="gap-1.5">
+                      <Printer size={12} /> Print / Share
+                    </Button>
+                  )}
+                  <Button variant="neon" size="sm" onClick={addStrat} className="gap-1.5">
+                    <Plus size={12} /> Add Strat
+                  </Button>
+                </div>
               ) : (
               <div className="flex items-center gap-2 shrink-0">
                 <Button
@@ -772,6 +815,103 @@ export default function PlaybookBuilderPage() {
                                 </div>
                               ))}
                             </div>
+
+                            {/* Advanced: phases + sketch */}
+                            {(() => {
+                              const phases = strat.phases ?? []
+                              const open = expandedPhases[strat.id] ?? (phases.length > 0)
+                              return (
+                                <div className="border-t border-border">
+                                  <button
+                                    onClick={() => setExpandedPhases(p => ({ ...p, [strat.id]: !open }))}
+                                    className="w-full flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                    <Clock size={11} />
+                                    Advanced — phases &amp; sketch
+                                    {phases.length > 0 && <span className="font-mono text-[10px] text-[color:var(--signal)]">{phases.length} phase{phases.length === 1 ? '' : 's'}</span>}
+                                    {(strat.sketch?.length ?? 0) > 0 && <PenLine size={10} className="text-[color:var(--signal)]" />}
+                                  </button>
+                                  {open && (
+                                    <div className="px-3 pb-3 space-y-3">
+                                      {/* Phase timeline */}
+                                      <div className="space-y-1.5">
+                                        {phases.length > 0 && (
+                                          <div className="flex items-center gap-2 px-1">
+                                            <p className="w-28 shrink-0 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Time window</p>
+                                            <p className="w-28 shrink-0 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Phase</p>
+                                            <p className="flex-1 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">What happens</p>
+                                          </div>
+                                        )}
+                                        {phases.map(ph => (
+                                          <div key={ph.id} className="flex items-start gap-2">
+                                            <input
+                                              value={ph.time}
+                                              onChange={e => updatePhase(strat.id, ph.id, { time: e.target.value })}
+                                              placeholder="1:55 → 1:25"
+                                              className="w-28 shrink-0 bg-background border border-border rounded px-1.5 py-1 text-[11px] font-mono text-foreground focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)]"
+                                            />
+                                            <input
+                                              value={ph.label}
+                                              onChange={e => updatePhase(strat.id, ph.id, { label: e.target.value })}
+                                              placeholder="Info phase"
+                                              className="w-28 shrink-0 bg-background border border-border rounded px-1.5 py-1 text-[11px] font-medium text-foreground focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)]"
+                                            />
+                                            <input
+                                              value={ph.notes}
+                                              onChange={e => updatePhase(strat.id, ph.id, { notes: e.target.value })}
+                                              placeholder="Gather info, default spread, no commitment"
+                                              className="flex-1 bg-background border border-border rounded px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:border-[color:color-mix(in_srgb,var(--signal)_50%,transparent)]"
+                                            />
+                                            <button
+                                              onClick={() => removePhase(strat.id, ph.id)}
+                                              className="p-1.5 text-muted-foreground hover:text-[color:var(--loss)] shrink-0"
+                                              title="Remove phase"
+                                            >
+                                              <X size={11} />
+                                            </button>
+                                          </div>
+                                        ))}
+                                        <Button variant="outline" size="sm" onClick={() => addPhase(strat.id)} className="gap-1.5 h-7 text-[11px]">
+                                          <Plus size={11} /> Add phase
+                                        </Button>
+                                      </div>
+
+                                      {/* Sketch */}
+                                      <div>
+                                        {sketchingStrat === strat.id ? (
+                                          <div className="rounded-lg border border-border bg-card p-2">
+                                            <div className="flex items-center justify-between mb-2">
+                                              <p className="text-[11px] font-medium text-foreground flex items-center gap-1.5"><PenLine size={11} /> Sketch — {playbook?.map}</p>
+                                              <Button variant="outline" size="sm" onClick={() => setSketchingStrat(null)} className="gap-1 h-6 text-[10px]"><Check size={10} /> Done</Button>
+                                            </div>
+                                            <LineupBoard
+                                              mapName={playbook?.map ?? ''}
+                                              initialActions={strat.sketch ?? []}
+                                              onSave={async (actions: DrawAction[]) => { updateStrat(strat.id, { sketch: actions }) }}
+                                            />
+                                          </div>
+                                        ) : (strat.sketch?.length ?? 0) > 0 ? (
+                                          <div className="rounded-lg border border-border bg-card p-2">
+                                            <div className="flex items-center justify-between mb-2">
+                                              <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5"><PenLine size={11} /> Sketch</p>
+                                              <Button variant="outline" size="sm" onClick={() => setSketchingStrat(strat.id)} className="gap-1 h-6 text-[10px]"><Pencil size={10} /> Edit</Button>
+                                            </div>
+                                            <div className="pointer-events-none max-w-[280px]">
+                                              <LineupBoard mapName={playbook?.map ?? ''} initialActions={strat.sketch ?? []} readOnly onSave={async () => {}} />
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <Button variant="outline" size="sm" onClick={() => setSketchingStrat(strat.id)} className="gap-1.5 h-7 text-[11px]">
+                                            <PenLine size={11} /> Add sketch on {playbook?.map} radar
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </div>
                         )
                       })}
@@ -997,6 +1137,117 @@ export default function PlaybookBuilderPage() {
                 {chatLoading ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
               </Button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Print / Share view */}
+      {showPrintView && (
+        <PrintStratsView
+          playbookName={pbName}
+          map={playbook?.map ?? ''}
+          opponentName={isAntistrat ? playbook?.opponent_name ?? null : null}
+          strats={strats}
+          onClose={() => setShowPrintView(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+const MAP_LABEL: Record<string, string> = {
+  de_dust2: 'Dust2', de_mirage: 'Mirage', de_inferno: 'Inferno', de_nuke: 'Nuke',
+  de_ancient: 'Ancient', de_anubis: 'Anubis', de_overpass: 'Overpass', de_vertigo: 'Vertigo',
+}
+
+function PrintStratsView({
+  playbookName, map, opponentName, strats, onClose,
+}: {
+  playbookName: string
+  map: string
+  opponentName: string | null
+  strats: Strat[]
+  onClose: () => void
+}) {
+  const mapLabel = MAP_LABEL[map] ?? map
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 print:bg-white print:p-0 print:block">
+      <div className="print-area w-full max-w-3xl bg-[color:var(--card)] rounded-xl border border-border my-6 print:my-0 print:max-w-none print:border-0 print:rounded-none">
+        {/* Toolbar — hidden when printing */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border sticky top-0 bg-[color:var(--card)] rounded-t-xl print:hidden">
+          <div className="flex items-center gap-2">
+            <ClipboardList size={15} className="text-[color:var(--signal)]" />
+            <p className="text-sm font-semibold text-foreground">Print / Share — {strats.length} strat{strats.length === 1 ? '' : 's'}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="neon" size="sm" onClick={() => window.print()} className="gap-1.5">
+              <Printer size={13} /> Print / Save PDF
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose} className="gap-1"><X size={14} /></Button>
+          </div>
+        </div>
+
+        {/* Printable content */}
+        <div className="p-6 print:p-8 print:text-black">
+          <div className="mb-5 pb-3 border-b border-border print:border-gray-300">
+            <h1 className="text-xl font-bold text-foreground print:text-black">{playbookName}</h1>
+            <p className="text-sm text-muted-foreground print:text-gray-600">
+              {mapLabel}{opponentName ? ` · vs ${opponentName}` : ''} · {strats.length} strat{strats.length === 1 ? '' : 's'}
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {strats.map(strat => (
+              <div key={strat.id} className="break-inside-avoid">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={cn(
+                    'text-[10px] font-bold uppercase px-1.5 py-0.5 rounded',
+                    strat.side === 't'
+                      ? 'bg-[color:color-mix(in_srgb,var(--tside)_18%,transparent)] text-[color:var(--tside)] print:bg-orange-100 print:text-orange-800'
+                      : 'bg-[color:color-mix(in_srgb,var(--ct)_18%,transparent)] text-[color:var(--ct)] print:bg-blue-100 print:text-blue-800'
+                  )}>
+                    {strat.side === 't' ? 'T' : 'CT'}
+                  </span>
+                  <h2 className="text-base font-bold text-foreground print:text-black">{strat.name}</h2>
+                </div>
+
+                {/* Phases */}
+                {(strat.phases?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {strat.phases!.map(ph => (
+                      <div key={ph.id} className="text-[11px] px-2 py-1 rounded border border-border print:border-gray-300">
+                        <span className="font-mono font-semibold text-[color:var(--signal)] print:text-black">{ph.time || '—'}</span>
+                        {ph.label && <span className="text-foreground print:text-black font-medium"> · {ph.label}</span>}
+                        {ph.notes && <span className="text-muted-foreground print:text-gray-600"> — {ph.notes}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Player table */}
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="text-left text-muted-foreground print:text-gray-500">
+                      <th className="border border-border print:border-gray-300 px-2 py-1 font-semibold w-28">Player</th>
+                      <th className="border border-border print:border-gray-300 px-2 py-1 font-semibold w-20">Role</th>
+                      <th className="border border-border print:border-gray-300 px-2 py-1 font-semibold">What you do</th>
+                      <th className="border border-border print:border-gray-300 px-2 py-1 font-semibold w-32">Utility</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {strat.assignments.map((a, i) => (
+                      <tr key={i} className="align-top">
+                        <td className="border border-border print:border-gray-300 px-2 py-1 text-foreground print:text-black font-medium">{a.player || '—'}</td>
+                        <td className="border border-border print:border-gray-300 px-2 py-1 text-muted-foreground print:text-gray-600">{a.role || ''}</td>
+                        <td className="border border-border print:border-gray-300 px-2 py-1 text-foreground print:text-black">{a.instruction || ''}</td>
+                        <td className="border border-border print:border-gray-300 px-2 py-1 text-muted-foreground print:text-gray-600">{a.utility.map(u => u.name).join(', ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
           </div>
         </div>
       </div>

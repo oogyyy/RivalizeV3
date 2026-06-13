@@ -8,6 +8,13 @@ const stratSchema = z.object({
   id:   z.string().max(64),
   name: z.string().max(120),
   side: z.enum(['t', 'ct']),
+  phases: z.array(z.object({
+    id:    z.string().max(64),
+    time:  z.string().max(32),
+    label: z.string().max(64),
+    notes: z.string().max(500),
+  })).max(8).optional().default([]),
+  sketch: z.array(z.any()).max(3000).optional(),
   assignments: z.array(z.object({
     player:      z.string().max(64),
     role:        z.string().max(24).optional().default(''),

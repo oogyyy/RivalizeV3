@@ -11,6 +11,13 @@ const stratSchema = z.object({
   id:   z.string().max(64),
   name: z.string().max(120),
   side: z.enum(['t', 'ct']),
+  phases: z.array(z.object({
+    id:    z.string().max(64),
+    time:  z.string().max(32),
+    label: z.string().max(64),
+    notes: z.string().max(500),
+  })).max(8).optional().default([]),
+  sketch: z.array(z.any()).max(3000).optional(),
   assignments: z.array(z.object({
     player:      z.string().max(64),
     role:        z.string().max(24).optional().default(''),
@@ -36,8 +43,10 @@ function parseImproved(text: string, original: Strat): Strat | null {
     const assignments = Array.isArray(raw.assignments) ? raw.assignments : []
     if (assignments.length !== 5) return null
     return {
-      id:   original.id,
-      side: original.side,
+      id:     original.id,
+      side:   original.side,
+      phases: original.phases,
+      sketch: original.sketch,
       name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 120) : original.name,
       assignments: original.assignments.map((a, i) => {
         const out = assignments[i] as { instruction?: unknown } | undefined
@@ -86,6 +95,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .map((a, i) => `${i + 1}. ${a.player || `Player ${i + 1}`}${a.role ? ` (${a.role})` : ''}: ${a.instruction || '(empty)'}${a.utility.length ? ` [linked lineups: ${a.utility.map(u => u.name).join(', ')}]` : ''}`)
     .join('\n')
 
+  const phaseContext = strat.phases.length
+    ? `\nThe strat runs in phases:\n${strat.phases.map(p => `- ${p.time} ${p.label}${p.notes ? `: ${p.notes}` : ''}`).join('\n')}\nInstructions should be consistent with these phase timings.`
+    : ''
+
   const systemPrompt = `You are an expert CS2 coach refining a team's set play on ${playbook.map}.
 ${cs2Doctrine()}
 ${calloutGuide(playbook.map)}
@@ -106,7 +119,7 @@ The 5 assignments must be in the same order as the input rows.`
     const result = await generateText({
       model: getAIModel(),
       system: systemPrompt,
-      prompt: `Strat: "${strat.name}" (${sideLabel})\n${rows}`,
+      prompt: `Strat: "${strat.name}" (${sideLabel})${phaseContext}\n${rows}`,
       maxTokens: 1200,
       temperature: 0.3,
     })
