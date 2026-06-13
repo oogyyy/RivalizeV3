@@ -1,20 +1,25 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ExternalLink, Link2, Trophy, X } from 'lucide-react'
 
 interface Props {
-  folderId: string
+  /** faceit-team link/unlink endpoint, e.g. /api/teams/<id>/faceit-team or /api/opponents/<id>/faceit-team */
+  endpoint: string
   initialTeamId: string | null
   initialTeamName: string | null
   isOwnerOrAdmin: boolean
+  /** Copy shown under the heading when no team is linked yet. */
+  emptyHint?: string
 }
 
 function faceitTeamUrl(id: string) {
   return `https://www.faceit.com/en/teams/${id}/leagues`
 }
 
-export default function EseaTeamLink({ folderId, initialTeamId, initialTeamName, isOwnerOrAdmin }: Props) {
+export default function EseaTeamLink({ endpoint, initialTeamId, initialTeamName, isOwnerOrAdmin, emptyHint }: Props) {
+  const router = useRouter()
   const [teamId, setTeamId]     = useState<string | null>(initialTeamId)
   const [teamName, setTeamName] = useState<string | null>(initialTeamName)
   const [input, setInput]       = useState('')
@@ -29,7 +34,7 @@ export default function EseaTeamLink({ folderId, initialTeamId, initialTeamName,
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/opponents/${folderId}/faceit-team`, {
+      const res = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ input }),
@@ -39,6 +44,7 @@ export default function EseaTeamLink({ folderId, initialTeamId, initialTeamName,
       setTeamId(data.faceitTeamId)
       setTeamName(data.faceitTeamName)
       setInput('')
+      router.refresh()
     } catch {
       setError('Network error')
     } finally {
@@ -50,10 +56,11 @@ export default function EseaTeamLink({ folderId, initialTeamId, initialTeamName,
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/opponents/${folderId}/faceit-team`, { method: 'DELETE' })
+      const res = await fetch(endpoint, { method: 'DELETE' })
       if (!res.ok) { setError('Failed to unlink'); return }
       setTeamId(null)
       setTeamName(null)
+      router.refresh()
     } catch {
       setError('Network error')
     } finally {
@@ -76,7 +83,7 @@ export default function EseaTeamLink({ folderId, initialTeamId, initialTeamName,
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>ESEA / FACEIT Team</p>
           <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
-            {teamId ? (teamName ?? 'Linked team') : 'Link this opponent to their ESEA team page'}
+            {teamId ? (teamName ?? 'Linked team') : (emptyHint ?? 'Link this opponent to their ESEA team page')}
           </p>
         </div>
         {teamId && isOwnerOrAdmin && (

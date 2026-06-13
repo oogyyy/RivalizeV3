@@ -32,6 +32,8 @@ export interface Team {
   created_by: string
   logo_url: string | null
   created_at: string
+  faceit_team_id?: string | null
+  faceit_team_name?: string | null
 }
 
 export interface TeamMember {

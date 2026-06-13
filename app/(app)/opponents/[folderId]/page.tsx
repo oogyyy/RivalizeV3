@@ -347,8 +347,9 @@ export default async function OpponentPage({
           <div className="lg:col-span-2 space-y-5">
             {faceitTeamId && (
               <EseaMatchList
-                folderId={folderId}
-                teamId={teamId}
+                matchesUrl={`/api/opponents/${folderId}/faceit-matches`}
+                uploadTeamId={teamId}
+                demoType="opponent"
                 opponentName={folder.opponent_display_name}
                 isOwnerOrAdmin={isOwnerOrAdmin}
                 uploadedMatchIds={(demos ?? []).map(d => d.faceit_match_id).filter((x): x is string => !!x)}
@@ -490,7 +491,7 @@ export default async function OpponentPage({
 
             {/* ESEA / FACEIT team link */}
             <EseaTeamLink
-              folderId={folderId}
+              endpoint={`/api/opponents/${folderId}/faceit-team`}
               initialTeamId={faceitTeamId}
               initialTeamName={faceitTeamName}
               isOwnerOrAdmin={isOwnerOrAdmin}

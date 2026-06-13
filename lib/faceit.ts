@@ -114,6 +114,14 @@ export interface FaceitTeamMatch {
   maps: string[]
   /** Series format (1 = BO1, 3 = BO3…), or null when unknown. */
   bestOf: number | null
+  /** ESEA season number parsed from the competition name (e.g. 57), or null. */
+  season: number | null
+}
+
+/** Pull the ESEA season number out of a competition name like "S57 NA Intermediate…". */
+function parseSeason(competitionName: string): number | null {
+  const m = competitionName.match(/\bS(\d{1,3})\b/i)
+  return m ? Number(m[1]) : null
 }
 
 /** One stat segment (e.g. a map) from the team stats endpoint. */
@@ -217,14 +225,14 @@ async function mapWithConcurrency<T, R>(
  *
  * The FACEIT Data API has no team-match-history endpoint, so we anchor on a
  * roster player (the captain when known) and pull their CS2 history, keeping
- * only `championship` matches (ESEA league play). We decide which faction is
- * the scouted team by roster overlap against the full team roster — robust to
- * stand-ins and to the captain sitting a match out (a single-player check would
- * flip the W/L and opponent whenever the anchor wasn't on the server).
+ * `championship` matches (ESEA league play).
  *
- * Each kept match is then enriched via the match-details endpoint, the only
- * place that reliably carries the ESEA team names, the picked map(s) and the
- * best-of format (the history endpoint leaves faction names null for leagues).
+ * Each match is enriched via the match-details endpoint — the only place that
+ * reliably carries the ESEA team names, rosters, picked map(s) and best-of (the
+ * history endpoint leaves faction names null and rosters sparse for leagues).
+ * Which faction is the scouted team is decided by roster overlap against the
+ * full team (falling back to the anchor's presence), so the W/L and opponent
+ * stay correct even when the captain sits a match out.
  */
 export async function getTeamMatchHistory(
   teamId: string,
@@ -236,40 +244,44 @@ export async function getTeamMatchHistory(
 
   const memberIds = new Set(team.members.map(m => m.user_id))
 
-  const history = await getPlayerMatchHistory(anchorId, Math.min(100, limit * 4))
-
-  // Keep championship matches that actually belong to this team, deciding the
-  // faction by which side has more of our roster on it.
-  const candidates: Array<{ m: FaceitMatchItem; inF1: boolean }> = []
-  for (const m of history.items) {
-    if (m.competition_type !== 'championship') continue
-    const f1 = (m.teams.faction1.roster ?? []).filter(p => memberIds.has(p.player_id)).length
-    const f2 = (m.teams.faction2.roster ?? []).filter(p => memberIds.has(p.player_id)).length
-    if (f1 === 0 && f2 === 0) continue           // not this team's match (mix/pug)
-    candidates.push({ m, inF1: f1 >= f2 })
-    if (candidates.length >= limit) break
+  // Which faction is ours? Decide by roster overlap, then by the anchor's
+  // presence, else null when the rosters carry no identifying info.
+  const ourFaction = (teams: FaceitMatchItem['teams']): boolean | null => {
+    const f1 = teams.faction1.roster ?? []
+    const f2 = teams.faction2.roster ?? []
+    const f1o = f1.filter(p => memberIds.has(p.player_id)).length
+    const f2o = f2.filter(p => memberIds.has(p.player_id)).length
+    if (f1o || f2o) return f1o >= f2o
+    if (f1.some(p => p.player_id === anchorId)) return true
+    if (f2.some(p => p.player_id === anchorId)) return false
+    return null
   }
 
-  const matches = await mapWithConcurrency(candidates, 6, async ({ m, inF1 }) => {
-    const opp = inF1 ? m.teams.faction2 : m.teams.faction1
+  const history = await getPlayerMatchHistory(anchorId, Math.min(100, limit * 4))
+  const candidates = history.items
+    .filter(m => m.competition_type === 'championship')
+    .slice(0, limit)
+
+  const matches = await mapWithConcurrency(candidates, 6, async (m) => {
     const score = m.results?.score
 
-    // Enrich with match details — names / maps / best-of (best-effort).
-    let opponentName = opp.name || ''
-    let maps: string[] = []
-    let bestOf: number | null = null
-    try {
-      const detail = await getMatchDetail(m.match_id)
-      bestOf = typeof detail.best_of === 'number' ? detail.best_of : null
-      maps = (detail.voting?.map?.pick ?? []).filter(Boolean)
-      const detailOpp = inF1 ? detail.teams.faction2 : detail.teams.faction1
-      opponentName = opponentName || detailOpp?.name || ''
-    } catch {
-      /* keep history-derived fallbacks */
-    }
-    // Last-resort opponent label from their roster, so we never show "Unknown".
+    // Match details carry the only reliable ESEA team names, rosters (for faction
+    // detection), picked map(s) and best-of. Best-effort — fall back to history.
+    let detail: FaceitMatchDetail | null = null
+    try { detail = await getMatchDetail(m.match_id) } catch { /* keep fallbacks */ }
+
+    // Prefer detail rosters for faction; fall back to history; default faction1.
+    const inF1 =
+      (detail ? ourFaction(detail.teams) : null) ??
+      ourFaction(m.teams) ??
+      true
+
+    const histOpp   = inF1 ? m.teams.faction2 : m.teams.faction1
+    const detailOpp = detail ? (inF1 ? detail.teams.faction2 : detail.teams.faction1) : null
+
+    let opponentName = detailOpp?.name || histOpp.name || ''
     if (!opponentName) {
-      const oppRoster = opp.roster ?? []
+      const oppRoster = detailOpp?.roster ?? histOpp.roster ?? []
       opponentName = oppRoster[0]?.nickname ? `${oppRoster[0].nickname}'s team` : 'Unknown'
     }
 
@@ -283,8 +295,9 @@ export async function getTeamMatchHistory(
       won: m.results ? m.results.winner === (inF1 ? 'faction1' : 'faction2') : null,
       matchUrl: m.match_url,
       ourFaction: (inF1 ? 'faction1' : 'faction2') as 'faction1' | 'faction2',
-      maps,
-      bestOf,
+      maps: (detail?.voting?.map?.pick ?? []).filter(Boolean),
+      bestOf: typeof detail?.best_of === 'number' ? detail.best_of : null,
+      season: parseSeason(m.competition_name),
     }
   })
 

@@ -18,6 +18,7 @@ interface FaceitTeamMatch {
   matchUrl: string
   maps: string[]
   bestOf: number | null
+  season: number | null
 }
 
 /** "de_mirage" → "Mirage"; passes through already-clean labels. */
@@ -29,20 +30,26 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error'
 interface UploadState { status: UploadStatus; progress?: number; error?: string }
 
 interface Props {
-  folderId: string
-  teamId: string
-  opponentName: string
+  /** GET endpoint returning { matches } for the linked FACEIT team. */
+  matchesUrl: string
+  /** The local team id that uploaded demos are attached to. */
+  uploadTeamId: string
+  /** How uploaded demos are classified — 'opponent' for scouting folders, 'self' for My Team. */
+  demoType: 'self' | 'opponent'
+  /** For opponent demos, the folder's opponent name. For self demos, each match's own opponent is used. */
+  opponentName?: string
   isOwnerOrAdmin: boolean
-  /** faceit_match_id values that already have a demo in this folder. */
+  /** faceit_match_id values that already have a demo here. */
   uploadedMatchIds: string[]
 }
 
-export default function EseaMatchList({ folderId, teamId, opponentName, isOwnerOrAdmin, uploadedMatchIds }: Props) {
+export default function EseaMatchList({ matchesUrl, uploadTeamId, demoType, opponentName, isOwnerOrAdmin, uploadedMatchIds }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
   const [matches, setMatches] = useState<FaceitTeamMatch[]>([])
   const [states, setStates]   = useState<Record<string, UploadState>>({})
+  const [season, setSeason]   = useState<number | 'all'>('all')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const activeMatch  = useRef<string | null>(null)
@@ -50,13 +57,25 @@ export default function EseaMatchList({ folderId, teamId, opponentName, isOwnerO
 
   useEffect(() => {
     let active = true
-    fetch(`/api/opponents/${folderId}/faceit-matches`)
+    fetch(matchesUrl)
       .then(r => r.json())
-      .then(d => { if (!active) return; setMatches(d.matches ?? []); if (d.error) setError(d.error) })
+      .then(d => {
+        if (!active) return
+        const list: FaceitTeamMatch[] = d.matches ?? []
+        setMatches(list)
+        // Default to the most recent season, like esea.team.
+        const latest = list.map(m => m.season).filter((s): s is number => s != null).sort((a, b) => b - a)[0]
+        if (latest != null) setSeason(latest)
+        if (d.error) setError(d.error)
+      })
       .catch(() => { if (active) setError('Failed to load matches') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [folderId])
+  }, [matchesUrl])
+
+  // Distinct seasons present, newest first.
+  const seasons = [...new Set(matches.map(m => m.season).filter((s): s is number => s != null))].sort((a, b) => b - a)
+  const visibleMatches = season === 'all' ? matches : matches.filter(m => m.season === season)
 
   function pickFile(matchId: string) {
     activeMatch.current = matchId
@@ -74,11 +93,17 @@ export default function EseaMatchList({ folderId, teamId, opponentName, isOwnerO
       return
     }
 
+    // For self demos, record who they actually played; opponent folders use the folder name.
+    const match = matches.find(x => x.matchId === matchId)
+    const demoOpponent = demoType === 'self'
+      ? (match?.opponentName || 'My Team')
+      : (opponentName || 'Opponent')
+
     setStates(p => ({ ...p, [matchId]: { status: 'uploading', progress: 0 } }))
     try {
       await uploadViaServer(
         file,
-        { teamId, opponentName, demoType: 'opponent', faceitMatchId: matchId },
+        { teamId: uploadTeamId, opponentName: demoOpponent, demoType, faceitMatchId: matchId },
         pct => setStates(p => ({ ...p, [matchId]: { status: 'uploading', progress: pct } })),
       )
       setStates(p => ({ ...p, [matchId]: { status: 'done' } }))
@@ -95,9 +120,21 @@ export default function EseaMatchList({ folderId, teamId, opponentName, isOwnerO
       <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-border/50">
         <Swords size={14} style={{ color: 'var(--signal)' }} />
         <h2 className="text-sm font-semibold text-foreground">ESEA Match History</h2>
+        {!loading && seasons.length > 0 && (
+          <select
+            value={String(season)}
+            onChange={e => setSeason(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            className="ml-auto text-[11px] font-semibold rounded px-1.5 py-1 outline-none cursor-pointer"
+            style={{ background: 'var(--elevated)', border: '1px solid var(--border)', color: 'var(--text)' }}
+            title="Filter by ESEA season"
+          >
+            <option value="all">All seasons</option>
+            {seasons.map(s => <option key={s} value={s}>Season {s}</option>)}
+          </select>
+        )}
         {!loading && (
-          <span className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: 'color-mix(in srgb, var(--signal) 12%, transparent)', color: 'var(--signal)' }}>
-            {matches.length}
+          <span className={`${seasons.length > 0 ? '' : 'ml-auto'} text-[10px] font-semibold px-1.5 py-0.5 rounded`} style={{ background: 'color-mix(in srgb, var(--signal) 12%, transparent)', color: 'var(--signal)' }}>
+            {visibleMatches.length}
           </span>
         )}
       </div>
@@ -117,9 +154,13 @@ export default function EseaMatchList({ folderId, teamId, opponentName, isOwnerO
         <p className="text-xs text-muted-foreground text-center py-8">
           {error ?? 'No recent ESEA matches found for this team.'}
         </p>
+      ) : visibleMatches.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-8">
+          No matches in this season.
+        </p>
       ) : (
         <div className="divide-y divide-border/50">
-          {matches.map(m => {
+          {visibleMatches.map(m => {
             const st = states[m.matchId]
             const isUploaded = uploaded.has(m.matchId) || st?.status === 'done'
             return (

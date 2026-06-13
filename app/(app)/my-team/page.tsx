@@ -35,11 +35,17 @@ export default async function MyTeamPage({
   // Fetch all team names — exclude personal teams (those belong to /improve)
   const { data: teamRows } = await admin
     .from('teams')
-    .select('id, name, is_personal')
+    .select('id, name, is_personal, faceit_team_id, faceit_team_name')
     .in('id', teamIds)
 
   const teamMap = new Map(
     (teamRows ?? []).filter(t => !t.is_personal).map(t => [t.id, t.name as string])
+  )
+  const faceitByTeam = new Map(
+    (teamRows ?? []).map(t => [t.id, {
+      id:   (t as { faceit_team_id?: string | null }).faceit_team_id ?? null,
+      name: (t as { faceit_team_name?: string | null }).faceit_team_name ?? null,
+    }])
   )
 
   const allTeams: TeamOption[] = membershipList
@@ -78,7 +84,7 @@ export default async function MyTeamPage({
       .from('demos')
       // Slim projection — the heavy rounds[] array stays in Postgres. The per-map
       // T/CT split that used to need rounds is computed in-DB via the RPC below.
-      .select(`id, status, map, match_date, created_at, opponent_slug, error_message, processing_started_at, ${PARSED_SUMMARY_SELECT}`)
+      .select(`id, status, map, match_date, created_at, opponent_slug, error_message, processing_started_at, faceit_match_id, ${PARSED_SUMMARY_SELECT}`)
       .eq('team_id', selectedTeamId)
       .eq('demo_type', 'self')
       .order('created_at', { ascending: false })
@@ -97,6 +103,11 @@ export default async function MyTeamPage({
     mapSideWins[s.map] = { tWins: s.t_wins, tTotal: s.t_total, ctWins: s.ct_wins, ctTotal: s.ct_total }
   }
 
+  const faceit = faceitByTeam.get(selectedTeamId) ?? { id: null, name: null }
+  const uploadedFaceitMatchIds = demos
+    .map(d => (d as { faceit_match_id?: string | null }).faceit_match_id)
+    .filter((x): x is string => !!x)
+
   return (
     <MyTeamDashboard
       selectedTeamId={selectedTeamId}
@@ -108,6 +119,9 @@ export default async function MyTeamPage({
       canInvite={canInvite}
       canDelete={canDelete}
       myFaceitId={myFaceitId}
+      faceitTeamId={faceit.id}
+      faceitTeamName={faceit.name}
+      uploadedFaceitMatchIds={uploadedFaceitMatchIds}
     />
   )
 }

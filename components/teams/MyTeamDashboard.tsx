@@ -12,6 +12,8 @@ import type { DemoRowData } from './DemoListMultiSelect'
 import MapFolderList, { type MapGroup } from './MapFolderList'
 import DemoUploadButton from './DemoUploadButton'
 import FaceitImportButton from './FaceitImportButton'
+import EseaTeamLink from './EseaTeamLink'
+import EseaMatchList from './EseaMatchList'
 
 interface TeamOption {
   id: string
@@ -33,6 +35,11 @@ interface MyTeamDashboardProps {
   canInvite: boolean
   canDelete: boolean
   myFaceitId: string | null
+  /** Linked FACEIT/ESEA team for this team, if any. */
+  faceitTeamId: string | null
+  faceitTeamName: string | null
+  /** faceit_match_id values already uploaded for this team (for the "Analyzed" badge). */
+  uploadedFaceitMatchIds: string[]
 }
 
 const ACTIVE_DUTY_MAPS = [
@@ -169,6 +176,9 @@ export default function MyTeamDashboard({
   canInvite,
   canDelete,
   myFaceitId,
+  faceitTeamId,
+  faceitTeamName,
+  uploadedFaceitMatchIds,
 }: MyTeamDashboardProps) {
   const router = useRouter()
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
@@ -465,6 +475,28 @@ export default function MyTeamDashboard({
           )}
         </div>
       </div>
+
+      {/* ESEA / FACEIT team link + match history (own team) */}
+      {(faceitTeamId || canEdit) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <EseaTeamLink
+            endpoint={`/api/teams/${selectedTeamId}/faceit-team`}
+            initialTeamId={faceitTeamId}
+            initialTeamName={faceitTeamName}
+            isOwnerOrAdmin={canEdit}
+            emptyHint="Link your team's ESEA/FACEIT page to pull your match history"
+          />
+          {faceitTeamId && (
+            <EseaMatchList
+              matchesUrl={`/api/teams/${selectedTeamId}/faceit-matches`}
+              uploadTeamId={selectedTeamId}
+              demoType="self"
+              isOwnerOrAdmin={canEdit}
+              uploadedMatchIds={uploadedFaceitMatchIds}
+            />
+          )}
+        </div>
+      )}
 
       {/* Zero-demos onboarding */}
       {hasNoDemos && (
