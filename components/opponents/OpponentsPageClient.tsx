@@ -198,7 +198,7 @@ export default function OpponentsPageClient({ folders, demosBySlug, primaryTeamI
                       </p>
                       {opponent.faceit_team_id && (
                         <a
-                          href={`https://esea.team/team/${opponent.faceit_team_id}`}
+                          href={`https://www.faceit.com/en/teams/${opponent.faceit_team_id}/leagues`}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}

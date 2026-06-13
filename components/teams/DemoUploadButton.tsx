@@ -61,7 +61,7 @@ const CHUNK_SIZE = 9 * 1024 * 1024
 // Exported for reuse by other import flows (e.g. Pro Match Library).
 export async function uploadViaServer(
   file: File,
-  params: { teamId: string; opponentName: string; demoType: string; fileHash?: string },
+  params: { teamId: string; opponentName: string; demoType: string; fileHash?: string; faceitMatchId?: string },
   onProgress: (pct: number) => void,
 ): Promise<{ id: string; _adopted?: boolean }> {
   const base = new URL('/api/demos/upload', window.location.origin)
@@ -71,6 +71,7 @@ export async function uploadViaServer(
     opponentName: params.opponentName,
     demoType:     params.demoType,
   })
+  if (params.faceitMatchId) common.set('faceitMatchId', params.faceitMatchId)
 
   // 1 — init multipart upload
   const initUrl = new URL(base)

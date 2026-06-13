@@ -78,14 +78,14 @@ export default async function OpponentPage({
 
   const stats = folder.aggregated_stats as AggregatedStats | null
 
-  type DemoListRow  = { id: string; status: string; map: string; match_date: string | null; created_at: string; opponent_slug: string }
+  type DemoListRow  = { id: string; status: string; map: string; match_date: string | null; created_at: string; opponent_slug: string; faceit_match_id: string | null }
   type DemoStatRow  = { id: string; map: string; parsed_data: unknown }
 
   // Two parallel queries: display list (no heavy parsed_data) + stat computation (completed only)
   const [listResult, statResult] = await Promise.all([
     admin
       .from('demos')
-      .select('id, status, map, match_date, created_at, opponent_slug')
+      .select('id, status, map, match_date, created_at, opponent_slug, faceit_match_id')
       .eq('team_id', teamId)
       .eq('opponent_slug', folder.opponent_slug)
       .eq('demo_type', 'opponent')
@@ -347,6 +347,7 @@ export default async function OpponentPage({
                 teamId={teamId}
                 opponentName={folder.opponent_display_name}
                 isOwnerOrAdmin={isOwnerOrAdmin}
+                uploadedMatchIds={(demos ?? []).map(d => d.faceit_match_id).filter((x): x is string => !!x)}
               />
             )}
             <div className="rv-panel overflow-hidden">
